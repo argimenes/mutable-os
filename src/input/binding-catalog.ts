@@ -2,6 +2,7 @@ import { BindingRegistry, chord, keyboard as k, mouse, type Trigger } from "./bi
 
 export function registerInputActions(registry: BindingRegistry, platform = typeof navigator === "undefined" ? "" : navigator.platform) {
   const add = (id: string, name: string, description: string, category: string, scope: string, defaults: Trigger[], tags: string[] = []) => registry.register({ id, name, description, category, scope, defaults, tags, handler: context => context.run(id) });
+  add("character.initialis.apply", "Apply Initialis", "Decorate one selected uppercase Latin character with the bundled Initialis preset.", "Annotations", "editor/standoff", [chord(k(";", "Ctrl"), k("i"))]);
   const primary = /Mac|iPhone|iPad|iPod/i.test(platform) ? "Meta" : "Ctrl";
   add("text.selectAll", "Select Block, then Document text", "Select the active TextBlock; repeat with the whole Block selected to select visible text in this Document.", "Text Selection", "document-select-all", [k("a", "Meta"), k("a", "Ctrl")]);
   add("find.open", "Find in document", "Find text recursively in the current Page, Container, or Document.", "Find", "document-find-open", [k("f", primary)]);

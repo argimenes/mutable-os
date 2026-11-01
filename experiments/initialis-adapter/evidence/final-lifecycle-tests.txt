@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /Users/iianneill/Documents/GitHub/speedy-ts-reactive
+
+ ✓ src/features/initialis/initialis.test.ts (13 tests) 95ms
+ ✓ src/rendering/character-surface.test.tsx (27 tests) 2191ms
+
+ Test Files  2 passed (2)
+      Tests  40 passed (40)
+   Start at  23:19:17
+   Duration  7.41s (transform 3.48s, setup 0ms, collect 5.98s, tests 2.29s, environment 1.22s, prepare 116ms)
+

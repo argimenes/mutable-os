@@ -1,0 +1,1166 @@
+{
+  "direct": {
+    "painted": [
+      {
+        "name": "native-leading-caret",
+        "x": 294.5,
+        "target": 294
+      },
+      {
+        "name": "native-pointer-leading",
+        "x": 294.5,
+        "target": 294
+      },
+      {
+        "name": "native-pointer-trailing",
+        "x": 341.5,
+        "target": 342
+      },
+      {
+        "name": "paragraph-end-leading",
+        "x": 303.5,
+        "target": 303.296875
+      },
+      {
+        "name": "paragraph-end-trailing",
+        "x": 350.5,
+        "target": 351.296875
+      },
+      {
+        "name": "line-end-leading",
+        "x": 303.5,
+        "target": 303.296875
+      },
+      {
+        "name": "line-end-trailing",
+        "x": 350.5,
+        "target": 351.296875
+      }
+    ],
+    "handlers": {
+      "plain": {
+        "handlerMs": {
+          "n": 60,
+          "median": 6.4000000059604645,
+          "p95": 10.5
+        },
+        "afterQueuedCaretMs": {
+          "n": 60,
+          "median": 8.399999991059303,
+          "p95": 13.299999997019768
+        },
+        "caretExecutionMs": {
+          "n": 60,
+          "median": 1.9000000059604645,
+          "p95": 3.5
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 16.700000002980232,
+          "p95": 18.200000002980232
+        }
+      },
+      "spacing": {
+        "handlerMs": {
+          "n": 60,
+          "median": 6.5999999940395355,
+          "p95": 9.799999997019768
+        },
+        "afterQueuedCaretMs": {
+          "n": 60,
+          "median": 8.700000002980232,
+          "p95": 12.599999994039536
+        },
+        "caretExecutionMs": {
+          "n": 60,
+          "median": 2,
+          "p95": 2.3999999910593033
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 16.69999999552965,
+          "p95": 17.5
+        }
+      }
+    },
+    "batches": [
+      {
+        "variant": "plain",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "spacing",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 16
+        }
+      },
+      {
+        "variant": "plain",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "spacing",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "plain",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "spacing",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 16
+        }
+      }
+    ],
+    "unrelated": {
+      "documents": 2,
+      "characters": 10200,
+      "annotations": 162
+    },
+    "extended": {
+      "checks": [
+        {
+          "name": "font advance",
+          "passed": true
+        },
+        {
+          "name": "zoom advance",
+          "passed": true
+        },
+        {
+          "name": "scale advance",
+          "passed": true
+        },
+        {
+          "name": "narrow advance",
+          "passed": true
+        },
+        {
+          "name": "hidden fallback",
+          "passed": true
+        },
+        {
+          "name": "late font advance",
+          "passed": true
+        },
+        {
+          "name": "font/layout work keeps original Text",
+          "passed": true
+        },
+        {
+          "name": "font/layout work makes no canonical edit",
+          "passed": true
+        },
+        {
+          "name": "scrolling keeps native advance",
+          "passed": true
+        },
+        {
+          "name": "missing ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "conflict ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "rtl ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "rotation ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "mixed bidi fallback",
+          "passed": true
+        },
+        {
+          "name": "mixed bidi removal restores surface",
+          "passed": true
+        },
+        {
+          "name": "native envelope round-trip",
+          "passed": true
+        },
+        {
+          "name": "native reopen text and property",
+          "passed": true
+        },
+        {
+          "name": "native reopen surface mounted",
+          "passed": true
+        },
+        {
+          "name": "nested shared surface and occurrence identity",
+          "passed": true
+        },
+        {
+          "name": "shared canonical edit in both occurrences",
+          "passed": true
+        },
+        {
+          "name": "shared edit retains both mounted cells",
+          "passed": true
+        },
+        {
+          "name": "shared edit Undo",
+          "passed": true
+        },
+        {
+          "name": "nested disposal cleans its surface only",
+          "passed": true
+        },
+        {
+          "name": "nested remount restores surface",
+          "passed": true
+        }
+      ],
+      "geometries": [
+        {
+          "name": "font",
+          "native": 341.984375,
+          "right": 342,
+          "delta": 0.015625
+        },
+        {
+          "name": "zoom",
+          "native": 353.984375,
+          "right": 354,
+          "delta": 0.015625
+        },
+        {
+          "name": "scale",
+          "native": 351.58123779296875,
+          "right": 351.6000061035156,
+          "delta": 0.018768310546875
+        },
+        {
+          "name": "narrow",
+          "native": 341.984375,
+          "right": 342,
+          "delta": 0.015625
+        }
+      ]
+    },
+    "boundaries": [
+      {
+        "mode": "paragraph-end",
+        "before": {
+          "logical": {
+            "anchor": 1,
+            "head": 1
+          },
+          "rect": {
+            "x": 303.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          }
+        },
+        "after": {
+          "logical": {
+            "anchor": 2,
+            "head": 2
+          },
+          "rect": {
+            "x": 351.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          }
+        },
+        "clip": {
+          "x": 298,
+          "y": 429,
+          "width": 65,
+          "height": 65,
+          "scale": 3
+        }
+      },
+      {
+        "mode": "line-end",
+        "before": {
+          "logical": {
+            "anchor": 1,
+            "head": 1
+          },
+          "rect": {
+            "x": 303.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          },
+          "next": 483.140625
+        },
+        "after": {
+          "logical": {
+            "anchor": 2,
+            "head": 2
+          },
+          "rect": {
+            "x": 351.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          },
+          "next": 483.140625
+        },
+        "clip": {
+          "x": 298,
+          "y": 429,
+          "width": 65,
+          "height": 65,
+          "scale": 3
+        }
+      }
+    ],
+    "browser": "Chrome/156.0.8078.76",
+    "interactionChecks": 96,
+    "allPassed": true,
+    "activationMs": {
+      "n": 6,
+      "median": 33.3500000089407,
+      "p95": 46.69999998807907
+    },
+    "performance": {
+      "plain": {
+        "eventTimingMs": {
+          "n": 60,
+          "median": 16,
+          "p95": 24
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 14.799999997019768,
+          "p95": 16.200000002980232
+        },
+        "keydownProcessingMs": {
+          "n": 60,
+          "median": 4.600000001490116,
+          "p95": 11.699999988079071
+        },
+        "counts": [
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      },
+      "spacing": {
+        "eventTimingMs": {
+          "n": 60,
+          "median": 16,
+          "p95": 24
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 14.799999997019768,
+          "p95": 16.19999998807907
+        },
+        "keydownProcessingMs": {
+          "n": 60,
+          "median": 4.600000001490116,
+          "p95": 10.700000002980232
+        },
+        "counts": [
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      }
+    },
+    "geometry": {
+      "cell": {
+        "x": 294,
+        "y": 327.546875,
+        "w": 48,
+        "h": 48
+      },
+      "nativeRange": {
+        "x": 341.984375,
+        "y": 342.546875,
+        "w": 0,
+        "h": 17
+      },
+      "paintedCaretX": 341.5,
+      "paintedCaretBoundsAt3x": {
+        "left": 156,
+        "right": 158,
+        "top": 63,
+        "bottom": 113
+      },
+      "selectionBlueHeightCSSPx": 45.666666666666664
+    },
+    "matrix": [
+      {
+        "variant": "spacing",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 48,
+          "h": 17
+        }
+      }
+    ],
+    "clipboard": {
+      "checks": [
+        {
+          "name": "copy source once",
+          "passed": true
+        },
+        {
+          "name": "plain paste",
+          "passed": true
+        },
+        {
+          "name": "plain paste undo",
+          "passed": true
+        },
+        {
+          "name": "rich paste",
+          "passed": true
+        },
+        {
+          "name": "rich paste undo",
+          "passed": true
+        }
+      ],
+      "types": [
+        "text/plain",
+        "text/html",
+        "application/x-mutable-fragment+json"
+      ],
+      "plain": "BUO"
+    },
+    "imePreedit": true
+  },
+  "solid": {
+    "painted": [
+      {
+        "name": "native-leading-caret",
+        "x": 294.5,
+        "target": 294
+      },
+      {
+        "name": "native-pointer-leading",
+        "x": 294.5,
+        "target": 294
+      },
+      {
+        "name": "native-pointer-trailing",
+        "x": 341.5,
+        "target": 342
+      },
+      {
+        "name": "paragraph-end-leading",
+        "x": 303.5,
+        "target": 303.296875
+      },
+      {
+        "name": "paragraph-end-trailing",
+        "x": 350.5,
+        "target": 351.296875
+      },
+      {
+        "name": "line-end-leading",
+        "x": 303.5,
+        "target": 303.296875
+      },
+      {
+        "name": "line-end-trailing",
+        "x": 350.5,
+        "target": 351.296875
+      }
+    ],
+    "handlers": {
+      "plain": {
+        "handlerMs": {
+          "n": 60,
+          "median": 7.75,
+          "p95": 8.5
+        },
+        "afterQueuedCaretMs": {
+          "n": 60,
+          "median": 9.799999997019768,
+          "p95": 10.599999994039536
+        },
+        "caretExecutionMs": {
+          "n": 60,
+          "median": 1.9000000059604645,
+          "p95": 2.0999999940395355
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 16.69999999552965,
+          "p95": 17.599999994039536
+        }
+      },
+      "spacing": {
+        "handlerMs": {
+          "n": 60,
+          "median": 7.749999992549419,
+          "p95": 8.600000008940697
+        },
+        "afterQueuedCaretMs": {
+          "n": 60,
+          "median": 9.649999998509884,
+          "p95": 10.599999994039536
+        },
+        "caretExecutionMs": {
+          "n": 60,
+          "median": 1.8999999910593033,
+          "p95": 2.1000000089406967
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 16.600000008940697,
+          "p95": 17.5
+        }
+      }
+    },
+    "batches": [
+      {
+        "variant": "plain",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "spacing",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "plain",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "spacing",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "plain",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      },
+      {
+        "variant": "spacing",
+        "eventTimingMs": {
+          "n": 20,
+          "median": 16,
+          "p95": 24
+        }
+      }
+    ],
+    "unrelated": {
+      "documents": 2,
+      "characters": 10200,
+      "annotations": 162
+    },
+    "extended": {
+      "checks": [
+        {
+          "name": "font advance",
+          "passed": true
+        },
+        {
+          "name": "zoom advance",
+          "passed": true
+        },
+        {
+          "name": "scale advance",
+          "passed": true
+        },
+        {
+          "name": "narrow advance",
+          "passed": true
+        },
+        {
+          "name": "hidden fallback",
+          "passed": true
+        },
+        {
+          "name": "late font advance",
+          "passed": true
+        },
+        {
+          "name": "font/layout work keeps original Text",
+          "passed": true
+        },
+        {
+          "name": "font/layout work makes no canonical edit",
+          "passed": true
+        },
+        {
+          "name": "scrolling keeps native advance",
+          "passed": true
+        },
+        {
+          "name": "missing ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "conflict ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "rtl ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "rotation ordinary-text fallback",
+          "passed": true
+        },
+        {
+          "name": "mixed bidi fallback",
+          "passed": true
+        },
+        {
+          "name": "mixed bidi removal restores surface",
+          "passed": true
+        },
+        {
+          "name": "native envelope round-trip",
+          "passed": true
+        },
+        {
+          "name": "native reopen text and property",
+          "passed": true
+        },
+        {
+          "name": "native reopen surface mounted",
+          "passed": true
+        },
+        {
+          "name": "nested shared surface and occurrence identity",
+          "passed": true
+        },
+        {
+          "name": "shared canonical edit in both occurrences",
+          "passed": true
+        },
+        {
+          "name": "shared edit retains both mounted cells",
+          "passed": true
+        },
+        {
+          "name": "shared edit Undo",
+          "passed": true
+        },
+        {
+          "name": "nested disposal cleans its surface only",
+          "passed": true
+        },
+        {
+          "name": "nested remount restores surface",
+          "passed": true
+        }
+      ],
+      "geometries": [
+        {
+          "name": "font",
+          "native": 341.984375,
+          "right": 342,
+          "delta": 0.015625
+        },
+        {
+          "name": "zoom",
+          "native": 353.984375,
+          "right": 354,
+          "delta": 0.015625
+        },
+        {
+          "name": "scale",
+          "native": 351.58123779296875,
+          "right": 351.6000061035156,
+          "delta": 0.018768310546875
+        },
+        {
+          "name": "narrow",
+          "native": 341.984375,
+          "right": 342,
+          "delta": 0.015625
+        }
+      ]
+    },
+    "boundaries": [
+      {
+        "mode": "paragraph-end",
+        "before": {
+          "logical": {
+            "anchor": 1,
+            "head": 1
+          },
+          "rect": {
+            "x": 303.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          }
+        },
+        "after": {
+          "logical": {
+            "anchor": 2,
+            "head": 2
+          },
+          "rect": {
+            "x": 351.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          }
+        },
+        "clip": {
+          "x": 298,
+          "y": 429,
+          "width": 65,
+          "height": 65,
+          "scale": 3
+        }
+      },
+      {
+        "mode": "line-end",
+        "before": {
+          "logical": {
+            "anchor": 1,
+            "head": 1
+          },
+          "rect": {
+            "x": 303.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          },
+          "next": 483.140625
+        },
+        "after": {
+          "logical": {
+            "anchor": 2,
+            "head": 2
+          },
+          "rect": {
+            "x": 351.28125,
+            "y": 449.140625,
+            "w": 0,
+            "h": 17
+          },
+          "cell": {
+            "left": 303.296875,
+            "right": 351.296875,
+            "top": 434.140625,
+            "bottom": 482.140625
+          },
+          "next": 483.140625
+        },
+        "clip": {
+          "x": 298,
+          "y": 429,
+          "width": 65,
+          "height": 65,
+          "scale": 3
+        }
+      }
+    ],
+    "browser": "Chrome/156.0.8078.76",
+    "interactionChecks": 96,
+    "allPassed": true,
+    "activationMs": {
+      "n": 6,
+      "median": 33.600000001490116,
+      "p95": 42.70000000298023
+    },
+    "performance": {
+      "plain": {
+        "eventTimingMs": {
+          "n": 60,
+          "median": 16,
+          "p95": 24
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 14.900000005960464,
+          "p95": 16.200000002980232
+        },
+        "keydownProcessingMs": {
+          "n": 60,
+          "median": 5.6500000059604645,
+          "p95": 11.900000005960464
+        },
+        "counts": [
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      },
+      "spacing": {
+        "eventTimingMs": {
+          "n": 60,
+          "median": 16,
+          "p95": 24
+        },
+        "firstFrameMs": {
+          "n": 60,
+          "median": 14.900000005960464,
+          "p95": 16.19999998807907
+        },
+        "keydownProcessingMs": {
+          "n": 60,
+          "median": 5.6500000059604645,
+          "p95": 11.700000002980232
+        },
+        "counts": [
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "paragraphTextWalks": 0,
+            "fullValidation": 0,
+            "broadPlanning": 0,
+            "unrelatedGeometry": 0,
+            "unrelatedMutations": 0,
+            "workers": 0,
+            "requests": 0,
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      }
+    },
+    "geometry": {
+      "cell": {
+        "x": 294,
+        "y": 327.546875,
+        "w": 48,
+        "h": 48
+      },
+      "nativeRange": {
+        "x": 341.984375,
+        "y": 342.546875,
+        "w": 0,
+        "h": 17
+      },
+      "paintedCaretX": 341.5,
+      "paintedCaretBoundsAt3x": {
+        "left": 156,
+        "right": 158,
+        "top": 63,
+        "bottom": 113
+      },
+      "selectionBlueHeightCSSPx": 45.666666666666664
+    },
+    "matrix": [
+      {
+        "variant": "spacing",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 48,
+          "h": 17
+        }
+      }
+    ],
+    "clipboard": {
+      "checks": [
+        {
+          "name": "copy source once",
+          "passed": true
+        },
+        {
+          "name": "plain paste",
+          "passed": true
+        },
+        {
+          "name": "plain paste undo",
+          "passed": true
+        },
+        {
+          "name": "rich paste",
+          "passed": true
+        },
+        {
+          "name": "rich paste undo",
+          "passed": true
+        }
+      ],
+      "types": [
+        "text/plain",
+        "text/html",
+        "application/x-mutable-fragment+json"
+      ],
+      "plain": "BUO"
+    },
+    "imePreedit": true
+  }
+}

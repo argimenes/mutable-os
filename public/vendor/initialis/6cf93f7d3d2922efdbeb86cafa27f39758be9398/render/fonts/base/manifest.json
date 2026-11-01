@@ -1,0 +1,13 @@
+[
+  {
+    "slug": "cormorant-garamond",
+    "name": "Cormorant Garamond",
+    "group": "roman",
+    "note": "display Garamond, sharp and light",
+    "license": "OFL",
+    "files": {
+      "700": "cormorant-garamond-700.ttf"
+    },
+    "caps": true
+  }
+]

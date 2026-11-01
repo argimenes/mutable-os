@@ -149,3 +149,20 @@ it.each([false,true])('tracks list wrapping without snapshots and saves list/Und
  const literal=f.make();await literal.service.open(location);
  expect(nativeText(captureNative(literal.editor.repository.readState(),id))).toBe(nativeText(captureNative(editor.repository.readState(),id)));
 });
+
+it('marks Initialis authoring dirty without saving, and persists full settings on manual Save',async()=>{
+ const f=await host(),{editor,service}=f.make(),location={folder:'.',filename:'rich.mutable.json'};
+ const id=await service.open(location),view=editor.createView('initialis-save-proof');
+ const node=Object.values(view.state.nodes).find(n=>n.viewType==='standoff-editor-block'&&n.inlineContent.some(k=>/^[A-Z]$/.test(String(view.state.nodes[k]?.payload.text))))!;
+ const index=node.inlineContent.findIndex(k=>/^[A-Z]$/.test(String(view.state.nodes[k]?.payload.text)));
+ const before=await fs.readFile(path.join(f.root,location.filename),'utf8');expect(service.isDirty(id)).toBe(false);
+ const snapshot=vi.spyOn(editor.repository,'snapshot');
+ expect(editor.initialis.apply(node.key,{anchor:index,head:index+1})).toBe(true);
+ expect(snapshot).not.toHaveBeenCalled();expect(service.isDirty(id)).toBe(true);expect(await fs.readFile(path.join(f.root,location.filename),'utf8')).toBe(before);
+ expect(editor.initialis.service.stats.workersStarted).toBe(0);snapshot.mockRestore();
+ expect(await service.save(id)).toMatchObject({phase:'saved',dirty:false});
+ const fresh=f.make();await fresh.service.open(location);
+ const properties=Object.values(fresh.editor.repository.readState().contents).flatMap(c=>(c.payload.standoffProperties??[]) as any[]),property=properties.find(p=>p.type==='style/character-surface');
+ expect(property.metadata.renderer).toBe('initialis');expect(Object.keys(property.metadata.settings)).toHaveLength(156);expect(property.metadata.settings).not.toHaveProperty('text');
+ expect((await fs.readdir(f.root)).filter(name=>name.endsWith('.md'))).toEqual(['import.md']);
+});

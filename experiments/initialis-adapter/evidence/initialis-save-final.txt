@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /Users/iianneill/Documents/GitHub/speedy-ts-reactive
+
+ ✓ src/persistence/native-session.test.ts (15 tests | 14 skipped) 304ms
+   ✓ marks Initialis authoring dirty without saving, and persists full settings on manual Save 303ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 14 skipped (15)
+   Start at  23:14:27
+   Duration  4.28s (transform 1.78s, setup 0ms, collect 2.60s, tests 304ms, environment 583ms, prepare 111ms)
+

@@ -1,3 +1,4 @@
+import { CharacterSurfaceHost, type CharacterSurfaceRequest } from './character-surface-host';
 import { TaskControl, StandaloneTaskDisclosure } from './task-control';
 import { taskState } from '../runtime/tasks';
 import { managedAsset } from '../interchange/managed-asset';
@@ -84,6 +85,9 @@ function rangeFragments(
   if (!cells.length) return [];
   const startCell = cells[Math.max(0, Math.min(start, cells.length - 1))];
   const endCell = cells[Math.max(0, Math.min(endInclusive, cells.length - 1))];
+  // Exact single-Cell decorations use the same visual box as the surface.
+  // Mixed text/surface ranges retain the established policy for this increment.
+  if(startCell===endCell&&startCell.hasAttribute('data-character-surface'))return [localFragment(startCell.getBoundingClientRect(),surface.getBoundingClientRect(),surface,scale)];
   const startNode = startCell.firstChild ?? startCell;
   const endNode = endCell.firstChild ?? endCell;
   const range = document.createRange();
@@ -401,6 +405,7 @@ export function StandoffEditorView(props: BlockViewProps) {
   let searchVisible = true;
   let frame = 0;
   let disposed = false;
+  let characterHost: CharacterSurfaceHost | undefined;
   const [highlighterShapes, setHighlighterShapes] = createSignal<DecorationShape[]>([]);
   const [foregroundShapes, setForegroundShapes] = createSignal<DecorationShape[]>([]);
   const [regionEffects, setRegionEffects] = createSignal<RegionEffect[]>([]);
@@ -450,6 +455,7 @@ export function StandoffEditorView(props: BlockViewProps) {
   const measure = () => {
     frame = 0;
     if(disposed || !editor.visualEffects.alive() || activity && !activity().visible)return;
+    characterHost?.measure();
     const scale = coordinates?.scale() ?? 1;
     const foreground: DecorationShape[] = [];
     const occupied: UnderlineLane[] = [];
@@ -580,6 +586,32 @@ export function StandoffEditorView(props: BlockViewProps) {
   const onCandidateScroll = () => { if (searchVisible && (editor.decorations.nodes[props.nodeKey] ?? []).some(d => d.excludable)) scheduleMeasure(); };
 
   onMount(() => {
+    if(editor.features.inlineCharacterSurfaces) createEffect(()=>{
+      const sources=rendering.surfaces();
+      const owner=node();
+      const requests:CharacterSurfaceRequest[]=[];
+      if(!draft())for(const item of sources){
+        const {start,end,key}=item.source;
+        if(end!==start+1||!Number.isInteger(start)||sources.some(other=>other!==item&&other.source.start<end+1&&other.source.end>start-1))continue;
+        if(item.bindings.length!==1)continue;
+        const binding=item.bindings[0],renderer=binding.renderer;
+        if(renderer.target!=='character-surface')continue;
+        const cellKey=owner?.inlineContent[start],cell=cellKey?projection.state.nodes[cellKey]:undefined;
+        const text=String(cell?.payload.text??'');
+        const nextKey=owner?.inlineContent[end],next=String(nextKey?projection.state.nodes[nextKey]?.payload.text??'':'');
+        // A combining continuation is not a single-Cell grapheme.
+        if(cell?.viewType!=='text-cell'||! /^[A-Z]$/.test(text)||/^[\p{Mark}\u200c\u200d\u202a-\u202e\u2066-\u2069]/u.test(next))continue;
+        if(concealedRanges().some(r=>hasActiveRange(r.annotation)&&r.annotation.start<=start&&r.annotation.end>=start)||superpositions().some(r=>r.active!=='source'&&r.start<=start&&r.end>=start))continue;
+        const element=flow.children[start] as HTMLElement|undefined;
+        if(!element||element.dataset.inlineKey!==cellKey)continue;
+        requests.push({identity:key,cell:element,text,renderer,params:binding.params()});
+      }
+      untrack(()=>{
+        if(!requests.length){characterHost?.dispose();characterHost=undefined;return;}
+        characterHost??=new CharacterSurfaceHost(flow,scheduleMeasure);
+        characterHost.update(requests);
+      });
+    });
     document.addEventListener("scroll",onCandidateScroll,true);
     disposeMount = editor.mounts.register(props.nodeKey, {
       root,
@@ -682,6 +714,7 @@ export function StandoffEditorView(props: BlockViewProps) {
     if(!projection.state.nodes[props.nodeKey])editor.decorations.removeOccurrence(props.nodeKey);
     document.removeEventListener("scroll",onCandidateScroll,true);
     if (editor.crossText.segments[props.nodeKey]) queueMicrotask(() => editor.crossText.validate());
+    characterHost?.dispose();
     caretSurface?.dispose();
     editor.measurements.releaseCaret(props.nodeKey);
     disposeMount?.();

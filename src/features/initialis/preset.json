@@ -1,0 +1,1688 @@
+{
+  "revision": "6cf93f7d3d2922efdbeb86cafa27f39758be9398",
+  "schemaVersion": 1,
+  "assetVersion": "6cf93f7d3d2922efdbeb86cafa27f39758be9398-subset-1",
+  "defaults": {
+    "font": "cormorant-garamond-700",
+    "size": 0.66,
+    "dx": 0,
+    "dy": 0,
+    "lLayout": "row",
+    "tracking": -0.05,
+    "lWeave": "none",
+    "lWeaveGap": 6,
+    "lWeaveFlip": false,
+    "embolden": 0,
+    "lInflate": 0,
+    "lBlob": 0,
+    "lBlobWeight": 1.3,
+    "lBlobPart": 30,
+    "lBlobCounter": 40,
+    "lBlobFillet": 0.25,
+    "lBlobRoom": 30,
+    "letterGap": 12,
+    "lFill": "paper",
+    "lPattern": "hatch",
+    "lPatScale": 8,
+    "lPatAngle": 45,
+    "lPatW": 1.4,
+    "lPatColor": "A",
+    "lPatBg": "paper",
+    "lSplit": "wave",
+    "lSplitPos": 0,
+    "lSplitFreq": 3,
+    "lSplitGap": 4,
+    "lSplitA": "B",
+    "lSplitB": "C",
+    "lFil": "none",
+    "lFilScale": 1,
+    "lFilInset": 5,
+    "lFilColor": "auto",
+    "lInline": 0,
+    "lInlineOff": 7,
+    "lInlineColor": "auto",
+    "lOutline": 0,
+    "lOutlineColor": "A",
+    "lEcho": 0,
+    "lEchoGap": 10,
+    "lEchoW": 1.4,
+    "lEchoStyle": "line",
+    "lEchoColor": "A",
+    "lHalo": 0,
+    "lHaloColor": "paper",
+    "lShadow": "none",
+    "lShadowLen": 18,
+    "lShadowAngle": 45,
+    "lShadowFill": "solid",
+    "lShadowColor": "A",
+    "frame": "rect",
+    "fMargin": 40,
+    "fRules": 2,
+    "fW1": 12,
+    "fGap": 8,
+    "fW2": 2.5,
+    "fRuleStyle": "solid",
+    "fRuleColor": "A",
+    "fBand": "none",
+    "fBorder": "none",
+    "fField": "A",
+    "fPattern": "none",
+    "fPatScale": 7,
+    "fPatAngle": 0,
+    "fPatW": 1.2,
+    "fPatColor": "paper",
+    "fShadow": 0,
+    "fShadowAngle": 45,
+    "fShadowStyle": "line",
+    "fShadowColor": "A",
+    "fCorner": "none",
+    "fCornerSize": 22,
+    "fCornerColor": "auto",
+    "orn": "grow",
+    "seed": 1,
+    "oRegion": "field",
+    "oHalo": 140,
+    "oSeeds": "gaps",
+    "oSeedCount": 3,
+    "oSym": "none",
+    "oDensity": 0.75,
+    "oSprout": 0.85,
+    "oMargin": 7,
+    "oStemStyle": "solid",
+    "oStemW": 9,
+    "oTaper": 0.55,
+    "oCurl": 0.65,
+    "oTurns": 1.1,
+    "oUndulate": 0,
+    "oWander": 0.25,
+    "oLength": 1,
+    "oBranch": 0.5,
+    "oDepth": 3,
+    "oThin": 0.5,
+    "oBranchAngle": 40,
+    "oTerminal": "flower",
+    "oLeaf": "acanthus",
+    "oLeafSize": 1,
+    "oLeafEvery": 0.55,
+    "oLeafW": 0.55,
+    "oLobes": 4,
+    "oLobeDepth": 0.45,
+    "oSerr": 0,
+    "oLeafCurl": 0.4,
+    "oLeafAngle": 45,
+    "oLeafSide": "alt",
+    "oFillLeaves": true,
+    "oFlower": "rosette",
+    "oFlowerChance": 0.3,
+    "oFlowerSize": 1,
+    "oPetals": 6,
+    "oBerries": 0.4,
+    "oBerrySize": 1,
+    "oDots": 0.5,
+    "oBeads": 0,
+    "oFill": "paper",
+    "oStroke": "none",
+    "oStrokeW": 1.5,
+    "oDetail": "veins",
+    "oDetailW": 1.6,
+    "oDetailColor": "auto",
+    "oContrast": 0,
+    "oPenAngle": 35,
+    "tKind": "none",
+    "tWhere": "gaps",
+    "tScale": 9,
+    "tSize": 2.4,
+    "tGap": 4,
+    "tGrade": 0,
+    "tShape": "dot",
+    "tBubble": "solid",
+    "tCell": "pebble",
+    "tTruchet": "arcs",
+    "tCoral": "coral",
+    "tTwist": 0.3,
+    "tColor": "auto",
+    "wobble": 0,
+    "wobbleScale": 70,
+    "sketch": 1,
+    "rough": 0.2,
+    "roughScale": 14,
+    "spread": 0,
+    "bleed": 0,
+    "edge": 0.15,
+    "edgeScale": 6,
+    "speckle": 0,
+    "dirt": 0,
+    "mottle": 0.08,
+    "grain": 0.4,
+    "misreg": 0,
+    "paper": "#f3eee3",
+    "inkA": "#1a1614",
+    "inkB": "#b3301e",
+    "inkC": "#2c4a8c"
+  },
+  "schema": [
+    {
+      "key": "font",
+      "default": "cormorant-garamond-700",
+      "spec": "font"
+    },
+    {
+      "key": "size",
+      "default": 0.66,
+      "spec": [
+        0.2,
+        1.3,
+        0.01
+      ]
+    },
+    {
+      "key": "dx",
+      "default": 0,
+      "spec": [
+        -0.35,
+        0.35,
+        0.005
+      ]
+    },
+    {
+      "key": "dy",
+      "default": 0,
+      "spec": [
+        -0.35,
+        0.35,
+        0.005
+      ]
+    },
+    {
+      "key": "lLayout",
+      "default": "row",
+      "spec": [
+        "row",
+        "stack"
+      ]
+    },
+    {
+      "key": "tracking",
+      "default": -0.05,
+      "spec": [
+        -0.6,
+        0.4,
+        0.01
+      ]
+    },
+    {
+      "key": "lWeave",
+      "default": "none",
+      "spec": [
+        "none",
+        "stack",
+        "weave"
+      ]
+    },
+    {
+      "key": "lWeaveGap",
+      "default": 6,
+      "spec": [
+        0,
+        30,
+        0.5
+      ]
+    },
+    {
+      "key": "lWeaveFlip",
+      "default": false,
+      "spec": "bool"
+    },
+    {
+      "key": "embolden",
+      "default": 0,
+      "spec": [
+        -6,
+        24,
+        0.5
+      ]
+    },
+    {
+      "key": "lInflate",
+      "default": 0,
+      "spec": [
+        0,
+        40,
+        0.5
+      ]
+    },
+    {
+      "key": "lBlob",
+      "default": 0,
+      "spec": [
+        0,
+        6,
+        0.05
+      ]
+    },
+    {
+      "key": "lBlobWeight",
+      "default": 1.3,
+      "spec": [
+        0.4,
+        3,
+        0.01
+      ]
+    },
+    {
+      "key": "lBlobPart",
+      "default": 30,
+      "spec": [
+        0,
+        120,
+        1
+      ]
+    },
+    {
+      "key": "lBlobCounter",
+      "default": 40,
+      "spec": [
+        0,
+        120,
+        1
+      ]
+    },
+    {
+      "key": "lBlobFillet",
+      "default": 0.25,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "lBlobRoom",
+      "default": 30,
+      "spec": [
+        0,
+        200,
+        1
+      ]
+    },
+    {
+      "key": "letterGap",
+      "default": 12,
+      "spec": [
+        0,
+        80,
+        1
+      ]
+    },
+    {
+      "key": "lFill",
+      "default": "paper",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper",
+        "none",
+        "pattern",
+        "split"
+      ]
+    },
+    {
+      "key": "lPattern",
+      "default": "hatch",
+      "spec": [
+        "hatch",
+        "cross",
+        "waves",
+        "dots",
+        "stipple",
+        "checker",
+        "diaper",
+        "scales",
+        "rays",
+        "rings",
+        "grid",
+        "seigaiha",
+        "asanoha",
+        "kikko",
+        "shippo",
+        "frets",
+        "ice",
+        "contour",
+        "engrave",
+        "halftone",
+        "mosaic",
+        "wash",
+        "frost",
+        "mycelium"
+      ]
+    },
+    {
+      "key": "lPatScale",
+      "default": 8,
+      "spec": [
+        2,
+        40,
+        0.5
+      ]
+    },
+    {
+      "key": "lPatAngle",
+      "default": 45,
+      "spec": [
+        0,
+        180,
+        1
+      ]
+    },
+    {
+      "key": "lPatW",
+      "default": 1.4,
+      "spec": [
+        0.3,
+        8,
+        0.1
+      ]
+    },
+    {
+      "key": "lPatColor",
+      "default": "A",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lPatBg",
+      "default": "paper",
+      "spec": [
+        "none",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lSplit",
+      "default": "wave",
+      "spec": [
+        "straight",
+        "wave",
+        "zigzag",
+        "meander"
+      ]
+    },
+    {
+      "key": "lSplitPos",
+      "default": 0,
+      "spec": [
+        -0.3,
+        0.3,
+        0.01
+      ]
+    },
+    {
+      "key": "lSplitFreq",
+      "default": 3,
+      "spec": [
+        1,
+        12,
+        0.5
+      ]
+    },
+    {
+      "key": "lSplitGap",
+      "default": 4,
+      "spec": [
+        0,
+        16,
+        0.25
+      ]
+    },
+    {
+      "key": "lSplitA",
+      "default": "B",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lSplitB",
+      "default": "C",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lFil",
+      "default": "none",
+      "spec": [
+        "none",
+        "scroll",
+        "leafy",
+        "beads"
+      ]
+    },
+    {
+      "key": "lFilScale",
+      "default": 1,
+      "spec": [
+        0.4,
+        2.5,
+        0.05
+      ]
+    },
+    {
+      "key": "lFilInset",
+      "default": 5,
+      "spec": [
+        1,
+        30,
+        0.5
+      ]
+    },
+    {
+      "key": "lFilColor",
+      "default": "auto",
+      "spec": [
+        "auto",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lInline",
+      "default": 0,
+      "spec": [
+        0,
+        10,
+        0.25
+      ]
+    },
+    {
+      "key": "lInlineOff",
+      "default": 7,
+      "spec": [
+        1,
+        40,
+        0.5
+      ]
+    },
+    {
+      "key": "lInlineColor",
+      "default": "auto",
+      "spec": [
+        "auto",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lOutline",
+      "default": 0,
+      "spec": [
+        0,
+        14,
+        0.25
+      ]
+    },
+    {
+      "key": "lOutlineColor",
+      "default": "A",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lEcho",
+      "default": 0,
+      "spec": [
+        0,
+        5,
+        1
+      ]
+    },
+    {
+      "key": "lEchoGap",
+      "default": 10,
+      "spec": [
+        2,
+        40,
+        0.5
+      ]
+    },
+    {
+      "key": "lEchoW",
+      "default": 1.4,
+      "spec": [
+        0.3,
+        8,
+        0.1
+      ]
+    },
+    {
+      "key": "lEchoStyle",
+      "default": "line",
+      "spec": [
+        "line",
+        "dots",
+        "dashes"
+      ]
+    },
+    {
+      "key": "lEchoColor",
+      "default": "A",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lHalo",
+      "default": 0,
+      "spec": [
+        0,
+        40,
+        0.5
+      ]
+    },
+    {
+      "key": "lHaloColor",
+      "default": "paper",
+      "spec": [
+        "none",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "lShadow",
+      "default": "none",
+      "spec": [
+        "none",
+        "drop",
+        "extrude"
+      ]
+    },
+    {
+      "key": "lShadowLen",
+      "default": 18,
+      "spec": [
+        1,
+        90,
+        0.5
+      ]
+    },
+    {
+      "key": "lShadowAngle",
+      "default": 45,
+      "spec": [
+        0,
+        360,
+        5
+      ]
+    },
+    {
+      "key": "lShadowFill",
+      "default": "solid",
+      "spec": [
+        "solid",
+        "hatch",
+        "outline"
+      ]
+    },
+    {
+      "key": "lShadowColor",
+      "default": "A",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "frame",
+      "default": "rect",
+      "spec": [
+        "none",
+        "rect",
+        "rounded",
+        "circle",
+        "arch",
+        "pointed",
+        "shield",
+        "lozenge",
+        "octagon",
+        "quatrefoil",
+        "scallop"
+      ]
+    },
+    {
+      "key": "fMargin",
+      "default": 40,
+      "spec": [
+        0,
+        200,
+        1
+      ]
+    },
+    {
+      "key": "fRules",
+      "default": 2,
+      "spec": [
+        0,
+        3,
+        1
+      ]
+    },
+    {
+      "key": "fW1",
+      "default": 12,
+      "spec": [
+        0,
+        50,
+        0.5
+      ]
+    },
+    {
+      "key": "fGap",
+      "default": 8,
+      "spec": [
+        1,
+        60,
+        0.5
+      ]
+    },
+    {
+      "key": "fW2",
+      "default": 2.5,
+      "spec": [
+        0,
+        20,
+        0.25
+      ]
+    },
+    {
+      "key": "fRuleStyle",
+      "default": "solid",
+      "spec": [
+        "solid",
+        "double",
+        "beads",
+        "dashed"
+      ]
+    },
+    {
+      "key": "fRuleColor",
+      "default": "A",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "fBand",
+      "default": "none",
+      "spec": [
+        "none",
+        "beads",
+        "pearls",
+        "dots",
+        "dentil",
+        "zigzag",
+        "wave",
+        "rope",
+        "checker",
+        "laurel"
+      ]
+    },
+    {
+      "key": "fBorder",
+      "default": "none",
+      "spec": [
+        "none",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "fField",
+      "default": "A",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "fPattern",
+      "default": "none",
+      "spec": [
+        "none",
+        "hatch",
+        "cross",
+        "waves",
+        "dots",
+        "stipple",
+        "checker",
+        "diaper",
+        "scales",
+        "rays",
+        "rings",
+        "grid",
+        "seigaiha",
+        "asanoha",
+        "kikko",
+        "shippo",
+        "frets",
+        "ice",
+        "contour",
+        "engrave",
+        "halftone",
+        "mosaic",
+        "wash",
+        "frost",
+        "mycelium"
+      ]
+    },
+    {
+      "key": "fPatScale",
+      "default": 7,
+      "spec": [
+        2,
+        60,
+        0.5
+      ]
+    },
+    {
+      "key": "fPatAngle",
+      "default": 0,
+      "spec": [
+        0,
+        180,
+        1
+      ]
+    },
+    {
+      "key": "fPatW",
+      "default": 1.2,
+      "spec": [
+        0.3,
+        10,
+        0.1
+      ]
+    },
+    {
+      "key": "fPatColor",
+      "default": "paper",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "fShadow",
+      "default": 0,
+      "spec": [
+        0,
+        70,
+        0.5
+      ]
+    },
+    {
+      "key": "fShadowAngle",
+      "default": 45,
+      "spec": [
+        0,
+        360,
+        5
+      ]
+    },
+    {
+      "key": "fShadowStyle",
+      "default": "line",
+      "spec": [
+        "line",
+        "solid",
+        "hatch"
+      ]
+    },
+    {
+      "key": "fShadowColor",
+      "default": "A",
+      "spec": [
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "fCorner",
+      "default": "none",
+      "spec": [
+        "none",
+        "dots",
+        "rosettes",
+        "squares",
+        "quarter"
+      ]
+    },
+    {
+      "key": "fCornerSize",
+      "default": 22,
+      "spec": [
+        6,
+        70,
+        0.5
+      ]
+    },
+    {
+      "key": "fCornerColor",
+      "default": "auto",
+      "spec": [
+        "auto",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "orn",
+      "default": "grow",
+      "spec": [
+        "grow",
+        "none"
+      ]
+    },
+    {
+      "key": "seed",
+      "default": 1,
+      "spec": "seed"
+    },
+    {
+      "key": "oRegion",
+      "default": "field",
+      "spec": [
+        "field",
+        "halo",
+        "counters"
+      ]
+    },
+    {
+      "key": "oHalo",
+      "default": 140,
+      "spec": [
+        20,
+        400,
+        1
+      ]
+    },
+    {
+      "key": "oSeeds",
+      "default": "gaps",
+      "spec": [
+        "gaps",
+        "frame",
+        "corners",
+        "root",
+        "letter"
+      ]
+    },
+    {
+      "key": "oSeedCount",
+      "default": 3,
+      "spec": [
+        0,
+        12,
+        1
+      ]
+    },
+    {
+      "key": "oSym",
+      "default": "none",
+      "spec": [
+        "none",
+        "mirror"
+      ]
+    },
+    {
+      "key": "oDensity",
+      "default": 0.75,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oSprout",
+      "default": 0.85,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oMargin",
+      "default": 7,
+      "spec": [
+        1.5,
+        40,
+        0.5
+      ]
+    },
+    {
+      "key": "oStemStyle",
+      "default": "solid",
+      "spec": [
+        "solid",
+        "dotted",
+        "beaded",
+        "dashed",
+        "double",
+        "thorny"
+      ]
+    },
+    {
+      "key": "oStemW",
+      "default": 9,
+      "spec": [
+        0.6,
+        32,
+        0.2
+      ]
+    },
+    {
+      "key": "oTaper",
+      "default": 0.55,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oCurl",
+      "default": 0.65,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oTurns",
+      "default": 1.1,
+      "spec": [
+        0.2,
+        3,
+        0.05
+      ]
+    },
+    {
+      "key": "oUndulate",
+      "default": 0,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oWander",
+      "default": 0.25,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oLength",
+      "default": 1,
+      "spec": [
+        0.2,
+        3,
+        0.05
+      ]
+    },
+    {
+      "key": "oBranch",
+      "default": 0.5,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oDepth",
+      "default": 3,
+      "spec": [
+        0,
+        5,
+        1
+      ]
+    },
+    {
+      "key": "oThin",
+      "default": 0.5,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oBranchAngle",
+      "default": 40,
+      "spec": [
+        10,
+        90,
+        1
+      ]
+    },
+    {
+      "key": "oTerminal",
+      "default": "flower",
+      "spec": [
+        "curl",
+        "ball",
+        "leaf",
+        "flower",
+        "point"
+      ]
+    },
+    {
+      "key": "oLeaf",
+      "default": "acanthus",
+      "spec": [
+        "none",
+        "acanthus",
+        "lance",
+        "willow",
+        "ovate",
+        "teardrop",
+        "oak",
+        "ivy",
+        "trefoil",
+        "cinquefoil",
+        "fern",
+        "dot",
+        "pod",
+        "dotted",
+        "comma",
+        "fan",
+        "needles",
+        "heart"
+      ]
+    },
+    {
+      "key": "oLeafSize",
+      "default": 1,
+      "spec": [
+        0.2,
+        3,
+        0.05
+      ]
+    },
+    {
+      "key": "oLeafEvery",
+      "default": 0.55,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oLeafW",
+      "default": 0.55,
+      "spec": [
+        0.15,
+        1.2,
+        0.01
+      ]
+    },
+    {
+      "key": "oLobes",
+      "default": 4,
+      "spec": [
+        1,
+        9,
+        1
+      ]
+    },
+    {
+      "key": "oLobeDepth",
+      "default": 0.45,
+      "spec": [
+        0,
+        0.9,
+        0.01
+      ]
+    },
+    {
+      "key": "oSerr",
+      "default": 0,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oLeafCurl",
+      "default": 0.4,
+      "spec": [
+        0,
+        1.5,
+        0.01
+      ]
+    },
+    {
+      "key": "oLeafAngle",
+      "default": 45,
+      "spec": [
+        10,
+        90,
+        1
+      ]
+    },
+    {
+      "key": "oLeafSide",
+      "default": "alt",
+      "spec": [
+        "alt",
+        "outer"
+      ]
+    },
+    {
+      "key": "oFillLeaves",
+      "default": true,
+      "spec": "bool"
+    },
+    {
+      "key": "oFlower",
+      "default": "rosette",
+      "spec": [
+        "none",
+        "rosette",
+        "daisy",
+        "rose",
+        "star",
+        "phyllo",
+        "target",
+        "burst",
+        "dotring",
+        "quatre",
+        "tulip",
+        "bell",
+        "bud",
+        "pomegranate",
+        "thistle"
+      ]
+    },
+    {
+      "key": "oFlowerChance",
+      "default": 0.3,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oFlowerSize",
+      "default": 1,
+      "spec": [
+        0.3,
+        3,
+        0.05
+      ]
+    },
+    {
+      "key": "oPetals",
+      "default": 6,
+      "spec": [
+        3,
+        12,
+        1
+      ]
+    },
+    {
+      "key": "oBerries",
+      "default": 0.4,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oBerrySize",
+      "default": 1,
+      "spec": [
+        0.2,
+        3,
+        0.05
+      ]
+    },
+    {
+      "key": "oDots",
+      "default": 0.5,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oBeads",
+      "default": 0,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oFill",
+      "default": "paper",
+      "spec": [
+        "none",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "oStroke",
+      "default": "none",
+      "spec": [
+        "none",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "oStrokeW",
+      "default": 1.5,
+      "spec": [
+        0.3,
+        8,
+        0.1
+      ]
+    },
+    {
+      "key": "oDetail",
+      "default": "veins",
+      "spec": [
+        "none",
+        "vein",
+        "veins",
+        "hatch",
+        "inline"
+      ]
+    },
+    {
+      "key": "oDetailW",
+      "default": 1.6,
+      "spec": [
+        0,
+        6,
+        0.1
+      ]
+    },
+    {
+      "key": "oDetailColor",
+      "default": "auto",
+      "spec": [
+        "auto",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "oContrast",
+      "default": 0,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "oPenAngle",
+      "default": 35,
+      "spec": [
+        0,
+        180,
+        1
+      ]
+    },
+    {
+      "key": "tKind",
+      "default": "none",
+      "spec": [
+        "none",
+        "stipple",
+        "bubbles",
+        "ripples",
+        "streams",
+        "fur",
+        "cells",
+        "truchet",
+        "coral"
+      ]
+    },
+    {
+      "key": "tWhere",
+      "default": "gaps",
+      "spec": [
+        "gaps",
+        "ground"
+      ]
+    },
+    {
+      "key": "tScale",
+      "default": 9,
+      "spec": [
+        2,
+        60,
+        0.5
+      ]
+    },
+    {
+      "key": "tSize",
+      "default": 2.4,
+      "spec": [
+        0.3,
+        14,
+        0.1
+      ]
+    },
+    {
+      "key": "tGap",
+      "default": 4,
+      "spec": [
+        0,
+        30,
+        0.5
+      ]
+    },
+    {
+      "key": "tGrade",
+      "default": 0,
+      "spec": [
+        -1,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "tShape",
+      "default": "dot",
+      "spec": [
+        "dot",
+        "ring",
+        "cross",
+        "star",
+        "dash"
+      ]
+    },
+    {
+      "key": "tBubble",
+      "default": "solid",
+      "spec": [
+        "solid",
+        "ring",
+        "target"
+      ]
+    },
+    {
+      "key": "tCell",
+      "default": "pebble",
+      "spec": [
+        "pebble",
+        "shard",
+        "outline"
+      ]
+    },
+    {
+      "key": "tTruchet",
+      "default": "arcs",
+      "spec": [
+        "arcs",
+        "diagonal",
+        "triangles"
+      ]
+    },
+    {
+      "key": "tCoral",
+      "default": "coral",
+      "spec": [
+        "coral",
+        "spots",
+        "maze",
+        "holes",
+        "worms"
+      ]
+    },
+    {
+      "key": "tTwist",
+      "default": 0.3,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "tColor",
+      "default": "auto",
+      "spec": [
+        "auto",
+        "A",
+        "B",
+        "C",
+        "paper"
+      ]
+    },
+    {
+      "key": "wobble",
+      "default": 0,
+      "spec": [
+        0,
+        14,
+        0.1
+      ]
+    },
+    {
+      "key": "wobbleScale",
+      "default": 70,
+      "spec": [
+        10,
+        400,
+        1
+      ]
+    },
+    {
+      "key": "sketch",
+      "default": 1,
+      "spec": [
+        1,
+        3,
+        1
+      ]
+    },
+    {
+      "key": "rough",
+      "default": 0.2,
+      "spec": [
+        0,
+        2,
+        0.01
+      ]
+    },
+    {
+      "key": "roughScale",
+      "default": 14,
+      "spec": [
+        3,
+        80,
+        0.5
+      ]
+    },
+    {
+      "key": "spread",
+      "default": 0,
+      "spec": [
+        -0.4,
+        0.4,
+        0.005
+      ]
+    },
+    {
+      "key": "bleed",
+      "default": 0,
+      "spec": [
+        0,
+        10,
+        0.1
+      ]
+    },
+    {
+      "key": "edge",
+      "default": 0.15,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "edgeScale",
+      "default": 6,
+      "spec": [
+        1,
+        40,
+        0.5
+      ]
+    },
+    {
+      "key": "speckle",
+      "default": 0,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "dirt",
+      "default": 0,
+      "spec": [
+        0,
+        1,
+        0.01
+      ]
+    },
+    {
+      "key": "mottle",
+      "default": 0.08,
+      "spec": [
+        0,
+        0.6,
+        0.01
+      ]
+    },
+    {
+      "key": "grain",
+      "default": 0.4,
+      "spec": [
+        0,
+        2,
+        0.01
+      ]
+    },
+    {
+      "key": "misreg",
+      "default": 0,
+      "spec": [
+        0,
+        10,
+        0.1
+      ]
+    },
+    {
+      "key": "paper",
+      "default": "#f3eee3",
+      "spec": "color"
+    },
+    {
+      "key": "inkA",
+      "default": "#1a1614",
+      "spec": "color"
+    },
+    {
+      "key": "inkB",
+      "default": "#b3301e",
+      "spec": "color"
+    },
+    {
+      "key": "inkC",
+      "default": "#2c4a8c",
+      "spec": "color"
+    }
+  ],
+  "fixed": {
+    "font": "cormorant-garamond-700",
+    "lBlob": 0,
+    "lFil": "none",
+    "lPattern": "hatch",
+    "fPattern": "none",
+    "frame": "rect",
+    "fBand": "none",
+    "fCorner": "none",
+    "tKind": "none",
+    "oLeaf": "acanthus",
+    "oFlower": "rosette"
+  }
+}

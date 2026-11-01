@@ -1,5 +1,6 @@
 import { batch, createMemo, createRenderEffect, createRoot, createSignal, For, onCleanup, untrack, type Accessor } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
+import { characterSurfaceDefinition } from './static-character-surface';
 import { immutable } from '../runtime/effect-contributions';
 import type { AnnotationRangeEvents, AnnotationRangeEvent } from '../runtime/annotation-range-events';
 import type { AnnotationHandlerContext, EffectGeometry, EffectParams, PropertyTypeDefinition, VisualEffectOwner, VisualEffectRegistry, VisualRenderer } from '../runtime/visual-effect-registry';
@@ -51,7 +52,12 @@ export function createRangeRendering(options:{
     const [source,update]=createSignal(initial);
     // Range rebasing does not change presentation configuration. In particular,
     // typing must not wake every SVG attribute or reconstruct binding lists.
-    const definition=createMemo(()=>source().definition,undefined,{equals:(a,b)=>a===b||equal(a,b)});
+    const configuration=createMemo(()=>{
+      const s=source();return {base:s.definition,type:s.type,annotation:s.owner.kind==='annotation',metadata:(s.data as {metadata?:unknown}).metadata};
+    },undefined,{equals:(a,b)=>!!a&&a.base===b.base&&a.type===b.type&&a.annotation===b.annotation&&a.metadata===b.metadata});
+    // Read metadata within this memo, so a changed setting invalidates it but
+    // offset rebasing does not repeatedly validate/serialize complete settings.
+    const definition=createMemo(()=>{const c=configuration();return c.annotation?characterSurfaceDefinition({type:c.type,metadata:c.metadata},c.base):c.base;},undefined,{equals:(a,b)=>a===b||equal(a,b)});
     let releaseInteraction:(()=>void)|undefined;
     const stopInteraction=()=>{releaseInteraction?.();releaseInteraction=undefined;};
     const invoke=(event:AnnotationRangeEvent)=>{
@@ -96,7 +102,12 @@ export function createRangeRendering(options:{
       return current.renderers.flatMap(binding=>{
         const renderer=registry.renderer(binding.name);
         if(!renderer){registry.report(`Unknown renderer ${binding.name}`);return [];}
-        const params=()=>registry.params(definition(),definition().renderers.find(b=>b.id===binding.id)!,active());
+        let lastDefinition:PropertyTypeDefinition|undefined,lastActive:boolean|undefined,lastParams:EffectParams;
+        const params=()=>{
+          const d=definition(),a=!!d.states?.['caret-inside']?.[binding.id]&&active();
+          if(d!==lastDefinition||a!==lastActive){lastDefinition=d;lastActive=a;lastParams=registry.params(d,d.renderers.find(b=>b.id===binding.id)!,a);}
+          return lastParams;
+        };
         try{renderer.validate(untrack(params));}catch(error){registry.report(`Invalid renderer ${binding.name}: ${error}`);return [];}
         const retained=previous?.find(item=>item.key===binding.id&&item.renderer===renderer);
         if(retained)return [retained];
@@ -154,6 +165,10 @@ export function createRangeRendering(options:{
   onCleanup(()=>{live=false;for(const instance of mounted.values())instance.dispose();mounted.clear();});
   return {
     overlays,classes,layout,eventRanges,
+    // Keep unavailable/invalid bindings represented: two owners must conflict
+    // even when one has no ready artwork. Reuses the existing source lifetime.
+    surfaces: createMemo(()=>instances().filter(instance=>instance.source().definition.renderers.some(b=>registry.renderer(b.name)?.target==='character-surface'))
+      .map(instance=>({source:instance.source(),bindings:instance.bindings().filter(b=>b.renderer.target==='character-surface')}))),
     measure(fragments:(start:number,endInclusive:number)=>VisualFragment[],allocate:(start:number,endInclusive:number,height:number)=>number){
       if(!live||!registry.alive())return;
       const measured=overlays().map(binding=>{

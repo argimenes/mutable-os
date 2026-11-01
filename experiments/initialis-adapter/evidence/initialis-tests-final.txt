@@ -1,0 +1,15 @@
+
+ RUN  v2.1.9 /Users/iianneill/Documents/GitHub/speedy-ts-reactive
+
+ ✓ src/input/bindings.test.ts (7 tests) 65ms
+ ✓ src/features/initialis/initialis.test.ts (13 tests) 152ms
+ ✓ src/rendering/character-surface.test.tsx (27 tests) 2686ms
+   ✓ retains Cell/Text and bounds presentation/rebasing work (direct=true) 305ms
+   ✓ keeps a failed bitmap ordinary and discards late replaced responses 368ms
+   ✓ falls back for mixed bidi text and restores after its removal without a full text walk (direct=true) 339ms
+
+ Test Files  3 passed (3)
+      Tests  47 passed (47)
+   Start at  23:14:13
+   Duration  12.30s (transform 6.60s, setup 0ms, collect 11.65s, tests 2.90s, environment 3.28s, prepare 565ms)
+

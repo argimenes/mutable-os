@@ -1,0 +1,762 @@
+{
+  "direct": {
+    "browser": "Chrome/156.0.8078.76",
+    "interactionChecks": 62,
+    "allPassed": true,
+    "activationMs": {
+      "n": 12,
+      "median": 1.6000000014901161,
+      "p95": 2.399999998509884
+    },
+    "performance": {
+      "plain": {
+        "eventTimingMs": {
+          "n": 40,
+          "median": 16,
+          "p95": 24
+        },
+        "firstFrameMs": {
+          "n": 40,
+          "median": 14.800000004470348,
+          "p95": 15.600000001490116
+        },
+        "keydownProcessingMs": {
+          "n": 40,
+          "median": 4.5,
+          "p95": 9.5
+        },
+        "counts": [
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 399,
+            "rangeRects": 378
+          },
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      },
+      "spacing": {
+        "eventTimingMs": {
+          "n": 40,
+          "median": 16,
+          "p95": 32
+        },
+        "firstFrameMs": {
+          "n": 40,
+          "median": 14.75000000372529,
+          "p95": 19.399999998509884
+        },
+        "keydownProcessingMs": {
+          "n": 40,
+          "median": 4.5,
+          "p95": 14.5
+        },
+        "counts": [
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      }
+    },
+    "geometry": {
+      "cell": {
+        "x": 294,
+        "y": 327.546875,
+        "w": 48,
+        "h": 48
+      },
+      "nativeRange": {
+        "x": 341.984375,
+        "y": 342.546875,
+        "w": 0,
+        "h": 17
+      },
+      "paintedCaretX": 341.5,
+      "paintedCaretBoundsAt3x": {
+        "left": 156,
+        "right": 158,
+        "top": 63,
+        "bottom": 113
+      },
+      "selectionBlueHeightCSSPx": 45.666666666666664
+    },
+    "matrix": [
+      {
+        "variant": "width",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 303.046875,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 9.0625,
+          "h": 17
+        }
+      },
+      {
+        "variant": "spacing",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 48,
+          "h": 17
+        }
+      },
+      {
+        "variant": "zero-font",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 351.546875,
+          "w": 0,
+          "h": 0
+        },
+        "trailing": {
+          "x": 342,
+          "y": 351.546875,
+          "w": 0,
+          "h": 0
+        },
+        "selected": {
+          "x": 294,
+          "y": 351.546875,
+          "w": 48,
+          "h": 0
+        }
+      },
+      {
+        "variant": "tiny-font",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 350.546875,
+          "w": 0,
+          "h": 1
+        },
+        "trailing": {
+          "x": 342.046875,
+          "y": 350.546875,
+          "w": 0,
+          "h": 1
+        },
+        "selected": {
+          "x": 294,
+          "y": 350.546875,
+          "w": 48.0625,
+          "h": 1
+        }
+      },
+      {
+        "variant": "scaled",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.917236328125,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 48,
+          "h": 17
+        }
+      },
+      {
+        "variant": "right-aligned",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 332.9375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 332.9375,
+          "y": 342.546875,
+          "w": 9.0625,
+          "h": 17
+        }
+      },
+      {
+        "variant": "font-40",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 0,
+          "h": 47
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 327.546875,
+          "w": 0,
+          "h": 47
+        },
+        "selected": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 47
+        }
+      },
+      {
+        "variant": "font-41",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 0,
+          "h": 49
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 326.546875,
+          "w": 0,
+          "h": 49
+        },
+        "selected": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 48,
+          "h": 49
+        }
+      },
+      {
+        "variant": "font-42",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 0,
+          "h": 50
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 326.546875,
+          "w": 0,
+          "h": 50
+        },
+        "selected": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 48,
+          "h": 50
+        }
+      }
+    ],
+    "clipboard": {
+      "checks": [
+        {
+          "name": "copy source once",
+          "passed": true
+        },
+        {
+          "name": "plain paste",
+          "passed": true
+        },
+        {
+          "name": "plain paste undo",
+          "passed": true
+        },
+        {
+          "name": "rich paste",
+          "passed": true
+        },
+        {
+          "name": "rich paste undo",
+          "passed": true
+        }
+      ],
+      "types": [
+        "text/plain",
+        "text/html",
+        "application/x-mutable-fragment+json"
+      ],
+      "plain": "BUO"
+    },
+    "imePreedit": true
+  },
+  "solid": {
+    "browser": "Chrome/156.0.8078.76",
+    "interactionChecks": 62,
+    "allPassed": true,
+    "activationMs": {
+      "n": 12,
+      "median": 1.6000000014901161,
+      "p95": 2.399999998509884
+    },
+    "performance": {
+      "plain": {
+        "eventTimingMs": {
+          "n": 40,
+          "median": 16,
+          "p95": 24
+        },
+        "firstFrameMs": {
+          "n": 40,
+          "median": 15,
+          "p95": 16.100000001490116
+        },
+        "keydownProcessingMs": {
+          "n": 40,
+          "median": 5.74999999627471,
+          "p95": 11.900000005960464
+        },
+        "counts": [
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 399,
+            "rangeRects": 378
+          },
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      },
+      "spacing": {
+        "eventTimingMs": {
+          "n": 40,
+          "median": 16,
+          "p95": 24
+        },
+        "firstFrameMs": {
+          "n": 40,
+          "median": 14.900000005960464,
+          "p95": 16.100000001490116
+        },
+        "keydownProcessingMs": {
+          "n": 40,
+          "median": 5.550000004470348,
+          "p95": 11.599999994039536
+        },
+        "counts": [
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          },
+          {
+            "snapshots": 0,
+            "commits": 20,
+            "inlineCommits": 20,
+            "projectionBuilds": 0,
+            "elementRects": 380,
+            "rangeRects": 360
+          }
+        ]
+      }
+    },
+    "geometry": {
+      "cell": {
+        "x": 294,
+        "y": 327.546875,
+        "w": 48,
+        "h": 48
+      },
+      "nativeRange": {
+        "x": 341.984375,
+        "y": 342.546875,
+        "w": 0,
+        "h": 17
+      },
+      "paintedCaretX": 341.5,
+      "paintedCaretBoundsAt3x": {
+        "left": 156,
+        "right": 158,
+        "top": 63,
+        "bottom": 113
+      },
+      "selectionBlueHeightCSSPx": 45.666666666666664
+    },
+    "matrix": [
+      {
+        "variant": "width",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 303.046875,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 9.0625,
+          "h": 17
+        }
+      },
+      {
+        "variant": "spacing",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 48,
+          "h": 17
+        }
+      },
+      {
+        "variant": "zero-font",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 351.546875,
+          "w": 0,
+          "h": 0
+        },
+        "trailing": {
+          "x": 342,
+          "y": 351.546875,
+          "w": 0,
+          "h": 0
+        },
+        "selected": {
+          "x": 294,
+          "y": 351.546875,
+          "w": 48,
+          "h": 0
+        }
+      },
+      {
+        "variant": "tiny-font",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 350.546875,
+          "w": 0,
+          "h": 1
+        },
+        "trailing": {
+          "x": 342.046875,
+          "y": 350.546875,
+          "w": 0,
+          "h": 1
+        },
+        "selected": {
+          "x": 294,
+          "y": 350.546875,
+          "w": 48.0625,
+          "h": 1
+        }
+      },
+      {
+        "variant": "scaled",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.917236328125,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 48,
+          "h": 17
+        }
+      },
+      {
+        "variant": "right-aligned",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 332.9375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "selected": {
+          "x": 332.9375,
+          "y": 342.546875,
+          "w": 9.0625,
+          "h": 17
+        }
+      },
+      {
+        "variant": "font-40",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 0,
+          "h": 47
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 327.546875,
+          "w": 0,
+          "h": 47
+        },
+        "selected": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 47
+        }
+      },
+      {
+        "variant": "font-41",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 0,
+          "h": 49
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 326.546875,
+          "w": 0,
+          "h": 49
+        },
+        "selected": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 48,
+          "h": 49
+        }
+      },
+      {
+        "variant": "font-42",
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "leading": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 0,
+          "h": 50
+        },
+        "trailing": {
+          "x": 341.984375,
+          "y": 326.546875,
+          "w": 0,
+          "h": 50
+        },
+        "selected": {
+          "x": 294,
+          "y": 326.546875,
+          "w": 48,
+          "h": 50
+        }
+      }
+    ],
+    "clipboard": {
+      "checks": [
+        {
+          "name": "copy source once",
+          "passed": true
+        },
+        {
+          "name": "plain paste",
+          "passed": true
+        },
+        {
+          "name": "plain paste undo",
+          "passed": true
+        },
+        {
+          "name": "rich paste",
+          "passed": true
+        },
+        {
+          "name": "rich paste undo",
+          "passed": true
+        }
+      ],
+      "types": [
+        "text/plain",
+        "text/html",
+        "application/x-mutable-fragment+json"
+      ],
+      "plain": "BUO"
+    },
+    "imePreedit": true
+  }
+}

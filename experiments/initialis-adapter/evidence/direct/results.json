@@ -1,0 +1,5743 @@
+{
+  "csp": "Same-origin scripts/workers/connect, local raster img blob/data; style inline required by existing renderer",
+  "internet": "External DNS disabled; local Mutable server available",
+  "path": "direct",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/156.0.8078.76",
+    "revision": "@93ce6b54af3fee27e384d1f30346e80db47a14da",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+    "jsVersion": "15.6.75.25"
+  },
+  "checks": [
+    {
+      "name": "trusted selection covers one source Cell",
+      "passed": true
+    },
+    {
+      "name": "keyboard authors exactly one Initialis property",
+      "passed": true
+    },
+    {
+      "name": "keyboard retains selection",
+      "passed": true
+    },
+    {
+      "name": "activation uses bounded canonical admission",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 1,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 1,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 1,
+        "inlineCommits": 1,
+        "projectionBuilds": 0,
+        "elementRects": 103,
+        "rangeRects": 93
+      }
+    },
+    {
+      "name": "source character and Cell retained",
+      "passed": true
+    },
+    {
+      "name": "duplicate is nonauthoring",
+      "passed": true
+    },
+    {
+      "name": "one trusted undo removes property",
+      "passed": true
+    },
+    {
+      "name": "trusted redo renders property",
+      "passed": true
+    },
+    {
+      "name": "trusted button retains selection and focus",
+      "passed": true,
+      "details": {
+        "selection": {
+          "anchor": 0,
+          "head": 1
+        },
+        "focused": true,
+        "properties": 1
+      }
+    },
+    {
+      "name": "button authors exactly one property",
+      "passed": true
+    },
+    {
+      "name": "collapsed keyboard rejection is nonauthoring",
+      "passed": true
+    },
+    {
+      "name": "collapsed toolbar rejection is nonauthoring",
+      "passed": true
+    },
+    {
+      "name": "multiple keyboard rejection is nonauthoring",
+      "passed": true
+    },
+    {
+      "name": "multiple toolbar rejection is nonauthoring",
+      "passed": true
+    },
+    {
+      "name": "lowercase keyboard rejection is nonauthoring",
+      "passed": true
+    },
+    {
+      "name": "lowercase toolbar rejection is nonauthoring",
+      "passed": true
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "static bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "static retains source Text",
+      "passed": true
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "cached bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "cached retains source Text",
+      "passed": true
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "background bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "background retains source Text",
+      "passed": true
+    },
+    {
+      "name": "generation overlapped typing",
+      "passed": true,
+      "details": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 1,
+        "active": 1
+      }
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "cached bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "cached retains source Text",
+      "passed": true
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "background bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "background retains source Text",
+      "passed": true
+    },
+    {
+      "name": "generation overlapped typing",
+      "passed": true,
+      "details": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 2,
+        "active": 1
+      }
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "static bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "static retains source Text",
+      "passed": true
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "background bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "background retains source Text",
+      "passed": true
+    },
+    {
+      "name": "generation overlapped typing",
+      "passed": true,
+      "details": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 2,
+        "active": 1
+      }
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "static bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "static retains source Text",
+      "passed": true
+    },
+    {
+      "name": "no worker asset requests while typing",
+      "passed": true
+    },
+    {
+      "name": "cached bounded typing work",
+      "passed": true,
+      "details": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      }
+    },
+    {
+      "name": "cached retains source Text",
+      "passed": true
+    },
+    {
+      "name": "native keyboard trailing boundary",
+      "passed": true
+    },
+    {
+      "name": "native keyboard leading boundary",
+      "passed": true
+    },
+    {
+      "name": "native pointer 0",
+      "passed": true
+    },
+    {
+      "name": "native pointer 0",
+      "passed": true
+    },
+    {
+      "name": "native pointer 1",
+      "passed": true
+    },
+    {
+      "name": "native pointer 1",
+      "passed": true
+    },
+    {
+      "name": "native pointer 0",
+      "passed": true
+    },
+    {
+      "name": "native pointer 0",
+      "passed": true
+    },
+    {
+      "name": "native pointer 1",
+      "passed": true
+    },
+    {
+      "name": "native pointer 1",
+      "passed": true
+    },
+    {
+      "name": "native pointer 0",
+      "passed": true
+    },
+    {
+      "name": "native pointer 0",
+      "passed": true
+    },
+    {
+      "name": "native pointer 1",
+      "passed": true
+    },
+    {
+      "name": "native pointer 1",
+      "passed": true
+    },
+    {
+      "name": "distinct loading stress 1",
+      "passed": true,
+      "details": {
+        "count": 1,
+        "ready": 1,
+        "elapsed": 175.79999999701977,
+        "first": 175.79999999701977,
+        "peakQueued": 0,
+        "generated": 1,
+        "bytes": 5151663,
+        "peakBytes": 5151663,
+        "workersStarted": 0,
+        "failures": 0
+      }
+    },
+    {
+      "name": "distinct loading stress 10",
+      "passed": true,
+      "details": {
+        "count": 10,
+        "ready": 10,
+        "elapsed": 1225.5,
+        "first": 159.6000000089407,
+        "peakQueued": 9,
+        "generated": 10,
+        "bytes": 6182219,
+        "peakBytes": 6182219,
+        "workersStarted": 0,
+        "failures": 0
+      }
+    },
+    {
+      "name": "distinct loading stress 50",
+      "passed": true,
+      "details": {
+        "count": 50,
+        "ready": 50,
+        "elapsed": 6223.899999991059,
+        "first": 156.79999999701977,
+        "peakQueued": 49,
+        "generated": 50,
+        "bytes": 11334085,
+        "peakBytes": 11334085,
+        "workersStarted": 0,
+        "failures": 0
+      }
+    },
+    {
+      "name": "distinct loading stress 100",
+      "passed": true,
+      "details": {
+        "count": 100,
+        "ready": 100,
+        "elapsed": 10390.09999999404,
+        "first": 223.59999999403954,
+        "peakQueued": 64,
+        "generated": 100,
+        "bytes": 16687075,
+        "peakBytes": 16690343,
+        "workersStarted": 0,
+        "failures": 0
+      }
+    },
+    {
+      "name": "IME preedit suspends artwork",
+      "passed": true
+    },
+    {
+      "name": "IME cancellation restores artwork and source",
+      "passed": true
+    },
+    {
+      "name": "font advance",
+      "passed": true
+    },
+    {
+      "name": "zoom advance",
+      "passed": true
+    },
+    {
+      "name": "scale advance",
+      "passed": true
+    },
+    {
+      "name": "narrow advance",
+      "passed": true
+    },
+    {
+      "name": "hidden fallback",
+      "passed": true
+    },
+    {
+      "name": "late font advance",
+      "passed": true
+    },
+    {
+      "name": "font/layout work keeps original Text",
+      "passed": true
+    },
+    {
+      "name": "font/layout work makes no canonical edit",
+      "passed": true
+    },
+    {
+      "name": "scrolling keeps native advance",
+      "passed": true
+    },
+    {
+      "name": "missing ordinary-text fallback",
+      "passed": true
+    },
+    {
+      "name": "conflict ordinary-text fallback",
+      "passed": true
+    },
+    {
+      "name": "rtl ordinary-text fallback",
+      "passed": true
+    },
+    {
+      "name": "rotation ordinary-text fallback",
+      "passed": true
+    },
+    {
+      "name": "mixed bidi fallback",
+      "passed": true
+    },
+    {
+      "name": "mixed bidi removal restores surface",
+      "passed": true
+    },
+    {
+      "name": "native envelope round-trip",
+      "passed": true
+    },
+    {
+      "name": "native reopen text and property",
+      "passed": true
+    },
+    {
+      "name": "native reopen surface mounted",
+      "passed": true
+    },
+    {
+      "name": "nested shared surface and occurrence identity",
+      "passed": true
+    },
+    {
+      "name": "shared canonical edit in both occurrences",
+      "passed": true
+    },
+    {
+      "name": "shared edit retains both mounted cells",
+      "passed": true
+    },
+    {
+      "name": "shared edit Undo",
+      "passed": true
+    },
+    {
+      "name": "nested disposal cleans its surface only",
+      "passed": true
+    },
+    {
+      "name": "nested remount restores surface",
+      "passed": true
+    },
+    {
+      "name": "font failure keeps text/property and makes no completion edit",
+      "passed": true
+    },
+    {
+      "name": "font failure is still undoable",
+      "passed": true
+    },
+    {
+      "name": "webgl failure keeps text/property and makes no completion edit",
+      "passed": true
+    },
+    {
+      "name": "webgl failure is still undoable",
+      "passed": true
+    },
+    {
+      "name": "worker failure keeps text/property and makes no completion edit",
+      "passed": true
+    },
+    {
+      "name": "worker failure is still undoable",
+      "passed": true
+    }
+  ],
+  "keyboardImmediate": {
+    "selection": {
+      "anchor": 0,
+      "head": 1
+    },
+    "properties": [
+      {
+        "id": "64ed661d-744b-43d7-8c90-5da3c70ea637",
+        "type": "style/character-surface",
+        "start": 0,
+        "end": 0,
+        "metadata": {
+          "renderer": "initialis",
+          "rendererVersion": "6cf93f7d3d2922efdbeb86cafa27f39758be9398",
+          "settingsVersion": 1,
+          "assetVersion": "6cf93f7d3d2922efdbeb86cafa27f39758be9398-subset-1",
+          "width": 48,
+          "height": 48,
+          "settings": {
+            "font": "cormorant-garamond-700",
+            "size": 0.66,
+            "dx": 0,
+            "dy": 0,
+            "lLayout": "row",
+            "tracking": -0.05,
+            "lWeave": "none",
+            "lWeaveGap": 6,
+            "lWeaveFlip": false,
+            "embolden": 0,
+            "lInflate": 0,
+            "lBlob": 0,
+            "lBlobWeight": 1.3,
+            "lBlobPart": 30,
+            "lBlobCounter": 40,
+            "lBlobFillet": 0.25,
+            "lBlobRoom": 30,
+            "letterGap": 12,
+            "lFill": "paper",
+            "lPattern": "hatch",
+            "lPatScale": 8,
+            "lPatAngle": 45,
+            "lPatW": 1.4,
+            "lPatColor": "A",
+            "lPatBg": "paper",
+            "lSplit": "wave",
+            "lSplitPos": 0,
+            "lSplitFreq": 3,
+            "lSplitGap": 4,
+            "lSplitA": "B",
+            "lSplitB": "C",
+            "lFil": "none",
+            "lFilScale": 1,
+            "lFilInset": 5,
+            "lFilColor": "auto",
+            "lInline": 0,
+            "lInlineOff": 7,
+            "lInlineColor": "auto",
+            "lOutline": 0,
+            "lOutlineColor": "A",
+            "lEcho": 0,
+            "lEchoGap": 10,
+            "lEchoW": 1.4,
+            "lEchoStyle": "line",
+            "lEchoColor": "A",
+            "lHalo": 0,
+            "lHaloColor": "paper",
+            "lShadow": "none",
+            "lShadowLen": 18,
+            "lShadowAngle": 45,
+            "lShadowFill": "solid",
+            "lShadowColor": "A",
+            "frame": "rect",
+            "fMargin": 40,
+            "fRules": 2,
+            "fW1": 12,
+            "fGap": 8,
+            "fW2": 2.5,
+            "fRuleStyle": "solid",
+            "fRuleColor": "A",
+            "fBand": "none",
+            "fBorder": "none",
+            "fField": "A",
+            "fPattern": "none",
+            "fPatScale": 7,
+            "fPatAngle": 0,
+            "fPatW": 1.2,
+            "fPatColor": "paper",
+            "fShadow": 0,
+            "fShadowAngle": 45,
+            "fShadowStyle": "line",
+            "fShadowColor": "A",
+            "fCorner": "none",
+            "fCornerSize": 22,
+            "fCornerColor": "auto",
+            "orn": "grow",
+            "seed": 1,
+            "oRegion": "field",
+            "oHalo": 140,
+            "oSeeds": "gaps",
+            "oSeedCount": 3,
+            "oSym": "none",
+            "oDensity": 0.75,
+            "oSprout": 0.85,
+            "oMargin": 7,
+            "oStemStyle": "solid",
+            "oStemW": 9,
+            "oTaper": 0.55,
+            "oCurl": 0.65,
+            "oTurns": 1.1,
+            "oUndulate": 0,
+            "oWander": 0.25,
+            "oLength": 1,
+            "oBranch": 0.5,
+            "oDepth": 3,
+            "oThin": 0.5,
+            "oBranchAngle": 40,
+            "oTerminal": "flower",
+            "oLeaf": "acanthus",
+            "oLeafSize": 1,
+            "oLeafEvery": 0.55,
+            "oLeafW": 0.55,
+            "oLobes": 4,
+            "oLobeDepth": 0.45,
+            "oSerr": 0,
+            "oLeafCurl": 0.4,
+            "oLeafAngle": 45,
+            "oLeafSide": "alt",
+            "oFillLeaves": true,
+            "oFlower": "rosette",
+            "oFlowerChance": 0.3,
+            "oFlowerSize": 1,
+            "oPetals": 6,
+            "oBerries": 0.4,
+            "oBerrySize": 1,
+            "oDots": 0.5,
+            "oBeads": 0,
+            "oFill": "paper",
+            "oStroke": "none",
+            "oStrokeW": 1.5,
+            "oDetail": "veins",
+            "oDetailW": 1.6,
+            "oDetailColor": "auto",
+            "oContrast": 0,
+            "oPenAngle": 35,
+            "tKind": "none",
+            "tWhere": "gaps",
+            "tScale": 9,
+            "tSize": 2.4,
+            "tGap": 4,
+            "tGrade": 0,
+            "tShape": "dot",
+            "tBubble": "solid",
+            "tCell": "pebble",
+            "tTruchet": "arcs",
+            "tCoral": "coral",
+            "tTwist": 0.3,
+            "tColor": "auto",
+            "wobble": 0,
+            "wobbleScale": 70,
+            "sketch": 1,
+            "rough": 0.2,
+            "roughScale": 14,
+            "spread": 0,
+            "bleed": 0,
+            "edge": 0.15,
+            "edgeScale": 6,
+            "speckle": 0,
+            "dirt": 0,
+            "mottle": 0.08,
+            "grain": 0.4,
+            "misreg": 0,
+            "paper": "#f3eee3",
+            "inkA": "#1a1614",
+            "inkB": "#b3301e",
+            "inkC": "#2c4a8c"
+          }
+        }
+      }
+    ],
+    "text": "BUONARROTO, — I send this as cover to two letters one is to go to Piero Aldobrandini, and the other to Giovanni Balducci in Rome. The latter I wish thee to hand to Bonifazio Fazi so that he may send it on, the other give to the aforesaid Piero. Concerning those two scoundrels, I have no time to tell the whole story of their knavery, and I beg all of you — and tell Lodovico the same — not to refer to their behaviour in any way, for we have not to deal with them in this matter. Let this suffice.\r",
+    "notice": ""
+  },
+  "keyboardReadyMs": 325.29999999701977,
+  "activationCounts": {
+    "counts": {
+      "paragraphTextWalks": 1,
+      "fullValidation": 0,
+      "broadPlanning": 0,
+      "unrelatedGeometry": 0,
+      "unrelatedMutations": 0,
+      "workers": 1,
+      "requests": 0,
+      "snapshots": 0,
+      "commits": 1,
+      "inlineCommits": 1,
+      "projectionBuilds": 0,
+      "elementRects": 103,
+      "rangeRects": 93
+    },
+    "marks": [],
+    "events": [
+      {
+        "start": 5062.20000000298,
+        "duration": 32,
+        "processing": 6.799999997019768
+      },
+      {
+        "start": 5085.20000000298,
+        "duration": 24,
+        "processing": 0.8999999910593033
+      },
+      {
+        "start": 5087.79999999702,
+        "duration": 32,
+        "processing": 15.199999988079071
+      }
+    ],
+    "domRetained": true
+  },
+  "toolbar": {
+    "selection": {
+      "anchor": 0,
+      "head": 1
+    },
+    "focused": true,
+    "properties": 1
+  },
+  "unrelated": {
+    "documents": 2,
+    "characters": 10200,
+    "annotations": 162
+  },
+  "performance": [
+    {
+      "variant": "static",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 6827.29999999702,
+          "key": "x",
+          "firstFrameMs": 12.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 6854.5999999940395,
+          "key": "Backspace",
+          "firstFrameMs": 16.200000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 6872.70000000298,
+          "key": "x",
+          "firstFrameMs": 14.699999988079071,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 6889.5,
+          "key": "Backspace",
+          "firstFrameMs": 14.5,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 6905.899999991059,
+          "key": "x",
+          "firstFrameMs": 14.5,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 6922.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15.199999988079071,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 6939.0999999940395,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 6955.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 6972.20000000298,
+          "key": "x",
+          "firstFrameMs": 15.199999988079071,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 6989.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7005.79999999702,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7022.5,
+          "key": "Backspace",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7039.0999999940395,
+          "key": "x",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7055.399999991059,
+          "key": "Backspace",
+          "firstFrameMs": 15.300000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7072.5,
+          "key": "x",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7089.0999999940395,
+          "key": "Backspace",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7105.70000000298,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7122.399999991059,
+          "key": "Backspace",
+          "firstFrameMs": 14.5,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7138.5999999940395,
+          "key": "x",
+          "firstFrameMs": 15.400000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7155.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 6827.29999999702,
+          "duration": 24,
+          "processing": 0.6000000089406967
+        },
+        {
+          "start": 6854.5999999940395,
+          "duration": 24,
+          "processing": 12.400000005960464
+        },
+        {
+          "start": 6872.70000000298,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 6889.5,
+          "duration": 16,
+          "processing": 9.800000011920929
+        },
+        {
+          "start": 6905.899999991059,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 6922.20000000298,
+          "duration": 16,
+          "processing": 9.099999994039536
+        },
+        {
+          "start": 6939.0999999940395,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 6955.79999999702,
+          "duration": 16,
+          "processing": 9
+        },
+        {
+          "start": 6972.20000000298,
+          "duration": 16,
+          "processing": 0
+        },
+        {
+          "start": 6989.20000000298,
+          "duration": 16,
+          "processing": 9.400000005960464
+        },
+        {
+          "start": 7005.79999999702,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 7022.5,
+          "duration": 16,
+          "processing": 9
+        },
+        {
+          "start": 7039.0999999940395,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 7055.399999991059,
+          "duration": 16,
+          "processing": 8.899999991059303
+        },
+        {
+          "start": 7072.5,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7089.0999999940395,
+          "duration": 16,
+          "processing": 8.900000005960464
+        },
+        {
+          "start": 7105.70000000298,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7122.399999991059,
+          "duration": 16,
+          "processing": 9.200000002980232
+        },
+        {
+          "start": 7138.5999999940395,
+          "duration": 16,
+          "processing": 0.19999998807907104
+        },
+        {
+          "start": 7155.79999999702,
+          "duration": 16,
+          "processing": 10.400000005960464
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 0,
+        "active": 0
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "cached",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 7276,
+          "key": "x",
+          "firstFrameMs": 11.399999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7289.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7305.29999999702,
+          "key": "x",
+          "firstFrameMs": 15.5,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7322.5999999940395,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7339.399999991059,
+          "key": "x",
+          "firstFrameMs": 14.600000008940697,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7355.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7372.5,
+          "key": "x",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7389.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7405.70000000298,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7422.5999999940395,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7439.29999999702,
+          "key": "x",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7455.899999991059,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7472.5999999940395,
+          "key": "x",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7489.0999999940395,
+          "key": "Backspace",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7505.79999999702,
+          "key": "x",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7522.5,
+          "key": "Backspace",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7539.0999999940395,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7555.899999991059,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7572.399999991059,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7589.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 7276,
+          "duration": 32,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 7289.20000000298,
+          "duration": 32,
+          "processing": 10
+        },
+        {
+          "start": 7305.29999999702,
+          "duration": 32,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 7322.5999999940395,
+          "duration": 32,
+          "processing": 9.799999997019768
+        },
+        {
+          "start": 7339.399999991059,
+          "duration": 32,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 7355.79999999702,
+          "duration": 32,
+          "processing": 9.700000002980232
+        },
+        {
+          "start": 7372.5,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7389.29999999702,
+          "duration": 32,
+          "processing": 9.799999997019768
+        },
+        {
+          "start": 7405.70000000298,
+          "duration": 32,
+          "processing": 0.30000001192092896
+        },
+        {
+          "start": 7422.5999999940395,
+          "duration": 32,
+          "processing": 9.899999991059303
+        },
+        {
+          "start": 7439.29999999702,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7455.899999991059,
+          "duration": 32,
+          "processing": 9.900000005960464
+        },
+        {
+          "start": 7472.5999999940395,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7489.0999999940395,
+          "duration": 32,
+          "processing": 9.799999997019768
+        },
+        {
+          "start": 7505.79999999702,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7522.5,
+          "duration": 32,
+          "processing": 10.299999997019768
+        },
+        {
+          "start": 7539.0999999940395,
+          "duration": 32,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 7555.899999991059,
+          "duration": 32,
+          "processing": 10
+        },
+        {
+          "start": 7572.399999991059,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7589.20000000298,
+          "duration": 32,
+          "processing": 9.900000005960464
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 0,
+        "active": 0
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "background",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 7688.70000000298,
+          "key": "x",
+          "firstFrameMs": 15.399999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7706.899999991059,
+          "key": "Backspace",
+          "firstFrameMs": 14,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7738.0999999940395,
+          "key": "x",
+          "firstFrameMs": 15.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7755.899999991059,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7772.5999999940395,
+          "key": "x",
+          "firstFrameMs": 14.600000008940697,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7789.5,
+          "key": "Backspace",
+          "firstFrameMs": 14.5,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7805.79999999702,
+          "key": "x",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7821.70000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15.599999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7839,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7855.70000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7872.20000000298,
+          "key": "x",
+          "firstFrameMs": 15.099999994039536,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7889,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7905.899999991059,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7922.5,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7939,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7955.5999999940395,
+          "key": "Backspace",
+          "firstFrameMs": 15.100000008940697,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 7972.5999999940395,
+          "key": "x",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 7989.399999991059,
+          "key": "Backspace",
+          "firstFrameMs": 14.600000008940697,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8005.70000000298,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8022.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.099999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 7688.70000000298,
+          "duration": 24,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 7706.899999991059,
+          "duration": 16,
+          "processing": 11
+        },
+        {
+          "start": 7738.0999999940395,
+          "duration": 24,
+          "processing": 0.19999998807907104
+        },
+        {
+          "start": 7755.899999991059,
+          "duration": 16,
+          "processing": 10.200000002980232
+        },
+        {
+          "start": 7772.5999999940395,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 7789.5,
+          "duration": 16,
+          "processing": 10.099999994039536
+        },
+        {
+          "start": 7805.79999999702,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 7821.70000000298,
+          "duration": 16,
+          "processing": 9.899999991059303
+        },
+        {
+          "start": 7839,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 7855.70000000298,
+          "duration": 16,
+          "processing": 10
+        },
+        {
+          "start": 7872.20000000298,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 7889,
+          "duration": 16,
+          "processing": 10.200000002980232
+        },
+        {
+          "start": 7905.899999991059,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 7922.5,
+          "duration": 16,
+          "processing": 10.099999994039536
+        },
+        {
+          "start": 7939,
+          "duration": 16,
+          "processing": 0.19999998807907104
+        },
+        {
+          "start": 7955.5999999940395,
+          "duration": 16,
+          "processing": 10
+        },
+        {
+          "start": 7972.5999999940395,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 7989.399999991059,
+          "duration": 16,
+          "processing": 10.099999994039536
+        },
+        {
+          "start": 8005.70000000298,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 8022.29999999702,
+          "duration": 16,
+          "processing": 10
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 1,
+        "active": 1
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "cached",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 8737.79999999702,
+          "key": "x",
+          "firstFrameMs": 16.200000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8755.89999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8772.39999999106,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8789,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8805.70000000298,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8822.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8839,
+          "key": "x",
+          "firstFrameMs": 14.399999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8855,
+          "key": "Backspace",
+          "firstFrameMs": 15.700000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8872.20000000298,
+          "key": "x",
+          "firstFrameMs": 15.099999994039536,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8889,
+          "key": "Backspace",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8905.5,
+          "key": "x",
+          "firstFrameMs": 15.099999994039536,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8922.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15.099999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8939,
+          "key": "x",
+          "firstFrameMs": 14,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8954.70000000298,
+          "key": "Backspace",
+          "firstFrameMs": 16.099999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 8972.89999999106,
+          "key": "x",
+          "firstFrameMs": 14.100000008940697,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 8988.59999999404,
+          "key": "Backspace",
+          "firstFrameMs": 15.400000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9005.59999999404,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9022.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9039,
+          "key": "x",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9055.89999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 8737.79999999702,
+          "duration": 24,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 8755.89999999106,
+          "duration": 16,
+          "processing": 10.200000002980232
+        },
+        {
+          "start": 8772.39999999106,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 8789,
+          "duration": 16,
+          "processing": 10.099999994039536
+        },
+        {
+          "start": 8805.70000000298,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 8822.29999999702,
+          "duration": 16,
+          "processing": 9.900000005960464
+        },
+        {
+          "start": 8839,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 8855,
+          "duration": 16,
+          "processing": 10.099999994039536
+        },
+        {
+          "start": 8872.20000000298,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 8889,
+          "duration": 16,
+          "processing": 10
+        },
+        {
+          "start": 8905.5,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 8922.20000000298,
+          "duration": 16,
+          "processing": 10.099999994039536
+        },
+        {
+          "start": 8939,
+          "duration": 16,
+          "processing": 0.19999998807907104
+        },
+        {
+          "start": 8954.70000000298,
+          "duration": 24,
+          "processing": 12.200000002980232
+        },
+        {
+          "start": 8972.89999999106,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 8988.59999999404,
+          "duration": 16,
+          "processing": 10.399999991059303
+        },
+        {
+          "start": 9005.59999999404,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 9022.39999999106,
+          "duration": 16,
+          "processing": 10.200000002980232
+        },
+        {
+          "start": 9039,
+          "duration": 16,
+          "processing": 0.29999999701976776
+        },
+        {
+          "start": 9055.89999999106,
+          "duration": 16,
+          "processing": 10.300000011920929
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 0,
+        "active": 0
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "background",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 9157.20000000298,
+          "key": "x",
+          "firstFrameMs": 13.5,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9172.89999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.400000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9189.39999999106,
+          "key": "x",
+          "firstFrameMs": 14.600000008940697,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9206.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.200000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9223,
+          "key": "x",
+          "firstFrameMs": 13.399999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9238.70000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9255.89999999106,
+          "key": "x",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9272.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9289,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9305.59999999404,
+          "key": "Backspace",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9322.09999999404,
+          "key": "x",
+          "firstFrameMs": 14.400000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9341.59999999404,
+          "key": "Backspace",
+          "firstFrameMs": 18.900000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9371.09999999404,
+          "key": "x",
+          "firstFrameMs": 15.700000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9389,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9405.70000000298,
+          "key": "x",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9422.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9439,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9456.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 9472.29999999702,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 9489,
+          "key": "Backspace",
+          "firstFrameMs": 14.599999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 9157.20000000298,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 9172.89999999106,
+          "duration": 16,
+          "processing": 10.299999997019768
+        },
+        {
+          "start": 9189.39999999106,
+          "duration": 16,
+          "processing": 0.29999999701976776
+        },
+        {
+          "start": 9206.39999999106,
+          "duration": 16,
+          "processing": 10.100000008940697
+        },
+        {
+          "start": 9223,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 9238.70000000298,
+          "duration": 16,
+          "processing": 10.200000002980232
+        },
+        {
+          "start": 9255.89999999106,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 9272.39999999106,
+          "duration": 16,
+          "processing": 10.200000002980232
+        },
+        {
+          "start": 9289,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 9305.59999999404,
+          "duration": 16,
+          "processing": 10.5
+        },
+        {
+          "start": 9322.09999999404,
+          "duration": 24,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 9341.59999999404,
+          "duration": 24,
+          "processing": 16.900000005960464
+        },
+        {
+          "start": 9371.09999999404,
+          "duration": 24,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 9389,
+          "duration": 16,
+          "processing": 10.5
+        },
+        {
+          "start": 9405.70000000298,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 9422.29999999702,
+          "duration": 16,
+          "processing": 10
+        },
+        {
+          "start": 9439,
+          "duration": 16,
+          "processing": 0.19999998807907104
+        },
+        {
+          "start": 9456.29999999702,
+          "duration": 16,
+          "processing": 10.199999988079071
+        },
+        {
+          "start": 9472.29999999702,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 9489,
+          "duration": 16,
+          "processing": 10.099999994039536
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 2,
+        "active": 1
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "static",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 10092.5,
+          "key": "x",
+          "firstFrameMs": 11.399999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10105.70000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10121.79999999702,
+          "key": "x",
+          "firstFrameMs": 15.299999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10139,
+          "key": "Backspace",
+          "firstFrameMs": 14.599999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10155.70000000298,
+          "key": "x",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10172.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10189.09999999404,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10205.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10222.39999999106,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10239.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.199999988079071,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10255.09999999404,
+          "key": "x",
+          "firstFrameMs": 14.600000008940697,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10271.70000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15.599999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10289.20000000298,
+          "key": "x",
+          "firstFrameMs": 14.699999988079071,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10305.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10322.39999999106,
+          "key": "x",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10339.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.600000008940697,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10356.39999999106,
+          "key": "x",
+          "firstFrameMs": 14.300000011920929,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10372.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.5,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10389.20000000298,
+          "key": "x",
+          "firstFrameMs": 14.199999988079071,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10405.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15.400000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 10092.5,
+          "duration": 32,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 10105.70000000298,
+          "duration": 32,
+          "processing": 9.100000008940697
+        },
+        {
+          "start": 10121.79999999702,
+          "duration": 32,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 10139,
+          "duration": 32,
+          "processing": 9.199999988079071
+        },
+        {
+          "start": 10155.70000000298,
+          "duration": 32,
+          "processing": 0.29999999701976776
+        },
+        {
+          "start": 10172.39999999106,
+          "duration": 32,
+          "processing": 9.100000008940697
+        },
+        {
+          "start": 10189.09999999404,
+          "duration": 32,
+          "processing": 0.19999998807907104
+        },
+        {
+          "start": 10205.79999999702,
+          "duration": 32,
+          "processing": 9.200000002980232
+        },
+        {
+          "start": 10222.39999999106,
+          "duration": 32,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 10239.20000000298,
+          "duration": 32,
+          "processing": 8.900000005960464
+        },
+        {
+          "start": 10255.09999999404,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 10271.70000000298,
+          "duration": 32,
+          "processing": 10.700000002980232
+        },
+        {
+          "start": 10289.20000000298,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 10305.79999999702,
+          "duration": 32,
+          "processing": 9.200000002980232
+        },
+        {
+          "start": 10322.39999999106,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 10339.39999999106,
+          "duration": 32,
+          "processing": 9.400000005960464
+        },
+        {
+          "start": 10356.39999999106,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 10372.79999999702,
+          "duration": 32,
+          "processing": 9.800000011920929
+        },
+        {
+          "start": 10389.20000000298,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 10405.29999999702,
+          "duration": 32,
+          "processing": 9.300000011920929
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 0,
+        "active": 0
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "background",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 10527.39999999106,
+          "key": "x",
+          "firstFrameMs": 10,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10554.59999999404,
+          "key": "Backspace",
+          "firstFrameMs": 16,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10572.5,
+          "key": "x",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10589,
+          "key": "Backspace",
+          "firstFrameMs": 14.899999991059303,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10605.70000000298,
+          "key": "x",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10622.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10638.89999999106,
+          "key": "x",
+          "firstFrameMs": 14,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10654.5,
+          "key": "Backspace",
+          "firstFrameMs": 15.599999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10671.89999999106,
+          "key": "x",
+          "firstFrameMs": 15.300000011920929,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10688.89999999106,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10705.59999999404,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10723.70000000298,
+          "key": "Backspace",
+          "firstFrameMs": 13.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10754.5,
+          "key": "x",
+          "firstFrameMs": 16.099999994039536,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10772.5,
+          "key": "Backspace",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10789.29999999702,
+          "key": "x",
+          "firstFrameMs": 14.599999994039536,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10806,
+          "key": "Backspace",
+          "firstFrameMs": 14.5,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10822.5,
+          "key": "x",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10839.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.599999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 10855.59999999404,
+          "key": "x",
+          "firstFrameMs": 14.700000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 10871.89999999106,
+          "key": "Backspace",
+          "firstFrameMs": 15.300000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 10527.39999999106,
+          "duration": 24,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 10554.59999999404,
+          "duration": 16,
+          "processing": 10.299999997019768
+        },
+        {
+          "start": 10572.5,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 10589,
+          "duration": 16,
+          "processing": 10.299999997019768
+        },
+        {
+          "start": 10605.70000000298,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 10622.20000000298,
+          "duration": 16,
+          "processing": 10.600000008940697
+        },
+        {
+          "start": 10638.89999999106,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 10654.5,
+          "duration": 16,
+          "processing": 10.5
+        },
+        {
+          "start": 10671.89999999106,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 10688.89999999106,
+          "duration": 16,
+          "processing": 10.599999994039536
+        },
+        {
+          "start": 10705.59999999404,
+          "duration": 24,
+          "processing": 0.19999998807907104
+        },
+        {
+          "start": 10723.70000000298,
+          "duration": 16,
+          "processing": 10.799999997019768
+        },
+        {
+          "start": 10754.5,
+          "duration": 24,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 10772.5,
+          "duration": 16,
+          "processing": 10.400000005960464
+        },
+        {
+          "start": 10789.29999999702,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 10806,
+          "duration": 16,
+          "processing": 10.5
+        },
+        {
+          "start": 10822.5,
+          "duration": 24,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 10839.20000000298,
+          "duration": 16,
+          "processing": 10.400000005960464
+        },
+        {
+          "start": 10855.59999999404,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 10871.89999999106,
+          "duration": 16,
+          "processing": 10.299999997019768
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 2,
+        "active": 1
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "static",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 11528,
+          "key": "x",
+          "firstFrameMs": 8.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11554.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11572,
+          "key": "x",
+          "firstFrameMs": 15.200000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11588.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15.099999994039536,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11605.5,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11622.09999999404,
+          "key": "Backspace",
+          "firstFrameMs": 15.200000002980232,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11639,
+          "key": "x",
+          "firstFrameMs": 14,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11654.59999999404,
+          "key": "Backspace",
+          "firstFrameMs": 16,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11672.20000000298,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11688.89999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11705.29999999702,
+          "key": "x",
+          "firstFrameMs": 14.5,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11721.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 15.800000011920929,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11738.89999999106,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11755.59999999404,
+          "key": "Backspace",
+          "firstFrameMs": 14.900000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11772.20000000298,
+          "key": "x",
+          "firstFrameMs": 14.399999991059303,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11789.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.699999988079071,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11805.59999999404,
+          "key": "x",
+          "firstFrameMs": 14,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11821.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15.900000005960464,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 11838.79999999702,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 11856.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 14.100000008940697,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 11528,
+          "duration": 24,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 11554.29999999702,
+          "duration": 16,
+          "processing": 9.800000011920929
+        },
+        {
+          "start": 11572,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 11588.79999999702,
+          "duration": 16,
+          "processing": 9.399999991059303
+        },
+        {
+          "start": 11605.5,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 11622.09999999404,
+          "duration": 16,
+          "processing": 9.5
+        },
+        {
+          "start": 11639,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 11654.59999999404,
+          "duration": 16,
+          "processing": 9.300000011920929
+        },
+        {
+          "start": 11672.20000000298,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 11688.89999999106,
+          "duration": 16,
+          "processing": 9.5
+        },
+        {
+          "start": 11705.29999999702,
+          "duration": 16,
+          "processing": 0.30000001192092896
+        },
+        {
+          "start": 11721.39999999106,
+          "duration": 16,
+          "processing": 9.5
+        },
+        {
+          "start": 11738.89999999106,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 11755.59999999404,
+          "duration": 16,
+          "processing": 9.600000008940697
+        },
+        {
+          "start": 11772.20000000298,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 11789.20000000298,
+          "duration": 16,
+          "processing": 9.799999997019768
+        },
+        {
+          "start": 11805.59999999404,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 11821.29999999702,
+          "duration": 16,
+          "processing": 9.700000002980232
+        },
+        {
+          "start": 11838.79999999702,
+          "duration": 24,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 11856.39999999106,
+          "duration": 16,
+          "processing": 9.899999991059303
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 0,
+        "active": 0
+      },
+      "assetRequests": 0
+    },
+    {
+      "variant": "cached",
+      "counts": {
+        "paragraphTextWalks": 0,
+        "fullValidation": 0,
+        "broadPlanning": 0,
+        "unrelatedGeometry": 0,
+        "unrelatedMutations": 0,
+        "workers": 0,
+        "requests": 0,
+        "snapshots": 0,
+        "commits": 20,
+        "inlineCommits": 20,
+        "projectionBuilds": 0,
+        "elementRects": 380,
+        "rangeRects": 360
+      },
+      "marks": [
+        {
+          "start": 11975.89999999106,
+          "key": "x",
+          "firstFrameMs": 10.300000011920929,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12004.39999999106,
+          "key": "Backspace",
+          "firstFrameMs": 16.100000008940697,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12022.20000000298,
+          "key": "x",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12038.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 15.699999988079071,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12055.5,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12072.29999999702,
+          "key": "Backspace",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12088.09999999404,
+          "key": "x",
+          "firstFrameMs": 15.799999997019768,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12106.20000000298,
+          "key": "Backspace",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12122.59999999404,
+          "key": "x",
+          "firstFrameMs": 14.600000008940697,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12138.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12156.29999999702,
+          "key": "x",
+          "firstFrameMs": 14.200000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12172.09999999404,
+          "key": "Backspace",
+          "firstFrameMs": 15.100000008940697,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12188.79999999702,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12206,
+          "key": "Backspace",
+          "firstFrameMs": 14.299999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12222,
+          "key": "x",
+          "firstFrameMs": 15.200000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12238.79999999702,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12255.39999999106,
+          "key": "x",
+          "firstFrameMs": 15.200000002980232,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12272.09999999404,
+          "key": "Backspace",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        },
+        {
+          "start": 12288.79999999702,
+          "key": "x",
+          "firstFrameMs": 15,
+          "caret": {
+            "anchor": 101,
+            "head": 101
+          }
+        },
+        {
+          "start": 12305.5,
+          "key": "Backspace",
+          "firstFrameMs": 14.799999997019768,
+          "caret": {
+            "anchor": 100,
+            "head": 100
+          }
+        }
+      ],
+      "events": [
+        {
+          "start": 11975.89999999106,
+          "duration": 32,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 12004.39999999106,
+          "duration": 24,
+          "processing": 10.600000008940697
+        },
+        {
+          "start": 12022.20000000298,
+          "duration": 16,
+          "processing": 0.10000000894069672
+        },
+        {
+          "start": 12038.20000000298,
+          "duration": 16,
+          "processing": 11
+        },
+        {
+          "start": 12055.5,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 12072.29999999702,
+          "duration": 16,
+          "processing": 11.299999997019768
+        },
+        {
+          "start": 12088.09999999404,
+          "duration": 24,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 12106.20000000298,
+          "duration": 16,
+          "processing": 10.900000005960464
+        },
+        {
+          "start": 12122.59999999404,
+          "duration": 16,
+          "processing": 0.29999999701976776
+        },
+        {
+          "start": 12138.79999999702,
+          "duration": 16,
+          "processing": 11
+        },
+        {
+          "start": 12156.29999999702,
+          "duration": 16,
+          "processing": 0.09999999403953552
+        },
+        {
+          "start": 12172.09999999404,
+          "duration": 16,
+          "processing": 10.899999991059303
+        },
+        {
+          "start": 12188.79999999702,
+          "duration": 24,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 12206,
+          "duration": 16,
+          "processing": 11.200000002980232
+        },
+        {
+          "start": 12222,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 12238.79999999702,
+          "duration": 16,
+          "processing": 10.799999997019768
+        },
+        {
+          "start": 12255.39999999106,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 12272.09999999404,
+          "duration": 16,
+          "processing": 10.399999991059303
+        },
+        {
+          "start": 12288.79999999702,
+          "duration": 16,
+          "processing": 0.20000000298023224
+        },
+        {
+          "start": 12305.5,
+          "duration": 16,
+          "processing": 10.5
+        }
+      ],
+      "domRetained": true,
+      "stats": {
+        "hashes": 0,
+        "workers": 0,
+        "generated": 0,
+        "active": 0
+      },
+      "assetRequests": 0
+    }
+  ],
+  "handlers": [
+    {
+      "variant": "static",
+      "samples": [
+        {
+          "handlerMs": 6,
+          "afterQueuedCaretMs": 7.9000000059604645,
+          "caretExecutionMs": 1.800000011920929,
+          "firstFrameMs": 13.900000005960464
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.699999988079071,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.5
+        },
+        {
+          "handlerMs": 5.299999997019768,
+          "afterQueuedCaretMs": 7.199999988079071,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.19999998807907
+        },
+        {
+          "handlerMs": 7.5,
+          "afterQueuedCaretMs": 9.5,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.100000008940697
+        },
+        {
+          "handlerMs": 5.700000002980232,
+          "afterQueuedCaretMs": 7.5999999940395355,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.799999997019768,
+          "afterQueuedCaretMs": 8.900000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 15.900000005960464
+        },
+        {
+          "handlerMs": 6,
+          "afterQueuedCaretMs": 8,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 17.099999994039536
+        },
+        {
+          "handlerMs": 6.799999997019768,
+          "afterQueuedCaretMs": 8.799999997019768,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.200000002980232
+        },
+        {
+          "handlerMs": 5.799999997019768,
+          "afterQueuedCaretMs": 8,
+          "caretExecutionMs": 2.2000000029802322,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 7.200000002980232,
+          "afterQueuedCaretMs": 9.200000002980232,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 5.799999997019768,
+          "afterQueuedCaretMs": 7.899999991059303,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.299999997019768
+        },
+        {
+          "handlerMs": 6.9000000059604645,
+          "afterQueuedCaretMs": 8.900000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.099999994039536
+        },
+        {
+          "handlerMs": 5.9000000059604645,
+          "afterQueuedCaretMs": 7.9000000059604645,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 7,
+          "afterQueuedCaretMs": 9,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 6,
+          "afterQueuedCaretMs": 8,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 7.299999997019768,
+          "afterQueuedCaretMs": 9.299999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 6.0999999940395355,
+          "afterQueuedCaretMs": 8.099999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 8.099999994039536,
+          "afterQueuedCaretMs": 10.200000002980232,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 6.9000000059604645,
+          "afterQueuedCaretMs": 9.100000008940697,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 15.700000002980232
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 2.0999999940395355,
+          "firstFrameMs": 17.599999994039536
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "cached",
+      "samples": [
+        {
+          "handlerMs": 6.9000000059604645,
+          "afterQueuedCaretMs": 9,
+          "caretExecutionMs": 2.0999999940395355,
+          "firstFrameMs": 17.700000002980232
+        },
+        {
+          "handlerMs": 7.700000002980232,
+          "afterQueuedCaretMs": 9.600000008940697,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 6.4000000059604645,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 9.900000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 15.800000011920929
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.699999988079071,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.5
+        },
+        {
+          "handlerMs": 7.699999988079071,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.69999998807907
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.300000011920929,
+          "caretExecutionMs": 1.800000011920929,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.600000008940697,
+          "afterQueuedCaretMs": 9.5,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.100000008940697
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.19999998807907
+        },
+        {
+          "handlerMs": 7.800000011920929,
+          "afterQueuedCaretMs": 9.800000011920929,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.80000001192093
+        },
+        {
+          "handlerMs": 6.899999991059303,
+          "afterQueuedCaretMs": 8.899999991059303,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 8.200000002980232,
+          "afterQueuedCaretMs": 10.200000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 15.899999991059303
+        },
+        {
+          "handlerMs": 6.700000002980232,
+          "afterQueuedCaretMs": 8.600000008940697,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 17.200000002980232
+        },
+        {
+          "handlerMs": 8.200000002980232,
+          "afterQueuedCaretMs": 10.200000002980232,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 6.800000011920929,
+          "afterQueuedCaretMs": 8.600000008940697,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 8.299999997019768,
+          "afterQueuedCaretMs": 10.299999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7,
+          "afterQueuedCaretMs": 8.900000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 8.299999997019768,
+          "afterQueuedCaretMs": 10.200000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7,
+          "afterQueuedCaretMs": 8.799999997019768,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 9.799999997019768,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.200000002980232
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "background",
+      "samples": [
+        {
+          "handlerMs": 6.799999997019768,
+          "afterQueuedCaretMs": 8.700000002980232,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 17.700000002980232
+        },
+        {
+          "handlerMs": 7.700000002980232,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.299999997019768
+        },
+        {
+          "handlerMs": 6.4000000059604645,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 9.900000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.799999997019768,
+          "afterQueuedCaretMs": 8.599999994039536,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 17
+        },
+        {
+          "handlerMs": 8.099999994039536,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 6.700000002980232,
+          "afterQueuedCaretMs": 8.799999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 10,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.600000008940697,
+          "afterQueuedCaretMs": 9.700000002980232,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 6.600000008940697,
+          "afterQueuedCaretMs": 8.600000008940697,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 7.700000002980232,
+          "afterQueuedCaretMs": 9.700000002980232,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 8,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 15.599999994039536
+        },
+        {
+          "handlerMs": 6.800000011920929,
+          "afterQueuedCaretMs": 8.700000002980232,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.900000005960464
+        },
+        {
+          "handlerMs": 8.200000002980232,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.299999997019768
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.5999999940395355,
+          "afterQueuedCaretMs": 9.5,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.700000002980232,
+          "afterQueuedCaretMs": 8.600000008940697,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.80000001192093
+        },
+        {
+          "handlerMs": 7.699999988079071,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.5
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "cached",
+      "samples": [
+        {
+          "handlerMs": 6.100000008940697,
+          "afterQueuedCaretMs": 7.9000000059604645,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 18.30000001192093
+        },
+        {
+          "handlerMs": 7.899999991059303,
+          "afterQueuedCaretMs": 9.899999991059303,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.400000005960464
+        },
+        {
+          "handlerMs": 7.799999997019768,
+          "afterQueuedCaretMs": 9.699999988079071,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16
+        },
+        {
+          "handlerMs": 7.799999997019768,
+          "afterQueuedCaretMs": 9.799999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.299999997019768
+        },
+        {
+          "handlerMs": 6.4000000059604645,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.900000005960464
+        },
+        {
+          "handlerMs": 7.699999988079071,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.299999997019768,
+          "afterQueuedCaretMs": 8.200000002980232,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.799999997019768,
+          "afterQueuedCaretMs": 9.799999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.100000008940697
+        },
+        {
+          "handlerMs": 7.899999991059303,
+          "afterQueuedCaretMs": 9.699999988079071,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 17.19999998807907
+        },
+        {
+          "handlerMs": 6.600000008940697,
+          "afterQueuedCaretMs": 8.600000008940697,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.100000008940697
+        },
+        {
+          "handlerMs": 7.899999991059303,
+          "afterQueuedCaretMs": 9.899999991059303,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.200000002980232
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.69999998807907
+        },
+        {
+          "handlerMs": 7.800000011920929,
+          "afterQueuedCaretMs": 9.800000011920929,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.400000005960464
+        },
+        {
+          "handlerMs": 6.700000002980232,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 17
+        },
+        {
+          "handlerMs": 7.700000002980232,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.799999997019768,
+          "afterQueuedCaretMs": 9.700000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.600000008940697
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "background",
+      "samples": [
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 17.899999991059303
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 9.900000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 6.700000002980232,
+          "afterQueuedCaretMs": 8.599999994039536,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.5,
+          "afterQueuedCaretMs": 9.600000008940697,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.200000002980232
+        },
+        {
+          "handlerMs": 7.799999997019768,
+          "afterQueuedCaretMs": 9.699999988079071,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.299999997019768
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.599999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 15.799999997019768
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 9.900000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.5
+        },
+        {
+          "handlerMs": 6.299999997019768,
+          "afterQueuedCaretMs": 8.200000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.700000002980232,
+          "afterQueuedCaretMs": 9.600000008940697,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 6.4000000059604645,
+          "afterQueuedCaretMs": 8.200000002980232,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 8.099999994039536,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 6.299999997019768,
+          "afterQueuedCaretMs": 8.099999994039536,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.699999988079071,
+          "afterQueuedCaretMs": 9.799999997019768,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 7.799999997019768,
+          "afterQueuedCaretMs": 9.799999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.5999999940395355,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.099999994039536
+        },
+        {
+          "handlerMs": 6.9000000059604645,
+          "afterQueuedCaretMs": 8.800000011920929,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 17.30000001192093
+        },
+        {
+          "handlerMs": 7.699999988079071,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.5
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "static",
+      "samples": [
+        {
+          "handlerMs": 5.700000002980232,
+          "afterQueuedCaretMs": 7.4000000059604645,
+          "caretExecutionMs": 1.7000000029802322,
+          "firstFrameMs": 14.700000002980232
+        },
+        {
+          "handlerMs": 6.9000000059604645,
+          "afterQueuedCaretMs": 8.799999997019768,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 5.5999999940395355,
+          "afterQueuedCaretMs": 7.299999997019768,
+          "caretExecutionMs": 1.7000000029802322,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.699999988079071,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.19999998807907
+        },
+        {
+          "handlerMs": 5.700000002980232,
+          "afterQueuedCaretMs": 7.5,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 17.100000008940697
+        },
+        {
+          "handlerMs": 6.799999997019768,
+          "afterQueuedCaretMs": 8.700000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 5.5999999940395355,
+          "afterQueuedCaretMs": 7.5,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.69999998807907
+        },
+        {
+          "handlerMs": 6.600000008940697,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 5.700000002980232,
+          "afterQueuedCaretMs": 7.700000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.0999999940395355,
+          "afterQueuedCaretMs": 9.299999997019768,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 16.69999998807907
+        },
+        {
+          "handlerMs": 6.200000002980232,
+          "afterQueuedCaretMs": 8.300000011920929,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 10,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.299999997019768
+        },
+        {
+          "handlerMs": 8.700000002980232,
+          "afterQueuedCaretMs": 12.5,
+          "caretExecutionMs": 3.699999988079071,
+          "firstFrameMs": 16.200000002980232
+        },
+        {
+          "handlerMs": 7.4000000059604645,
+          "afterQueuedCaretMs": 9.600000008940697,
+          "caretExecutionMs": 2.2000000029802322,
+          "firstFrameMs": 17.400000005960464
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.899999991059303
+        },
+        {
+          "handlerMs": 8.100000008940697,
+          "afterQueuedCaretMs": 10.300000011920929,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 16.400000005960464
+        },
+        {
+          "handlerMs": 6.200000002980232,
+          "afterQueuedCaretMs": 8.099999994039536,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 7.4000000059604645,
+          "afterQueuedCaretMs": 9.400000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.0999999940395355,
+          "afterQueuedCaretMs": 8,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 15.799999997019768
+        },
+        {
+          "handlerMs": 7.299999997019768,
+          "afterQueuedCaretMs": 9.399999991059303,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.5
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "background",
+      "samples": [
+        {
+          "handlerMs": 7.0999999940395355,
+          "afterQueuedCaretMs": 9.099999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.900000005960464
+        },
+        {
+          "handlerMs": 8.299999997019768,
+          "afterQueuedCaretMs": 10.299999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 6.899999991059303,
+          "afterQueuedCaretMs": 8.899999991059303,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 8.5,
+          "afterQueuedCaretMs": 10.5,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.700000002980232,
+          "afterQueuedCaretMs": 8.600000008940697,
+          "caretExecutionMs": 1.800000011920929,
+          "firstFrameMs": 15.799999997019768
+        },
+        {
+          "handlerMs": 8.100000008940697,
+          "afterQueuedCaretMs": 10.100000008940697,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 17.5
+        },
+        {
+          "handlerMs": 6.9000000059604645,
+          "afterQueuedCaretMs": 8.800000011920929,
+          "caretExecutionMs": 1.800000011920929,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 8.100000008940697,
+          "afterQueuedCaretMs": 10,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.599999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.69999998807907
+        },
+        {
+          "handlerMs": 7.800000011920929,
+          "afterQueuedCaretMs": 9.900000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.599999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 8.199999988079071,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 6.4000000059604645,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.200000002980232
+        },
+        {
+          "handlerMs": 8.099999994039536,
+          "afterQueuedCaretMs": 10,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 17.299999997019768
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.800000011920929,
+          "afterQueuedCaretMs": 9.700000002980232,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 8,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 2.0999999940395355,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.899999991059303
+        },
+        {
+          "handlerMs": 8.100000008940697,
+          "afterQueuedCaretMs": 10.200000002980232,
+          "caretExecutionMs": 2.0999999940395355,
+          "firstFrameMs": 16.700000002980232
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "static",
+      "samples": [
+        {
+          "handlerMs": 5.799999997019768,
+          "afterQueuedCaretMs": 7.600000008940697,
+          "caretExecutionMs": 1.800000011920929,
+          "firstFrameMs": 13.200000002980232
+        },
+        {
+          "handlerMs": 7.700000002980232,
+          "afterQueuedCaretMs": 9.700000002980232,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 5.799999997019768,
+          "afterQueuedCaretMs": 7.799999997019768,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.399999991059303,
+          "afterQueuedCaretMs": 9.5,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 16.69999998807907
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.400000005960464,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.600000008940697,
+          "afterQueuedCaretMs": 9.700000002980232,
+          "caretExecutionMs": 2.0999999940395355,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 5.700000002980232,
+          "afterQueuedCaretMs": 7.700000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.599999994039536
+        },
+        {
+          "handlerMs": 7.9000000059604645,
+          "afterQueuedCaretMs": 9.800000011920929,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 15.800000011920929
+        },
+        {
+          "handlerMs": 5.700000002980232,
+          "afterQueuedCaretMs": 7.5999999940395355,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.400000005960464
+        },
+        {
+          "handlerMs": 7.399999991059303,
+          "afterQueuedCaretMs": 9.399999991059303,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.099999994039536
+        },
+        {
+          "handlerMs": 5.9000000059604645,
+          "afterQueuedCaretMs": 7.799999997019768,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.200000002980232
+        },
+        {
+          "handlerMs": 7.200000002980232,
+          "afterQueuedCaretMs": 9.299999997019768,
+          "caretExecutionMs": 2.0999999940395355,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 5.899999991059303,
+          "afterQueuedCaretMs": 7.799999997019768,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 7.5999999940395355,
+          "afterQueuedCaretMs": 9.599999994039536,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 5.700000002980232,
+          "afterQueuedCaretMs": 7.5999999940395355,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 7.199999988079071,
+          "afterQueuedCaretMs": 9.199999988079071,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16
+        },
+        {
+          "handlerMs": 5.5999999940395355,
+          "afterQueuedCaretMs": 7.5,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.299999997019768
+        },
+        {
+          "handlerMs": 7.0999999940395355,
+          "afterQueuedCaretMs": 9.200000002980232,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 17.5
+        },
+        {
+          "handlerMs": 5.5999999940395355,
+          "afterQueuedCaretMs": 7.5,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 7.5,
+          "afterQueuedCaretMs": 9.5,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.700000002980232
+        }
+      ],
+      "restored": true
+    },
+    {
+      "variant": "cached",
+      "samples": [
+        {
+          "handlerMs": 6.799999997019768,
+          "afterQueuedCaretMs": 8.900000005960464,
+          "caretExecutionMs": 2.1000000089406967,
+          "firstFrameMs": 17.599999994039536
+        },
+        {
+          "handlerMs": 8,
+          "afterQueuedCaretMs": 9.900000005960464,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 15.800000011920929
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.599999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 17.599999994039536
+        },
+        {
+          "handlerMs": 8,
+          "afterQueuedCaretMs": 10,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 15.900000005960464
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.399999991059303,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 17.399999991059303
+        },
+        {
+          "handlerMs": 8.400000005960464,
+          "afterQueuedCaretMs": 10.400000005960464,
+          "caretExecutionMs": 2,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.399999991059303,
+          "afterQueuedCaretMs": 8.299999997019768,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 7.700000002980232,
+          "afterQueuedCaretMs": 9.700000002980232,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 6.5999999940395355,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 17
+        },
+        {
+          "handlerMs": 8.700000002980232,
+          "afterQueuedCaretMs": 10.899999991059303,
+          "caretExecutionMs": 2.199999988079071,
+          "firstFrameMs": 16.299999997019768
+        },
+        {
+          "handlerMs": 6.700000002980232,
+          "afterQueuedCaretMs": 8.599999994039536,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 8.200000002980232,
+          "afterQueuedCaretMs": 10.100000008940697,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.600000008940697
+        },
+        {
+          "handlerMs": 6.799999997019768,
+          "afterQueuedCaretMs": 8.699999988079071,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 8,
+          "afterQueuedCaretMs": 10,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.5
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.299999997019768,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 16.799999997019768
+        },
+        {
+          "handlerMs": 8.099999994039536,
+          "afterQueuedCaretMs": 10,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.700000002980232
+        },
+        {
+          "handlerMs": 6.5,
+          "afterQueuedCaretMs": 8.299999997019768,
+          "caretExecutionMs": 1.7999999970197678,
+          "firstFrameMs": 15.700000002980232
+        },
+        {
+          "handlerMs": 8.199999988079071,
+          "afterQueuedCaretMs": 10.199999988079071,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 17.69999998807907
+        },
+        {
+          "handlerMs": 6.600000008940697,
+          "afterQueuedCaretMs": 8.5,
+          "caretExecutionMs": 1.8999999910593033,
+          "firstFrameMs": 16.30000001192093
+        },
+        {
+          "handlerMs": 8.199999988079071,
+          "afterQueuedCaretMs": 10.099999994039536,
+          "caretExecutionMs": 1.9000000059604645,
+          "firstFrameMs": 16.69999998807907
+        }
+      ],
+      "restored": true
+    }
+  ],
+  "trailing": {
+    "cell": {
+      "x": 294,
+      "y": 327.546875,
+      "w": 48,
+      "h": 48
+    },
+    "native": {
+      "x": 341.984375,
+      "y": 342.546875,
+      "w": 0,
+      "h": 17
+    },
+    "nativeRects": [
+      {
+        "x": 341.984375,
+        "y": 342.546875,
+        "w": 0,
+        "h": 17
+      }
+    ],
+    "logical": {
+      "anchor": 1,
+      "head": 1
+    },
+    "endpoints": {
+      "anchor": "original-text",
+      "anchorOffset": 1,
+      "focus": "original-text",
+      "focusOffset": 1
+    },
+    "sameText": true,
+    "sameCell": true
+  },
+  "leading": {
+    "cell": {
+      "x": 294,
+      "y": 327.546875,
+      "w": 48,
+      "h": 48
+    },
+    "native": {
+      "x": 294,
+      "y": 342.546875,
+      "w": 0,
+      "h": 17
+    },
+    "nativeRects": [
+      {
+        "x": 294,
+        "y": 342.546875,
+        "w": 0,
+        "h": 17
+      }
+    ],
+    "logical": {
+      "anchor": 0,
+      "head": 0
+    },
+    "endpoints": {
+      "anchor": "original-text",
+      "anchorOffset": 0,
+      "focus": "original-text",
+      "focusOffset": 0
+    },
+    "sameText": true,
+    "sameCell": true
+  },
+  "selection": {
+    "cell": {
+      "x": 294,
+      "y": 327.546875,
+      "w": 48,
+      "h": 48
+    },
+    "native": {
+      "x": 294,
+      "y": 342.546875,
+      "w": 48,
+      "h": 17
+    },
+    "nativeRects": [
+      {
+        "x": 294,
+        "y": 342.546875,
+        "w": 48,
+        "h": 17
+      }
+    ],
+    "logical": {
+      "anchor": 0,
+      "head": 1
+    },
+    "endpoints": {
+      "anchor": "original-text",
+      "anchorOffset": 0,
+      "focus": "original-text",
+      "focusOffset": 1
+    },
+    "sameText": true,
+    "sameCell": true
+  },
+  "grid": [
+    {
+      "point": {
+        "x": 298.8,
+        "y": 332.346875,
+        "expected": 0
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 294,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 0,
+          "head": 0
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 0,
+          "focus": "original-text",
+          "focusOffset": 0
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 306,
+        "y": 332.346875,
+        "expected": 0
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 294,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 0,
+          "head": 0
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 0,
+          "focus": "original-text",
+          "focusOffset": 0
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 330,
+        "y": 332.346875,
+        "expected": 1
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 341.984375,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 1,
+          "head": 1
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 1,
+          "focus": "original-text",
+          "focusOffset": 1
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 337.2,
+        "y": 332.346875,
+        "expected": 1
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 341.984375,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 1,
+          "head": 1
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 1,
+          "focus": "original-text",
+          "focusOffset": 1
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 298.8,
+        "y": 351.546875,
+        "expected": 0
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 294,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 0,
+          "head": 0
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 0,
+          "focus": "original-text",
+          "focusOffset": 0
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 306,
+        "y": 351.546875,
+        "expected": 0
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 294,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 0,
+          "head": 0
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 0,
+          "focus": "original-text",
+          "focusOffset": 0
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 330,
+        "y": 351.546875,
+        "expected": 1
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 341.984375,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 1,
+          "head": 1
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 1,
+          "focus": "original-text",
+          "focusOffset": 1
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 337.2,
+        "y": 351.546875,
+        "expected": 1
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 341.984375,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 1,
+          "head": 1
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 1,
+          "focus": "original-text",
+          "focusOffset": 1
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 298.8,
+        "y": 370.746875,
+        "expected": 0
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 294,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 0,
+          "head": 0
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 0,
+          "focus": "original-text",
+          "focusOffset": 0
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 306,
+        "y": 370.746875,
+        "expected": 0
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 294,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 294,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 0,
+          "head": 0
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 0,
+          "focus": "original-text",
+          "focusOffset": 0
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 330,
+        "y": 370.746875,
+        "expected": 1
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 341.984375,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 1,
+          "head": 1
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 1,
+          "focus": "original-text",
+          "focusOffset": 1
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    },
+    {
+      "point": {
+        "x": 337.2,
+        "y": 370.746875,
+        "expected": 1
+      },
+      "state": {
+        "cell": {
+          "x": 294,
+          "y": 327.546875,
+          "w": 48,
+          "h": 48
+        },
+        "native": {
+          "x": 341.984375,
+          "y": 342.546875,
+          "w": 0,
+          "h": 17
+        },
+        "nativeRects": [
+          {
+            "x": 341.984375,
+            "y": 342.546875,
+            "w": 0,
+            "h": 17
+          }
+        ],
+        "logical": {
+          "anchor": 1,
+          "head": 1
+        },
+        "endpoints": {
+          "anchor": "original-text",
+          "anchorOffset": 1,
+          "focus": "original-text",
+          "focusOffset": 1
+        },
+        "sameText": true,
+        "sameCell": true
+      }
+    }
+  ],
+  "stress": [
+    {
+      "count": 1,
+      "ready": 1,
+      "elapsed": 175.79999999701977,
+      "first": 175.79999999701977,
+      "peakQueued": 0,
+      "generated": 1,
+      "bytes": 5151663,
+      "peakBytes": 5151663,
+      "workersStarted": 0,
+      "failures": 0
+    },
+    {
+      "count": 10,
+      "ready": 10,
+      "elapsed": 1225.5,
+      "first": 159.6000000089407,
+      "peakQueued": 9,
+      "generated": 10,
+      "bytes": 6182219,
+      "peakBytes": 6182219,
+      "workersStarted": 0,
+      "failures": 0
+    },
+    {
+      "count": 50,
+      "ready": 50,
+      "elapsed": 6223.899999991059,
+      "first": 156.79999999701977,
+      "peakQueued": 49,
+      "generated": 50,
+      "bytes": 11334085,
+      "peakBytes": 11334085,
+      "workersStarted": 0,
+      "failures": 0
+    },
+    {
+      "count": 100,
+      "ready": 100,
+      "elapsed": 10390.09999999404,
+      "first": 223.59999999403954,
+      "peakQueued": 64,
+      "generated": 100,
+      "bytes": 16687075,
+      "peakBytes": 16690343,
+      "workersStarted": 0,
+      "failures": 0
+    }
+  ],
+  "extended": {
+    "checks": [
+      {
+        "name": "font advance",
+        "passed": true
+      },
+      {
+        "name": "zoom advance",
+        "passed": true
+      },
+      {
+        "name": "scale advance",
+        "passed": true
+      },
+      {
+        "name": "narrow advance",
+        "passed": true
+      },
+      {
+        "name": "hidden fallback",
+        "passed": true
+      },
+      {
+        "name": "late font advance",
+        "passed": true
+      },
+      {
+        "name": "font/layout work keeps original Text",
+        "passed": true
+      },
+      {
+        "name": "font/layout work makes no canonical edit",
+        "passed": true
+      },
+      {
+        "name": "scrolling keeps native advance",
+        "passed": true
+      },
+      {
+        "name": "missing ordinary-text fallback",
+        "passed": true
+      },
+      {
+        "name": "conflict ordinary-text fallback",
+        "passed": true
+      },
+      {
+        "name": "rtl ordinary-text fallback",
+        "passed": true
+      },
+      {
+        "name": "rotation ordinary-text fallback",
+        "passed": true
+      },
+      {
+        "name": "mixed bidi fallback",
+        "passed": true
+      },
+      {
+        "name": "mixed bidi removal restores surface",
+        "passed": true
+      },
+      {
+        "name": "native envelope round-trip",
+        "passed": true
+      },
+      {
+        "name": "native reopen text and property",
+        "passed": true
+      },
+      {
+        "name": "native reopen surface mounted",
+        "passed": true
+      },
+      {
+        "name": "nested shared surface and occurrence identity",
+        "passed": true
+      },
+      {
+        "name": "shared canonical edit in both occurrences",
+        "passed": true
+      },
+      {
+        "name": "shared edit retains both mounted cells",
+        "passed": true
+      },
+      {
+        "name": "shared edit Undo",
+        "passed": true
+      },
+      {
+        "name": "nested disposal cleans its surface only",
+        "passed": true
+      },
+      {
+        "name": "nested remount restores surface",
+        "passed": true
+      }
+    ],
+    "geometries": [
+      {
+        "name": "font",
+        "native": 341.984375,
+        "right": 342,
+        "delta": 0.015625
+      },
+      {
+        "name": "zoom",
+        "native": 353.984375,
+        "right": 354,
+        "delta": 0.015625
+      },
+      {
+        "name": "scale",
+        "native": 351.58123779296875,
+        "right": 351.6000061035156,
+        "delta": 0.018768310546875
+      },
+      {
+        "name": "narrow",
+        "native": 341.984375,
+        "right": 342,
+        "delta": 0.015625
+      }
+    ]
+  },
+  "failures": [
+    {
+      "mode": "font",
+      "surface": false,
+      "text": "BUONARROTO, — I send this as cover to two letters one is to go to Piero Aldobrandini, and the other to Giovanni Balducci in Rome. The latter I wish thee to hand to Bonifazio Fazi so that he may send it on, the other give to the aforesaid Piero. Concerning those two scoundrels, I have no time to tell the whole story of their knavery, and I beg all of you — and tell Lodovico the same — not to refer to their behaviour in any way, for we have not to deal with them in this matter. Let this suffice.\r",
+      "properties": 1,
+      "stats": {
+        "hashes": 3,
+        "workersStarted": 1,
+        "workersTerminated": 1,
+        "generated": 0,
+        "cacheHits": 0,
+        "deduplicated": 1,
+        "queuedCancelled": 0,
+        "staleResults": 0,
+        "failures": 1,
+        "evicted": 0,
+        "bytes": 0,
+        "peakBytes": 0,
+        "active": 0,
+        "queued": 0,
+        "leases": 2,
+        "renderMs": [],
+        "startupMs": []
+      },
+      "revision": 413
+    },
+    {
+      "mode": "webgl",
+      "surface": false,
+      "text": "BUONARROTO, — I send this as cover to two letters one is to go to Piero Aldobrandini, and the other to Giovanni Balducci in Rome. The latter I wish thee to hand to Bonifazio Fazi so that he may send it on, the other give to the aforesaid Piero. Concerning those two scoundrels, I have no time to tell the whole story of their knavery, and I beg all of you — and tell Lodovico the same — not to refer to their behaviour in any way, for we have not to deal with them in this matter. Let this suffice.\r",
+      "properties": 1,
+      "stats": {
+        "hashes": 3,
+        "workersStarted": 1,
+        "workersTerminated": 1,
+        "generated": 0,
+        "cacheHits": 0,
+        "deduplicated": 1,
+        "queuedCancelled": 0,
+        "staleResults": 0,
+        "failures": 1,
+        "evicted": 0,
+        "bytes": 0,
+        "peakBytes": 0,
+        "active": 0,
+        "queued": 0,
+        "leases": 2,
+        "renderMs": [],
+        "startupMs": []
+      },
+      "revision": 416
+    },
+    {
+      "mode": "worker",
+      "surface": false,
+      "text": "BUONARROTO, — I send this as cover to two letters one is to go to Piero Aldobrandini, and the other to Giovanni Balducci in Rome. The latter I wish thee to hand to Bonifazio Fazi so that he may send it on, the other give to the aforesaid Piero. Concerning those two scoundrels, I have no time to tell the whole story of their knavery, and I beg all of you — and tell Lodovico the same — not to refer to their behaviour in any way, for we have not to deal with them in this matter. Let this suffice.\r",
+      "properties": 1,
+      "stats": {
+        "hashes": 3,
+        "workersStarted": 1,
+        "workersTerminated": 1,
+        "generated": 0,
+        "cacheHits": 0,
+        "deduplicated": 1,
+        "queuedCancelled": 0,
+        "staleResults": 0,
+        "failures": 1,
+        "evicted": 0,
+        "bytes": 0,
+        "peakBytes": 0,
+        "active": 0,
+        "queued": 0,
+        "leases": 2,
+        "renderMs": [],
+        "startupMs": []
+      },
+      "revision": 419
+    }
+  ],
+  "assetRequests": [
+    "/vendor/initialis/worker.mjs",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/render.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fonts.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/compose.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ink.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/params.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/names.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/field.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ornament.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/frame.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/patterns.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fill.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/texture.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/outline.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/util.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/shapes.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/base/manifest.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/initials/manifest.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/caps/cormorant-garamond-700.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/pattern/hatch.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/frame/rect.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/leaf/acanthus.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/flower/rosette.js",
+    "/vendor/initialis/worker.mjs",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/render.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fonts.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/compose.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ink.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/params.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/names.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/field.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ornament.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/frame.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/patterns.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/texture.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fill.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/util.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/outline.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/shapes.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/base/manifest.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/initials/manifest.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/caps/cormorant-garamond-700.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/pattern/hatch.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/frame/rect.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/leaf/acanthus.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/flower/rosette.js",
+    "/vendor/initialis/worker.mjs",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fonts.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/render.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/compose.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ink.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/params.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/names.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/field.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ornament.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/frame.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/patterns.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fill.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/texture.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/util.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/shapes.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/outline.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/base/manifest.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/initials/manifest.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/caps/cormorant-garamond-700.js",
+    "/vendor/initialis/worker.mjs",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/render.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fonts.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/compose.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ink.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/params.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/field.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/kinds/names.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/ornament.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/patterns.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/fill.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/texture.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/outline.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/util.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/shapes.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/src/frame.js",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/base/manifest.json",
+    "/vendor/initialis/6cf93f7d3d2922efdbeb86cafa27f39758be9398/render/fonts/initials/manifest.json"
+  ],
+  "stats": {
+    "hashes": 3,
+    "workersStarted": 1,
+    "workersTerminated": 1,
+    "generated": 0,
+    "cacheHits": 0,
+    "deduplicated": 1,
+    "queuedCancelled": 1,
+    "staleResults": 0,
+    "failures": 1,
+    "evicted": 0,
+    "bytes": 0,
+    "peakBytes": 0,
+    "active": 0,
+    "queued": 0,
+    "leases": 0,
+    "renderMs": [],
+    "startupMs": []
+  },
+  "errors": []
+}

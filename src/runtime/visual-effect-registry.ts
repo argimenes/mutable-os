@@ -39,10 +39,21 @@ export interface VisualEffectProps {
   params:Accessor<EffectParams>;
   geometry:Accessor<EffectGeometry>;
 }
+export interface CharacterSurface { readonly image: string; readonly width: number; readonly height: number }
+export interface CharacterSurfacePresentation {visibility:'visible'|'nearby'|'offscreen';pixelRatio:number}
+/** Owned asynchronous readiness. A renderer must release its work on abort;
+ * callbacks never author content or invalidate unrelated range bindings. */
+export interface CharacterSurfaceReadiness {
+  signal:AbortSignal;
+  presentation:CharacterSurfacePresentation;
+  ready(surface:CharacterSurface|undefined):void;
+  observe(listener:(state:CharacterSurfacePresentation)=>void):()=>void;
+}
 export type VisualRenderer = {
   name:string; defaults:EffectParams;
   validate(params:EffectParams):void;
 } & ({ target:'range-overlay'; layoutParams:readonly string[]; laneHeight(params:EffectParams):number; View:Component<VisualEffectProps> }
+  | { target:'character-surface'; surface(text:string, params:EffectParams, document:Document, readiness?:CharacterSurfaceReadiness):CharacterSurface|undefined }
   | { target:'cell-style'; classes(params:EffectParams):readonly string[] }
   | { target:'text-presentation'; focusKinds: readonly FocusRegion['kind'][];
       /** Called within a Solid root; own resources with onCleanup. */
@@ -93,7 +104,7 @@ export class VisualEffectRegistry {
   private touch(){this.changed[1](n=>n+1);}
   registerRenderer(definition:VisualRenderer){
     this.assertLive();if(this.renderers.has(definition.name))throw Error(`Renderer ${definition.name} already registered`);
-    if(!definition.name||!['range-overlay','cell-style','text-presentation','viewport-presentation'].includes(definition.target))throw Error('Unsupported renderer target');
+    if(!definition.name||!['range-overlay','cell-style','character-surface','text-presentation','viewport-presentation'].includes(definition.target))throw Error('Unsupported renderer target');
     json(definition.defaults);definition.validate(definition.defaults);
     const entry=Object.freeze({...definition,...(definition.target==='range-overlay'?{layoutParams:Object.freeze([...definition.layoutParams])}:{}),...(definition.target==='text-presentation'?{focusKinds:Object.freeze([...definition.focusKinds])}:{}),defaults:frozen(structuredClone(definition.defaults))}) as VisualRenderer;
     this.renderers.set(entry.name,entry);this.touch();

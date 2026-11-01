@@ -135,6 +135,10 @@ export type FeatureFlags = Readonly<{
   textSuperposition: boolean;
   /** Direct DOM character cells, updated by one reactive effect per paragraph. */
   directDomCharacterCells: boolean;
+  /** Native-layout, single-Cell static character surfaces. */
+  inlineCharacterSurfaces: boolean;
+  /** Bundled asynchronous Initialis still-image renderer and direct activation. */
+  initialisCharacterRenderer: boolean;
   /** Transient caret enter/leave events and SVG emphasis for opted-in annotations. */
   annotationRangeEvents: boolean;
   /** Session-only focus effects; Normal is the initial mode. */
@@ -214,6 +218,8 @@ export const featureFlags: FeatureFlags = Object.freeze({
   compactEditorChrome: true,
   textSuperposition: false,
   directDomCharacterCells: true,
+  inlineCharacterSurfaces: true,
+  initialisCharacterRenderer: true,
   annotationRangeEvents: true,
   caretModes: true,
   readingSpotlight: true,

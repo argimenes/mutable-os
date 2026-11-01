@@ -1,0 +1,16 @@
+{
+  "src/features/initialis/controller.ts": "102f96489a503028b08fe66885aa51639489e1950d8a218161117ae8e31b94dc",
+  "src/features/initialis/settings.ts": "cc7a7eb5e624180f9673642a330d2fd6681d0b9233810693ff848abd43c4d587",
+  "src/features/initialis/service.ts": "43594a2d231ed9016072833161e0e9f74fc7e92db9f836bc512ce03df7e8d750",
+  "src/features/initialis/preset.json": "b69075ecf57a7412b3cb617429d0a9c7451f6783faa48fd1ad0ac5ea284fb797",
+  "src/rendering/character-surface-host.ts": "70255e68236bd936414f547e9015114b93acc65e634371ed21db4a2ae3158863",
+  "src/rendering/static-character-surface.ts": "422a2c035f583ebb695e281f9a00e09b9c2a52aebb0d5c3e8a157b7d9ebf1347",
+  "src/rendering/range-rendering.tsx": "ed2cd9051f50af0c3bc50fc6e073b11ec13860ff1e7e40f1766db135c58b84c3",
+  "src/rendering/standoff-editor-view.tsx": "7a767ab32b9c1c609c7b16f779a06dcd9b0aa151f55cb77769fd1d078ca16ac6",
+  "src/runtime/visual-effect-registry.ts": "15e250215c896ecfbed6d407303080bad26d7f6f9c10d4a9c22a95e7e98c3110",
+  "src/rendering/document-style-bar.tsx": "8b26402371fcd6186a958b09f5a04923a7c0386b8bb4664776b9ef63ae7bbfa1",
+  "src/reactive-editor/editor.ts": "01d6d39a416c5dc11d52927a17ef0d0a35ba9409516804ed04860564210341d7",
+  "src/input/binding-catalog.ts": "9628ae04f97462b5a3a7577de814f6e5a854d76b9bd67b64d76b4a7a4cc2a8f1",
+  "src/configuration.ts": "dde07e782531948d6739a0969bbad59c5f1b1451128c8a2b1d1d6a70ca1a9483",
+  "public/vendor/initialis/worker.mjs": "4eb4f183e18f748098d4a82762eead9a718f2b81e0140e3d75f35235670239cb"
+}

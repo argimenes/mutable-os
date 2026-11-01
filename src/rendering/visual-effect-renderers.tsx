@@ -1,3 +1,4 @@
+import { registerStaticCharacterSurface } from './static-character-surface';
 import { For } from 'solid-js';
 import { rectanglePath, underlineShapes, outlineShapes } from './decorations';
 import type { EffectParams, VisualEffectRegistry, VisualEffectProps } from '../runtime/visual-effect-registry';
@@ -26,6 +27,7 @@ function Region(props:VisualEffectProps) {
 }
 function finite(params:EffectParams,key:string,min:number,max:number){const n=params[key];if(typeof n!=='number'||!Number.isFinite(n)||n<min||n>max)throw Error(`Invalid renderer parameter ${key}`);}
 export function registerVisualEffectRenderers(registry:VisualEffectRegistry){
+  registerStaticCharacterSurface(registry);
   registry.registerRenderer({name:'svg-underline',target:'range-overlay',defaults:{color:'purple',thickness:2,lineStyle:'solid',opacity:1,offset:1.5},
     validate(p){if(typeof p.color!=='string'||!p.color)throw Error('Invalid underline color');finite(p,'thickness',0,100);finite(p,'opacity',0,1);finite(p,'offset',-1000,1000);if(!['solid','dashed','dotted'].includes(String(p.lineStyle)))throw Error('Invalid underline line style');},
     layoutParams:['thickness','offset'],laneHeight:p=>Number(p.thickness),View:Underline});

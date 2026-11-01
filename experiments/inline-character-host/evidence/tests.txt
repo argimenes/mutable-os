@@ -1,0 +1,16 @@
+
+ RUN  v2.1.9 /Users/iianneill/Documents/GitHub/speedy-ts-reactive
+
+ ✓ src/runtime/visual-effect-registry.test.tsx (4 tests) 179ms
+ ✓ src/persistence/native-resource.test.ts (15 tests) 293ms
+ ✓ src/rendering/direct-character-cells.test.tsx (13 tests) 1327ms
+   ✓ does not allocate reactive computations per character in the default renderer 347ms
+ ✓ src/rendering/range-rendering.test.tsx (15 tests) 1685ms
+ ✓ src/rendering/character-surface.test.tsx (27 tests) 2604ms
+   ✓ retains Cell/Text and bounds presentation/rebasing work (direct=true) 550ms
+
+ Test Files  5 passed (5)
+      Tests  74 passed (74)
+   Start at  22:20:17
+   Duration  13.78s (transform 10.30s, setup 0ms, collect 28.60s, tests 6.09s, environment 6.40s, prepare 1.12s)
+

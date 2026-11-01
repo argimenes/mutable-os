@@ -1,0 +1,142 @@
+[
+  {
+    "path": "lib/initialis.js",
+    "bytes": 12753,
+    "sha256": "928ee3758ae9f8ca778f8d84ab07c7213e6b760bfedc9924a6255b99076e0af4"
+  },
+  {
+    "path": "render/fonts/base/manifest.json",
+    "bytes": 9806,
+    "sha256": "5e29aae06716b5eb62900160b32989f21e6e309c0785cbdbffe1ceeddef2e8f8"
+  },
+  {
+    "path": "render/fonts/caps/cinzel-700.json",
+    "bytes": 19446,
+    "sha256": "5722a86ee0048dea5b73b732bfa61cfc263b62d9a4fbaed81f30ad99f03bb302"
+  },
+  {
+    "path": "render/fonts/caps/cormorant-garamond-700.json",
+    "bytes": 22586,
+    "sha256": "0b0623b3259f98977e96ee1c571fbd463349271f10dd0300f81145f80587c404"
+  },
+  {
+    "path": "render/fonts/initials/manifest.json",
+    "bytes": 1924,
+    "sha256": "22f7b08f192474735d9483191a8ece69f17320216508b7bab70a4526861b00bf"
+  },
+  {
+    "path": "render/src/compose.js",
+    "bytes": 44703,
+    "sha256": "292311a0a943f04660971a28738ee637d50b2b0e823f73dd9ee9ce68e9177ffb"
+  },
+  {
+    "path": "render/src/field.js",
+    "bytes": 5431,
+    "sha256": "901b0bff855371e2f3bae9de92ba66967fe528a8a0aa8ec8de28ff6a8cc79ae8"
+  },
+  {
+    "path": "render/src/fill.js",
+    "bytes": 4405,
+    "sha256": "17b1512f8a9b7e05473d279d4b438fb47dadb2baca3ac37278b92a6cc395d722"
+  },
+  {
+    "path": "render/src/fonts.js",
+    "bytes": 6678,
+    "sha256": "0a4bcc46166ddaff42081c8db4649af97abfdd85c4945e8ae8abb2ecb6c06ed0"
+  },
+  {
+    "path": "render/src/frame.js",
+    "bytes": 4039,
+    "sha256": "62722b2bf9fbf241dc3d78a4d02fa7541129bb812d8f56c1d314c87e6c05ff6f"
+  },
+  {
+    "path": "render/src/ink.js",
+    "bytes": 16878,
+    "sha256": "58d7558d856891d58847b7c3b20e0b08796ce55286867ced3968506e962d555e"
+  },
+  {
+    "path": "render/src/kinds.js",
+    "bytes": 4239,
+    "sha256": "8f03871ae006517d5e5edfb23db8dc7684cdec6596a39be7a4d2b6e7cbf27933"
+  },
+  {
+    "path": "render/src/kinds/flower/rosette.js",
+    "bytes": 666,
+    "sha256": "48383f3304cd1f5e48485521896adc7501173d8da6c2f3e1dbba59d937833116"
+  },
+  {
+    "path": "render/src/kinds/frame/circle.js",
+    "bytes": 592,
+    "sha256": "28d1b4aef251947c8d119bff8a8f22057a595fe9b4ad4f0f2a40513df95f5f60"
+  },
+  {
+    "path": "render/src/kinds/frame/rect.js",
+    "bytes": 507,
+    "sha256": "3adcee39fc87196a11944d2dcfa6c9a6d8f17356a6b65872cb09eb3cb6b38429"
+  },
+  {
+    "path": "render/src/kinds/leaf/acanthus.js",
+    "bytes": 769,
+    "sha256": "554c75261d2a262ccb1781cfee4665621a70cea32214424a42344ef35935385f"
+  },
+  {
+    "path": "render/src/kinds/names.js",
+    "bytes": 2101,
+    "sha256": "303d5e254aadc07db10f4c0d32c05a81ffea930851580fe43547329fd4db15f5"
+  },
+  {
+    "path": "render/src/kinds/pattern/hatch.js",
+    "bytes": 341,
+    "sha256": "e9d18e841d3aab5fdaa70a8d57e8ad914a915db2b63eae73cdf7798595ab2e2e"
+  },
+  {
+    "path": "render/src/ornament.js",
+    "bytes": 19005,
+    "sha256": "7e424916c598d91f64244b24939b5ebdc9fa7e8b5498143e475ce6c244ba2fc0"
+  },
+  {
+    "path": "render/src/outline.js",
+    "bytes": 7787,
+    "sha256": "e984a2a115bc14a8c5f74529711b6aca31452181405ecc915478137afc2e645a"
+  },
+  {
+    "path": "render/src/params.js",
+    "bytes": 17067,
+    "sha256": "10beeda71c559ca139ec351d286a637d846a04a36cead3822faa204f26f36bfb"
+  },
+  {
+    "path": "render/src/patterns.js",
+    "bytes": 3077,
+    "sha256": "b305a8143cad2f2652dea874293bf96f1667600384136284a393cdee26b863e0"
+  },
+  {
+    "path": "render/src/render.js",
+    "bytes": 10215,
+    "sha256": "1aa740a75c0f0cd222dc63e8bed906b106923e90e0291ac127bbe2835ff9290b"
+  },
+  {
+    "path": "render/src/shapes.js",
+    "bytes": 7346,
+    "sha256": "e1706a5f80baa823ab9989cdf4ea8d21f3a078e39aa08643090fcb207f9f8134"
+  },
+  {
+    "path": "render/src/texture.js",
+    "bytes": 5876,
+    "sha256": "5fe23a67f4d9cc6e820fd7067bb06794cc777b1a2df5e689b97bf388b77da63e"
+  },
+  {
+    "path": "render/src/util.js",
+    "bytes": 5165,
+    "sha256": "6e324bb76e3d00412dd0f45c36b6485404118b2893f3fd26a5e8521a21482e47"
+  },
+  {
+    "path": "render/src/worker.js",
+    "bytes": 6555,
+    "sha256": "e01978b685a30862ec50813cd042ebe23d07d4b7797e6f0bdc941c718d920d8b"
+  },
+  {
+    "path": "src/codes.js",
+    "bytes": 5256,
+    "sha256": "c3b5359915a08bd942f147bfd9976458c5362403e7f34801cee14b1a810a6d5f"
+  }
+]

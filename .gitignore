@@ -1,6 +1,9 @@
 node_modules
 dist
-public
+/public/*
+!/public/vendor/
+/public/vendor/*
+!/public/vendor/initialis/
 uploads
 surrealDB
 .DS_Store
