@@ -1,0 +1,157 @@
+{
+  "passed": true,
+  "entities": 10000,
+  "sourceDocuments": 20,
+  "annotationRows": 20000,
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/156.0.8078.76",
+    "revision": "@93ce6b54af3fee27e384d1f30346e80db47a14da",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+    "jsVersion": "15.6.75.25"
+  },
+  "typingWork": {
+    "snapshots": 0,
+    "workspaceChanges": 0,
+    "requests": 0
+  },
+  "visibleUpperBounds": [
+    {
+      "label": "2a-search",
+      "inputToVerifiedScreenshotMs": 382.29795900000136
+    },
+    {
+      "label": "2a-count-sort",
+      "inputToVerifiedScreenshotMs": 438.61062500000116
+    },
+    {
+      "label": "2b-documents",
+      "inputToVerifiedScreenshotMs": 322.85320800000045
+    },
+    {
+      "label": "2c-regex",
+      "inputToVerifiedScreenshotMs": 491.01470800000243
+    }
+  ],
+  "http": [
+    {
+      "op": "/api/native/vault/default",
+      "ms": 81.70000000298023
+    },
+    {
+      "op": "context",
+      "ms": 177.70000000298023
+    },
+    {
+      "op": "search",
+      "ms": 179
+    },
+    {
+      "op": "search",
+      "ms": 87.5
+    },
+    {
+      "op": "search",
+      "ms": 85
+    },
+    {
+      "op": "bulk-state",
+      "ms": 93.90000000596046
+    },
+    {
+      "op": "bulk-state",
+      "ms": 83.1000000089407
+    },
+    {
+      "op": "get",
+      "ms": 79.79999999701977
+    },
+    {
+      "op": "search",
+      "ms": 155.09999999403954
+    },
+    {
+      "op": "get",
+      "ms": 82.79999999701977
+    },
+    {
+      "op": "save",
+      "ms": 94.79999999701977
+    },
+    {
+      "op": "documents",
+      "ms": 77.79999999701977
+    },
+    {
+      "op": "mentions",
+      "ms": 114.19999998807907
+    },
+    {
+      "op": "/api/native/vault/default",
+      "ms": 100.6000000089407
+    },
+    {
+      "op": "/api/native/vault/establish",
+      "ms": 7.300000011920929
+    },
+    {
+      "op": "claims",
+      "ms": 89.09999999403954
+    },
+    {
+      "op": "semantic",
+      "ms": 86.79999999701977
+    },
+    {
+      "op": "claims",
+      "ms": 82.5
+    },
+    {
+      "op": "relationships",
+      "ms": 88.20000000298023
+    },
+    {
+      "op": "semantic",
+      "ms": 84.30000001192093
+    },
+    {
+      "op": "delete",
+      "ms": 82
+    },
+    {
+      "op": "restore",
+      "ms": 83.20000000298023
+    },
+    {
+      "op": "context",
+      "ms": 89.6000000089407
+    },
+    {
+      "op": "get",
+      "ms": 77.90000000596046
+    },
+    {
+      "op": "search",
+      "ms": 280.3999999910593
+    },
+    {
+      "op": "search",
+      "ms": 125.40000000596046
+    }
+  ],
+  "scenarios": [
+    "compact table",
+    "explicit bulk delete/restore with confirmation",
+    "preserved page on Back",
+    "global count sort",
+    "lazy tabs",
+    "bounded local typing",
+    "independent Instrument draft isolation and close guard",
+    "atomic plain Description",
+    "Documents and grouped Mentions",
+    "verified exact source navigation and stale-range refusal",
+    "canonical Claim and Relationship creation",
+    "referenced Entity soft delete and restore",
+    "bounded regex and invalid pattern"
+  ]
+}

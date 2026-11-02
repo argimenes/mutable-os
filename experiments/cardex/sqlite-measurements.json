@@ -1,0 +1,12 @@
+{
+  "baseline": {
+    "searchMs": 0.1529999999999916,
+    "openMs": 0.07329100000001176,
+    "saveMs": 0.8686250000000086
+  },
+  "unrelatedEntities": 10000,
+  "searchMs": 0.4954999999999927,
+  "openMs": 0.10300000000000864,
+  "saveMs": 0.639665999999977,
+  "affectedRecords": 1
+}

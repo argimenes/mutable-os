@@ -108,6 +108,9 @@ export type FeatureFlags = Readonly<{
   sqliteSemanticServices: boolean;
   /** Native Proposition authoring with vault-scoped canonical SQLite persistence. */
   thesis: boolean;
+  /** Cardex shell and local Entity Card authoring. */
+  cardex: boolean;
+  cardexIncrement2: boolean;
   /** Source-preserving Codex migration into explicitly selected disposable vaults. */
   legacyCodexImport: boolean;
   /** Initial Document format arrangements and creation menu. */
@@ -202,6 +205,8 @@ export const featureFlags: FeatureFlags = Object.freeze({
   sqliteEntities: true,
   sqliteSemanticServices: true,
   thesis: true,
+  cardex: true,
+  cardexIncrement2: true,
   legacyCodexImport: true,
   documentFormats: true,
   threeDObjects: true,

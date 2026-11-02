@@ -1,0 +1,9 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import Database from 'better-sqlite3';import {mkdtempSync,rmSync} from 'node:fs';import os from 'node:os';import path from 'node:path';import {randomUUID} from 'node:crypto';import {migrate} from './schema.mjs';import {runCardexRegex} from './client.mjs';
+test('isolated regex matches plain fields, rejects invalid patterns, cancels and leaves the writer available on timeout',async t=>{
+ const folder=mkdtempSync(path.join(os.tmpdir(),'cardex-regex-')),file=path.join(folder,'mutable.db'),db=new Database(file);t.after(()=>{db.close();rmSync(folder,{recursive:true,force:true});});migrate(db,'mutable',{fresh:true});db.pragma('journal_mode=WAL');const id=randomUUID();db.prepare('INSERT INTO Entity(guid,name,nameKey,description) VALUES(?,?,?,?)').run(id,'Ada','ada','Mathematician');
+ const request={op:'search',query:'^math',filters:{mode:'regex',target:'description'}};assert.equal((await runCardexRegex(file,request)).rows[0].id,id);await assert.rejects(runCardexRegex(file,{...request,query:'['}),/Invalid regular expression/);
+ db.prepare('UPDATE Entity SET name=?,nameKey=? WHERE guid=?').run('a'.repeat(1000)+'!','a'.repeat(1000)+'!',id);
+ const pathological={...request,query:'(a+)+$',filters:{mode:'regex',target:'name'}},failure=assert.rejects(runCardexRegex(file,pathological,undefined,{timeoutMs:300}),/budget/);
+ await new Promise(r=>setTimeout(r,100));const start=performance.now();db.prepare('UPDATE Entity SET description=? WHERE guid=?').run('Writer remained available',id);assert.ok(performance.now()-start<200);await failure;
+ const cancel=new AbortController(),aborted=assert.rejects(runCardexRegex(file,pathological,cancel.signal),/cancel|Abort/i);setTimeout(()=>cancel.abort(),100);await aborted;assert.equal(db.prepare('SELECT description FROM Entity WHERE guid=?').get(id).description,'Writer remained available');
+});

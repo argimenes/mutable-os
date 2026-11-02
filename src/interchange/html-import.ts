@@ -1,10 +1,10 @@
+import {safeColor as color} from './inline-values.mjs';
 import { emptyFragment, LIMITS, safeUrl, validateFragment, type FragmentBlock, type MutableFragment, type Property, type Reference } from './fragment';
 import { activeTags, attribute, type HtmlNode } from './html-ast';
 
 type Mark = { type: string; attributes: Record<string, unknown>; target?: Reference };
 const paragraphs = new Set(['p', 'div', 'section', 'article', 'main', 'header', 'footer', 'aside', 'blockquote', 'address', 'figure', 'figcaption', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre']);
 const inlineTypes: Record<string, string> = { b: 'style/bold', strong: 'style/bold', i: 'style/italics', em: 'style/italics', u: 'style/underline', s: 'style/strikethrough', strike: 'style/strikethrough', del: 'style/strikethrough', sup: 'style/superscript', sub: 'style/subscript', mark: 'style/highlight' };
-const color = (value: string) => /^(#[\da-f]{3,8}|[a-z]{1,24}|rgba?\([\d.,%\s]+\)|hsla?\([\d.,%\s]+\))$/i.test(value) && !['inherit', 'initial', 'unset', 'revert'].includes(value);
 const integer = (value: string | undefined, fallback: number) => value !== undefined && /^-?\d+$/.test(value) && Math.abs(Number(value)) <= 1000000 ? Number(value) : fallback;
 
 /** HTML semantics only. Outputs the same fragment used by native paste. */

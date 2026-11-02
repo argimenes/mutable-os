@@ -74,7 +74,7 @@ export function canonicalPropositions(db,ledger,request,check=()=>{}) {
    const attrs=old?.attributes??{thesis:{version:1,archived:false,...(request.source?{source:source(request.source,vaultGuid)}:{})}};
    attrs.thesis={...attrs.thesis,annotationOrder:rows.map(row=>row.guid)};
    if(old){
-    ctx.change('Entity',id,()=>db.prepare('UPDATE Entity SET name=?,nameKey=?,revision=revision+1,modifiedUtc=?,lastUpdatedByActorGuid=? WHERE guid=?').run(name,name.normalize('NFKC').toLowerCase(),ctx.now,ctx.actorGuid,id));
+    ctx.change('Entity',id,()=>db.prepare('UPDATE Entity SET nameStrata=CASE WHEN name=? THEN nameStrata ELSE NULL END,name=?,nameKey=?,revision=revision+1,modifiedUtc=?,lastUpdatedByActorGuid=? WHERE guid=?').run(name,name,name.normalize('NFKC').toLowerCase(),ctx.now,ctx.actorGuid,id));
     ctx.change('Block',blockId,()=>db.prepare('UPDATE Block SET text=?,cellCount=?,attributes=?,modifiedUtc=?,lastUpdatedByActorGuid=? WHERE guid=?').run(request.text,[...request.text].length,JSON.stringify(attrs),ctx.now,ctx.actorGuid,blockId));
    }else{
     for(const table of canonicalTables)if(table!=='Time'&&db.prepare(`SELECT 1 FROM ${table} WHERE guid=?`).get(id))throw Error('Canonical GUID already exists');

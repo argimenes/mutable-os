@@ -19,6 +19,7 @@ export const desktopApplications = [
   { id: "calendar", name: "Calendar" },
   { id: "tasks", name: "Tasks" },
   { id: "acetate", name: "Acetate" },
+  { id: "cardex", name: "Cardex", command: "cardex.open" },
   { id: "thesis", name: "Thesis", command: "thesis.open" },
   { id: "dialectic", name: "Dialectic" },
   { id: "osmosis", name: "Osmosis" },

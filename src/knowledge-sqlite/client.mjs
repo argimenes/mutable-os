@@ -65,6 +65,7 @@ export async function openSqliteFoundation(options) {
   return {
     // Internal host capabilities; not exposed through a browser/request route.
     inventory:()=>request('inventory'),resourceProjection:resourceId=>request('resource-projection',undefined,{resourceId}),
+    cardex:(payload,signal)=>cancellable('cardex',payload,signal),
     propositions:(payload,signal)=>cancellable('propositions',payload,signal),
     entities:(payload,signal)=>cancellable('entities',payload,signal),
     packageData:(payload,signal)=>cancellable('package-data',payload,signal),
@@ -87,4 +88,16 @@ export async function openSqliteFoundation(options) {
     backup: directory => request('backup', directory), terminate,
     async close() { if (dead) { await exited; return; } if (closing) { await exited; return; } const done = request('close'); closing = true; try { await done; } finally { await exited; } },
   };
+}
+
+/** Termination affects only this read-only query; never terminates the canonical writer. */
+export function runCardexRegex(file,request,signal,{timeoutMs=2000}={}){
+ return new Promise((resolve,reject)=>{
+  if(signal?.aborted){reject(signal.reason??Error('Search cancelled'));return;}
+  const worker=new Worker(path.join(path.dirname(fileURLToPath(import.meta.url)),'cardex-regex-worker.mjs'),{workerData:{file,request}});let finished=false;
+  const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);void worker.terminate();error?reject(error):resolve(result);};
+  const abort=()=>finish(signal.reason??Error('Search cancelled'));
+  const timer=setTimeout(()=>finish(Error('Regex exceeded its two-second budget; simplify the pattern or narrow the filters')),timeoutMs);
+  signal?.addEventListener('abort',abort,{once:true});worker.on('message',m=>finish(m.error?Error(m.error):null,m.result));worker.on('error',e=>finish(e));worker.on('exit',code=>{if(!finished)finish(Error('Regex reader stopped ('+code+')'));});
+ });
 }

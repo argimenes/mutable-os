@@ -53,11 +53,11 @@ export async function qualifyDesktopApplications() {
   };
   const stop = render(() => <CavernStartup>{() => <Desktop />}</CavernStartup>, host);
   try {
-    await until(() => host.querySelectorAll('[data-desktop-application]').length === 18, 'desktop ready');
+    await until(() => host.querySelectorAll('[data-desktop-application]').length === desktopApplications.length, 'desktop ready');
     const icons = () => [...host.querySelectorAll<HTMLButtonElement>('[data-desktop-application]')];
     const icon = (id: string) => host.querySelector<HTMLButtonElement>(`[data-desktop-application="${id}"]`)!;
     await Promise.all(icons().map(button => button.querySelector('img')!.decode()));
-    check(icons().every(button => button.querySelector('img')!.naturalWidth === 224), 'All 18 lossless square images load');
+    check(icons().every(button => {const img=button.querySelector('img')!;return img.naturalWidth>=224&&img.naturalWidth===img.naturalHeight;}), 'All registered square application images load');
     check(icons().every(button => button.querySelector('img')!.getBoundingClientRect().width === 72), 'Artwork displays at 72 CSS pixels');
     const before = session.editor.repository.state.revision;
     await click(icon('flint'));

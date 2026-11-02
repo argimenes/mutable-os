@@ -22,7 +22,7 @@ function mount(enabled = true, extra = 0, actions?: DesktopActions) {
   const click = (id: string, double = false) => icon(id).dispatchEvent(new MouseEvent(double ? "dblclick" : "click", { bubbles: true, detail: double ? 2 : 1 }));
   return { session, editor: session.editor, host, icon, click };
 }
-it("renders all 18 tiles; selection and background clearing never commit or snapshot", () => {
+it("renders all registered tiles; selection and background clearing never commit or snapshot", () => {
   const f = mount(), snapshot = vi.spyOn(f.editor.repository, "snapshot"), commit = vi.spyOn(f.editor.repository, "commit");
   expect([...f.host.querySelectorAll('[data-desktop-application]')].map(el => el.getAttribute("aria-label"))).toEqual(desktopApplications.map(a => a.name));
   f.click("flint"); expect(f.icon("flint").getAttribute("aria-pressed")).toBe("true");

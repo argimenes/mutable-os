@@ -1,3 +1,4 @@
+import {displayEntityName} from './entity-display.mjs';
 import {authorityIdentity} from './authority-identities.mjs';
 import {deterministicReview} from './deterministic.mjs';
 import {resources} from './resources.mjs';
@@ -11,7 +12,7 @@ const key = s => s.normalize('NFKC').toLowerCase();
 const string = (v, max = 1000) => { if (typeof v !== 'string' || !v.trim() || v.length > max) throw Error('Invalid Entity value'); return v; };
 const guid = v => { string(v, 512); if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)) throw Error('Supply a stable UUID'); return v; };
 const expected = v => { if (!Number.isSafeInteger(v) || v < 0) throw Error('Expected revision required'); return v; };
-const entity = (db, id) => { const row = db.prepare('SELECT guid AS id,name,revision,description,typename,attributes FROM Entity WHERE guid=?').get(string(id,512)); if (!row) return; return {...row,attributes:row.attributes===null?null:JSON.parse(row.attributes), aliases: db.prepare("SELECT guid AS id,alias AS name,origin,revision FROM EntityAlias WHERE entityGuid=? AND origin IN ('curated','imported') ORDER BY aliasKey,guid LIMIT 201").all(id)}; };
+const entity = (db, id) => { const row = db.prepare('SELECT guid AS id,name,revision,deletedUtc,description,typename,attributes FROM Entity WHERE guid=?').get(string(id,512)); if (!row) return; return {...row,displayName:displayEntityName(row.name,row.deletedUtc),attributes:row.attributes===null?null:JSON.parse(row.attributes), aliases: db.prepare("SELECT guid AS id,alias AS name,origin,revision FROM EntityAlias WHERE entityGuid=? AND origin IN ('curated','imported') ORDER BY aliasKey,guid LIMIT 201").all(id)}; };
 export const entityMutation = op => ['authority-import','deterministic-review','pdf-commit','resource-review','iiif-commit','wiki-commit','wiki-review','scholarly-commit','create','rename','update','alias-add','alias-update','alias-remove','relationship-create','relationship-update'].includes(op);
 /** Typed semantic dispatch keeps the existing Entity/Relationship operation names. */
 export function entityCommand(request){
@@ -41,7 +42,7 @@ export function canonicalEntities(db, request, check = () => {}, ledger = canoni
       if (!ids.length) result = {rows:[]};
       else {
         const placeholders = ids.map(()=>'?').join(',');
-        if (op === 'names') result = {rows:db.prepare(`SELECT guid AS id,name FROM Entity WHERE guid IN (${placeholders})`).all(...ids)};
+        if (op === 'names') result = {rows:db.prepare(`SELECT guid AS id,name,deletedUtc FROM Entity WHERE guid IN (${placeholders})`).all(...ids).map(({deletedUtc,...r})=>({...r,name:displayEntityName(r.name,deletedUtc)}))};
         else {
           // Saved annotation segments, not logical mentions or graph edges.
           // The existing (targetEntityGuid,typename) index bounds this lookup.
@@ -61,8 +62,8 @@ export function canonicalEntities(db, request, check = () => {}, ledger = canoni
       const query=key(request.query), pattern=request.match==='exact'?query:'%'+query.replace(/[\\%_]/g,'\\$&')+'%';
       const comparator=request.match==='exact'?'= ?':"LIKE ? ESCAPE '\\'";
       const rows=[];
-      if (query.trim() && request.stream!=='alias') for(const r of db.prepare(`SELECT guid AS id,name FROM Entity WHERE nameKey ${comparator} ORDER BY nameKey,guid LIMIT 101`).all(pattern)) rows.push({...r,kind:'name',text:r.name});
-      if (query.trim() && request.stream!=='name') for(const r of db.prepare(`SELECT e.guid AS id,e.name,a.alias AS text FROM EntityAlias a JOIN Entity e ON e.guid=a.entityGuid WHERE a.origin IN ('curated','imported') AND a.aliasKey ${comparator} ORDER BY e.nameKey,e.guid,a.aliasKey LIMIT 101`).all(pattern)) rows.push({...r,kind:'alias'});
+      if (query.trim() && request.stream!=='alias') for(const r of db.prepare(`SELECT guid AS id,name FROM Entity WHERE deletedUtc IS NULL AND nameKey ${comparator} ORDER BY nameKey,guid LIMIT 101`).all(pattern)) rows.push({...r,kind:'name',text:r.name});
+      if (query.trim() && request.stream!=='name') for(const r of db.prepare(`SELECT e.guid AS id,e.name,a.alias AS text FROM EntityAlias a JOIN Entity e ON e.guid=a.entityGuid WHERE e.deletedUtc IS NULL AND a.origin IN ('curated','imported') AND a.aliasKey ${comparator} ORDER BY e.nameKey,e.guid,a.aliasKey LIMIT 101`).all(pattern)) rows.push({...r,kind:'alias'});
       result={matches:rows.slice(0,100),complete:rows.length<=100};
     } else if (op==='relationships') {
       string(request.id,512); if(!['out','in'].includes(request.direction))throw Error('Invalid relationship direction');
@@ -87,7 +88,8 @@ export function canonicalEntities(db, request, check = () => {}, ledger = canoni
         const name=request.name===undefined?old.name:string(request.name),typename=request.typename===undefined?old.typename:nullable(request.typename,256);
         if(typename!=='Time'&&db.prepare("SELECT 1 FROM sqlite_schema WHERE name='Time'").get()&&db.prepare('SELECT 1 FROM Time WHERE entityGuid=?').get(id))throw Error('Time extension requires Entity typename Time');
         if(typename!=='Concept'&&db.prepare("SELECT 1 FROM sqlite_schema WHERE name='ClaimQualifier'").get()&&db.prepare("SELECT 1 FROM ClaimQualifier WHERE entityGuid=? AND role='type-of'").get(id))throw Error('Existing type-of Claim qualifications require Concept Entity');
-        db.prepare('UPDATE Entity SET name=?,nameKey=?,typename=?,description=?,attributes=?,revision=revision+1,lastUpdatedByActorGuid=?,modifiedUtc=? WHERE guid=? AND revision=?').run(name,key(name),typename,request.description===undefined?old.description:nullable(request.description),request.attributes===undefined?(old.attributes===null?null:JSON.stringify(old.attributes)):attributes(request.attributes),actorGuid,now,id,request.expected);result={entity:entity(db,id)};
+        // Plain API edits cannot safely retarget local semantic ranges or a rich Description.
+        db.prepare('UPDATE Entity SET nameStrata=CASE WHEN name=? THEN nameStrata ELSE NULL END,descriptionDocument=CASE WHEN description IS ? THEN descriptionDocument ELSE NULL END,name=?,nameKey=?,typename=?,description=?,attributes=?,revision=revision+1,lastUpdatedByActorGuid=?,modifiedUtc=? WHERE guid=? AND revision=?').run(name,request.description===undefined?old.description:nullable(request.description),name,key(name),typename,request.description===undefined?old.description:nullable(request.description),request.attributes===undefined?(old.attributes===null?null:JSON.stringify(old.attributes)):attributes(request.attributes),actorGuid,now,id,request.expected);result={entity:entity(db,id)};
       }else if(op==='alias-add'){
         const name=string(request.name);if(!entity(db,request.entityId))throw Error('Entity missing');collision();
         if(db.prepare('SELECT count(*) AS n FROM EntityAlias WHERE entityGuid=?').get(request.entityId).n>=200)throw Error('Entity alias budget exceeded');

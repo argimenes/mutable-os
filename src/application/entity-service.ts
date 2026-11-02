@@ -138,7 +138,7 @@ export function entityService(editor:ReactiveEditor,owner:string):EntityService 
    current();if((await call({op:'current'},signal)).revision!==result.revision)throw Error('Canonical Entity summaries changed');current();
    if(result.entities.length!==new Set(ids).size)diagnostics.push('Some Entity identities are unresolved in this vault');
    const complete=!diagnostics.length;
-   return {rows:result.entities.map((e:CanonicalEntity)=>({id:e.id,name:e.name,...(complete?{mentions:counts.get(e.id)??0}:{})})),complete,diagnostics:[...new Set(diagnostics)].slice(0,32)};
+   return {rows:result.entities.map((e:CanonicalEntity)=>({id:e.id,name:e.displayName??e.name,...(complete?{mentions:counts.get(e.id)??0}:{})})),complete,diagnostics:[...new Set(diagnostics)].slice(0,32)};
   },
   async create(input,signal){let dispatched=false;try{return await mutate({op:'create',...input},signal,()=>{dispatched=true;});}catch(error){if(!dispatched)throw Object.assign(new Error(String(error)),{entityCreationOutcome:'not-created'});throw error;}},
   async rename(input){return mutate({op:'rename',...input});},

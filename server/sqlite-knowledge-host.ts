@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import {stat} from 'node:fs/promises';
 import { Router, json } from 'express';
-import { openSqliteFoundation } from '../src/knowledge-sqlite/client.mjs';
+import { openSqliteFoundation, runCardexRegex } from '../src/knowledge-sqlite/client.mjs';
 import { entityCommand } from '../src/knowledge-sqlite/entities.mjs';
 import { NativeVaultStore } from './native-vault-store.mjs';
 import { createSavedIndexer } from './sqlite-saved-indexer';
@@ -22,7 +22,7 @@ export class SqliteKnowledgeHost {
   readonly metrics={sweeps:0,cancellations:0,foregroundWaitMs:0,maxForegroundWaitMs:0};
   private semanticLeases=new Set<string>();
   private readers=new Map<string,{opening:Promise<any>;identity:string;active:number;timer?:ReturnType<typeof setTimeout>}>();
-  constructor(private options:{root:string;readOnly?:boolean;entitiesEnabled?:boolean;semanticServicesEnabled?:boolean;thesisEnabled?:boolean;store?:any;open?:typeof openSqliteFoundation;indexer?:typeof createSavedIndexer;debounceMs?:number;leaseMs?:number}) {
+  constructor(private options:{root:string;readOnly?:boolean;entitiesEnabled?:boolean;semanticServicesEnabled?:boolean;thesisEnabled?:boolean;cardexEnabled?:boolean;verifyCardexImage?:(reference:any)=>Promise<void>;store?:any;open?:typeof openSqliteFoundation;indexer?:typeof createSavedIndexer;debounceMs?:number;leaseMs?:number}) {
     this.store=options.store??new NativeVaultStore({root:options.root,readOnly:!!options.readOnly});
   }
   private serialize<T>(action:()=>Promise<T>):Promise<T> {
@@ -165,6 +165,19 @@ export class SqliteKnowledgeHost {
       throw error;
     }
   }
+  async cardex(body:any,signal?:AbortSignal){
+    if(this.closed||this.options.cardexEnabled===false||this.options.entitiesEnabled===false)throw Error('Cardex is unavailable');
+    if(typeof body.vault!=='string')throw Error('Select a Vault');
+    if((['save','delete','restore','bulk-state'].includes(body.request?.op)||body.request?.op==='semantic'&&body.request?.command?.op!=='get')&&this.options.readOnly)throw Error('Cardex is read-only');
+    if(body.request?.op==='save'&&body.request.imageRef){if(!this.options.verifyCardexImage)throw Error('Managed image storage unavailable');await this.options.verifyCardexImage(body.request.imageRef);}
+    const file=await this.store.resolve(path.posix.join(body.vault,'.mutable/mutable.db'));
+    if(body.request?.op==='search'&&body.request.filters?.mode==='regex'){
+      // Establish/migrate normally, then release the foreground gate before isolated regex evaluation.
+      await this.foreground(async()=>{const opened=await this.acquireContext(body.vault,normalizePolicy(body.policy),true);await this.release(opened.lease);});
+      return runCardexRegex(file,body.request,signal);
+    }
+    return this.foreground(async()=>{const opened=await this.acquireContext(body.vault,normalizePolicy(body.policy),true);try{signal?.throwIfAborted();return await this.entry(opened.lease).client!.cardex(body.request,signal);}finally{await this.release(opened.lease);}});
+  }
   async propositions(body:any,signal?:AbortSignal){
     if(this.closed||this.options.thesisEnabled===false)throw Error('Thesis is unavailable');
     if(typeof body.vault!=='string')throw Error('Select a Vault');
@@ -296,6 +309,7 @@ export class SqliteKnowledgeHost {
     this.savedScopes??=new SqliteSavedScopes(this);router.use('/facts',this.savedScopes.router());
     for(const [name,action]of Object.entries({
       'semantic-open':(b:any,_s?:AbortSignal)=>this.openSemantics(b.vault,b.policy),
+      cardex:(b:any,s?:AbortSignal)=>this.cardex(b,s),
       propositions:(b:any,s?:AbortSignal)=>this.propositions(b,s),
       semantics:(b:any,s?:AbortSignal)=>this.semantics(b,s),
       'semantic-audit':(b:any,s?:AbortSignal)=>this.semanticAudit(b,s)

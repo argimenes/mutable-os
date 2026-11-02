@@ -1,3 +1,4 @@
+import {canonicalCardex} from './cardex.mjs';
 import { isMainThread } from 'node:worker_threads';
 import { inspectVaultScope, lockVaultEstablishment } from './vault-scope.mjs';
 import Database from 'better-sqlite3';
@@ -70,6 +71,7 @@ function openValidatedFoundation({ vault, readOnly = false, initialize: create =
     return {
       vaultGuid: identity.vaultGuid,
       entities(request, check) { active(); if(entityMutation(request.op))writable(); return canonicalEntities(mutable,request,check,ledger); },
+      cardex(request, check) { active(); if(request.op==='semantic')semanticActive(); if(['save','delete','restore','bulk-state'].includes(request.op)||request.op==='semantic'&&request.command?.op!=='get')writable(); return canonicalCardex(mutable,ledger,request,check); },
       propositions(request, check) { active(); if(!thesisEnabled)throw Error('Thesis is disabled'); if(propositionMutation(request.op))writable(); return canonicalPropositions(mutable,ledger,request,check); },
       semantics(request, check) { semanticActive(); if(semanticMutation(request))writable(); return canonicalSemantics(mutable,ledger,request,check); },
       auditStatus() { active(); return ledger.status(); },

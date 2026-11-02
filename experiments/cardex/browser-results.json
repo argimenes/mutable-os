@@ -1,0 +1,188 @@
+{
+  "passed": true,
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/156.0.8078.76",
+    "revision": "@93ce6b54af3fee27e384d1f30346e80db47a14da",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+    "jsVersion": "15.6.75.25"
+  },
+  "unrelatedEntities": 10000,
+  "unrelatedDocuments": 20,
+  "typingCounts": {
+    "snapshots": 0,
+    "workspaceChanges": 0,
+    "requests": 0
+  },
+  "timings": [
+    {
+      "op": "/api/native/vault/default",
+      "ms": 51.5
+    },
+    {
+      "op": "context",
+      "ms": 131.8999999910593
+    },
+    {
+      "op": "search",
+      "ms": 85.09999999403954
+    },
+    {
+      "op": "/api/assets/begin",
+      "ms": 221
+    },
+    {
+      "op": "/api/assets/87ca3f4a-e8d0-4edb-84d7-b7ed1e2aff73/images/stage",
+      "ms": 415.79999999701977
+    },
+    {
+      "op": "/api/assets/87ca3f4a-e8d0-4edb-84d7-b7ed1e2aff73/publish",
+      "ms": 136.90000000596046
+    },
+    {
+      "op": "/api/assets/87ca3f4a-e8d0-4edb-84d7-b7ed1e2aff73/finish",
+      "ms": 106.40000000596046
+    },
+    {
+      "op": "/api/assets/sha256%3A5292695e45529075ae627e9544d2590fc359f6168aa479f8d35f6c2147fa9313/content?cavernId=cardex-test-cavern",
+      "ms": 87.70000000298023
+    },
+    {
+      "op": "save",
+      "ms": 174.19999998807907
+    },
+    {
+      "op": "save",
+      "ms": 160.70000000298023
+    },
+    {
+      "op": "search",
+      "ms": 144.90000000596046
+    },
+    {
+      "op": "/api/assets/sha256%3A5292695e45529075ae627e9544d2590fc359f6168aa479f8d35f6c2147fa9313/content?cavernId=cardex-test-cavern",
+      "ms": 88.40000000596046
+    },
+    {
+      "op": "get",
+      "ms": 82.29999999701977
+    },
+    {
+      "op": "/api/assets/sha256%3A5292695e45529075ae627e9544d2590fc359f6168aa479f8d35f6c2147fa9313/content?cavernId=cardex-test-cavern",
+      "ms": 85.79999999701977
+    },
+    {
+      "op": "/api/assets/begin",
+      "ms": 96.20000000298023
+    },
+    {
+      "op": "/api/assets/a723df98-a3fe-4c36-8b4a-9445de8c23d1/images/stage",
+      "ms": 339.19999998807907
+    },
+    {
+      "op": "/api/assets/a723df98-a3fe-4c36-8b4a-9445de8c23d1/publish",
+      "ms": 98.1000000089407
+    },
+    {
+      "op": "/api/assets/a723df98-a3fe-4c36-8b4a-9445de8c23d1/finish",
+      "ms": 104.30000001192093
+    },
+    {
+      "op": "/api/assets/sha256%3A5292695e45529075ae627e9544d2590fc359f6168aa479f8d35f6c2147fa9313/content?cavernId=cardex-test-cavern",
+      "ms": 84.90000000596046
+    },
+    {
+      "op": "/api/assets/sha256%3A5292695e45529075ae627e9544d2590fc359f6168aa479f8d35f6c2147fa9313/content?cavernId=cardex-test-cavern",
+      "ms": 89.5
+    },
+    {
+      "op": "/api/assets/begin",
+      "ms": 95.09999999403954
+    },
+    {
+      "op": "/api/assets/d64dd542-8488-48fe-8094-c27c6e3319a9/images/stage",
+      "ms": 344.79999999701977
+    },
+    {
+      "op": "/api/assets/d64dd542-8488-48fe-8094-c27c6e3319a9/publish",
+      "ms": 141.09999999403954
+    },
+    {
+      "op": "/api/assets/d64dd542-8488-48fe-8094-c27c6e3319a9/finish",
+      "ms": 105.29999999701977
+    },
+    {
+      "op": "/api/assets/sha256%3A7469fb0a028e15f6b8ba447983b6c2c4d670cb7f1546a06d18b08bf3b465f793/content?cavernId=cardex-test-cavern",
+      "ms": 85.79999999701977
+    },
+    {
+      "op": "save",
+      "ms": 216.5
+    },
+    {
+      "op": "save",
+      "ms": 166.70000000298023
+    },
+    {
+      "op": "save",
+      "ms": 161.5
+    },
+    {
+      "op": "context",
+      "ms": 94.09999999403954
+    },
+    {
+      "op": "get",
+      "ms": 77.79999999701977
+    },
+    {
+      "op": "save",
+      "ms": 284.69999998807907
+    },
+    {
+      "op": "/api/assets/sha256%3A5292695e45529075ae627e9544d2590fc359f6168aa479f8d35f6c2147fa9313/content?cavernId=cardex-test-cavern",
+      "ms": 87.70000000298023
+    },
+    {
+      "op": "get",
+      "ms": 149.79999999701977
+    },
+    {
+      "op": "/api/assets/sha256%3A7469fb0a028e15f6b8ba447983b6c2c4d670cb7f1546a06d18b08bf3b465f793/content?cavernId=cardex-test-cavern",
+      "ms": 87.5
+    },
+    {
+      "op": "impact",
+      "ms": 81.59999999403954
+    },
+    {
+      "op": "impact",
+      "ms": 82.90000000596046
+    },
+    {
+      "op": "delete",
+      "ms": 84.90000000596046
+    },
+    {
+      "op": "search",
+      "ms": 87.90000000596046
+    }
+  ],
+  "scenarios": [
+    "real SQLite CRUD save/search/reopen",
+    "local multi-paragraph Description",
+    "Name Strata",
+    "aliases retain keyboard focus",
+    "picker/drop/paste managed images",
+    "manual save",
+    "retained field Undo/Redo",
+    "dirty discard guard",
+    "blank placeholder tabs preserve drafts",
+    "independent Instrument",
+    "lost response retry",
+    "stale canonical revision preserves draft",
+    "dependency-aware deletion",
+    "deleting Entity retains managed images"
+  ],
+  "savedId": "b00f9712-5ec0-4880-8959-5e7ef0afafff"
+}

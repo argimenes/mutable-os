@@ -1,3 +1,5 @@
+import {safeUrl} from './inline-values.mjs';
+export {safeUrl} from './inline-values.mjs';
 import type { JsonObject } from '../block-tree/types';
 
 export type Reference = { kind: 'local'; object: 'block' | 'definition' | 'asset'; id: string }
@@ -28,7 +30,6 @@ export interface InterchangeScope { cavernId?: string; resourceId?: string }
 export const LIMITS = { bytes: 8 * 1024 * 1024, cells: 200000, blocks: 10000, properties: 20000, depth: 64, opaque: 256 * 1024 };
 export const emptyFragment = (): MutableFragment => ({ kind: 'mutable-fragment', version: 1, coordinates: 'unicode-scalar-or-object-v1', roots: [], blocks: [], placements: [], definitions: [], links: [], embeds: [], assets: [] });
 export const lengthOf = (b: FragmentBlock) => b.inline?.atoms.reduce((n, a) => n + (a.kind === 'text' ? [...a.text].length : 1), 0) ?? 0;
-export const safeUrl = (url: unknown) => typeof url === 'string' && /^(https?:\/\/|mailto:)/i.test(url.trim()) && !/[\u0000-\u001f]/.test(url);
 
 /** Extract disjoint groups without decoding into repository objects or reallocating IDs. */
 export function fragmentGroup(f: MutableFragment, roots: MutableFragment['roots']): MutableFragment {

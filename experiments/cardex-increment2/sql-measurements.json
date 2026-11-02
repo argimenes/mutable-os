@@ -1,0 +1,111 @@
+{
+  "entities": 10000,
+  "documents": 20,
+  "annotationRows": 20000,
+  "samples": {
+    "coveringIndex": {
+      "ms": {
+        "name": [
+          1.89,
+          0.82,
+          0.77
+        ],
+        "documents": [
+          48.66,
+          48.9,
+          49.47
+        ],
+        "mentions": [
+          48.63,
+          48.52,
+          48.52
+        ]
+      },
+      "countPlan": [
+        "MATERIALIZE counts",
+        "SEARCH s USING INDEX IX_Standoff_Type (typename=?)",
+        "SEARCH r USING INDEX sqlite_autoindex_Resource_1 (guid=?)",
+        "SEARCH e USING INDEX sqlite_autoindex_Entity_1 (guid=?)",
+        "USE TEMP B-TREE FOR GROUP BY",
+        "USE TEMP B-TREE FOR count(DISTINCT)",
+        "USE TEMP B-TREE FOR count(DISTINCT)",
+        "SCAN e USING INDEX IX_Entity_Active_Name",
+        "SEARCH c USING AUTOMATIC COVERING INDEX (id=?) LEFT-JOIN",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    },
+    "previousIndexes": {
+      "ms": {
+        "name": [
+          13.87,
+          12.95,
+          14.08
+        ],
+        "documents": [
+          48.5,
+          48.84,
+          48.58
+        ],
+        "mentions": [
+          48.68,
+          48.36,
+          48.16
+        ]
+      },
+      "countPlan": [
+        "MATERIALIZE counts",
+        "SEARCH s USING INDEX IX_Standoff_Type (typename=?)",
+        "SEARCH r USING INDEX sqlite_autoindex_Resource_1 (guid=?)",
+        "SEARCH e USING INDEX sqlite_autoindex_Entity_1 (guid=?)",
+        "USE TEMP B-TREE FOR GROUP BY",
+        "USE TEMP B-TREE FOR count(DISTINCT)",
+        "USE TEMP B-TREE FOR count(DISTINCT)",
+        "SCAN e USING INDEX IX_Entity_Active_Name",
+        "SEARCH c USING AUTOMATIC COVERING INDEX (id=?) LEFT-JOIN",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    },
+    "qualifiedGlobalIndex": {
+      "ms": {
+        "name": [
+          0.97,
+          0.77,
+          0.75
+        ],
+        "documents": [
+          36.86,
+          36.58,
+          36.61
+        ],
+        "mentions": [
+          36.76,
+          36.7,
+          36.86
+        ]
+      },
+      "countPlan": [
+        "MATERIALIZE counts",
+        "SCAN s USING INDEX IX_Standoff_Entity_Document_Logical",
+        "SEARCH r USING INDEX sqlite_autoindex_Resource_1 (guid=?)",
+        "SEARCH e USING INDEX sqlite_autoindex_Entity_1 (guid=?)",
+        "USE TEMP B-TREE FOR count(DISTINCT)",
+        "USE TEMP B-TREE FOR count(DISTINCT)",
+        "SCAN e USING INDEX IX_Entity_Active_Name",
+        "SEARCH c USING AUTOMATIC COVERING INDEX (id=?) LEFT-JOIN",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    }
+  },
+  "existingVaultReadOnly": [
+    [
+      852.12,
+      68.47,
+      73.17
+    ],
+    [
+      69.5,
+      69.36,
+      68.49
+    ]
+  ]
+}

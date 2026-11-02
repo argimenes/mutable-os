@@ -31,9 +31,9 @@ export function createEntityLookup() {
       const args = resourceId === undefined ? [pattern] : [pattern, resourceId];
       const rows = [];
       if (normalized.trim()) {
-        if (stream === 'all' || stream === 'name') rows.push(...db.prepare(`SELECT e.guid AS id,e.name,'name' AS kind,e.name AS text FROM Entity e WHERE e.nameKey ${comparator}${scope} ORDER BY e.nameKey,e.guid LIMIT 101`).all(...args));
-        if (stream === 'all' || stream === 'alias') rows.push(...db.prepare(`SELECT e.guid AS id,e.name,'alias' AS kind,a.alias AS text FROM EntityAlias a JOIN Entity e ON e.guid=a.entityGuid WHERE a.origin IN ('curated','imported') AND a.aliasKey ${comparator}${scope} ORDER BY e.nameKey,e.guid,a.aliasKey LIMIT 101`).all(...args));
-        if (stream === 'mention') rows.push(...db.prepare(`SELECT e.guid AS id,e.name,'mention' AS kind,s.text,s.resourceGuid AS resourceId,s.logicalGuid AS mentionId,s.sourceBlockGuid AS blockId,s.startIndex AS start,s.endIndex AS end FROM StandoffProperty s JOIN Entity e ON e.guid=s.targetEntityGuid JOIN Resource r ON r.guid=s.resourceGuid WHERE ${eligible} AND entity_fold(s.text) ${comparator}${resourceId === undefined ? '' : ' AND s.resourceGuid=?'} LIMIT 101`).all(...args));
+        if (stream === 'all' || stream === 'name') rows.push(...db.prepare(`SELECT e.guid AS id,e.name,'name' AS kind,e.name AS text FROM Entity e WHERE e.deletedUtc IS NULL AND e.nameKey ${comparator}${scope} ORDER BY e.nameKey,e.guid LIMIT 101`).all(...args));
+        if (stream === 'all' || stream === 'alias') rows.push(...db.prepare(`SELECT e.guid AS id,e.name,'alias' AS kind,a.alias AS text FROM EntityAlias a JOIN Entity e ON e.guid=a.entityGuid WHERE e.deletedUtc IS NULL AND a.origin IN ('curated','imported') AND a.aliasKey ${comparator}${scope} ORDER BY e.nameKey,e.guid,a.aliasKey LIMIT 101`).all(...args));
+        if (stream === 'mention') rows.push(...db.prepare(`SELECT e.guid AS id,e.name,'mention' AS kind,s.text,s.resourceGuid AS resourceId,s.logicalGuid AS mentionId,s.sourceBlockGuid AS blockId,s.startIndex AS start,s.endIndex AS end FROM StandoffProperty s JOIN Entity e ON e.guid=s.targetEntityGuid JOIN Resource r ON r.guid=s.resourceGuid WHERE e.deletedUtc IS NULL AND ${eligible} AND entity_fold(s.text) ${comparator}${resourceId === undefined ? '' : ' AND s.resourceGuid=?'} LIMIT 101`).all(...args));
       }
       check();
       const diagnostics = [];

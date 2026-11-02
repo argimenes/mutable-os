@@ -1,5 +1,7 @@
 /** Semantic resolver contract. No persistence rows, SQL or editor access. */
-export interface CanonicalEntity { id:string; name:string; revision:number; typename?:string|null; description?:string|null; attributes?:unknown; aliases:Array<{id:string;name:string;origin:string;revision:number}> }
+export interface CanonicalEntity {
+  deletedUtc?: string | null;
+  displayName?: string; id:string; name:string; revision:number; typename?:string|null; description?:string|null; attributes?:unknown; aliases:Array<{id:string;name:string;origin:string;revision:number}> }
 export type EntityStream = 'all'|'name'|'alias'|'mention';
 export interface EntityResolutionQuery {query:string;stream:EntityStream;match:'exact'|'partial';scope:'document'|'vault';refresh?:boolean}
 export interface EntityEvidence {kind:string;text:string;resourceId?:string;mentionId?:string;ranges?:readonly {blockId:string;start:number;end:number}[]}
