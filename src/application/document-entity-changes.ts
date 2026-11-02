@@ -18,7 +18,7 @@ function snapshot(editor: ReactiveEditor, root: string) {
     if (content.viewType === 'standoff-editor-block' || ['mutable/citation-block','mutable/web-article-block'].includes(content.viewType)) {
       const properties = ['mutable/citation-block','mutable/web-article-block'].includes(content.viewType)?content.payload.blockProperties:content.payload.standoffProperties;
       if (Array.isArray(properties)) properties.forEach((property, index) => {
-        if (!property || typeof property !== 'object' || Array.isArray(property)) return;
+        if (!property || typeof property !== 'object' || Array.isArray(property) || property.type === 'mutable/gloss') return;
         // A definition can live on the Document or, for cross-resource links,
         // the Workspace. Watch that owner as well as the local segment.
         if (property.annotationId) {
@@ -50,7 +50,7 @@ function localReferences(content: ContentRecord, includeOffsets: boolean, state?
   const properties = ['mutable/citation-block','mutable/web-article-block'].includes(content.viewType)?content.payload.blockProperties:content.payload.standoffProperties;
   if (!Array.isArray(properties)) return '[]';
   return JSON.stringify(properties.filter(property => property && typeof property === 'object'
-    && !Array.isArray(property) && (property.type === 'codex/entity-reference' || property.annotationId))
+    && !Array.isArray(property) && property.type !== 'mutable/gloss' && (property.type === 'codex/entity-reference' || property.annotationId))
     .filter(property => !state || resolveLinkedProperty(state, property, content.key).type === 'codex/entity-reference')
     .map(({ start, end, ...property }) => includeOffsets ? { ...property, start, end } : property));
 }
@@ -59,7 +59,8 @@ function source(editor: ReactiveEditor, key: string, release: () => void) {
   let current = snapshot(editor, key), queued = false, disposed = false, rangesChanged = false;
   const listeners = new Set<Listener>();
   const stop = editor.repository.subscribeChanges(change => {
-    if (change.taskStateOwner) return;
+    // Gloss admission proves that entity annotations and ownership are unchanged.
+    if (change.taskStateOwner || change.structural?.gloss) return;
     let relevant = false;
     const state = editor.repository.readState();
     if (change.emptyParagraph && current.dependencies.has(change.emptyParagraph.parent)) {

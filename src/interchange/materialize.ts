@@ -1,3 +1,4 @@
+import {GLOSS,glossDefinition} from '../features/gloss/model';
 import {WEB_BLOCK,webCapture} from '../web-resources/model';
 import {validAcademicAnchor} from '../academic/anchors';
 import {ACADEMIC_BLOCK,academicCapture} from '../academic/model';
@@ -22,7 +23,7 @@ export const opaque = (type: string, data: JsonObject, target?: Reference) => {
 export const contentRecord = (key: string, viewType: string, payload: JsonObject): ContentRecord => ({ key, viewType, payload, children: [], inlineContent: [], inlineRevision: 0, ownedRelations: {}, opaqueRelations: {}, wireChildren: 'present', wireRelation: 'omitted', revision: 0 });
 
 /** Two passes: allocate every owned identity, then resolve typed references only. */
-export function materializeFragment(input: MutableFragment, scope: InterchangeScope = {}, availableAssets: ReadonlyMap<string, string> = new Map(), availableBlocks: ReadonlyMap<string, boolean> = new Map(), retainedBlocks: ReadonlySet<string> = new Set(), allowExternalEntities = true): BlockFragment {
+export function materializeFragment(input: MutableFragment, scope: InterchangeScope = {}, availableAssets: ReadonlyMap<string, string> = new Map(), availableBlocks: ReadonlyMap<string, boolean> = new Map(), retainedBlocks: ReadonlySet<string> = new Set(), allowExternalEntities = true, preserveGlossIds = false): BlockFragment {
   const f = validateFragment(input);
   const keys = new Map(f.blocks.map(b => [b.localId, createContentKey()])), ids = new Map(f.blocks.map(b => [b.localId, createBlockId()]));
   const edges = new Map(f.placements.map(p => [p.localId, createPlacementKey()]));
@@ -34,7 +35,8 @@ export function materializeFragment(input: MutableFragment, scope: InterchangeSc
     // Never revive an opaque import, even after registration of its original type.
     const attributes = clone(attrs); for (const key of ['id', 'type', 'start', 'end', 'isZeroWidth', 'affinity', 'annotationId', 'externalDefinition']) delete attributes[key];
     if (type === 'mutable/opaque-property' || type === 'mutable/opaque-block-property') return { ...attributes, id: crypto.randomUUID(), type };
-    const allowed = (block && type==='mutable/academic-annotation' && validAcademicAnchor((attributes as any)?.anchor)) || (block ? blockProperties : passiveProperties).has(type);
+    const sourceDefinition=target?.kind==='local'&&target.object==='definition'?f.definitions.find(d=>d.localId===target.id):undefined;
+    const allowed = (!block&&type===GLOSS&&(glossDefinition({...attributes,type})||sourceDefinition&&glossDefinition({...sourceDefinition.attributes,type:sourceDefinition.type}))) || (block && type==='mutable/academic-annotation' && validAcademicAnchor((attributes as any)?.anchor)) || (block ? blockProperties : passiveProperties).has(type);
     let value: string | undefined, annotationId: string | undefined;
     let resolved = !target;
     if (target?.kind === 'url') { resolved = safeUrl(target.url); value = target.url; }
@@ -64,6 +66,11 @@ export function materializeFragment(input: MutableFragment, scope: InterchangeSc
     const value = resolveProperty(d.type, d.attributes, d.target);
     return [definitions.get(d.localId)!, { ...value, id: definitions.get(d.localId)! }];
   }));
+  const glosses=Object.values(linkedAnnotations).filter(glossDefinition) as any[];
+  const glossIds=new Map(glosses.map(d=>[d.metadata.gloss.localId,preserveGlossIds?d.metadata.gloss.localId:crypto.randomUUID()]));
+  for(const def of glosses){const g=def.metadata.gloss;g.localId=glossIds.get(g.localId);
+    if(!preserveGlossIds)g.links=Object.fromEntries(Object.entries(g.links).flatMap(([id,raw])=>{const link=raw as any;return link&&typeof link.type==='string'&&glossIds.has(link.toGlossId)?[[preserveGlossIds?id:crypto.randomUUID(),{...link,toGlossId:glossIds.get(link.toGlossId)}]]:[]}));
+  }
   const embeds = new Map(f.embeds.map(e => [e.localId, e]));
   for (const b of f.blocks) {
     let source=false;try{if(isSourceType(b.type)){sourceFormat(b.type,b.data);source=!b.inline;}}catch{}

@@ -77,7 +77,8 @@ export class NativeDocumentSession {
       const oriented = change.structural?.tabOrientationOwner;
       const tabMetadata = change.structural?.tabMetadata;
       const membership = change.structural?.membership;
-      const affected = oriented ? [oriented] : tabMetadata ? [...tabMetadata.owners,...(tabMetadata.inlineOwner?[tabMetadata.inlineOwner]:[])] : membership ? [...change.previousContents.keys()] : undefined;
+      const gloss = change.structural?.gloss;
+      const affected = gloss ? [gloss.owner,...gloss.texts] : oriented ? [oriented] : tabMetadata ? [...tabMetadata.owners,...(tabMetadata.inlineOwner?[tabMetadata.inlineOwner]:[])] : membership ? [...change.previousContents.keys()] : undefined;
       if (affected) {
         // Publish only each owning Document's
         // dirty flag and status, without recapture or the workspace-wide signal.

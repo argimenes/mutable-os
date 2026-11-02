@@ -52,7 +52,7 @@ export function materializePackage(fragment:MutableFragment,cavernId:string|unde
  }
 
  for(const b of isolated.blocks){const fields=Object.fromEntries(['style','css','html'].filter(k=>b.data[k]!==undefined).map(k=>[k,b.data[k]]));if(Object.keys(fields).length)b.data.packageInactivePresentation={version:1,fields,...b.data.packageInactivePresentation!==undefined?{previous:b.data.packageInactivePresentation}:{}};}
- const native=materializeFragment(isolated,{cavernId},new Map(assets),new Map(),new Set((fragment as MutableFragment&{packageRetainedBlocks?:string[]}).packageRetainedBlocks??[]),false);
+ const native=materializeFragment(isolated,{cavernId},new Map(assets),new Map(),new Set((fragment as MutableFragment&{packageRetainedBlocks?:string[]}).packageRetainedBlocks??[]),false,true);
  const root=native.state.contents[native.state.placements[native.roots[0]].contentKey];
  if(root.viewType!=='document-block')throw Error('Package has no native Document root');
  root.definitionOwnerKey=root.key;

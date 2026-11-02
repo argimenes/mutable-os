@@ -102,6 +102,7 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
      if(editor.features.tableLayouts&&parseTableCommand(query))return tables;
      return [...tables, ...tabs, ...[
      ...(editor.features.reversibleBlocks?surfaceCommands:[]),
+     ...(editor.features.glossMode?[{id:'gloss.create',name:'gloss',reason:'Write a Document-local Gloss'}]:[]),
      {id:'entity',name:'entity',reason:'Resolve an Entity or create explicitly'},
      {id:'link',name:'link',reason:'Reference an available native Document'},
      {id:'entity.list.open',name:'backlinks',reason:'Open the current Document Entity references'},
@@ -121,14 +122,20 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
     },
     reference:async(s,c,label)=>{const k=completionDocuments(editor,s.nodeKey),token=k.selection(editor.textRanges.snapshot(s.nodeKey,s.start,s.end));await k.createReference(token,c.data as DocumentTarget,label,()=>session.alive&&valid(s));restore(s,s.start+[...label].length);},
     command:(s,id)=>{
+     if(id==='gloss.create'){
+      if(!valid(s))throw Error('Stale Gloss source');
+      const selection={anchor:s.start,head:s.end};
+      if(s.inline)throw Error('Select text or place the caret inside a word before invoking /gloss.');
+      queueMicrotask(()=>{if(valid(s))void editor.commandRegistry.execute('gloss.create',{targetKey:s.nodeKey,args:{selection}});});return;
+     }
      if(tabCommands.some(c=>c.id===id)){
       if(!valid(s))throw Error('Stale command source');
       const parsed=parseTabCommand(session.state.input);
-      editor.commandRegistry.execute(id,{targetKey:s.nodeKey,args:{...(parsed?.id===id?parsed.args:{}),invocation:{nodeKey:s.nodeKey,contentKey:s.contentKey,placementKey:s.placementKey,version:s.version,start:s.start,end:s.end,coordinate:'cell'}}});return;
+      editor.commandRegistry.execute(id,{targetKey:s.nodeKey,args:{...(parsed?.id===id?parsed.args:{}),invocation:s.inline?{nodeKey:s.nodeKey,contentKey:s.contentKey,placementKey:s.placementKey,version:s.version,start:s.start,end:s.end,coordinate:'cell'}:undefined}});return;
      }
      if(tableCommands.some(c=>c.id===id)){
       if(!valid(s))throw Error('Stale command source');
-      editor.commandRegistry.execute(id,{targetKey:s.nodeKey,args:{invocation:{nodeKey:s.nodeKey,contentKey:s.contentKey,placementKey:s.placementKey,version:s.version,start:s.start,end:s.end,coordinate:'cell'}}});return;
+      editor.commandRegistry.execute(id,{targetKey:s.nodeKey,args:{invocation:s.inline?{nodeKey:s.nodeKey,contentKey:s.contentKey,placementKey:s.placementKey,version:s.version,start:s.start,end:s.end,coordinate:'cell'}:undefined}});return;
      }
      if(surfaceCommands.some(c=>c.id===id)){queueMicrotask(()=>{if(valid(s))editor.surfaces.run(id,s.nodeKey,{nodeKey:s.nodeKey,start:s.start,end:s.end,version:s.version});});return;}
      if(id==='entity'||id==='link') {queueMicrotask(()=>open(s,id==='entity'?'entity':'document',''));return;}
@@ -282,6 +289,9 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
    if((event.type==='copy'||event.type==='cut')&&event.clipboardData)event.clipboardData.setData('text/plain',text(s.nodeKey,Math.max(s.start,start),Math.min(s.end,end)));
    if(event.type!=='copy')intercept(s.nodeKey,start,end,event.type==='paste'?event.clipboardData?.getData('text/plain')??'':'',event.type==='paste'?'insertFromPaste':'deleteByCut');event.preventDefault();event.stopPropagation();return true;
   },before(key,start,end,text,type){
+   if(editor.features.glossMode&&type==='insertText'&&text==='/'&&!current){
+    try{editor.gloss.target(key,{anchor:start,head:end});open(snapshot(key,start,end,false),'command','');return true;}catch{/* Other slash commands retain their existing literal path. */}
+   }
    if(type!=='insertText'||text!==':'||end<=start||end-start>1000)return false;
    const n=editor.node(key);if((n?.payload.standoffProperties as any[]??[]).some(p=>!p.isDeleted&&/(?:^|[/:-])(?:code|literal)(?:$|[/:-])/.test(p.type??'')&&p.start<end&&p.end>=start))return false;
    try{const s=snapshot(key,start,end,false);open(s,'entity',s.literal+' : ');return true;}catch{return false;}

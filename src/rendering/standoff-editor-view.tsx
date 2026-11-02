@@ -311,7 +311,7 @@ function ProjectedAlternative(props: { nodeKey: NodeKey; sourceIndex: number; so
   const node = () => projection.state.nodes[props.nodeKey];
   const runs = createMemo(() => compileCellStyleRuns(
     ((node()?.payload.standoffProperties as StandoffAnnotation[] | undefined) ?? [])
-      .map(property => editor.linkedAnnotations.resolve(property, node()?.contentKey) as StandoffAnnotation),
+      .map(property => property.type === "mutable/gloss" ? editor.gloss.resolve(property, props.nodeKey) : editor.linkedAnnotations.resolve(property, node()?.contentKey) as StandoffAnnotation),
   ));
   return <span
     class={["reactive-superposition-projection",props.classes].filter(Boolean).join(" ")}
@@ -868,7 +868,7 @@ export function StandoffEditorView(props: BlockViewProps) {
       data-block-type="standoff-editor-block"
     >
       <Show when={editor.features.taskLists && taskState(node()) !== undefined}><StandaloneTaskDisclosure nodeKey={props.nodeKey} /><TaskControl nodeKey={props.nodeKey} /></Show>
-      <div ref={surface} class="reactive-standoff-surface" onPointerMove={hoverCandidate} onPointerLeave={() => setHovered(undefined)}>
+      <div ref={surface} class="reactive-standoff-surface" onClick={event => editor.gloss.click(props.nodeKey,event)} onPointerMove={hoverCandidate} onPointerLeave={() => setHovered(undefined)}>
         <DecorationLayer class="reactive-annotation-layer reactive-annotation-layer--foreground" shapes={highlighterShapes().filter(shape=>!shape.annotationKey||legacySvgKeys().has(shape.annotationKey))} blendMode="color-dodge" />
         <DecorationLayer class="reactive-selection-layer" shapes={selectionShapes()} />
         <DecorationLayer class="reactive-selection-layer reactive-search-layer" shapes={searchShapes()} />

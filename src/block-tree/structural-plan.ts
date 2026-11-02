@@ -2,7 +2,7 @@ import { tabOrientationRecordChange, tabMetadataRecordChange } from './tab-orien
 import { inlineOwnerFor } from './inline-plan';
 import type { ContentRecord, Location, PlacementRecord, RepositoryOperation, RepositoryState } from './types';
 
-export interface StructuralChange { tabOrientationOwner?: string; tabMetadata?: { owners: string[]; inlineOwner?: string }; membership?: { key:string; before?:string; after?:string }[]; contents: string[]; childrenOwners: string[]; inlineOwners: string[] }
+export interface StructuralChange { gloss?: import("./gloss-plan").GlossChange; tabOrientationOwner?: string; tabMetadata?: { owners: string[]; inlineOwner?: string }; membership?: { key:string; before?:string; after?:string }[]; contents: string[]; childrenOwners: string[]; inlineOwners: string[] }
 export interface StructuralEvidence {
   locationOf(key: string): Location | undefined;
   referenceCount(key: string): number;

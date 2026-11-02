@@ -9,7 +9,7 @@ import type { AnnotationAction, AnnotationPatch } from "../block-tree/annotation
 
 export class LinkedAnnotations {
   constructor(private editor: ReactiveEditor) {}
-  resolve(property: JsonObject, contentKey?: string) { return resolveLinkedProperty(this.editor.repository.state, property, contentKey); }
+  resolve(property: JsonObject, contentKey?: string) { return property.type === "mutable/gloss" ? this.editor.gloss.resolveContent(property, contentKey) : resolveLinkedProperty(this.editor.repository.state, property, contentKey); }
   private owner(id: string, property?: JsonObject, contentKey?: string) {
     const state = this.editor.repository.readState();
     if (property) return linkedDefinitionOwner(state, property, contentKey);

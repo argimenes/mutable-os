@@ -1,3 +1,4 @@
+import { glossChangeFor } from "./gloss-plan";
 import { structuralChangeFor, type StructuralChange } from "./structural-plan";
 import { taskStateChangeFor } from './task-state-plan';
 import { listWrapChangeFor, type ListWrapChange } from "./list-wrap-plan";
@@ -443,6 +444,11 @@ export class CanonicalRepository {
     if (!operations.length) return;
     const placementDelta = this.placementIdentity.validateCommit(operations);
     const bulk = operations.some(op => op.kind === "record-batch");
+    const gloss = !bulk && glossChangeFor(this.readState(), operations, {locationOf:key=>this.locationOf(key),ownedKeys:key=>this.ownedPlacementKeys(key)});
+    if(gloss) {
+      this.commitInline(label,operations,undefined,recordHistory,metadata,undefined,undefined,placementDelta,undefined,undefined,undefined,
+        {gloss,contents:[gloss.owner,...gloss.texts],childrenOwners:[],inlineOwners:gloss.texts});return;
+    }
     const taskStateOwner = !bulk && taskStateChangeFor(this.readState(), operations);
     if (taskStateOwner) {
       this.commitInline(label, operations, undefined, recordHistory, metadata, undefined, undefined, placementDelta, undefined, undefined, taskStateOwner);
