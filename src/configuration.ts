@@ -142,6 +142,7 @@ export type FeatureFlags = Readonly<{
   inlineCharacterSurfaces: boolean;
   /** Bundled asynchronous Initialis still-image renderer and direct activation. */
   glossMode: boolean;
+  glossPresentation: boolean;
   initialisCharacterRenderer: boolean;
   /** Transient caret enter/leave events and SVG emphasis for opted-in annotations. */
   annotationRangeEvents: boolean;
@@ -226,6 +227,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   directDomCharacterCells: true,
   inlineCharacterSurfaces: true,
   glossMode: true,
+  glossPresentation: true,
   initialisCharacterRenderer: true,
   annotationRangeEvents: true,
   caretModes: true,

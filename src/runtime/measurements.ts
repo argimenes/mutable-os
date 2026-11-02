@@ -56,6 +56,22 @@ export class MeasurementService {
     this.rangeCache={key,rects};return rects;
   }
   private rangeCache?:{key:string;rects:DOMRectReadOnly[]};
+  private retainedRanges=new Map<string,{stamp:string;ranges:Map<string,{x:number;y:number;width:number;height:number}[]>}>();
+  readonly rangeDiagnostics={reads:0,hits:0};
+  /** Occurrence-local geometry, translated by one shared block measurement.
+   * Scroll/host translation reuses offsets; content revision, width, scale,
+   * remount generation and explicit font/layout invalidation invalidate them. */
+  retainedRangeRects(nodeKey:NodeKey,start:number,end:number,revision:number,origin:DOMRectReadOnly,scale=1,frame=performance.now()):DOMRectReadOnly[]{
+    const handle=this.mounts.get(nodeKey);if(!handle)return [];
+    const stamp=`${handle.generation}:${revision}:${origin.width}:${scale}`;
+    let cached=this.retainedRanges.get(nodeKey);
+    if(cached?.stamp!==stamp){this.rangeCache=undefined;cached={stamp,ranges:new Map()};this.retainedRanges.set(nodeKey,cached);}
+    const key=`${start}:${end}`;let local=cached.ranges.get(key);
+    if(!local){this.rangeDiagnostics.reads++;local=this.rangeRects(nodeKey,start,end,frame).map(r=>({x:(r.left-origin.left)/scale,y:(r.top-origin.top)/scale,width:r.width/scale,height:r.height/scale}));cached.ranges.set(key,local);}
+    else this.rangeDiagnostics.hits++;
+    return local.map(r=>new DOMRectReadOnly(origin.left+r.x*scale,origin.top+r.y*scale,r.width*scale,r.height*scale));
+  }
+  invalidateRanges(nodeKey?:NodeKey){if(nodeKey)this.retainedRanges.delete(nodeKey);else this.retainedRanges.clear();this.rangeCache=undefined;}
   blockRect(nodeKey: NodeKey): DOMRect | undefined {
     return this.mounts.get(nodeKey)?.root.getBoundingClientRect();
   }

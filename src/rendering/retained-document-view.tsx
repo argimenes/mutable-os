@@ -1,3 +1,4 @@
+import {GlossPresentation} from '../features/gloss/presentation';
 import { createEffect, onCleanup, untrack, type JSX } from "solid-js";
 import { insert } from "solid-js/web";
 import { ReactiveViewProvider, useReactiveView } from "../reactive-editor/context";
@@ -20,7 +21,7 @@ export function RetainedDocumentHost(props: {
       // sibling. Resolve lazily because a returning slot is initially empty.
       const content = slot.closest('.flint-compact') && slot.querySelector<HTMLElement>(
         ':scope > .retained-document-session > .reactive-document-occurrence > .reactive-document-occurrence__content');
-      return content || slot.closest<HTMLElement>('[role="tabpanel"],.reactive-window__content') || slot;
+      return content || slot.querySelector<HTMLElement>('[data-gloss-scrollport]') || slot.closest<HTMLElement>('[role="tabpanel"],.reactive-window__content') || slot;
     },
     coordinates: context.coordinates!, selected: () => props.selected });
   let session!: RetainedDocumentSession;
@@ -40,7 +41,7 @@ export function RetainedDocumentHost(props: {
       <DocumentSessionWindowOwner session={session} manager={owner?.manager}>
       <ReactiveViewProvider editor={context.editor} projection={session.projection}
         coordinates={session.host.coordinates} windowGeometry={context.windowGeometry} activity={session.host.activity}>
-        {props.render(session)}
+        <GlossPresentation editor={context.editor} session={session}>{props.render(session)}</GlossPresentation>
       </ReactiveViewProvider>
       </DocumentSessionWindowOwner>
     </DocumentSessionContext.Provider>);

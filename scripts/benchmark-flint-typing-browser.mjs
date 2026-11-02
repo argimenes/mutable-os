@@ -85,6 +85,10 @@ try{
  if(process.env.BENCHMARK_ACADEMIC_SOURCE==='1'){await evaluate(`(async()=>{const {alto}=await import('/src/academic/fixtures.ts'),{parseOcr}=await import('/src/academic/ocr.ts');proof.editor.commands.insert({id:crypto.randomUUID(),type:'mutable/academic-resource-block',academicArchive:true,academic:{version:1,kind:'deterministic',snapshotId:crypto.randomUUID(),resourceId:'benchmark-source',source:'benchmark.alto',endpoint:'local-file',retrievedAt:'2026-10-19T00:00:00Z',asset:{kind:'managed',cavernId:'benchmark',assetId:'sha256:'+'a'.repeat(64)},format:'alto',projection:JSON.parse(JSON.stringify(parseOcr(alto)))}},{kind:'after',anchorKey:proof.text.key});})()`);await wait('document.querySelector(".mutable-academic-resource")');}
  if(process.env.BENCHMARK_VAULT_SIZE)await wait("proof.root.querySelectorAll('.flint-tree-document').length>0");
  await evaluate('new Promise(r=>setTimeout(r,300))');
+ if(process.env.BENCHMARK_GLOSS_PRESENTATION==='1'){
+  await evaluate(`document.querySelector('[aria-label="Gloss Mode"]').click()`);await wait('document.querySelector(".gloss-register-row")');
+  await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+ }
  await evaluate(`proof.flow.focus();proof.mount.restoreInlineSelection({anchor:100,head:100});proof.editor.caretModes.select(${JSON.stringify(process.env.BENCHMARK_CARET_MODE??'normal')})`);
  await wait("proof.editor.caretModes.active()==='normal' || proof.flow.dataset.readingSpotlight || (proof.flow.dataset.caretFocus && proof.root.querySelector('[data-caret-scope]'))");
  const presentation=await evaluate(`({mode:proof.editor.caretModes.active(),scoped:proof.root.querySelectorAll('[data-caret-scope]').length,opacities:[...new Set([...proof.flow.children].map(cell=>getComputedStyle(cell).opacity))],focus:!!proof.flow.dataset.caretFocus,otherFlows:[...proof.root.querySelectorAll('[data-caret-scope]:not([data-caret-focus])')].map(flow=>getComputedStyle(flow).opacity)})`);

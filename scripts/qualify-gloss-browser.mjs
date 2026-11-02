@@ -3,12 +3,16 @@
 import { createServer } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const commandQualification = true;
-const milestone = 'gloss-stage-a';
+const stageB=process.env.GLOSS_STAGE==='b';
+const milestone = stageB?'gloss-stage-b':'gloss-stage-a';
+const vault=stageB?await mkdtemp(path.join(tmpdir(),'mutable-gloss-vault-')):undefined;
+const api=stageB?(await import('express')).default():undefined;
+if(api)api.use('/api/native',(await import('../dist/server/native-document-store.mjs')).createNativeDocumentStoreRouter({root:vault}));
 const artifactDirectory = path.resolve('artifacts/'+milestone);
 await mkdir(artifactDirectory, { recursive: true });
 const profile = await mkdtemp(path.join(tmpdir(), `mutable-${milestone}-`));
@@ -17,7 +21,7 @@ const interactions = new Set();let profiled=false;
 try {
   server = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-tab-orientation', plugins: [solidPlugin(), {
     name: 'tab-orientation-isolated-fixture',
-    configureServer(server) { server.middlewares.use((req, res, next) => {
+    configureServer(server) { if(api)server.middlewares.use(api);server.middlewares.use((req, res, next) => {
     if (req.url === '/__tab_orientation') { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><html><head><title>Tab orientation qualification</title></head><body></body></html>'); }
     else if (req.url?.startsWith('/api/')) { res.statusCode = 503; res.end('Qualification has no backend'); }
     else next();
@@ -69,7 +73,9 @@ try {
           const shot=await send('Page.captureScreenshot',{format:'png'},sessionId);
           await writeFile(path.join(artifactDirectory,action.name+'.png'),Buffer.from(shot.data,'base64'));
         }
-        if(action.type==='fixture')await writeFile(path.join(artifactDirectory,'typing-fixture.mutable.json'),action.text);
+        if(action.type==='disk-proof'){const saved=await readFile(path.join(vault,'gloss-primary.ink'),'utf8');await writeFile(path.join(artifactDirectory,'saved-document.ink'),saved);result={bytes:Buffer.byteLength(saved),contains: saved.includes(action.id)};}
+        if(action.type==='wheel')await send('Input.dispatchMouseEvent',{type:'mouseWheel',x:action.x,y:action.y,deltaX:0,deltaY:action.deltaY},sessionId);
+        if(action.type==='fixture'){await writeFile(path.join(artifactDirectory,'typing-fixture.mutable.json'),action.text);if(stageB)await writeFile(path.join(vault,'gloss-primary.ink'),action.text);}
         if(action.type==='click') {
           if(action.double) {
             await send('Input.dispatchMouseEvent',{type:'mousePressed',x:action.x,y:action.y,button:action.button??'left',clickCount:1},sessionId);
@@ -85,7 +91,7 @@ try {
         }
         if(action.type==='viewport')await send('Emulation.setDeviceMetricsOverride',{width:action.width,height:action.height,deviceScaleFactor:action.deviceScaleFactor??1,mobile:false},sessionId);
         const profile=process.env.GLOSS_PROFILE&&!profiled&&action.type==='key'&&action.key==='Enter'&&!action.modifiers;if(profile){profiled=true;await send('Profiler.enable',{},sessionId);await send('Profiler.start',{},sessionId);}
-        if(action.type==='key')for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key:action.key,code:action.key.length===1&&/[a-z]/i.test(action.key)?'Key'+action.key.toUpperCase():action.key,...(type==='keyDown'&&action.key==='Enter'?{text:'\r'}:{}),...(type==='keyDown'&&action.text?{text:action.text}:{}),...(type==='keyDown'&&action.key==='a'&&(action.modifiers===4||action.modifiers===2)?{commands:['selectAll']}:{}),modifiers:action.modifiers??0,windowsVirtualKeyCode:({Tab:9,Escape:27,Enter:13,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40})[action.key]??(action.key.length===1?action.key.toUpperCase().charCodeAt(0):0)},sessionId);
+        if(action.type==='key')for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key:action.key,code:action.key.length===1&&/[a-z]/i.test(action.key)?'Key'+action.key.toUpperCase():action.key,...(type==='keyDown'&&action.key==='Enter'?{text:'\r'}:{}),...(type==='keyDown'&&action.text?{text:action.text}:{}),...(type==='keyDown'&&action.key==='a'&&(action.modifiers===4||action.modifiers===2)?{commands:['selectAll']}:{}),modifiers:action.modifiers??0,windowsVirtualKeyCode:({Tab:9,Backspace:8,Escape:27,Enter:13,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40})[action.key]??(action.key.length===1?action.key.toUpperCase().charCodeAt(0):0)},sessionId);
         if(profile){const data=await send('Profiler.stop',{},sessionId);await writeFile('/tmp/gloss-cpu.json',JSON.stringify(data.profile));console.error('PROFILE SAVED');}
         if(action.type==='accessibility')result=(await send('Accessibility.getFullAXTree',{},sessionId)).nodes.filter(n=>!n.ignored).map(n=>({role:n.role?.value,name:n.name?.value,properties:n.properties}));
         await send('Runtime.evaluate',{expression:`globalThis.__tabsResume(${JSON.stringify({result})})`},sessionId);
@@ -94,7 +100,7 @@ try {
     });
   }
   const result = await send('Runtime.evaluate', {
-    expression: `(async()=>{const m=await import('/src/application/gloss.browser-fixture.tsx');return m.qualifyGloss();})()`,
+    expression: `(async()=>{const m=await import('${stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss();})()`,
     awaitPromise: true, returnByValue: true,
   }, sessionId);
   // The last input resume can complete the fixture before its own CDP reply.
@@ -112,5 +118,6 @@ try {
     await exited; clearTimeout(force);
   }
   await server?.close();
+  if(vault)await rm(vault,{recursive:true,force:true,maxRetries:5,retryDelay:200});
   await rm(profile, { recursive: true, force: true, maxRetries:5, retryDelay:200 });
 }

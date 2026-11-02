@@ -99,6 +99,14 @@ describe('E1.3 product Document detachment',()=>{
     expect(s.current()).toBe(true);expect(c.windows()).toHaveLength(0);expect(f.session.windowManager!.count()).toBe(before);
     expect(f.session.documentSessions!.transfers.atOrigin(s)).toBe(true);expect(c.message()).toContain('injected failure');
   });
+  it('retains Gloss Mode and its index across detachment and return without editor reconstruction',async()=>{
+    const f=await setup(),s=f.session.documentSessions!.sessions()[0],mount=f.editor.mounts.get(f.text('a').key)!,revision=f.editor.repository.state.revision;
+    s.element.querySelector<HTMLButtonElement>('[data-command="gloss.mode"],[data-gloss-toggle]')!.click();await tick();
+    const index=(s.element as any).glossIndex;expect(index).toBeTruthy();expect(s.element.classList.contains('gloss-presenting')).toBe(true);expect(f.editor.repository.state.revision).toBe(revision);
+    const w=await detachProduct(f);expect((s.element as any).glossIndex).toBe(index);expect(s.element.querySelector('.gloss-register')).toBeTruthy();expect(f.editor.mounts.get(f.text('a').key)).toBe(mount);
+    await f.session.documentSessions!.detachment!.returnToFlint(w);expect((s.element as any).glossIndex).toBe(index);expect(f.editor.mounts.get(f.text('a').key)).toBe(mount);
+    s.element.querySelector<HTMLButtonElement>('[data-command="gloss.mode"],[data-gloss-toggle]')!.click();await tick();expect((s.element as any).glossIndex).toBeUndefined();expect(f.editor.mounts.get(f.text('a').key)).toBe(mount);
+  });
   it('disables product Detach for an unqualified iframe with a visible reason',async()=>{
     const f=await setup(),s=f.session.documentSessions!.sessions()[0];s.element.append(document.createElement('iframe'));
     f.host.querySelector<HTMLButtonElement>('[aria-label="Document actions: Document a"]')!.click();await tick();

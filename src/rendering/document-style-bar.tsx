@@ -1,3 +1,4 @@
+import {useGlossPresentation} from '../features/gloss/presentation-context';
 import { initialisCommand } from "../features/initialis/controller";
 import { ownSelectionToolbar } from "../input/selection-target";
 import { For, Show, createEffect, createSignal, createComponent, onCleanup } from "solid-js";
@@ -264,7 +265,9 @@ export function DocumentStyleBar(props: { editor: ReactiveEditor; scopeKey?: Nod
     restore();setNotice("");
     void editor.commandRegistry.execute(initialisCommand,{targetKey:node.key,args:{selection:savedRange}});
   };
+  const glossPresentation=useGlossPresentation();
   const tools = (): CompactTool[] => [
+    ...(glossPresentation?[{id:'gloss.mode',label:'Gloss Mode',glyph:'Gloss Mode',toolset:'Annotations' as const,persistent:true,width:94,pressed:glossPresentation.active,run:()=>{glossPresentation.toggle();restore();}},...(glossPresentation.active()&&glossPresentation.narrow()?[{id:'gloss.references',label:'Local References',glyph:'Refs',toolset:'Annotations' as const,persistent:true,width:46,pressed:glossPresentation.references,run:glossPresentation.toggleReferences}]:[])]:[]),
     ...(editor.features.glossMode?[{id:'gloss.create',label:'Create Gloss (Ctrl+; then G)',glyph:'G',toolset:'Annotations' as const,persistent:true,width:36,run:()=>{capture();const n=target();if(n)void editor.commandRegistry.execute('gloss.create',{targetKey:n.key,args:{selection:savedRange}});},disabled:()=>!target()}]:[]),
     ...(editor.initialis.enabled?[{id:initialisCommand,label:"Apply Initialis (Ctrl+; then I)",glyph:"𝓘",toolset:"Visual effects" as const,persistent:true,width:36,run:applyInitialis,disabled:()=>!target()}]:[]),
     ...(["undo", "redo"] as const).map(direction => ({ id: `history.${direction}`, label: direction === "undo" ? "Undo" : "Redo", glyph: direction === "undo" ? "↶" : "↷", toolset: "Typography" as const, primary: true, disabled: () => !target() || !historyTrigger(direction), run: () => history(direction) })),
@@ -304,6 +307,7 @@ export function DocumentStyleBar(props: { editor: ReactiveEditor; scopeKey?: Nod
     <fieldset><legend>Editor options</legend><SelectionOption /></fieldset>
   </>;
   const SessionControls = () => <>
+    <Show when={glossPresentation}><button type="button" data-gloss-toggle aria-pressed={glossPresentation?.active()} onClick={()=>{glossPresentation?.toggle();restore();}}>Gloss Mode</button><Show when={glossPresentation?.active()&&glossPresentation.narrow()}><button type="button" aria-expanded={glossPresentation?.references()} onClick={()=>glossPresentation?.toggleReferences()}>Local References</button></Show></Show>
     <Show when={editor.features.caretModes && editor.caretModes.enabled()}>
       <select class="document-style-bar__caret-mode" aria-label="Caret Mode" title="Session text focus" value={editor.caretModes.active()}
         onChange={event => { editor.pointerSpotlight.setActive(false); editor.caretModes.select(event.currentTarget.value); restore(); }}>

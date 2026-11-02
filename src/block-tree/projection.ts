@@ -272,6 +272,8 @@ export class BlockTreeProjection {
   }
 
   private updateInline(contentKey: ContentKey): void {
+    // A text edit outside this view must not publish even a revision-only update.
+    if (!this.contentNodes.has(contentKey)) return;
     const source = this.repository.readState();
     const content = source.contents[contentKey];
     const nodes = unwrap(this.state.nodes);
