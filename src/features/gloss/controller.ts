@@ -73,6 +73,29 @@ export class GlossController {
   return this.activate({key:rootKey,owner:root.contentKey,viewId:root.viewId,id,previous:JSON.stringify(def),raw:def.value,anchorElement:invoker},show);
  }
  deleteDefinition(rootKey:string,id:string,invoker?:HTMLElement){return this.openDefinition(rootKey,id,invoker,false)&&this.commit('',true);}
+ /** Reuse a local entity definition; never rename it or copy its relationships. */
+ private attachEntity(id:string,expected:string):boolean {
+  const d=this.draft;if(!d?.range)return false;
+  try {
+   const e=this.editor;e.textRanges.validate([d.range],'cell');
+   if(this.documentFor(d.key)!==d.owner||this.owner(d.range.contentKey)!==d.owner)throw Error('The anchor Document changed. Cancel and select it again.');
+   const state=e.repository.readState(),registry=state.contents[d.owner].payload.linkedAnnotations as Record<string,any>,def=registry?.[id];
+   if(!glossDefinition(def)||def.isDeleted||parseGloss(def.value).type.toLowerCase()!=='entity'||JSON.stringify(def)!==expected)throw Error('This entity changed. Select it again from the suggestions.');
+   if(d.id&&JSON.stringify(registry[d.id])!==d.previous)throw Error('This Gloss changed in another view. Copy your draft before cancelling.');
+   const c=state.contents[d.range.contentKey],props=clone(c.payload.standoffProperties as any[]??[]),origins=props.map((_,i):number|null=>i);
+   if(d.id){
+    const at=props.findIndex(p=>p.type===GLOSS&&p.annotationId===d.id&&p.start===d.range!.start&&p.end===d.range!.end-1);
+    if(at<0)throw Error('The Gloss occurrence changed. Cancel and select it again.');
+    props[at]={...props[at],annotationId:id};
+   }else if(!props.some(p=>p.type===GLOSS&&!p.isDeleted&&p.annotationId===id&&p.start===d.range!.start&&p.end===d.range!.end-1)){
+    props.push({id:crypto.randomUUID(),type:GLOSS,annotationId:id,start:d.range.start,end:d.range.end-1});origins.push(null);
+   }else {this.cancel();return true;}
+   if(d.id===id){this.cancel();return true;}
+   const operations:RepositoryOperation[]=[{kind:'put-content',annotationOrigins:origins,record:{...clone(c),payload:{...clone(c.payload),standoffProperties:props}}}];
+   if(!glossChangeFor(state,operations,this.evidence))throw Error('Gloss reference could not be safely admitted; no changes made.');
+   e.repository.commit('Reference Gloss entity',operations);this.cancel();return true;
+  }catch(error){this.status[1](error instanceof Error?error.message:String(error));return false;}
+ }
  commit(raw:string,remove=false):boolean {
   const d=this.draft;if(!d)return false;
   try {
@@ -105,7 +128,8 @@ export class GlossController {
   const d=this.draft!,h=this.editor.mounts.get(d.key)!,doc=h.root.ownerDocument,win=doc.defaultView!;
   const box=doc.createElement('div');box.className='gloss-input';box.setAttribute('role','dialog');box.setAttribute('aria-label',d.id?'Edit Gloss':'Create Gloss');
   const input=doc.createElement('textarea');input.setAttribute('aria-label','Gloss');input.placeholder='type: your thought';input.value=d.raw;input.rows=2;this.draftInput=input;
-  const suggestions=doc.createElement('div');suggestions.className='gloss-suggestions';
+  const suggestions=doc.createElement('div');suggestions.className='gloss-suggestions';suggestions.id='gloss-suggestions-'+crypto.randomUUID();suggestions.setAttribute('role','listbox');
+  input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-controls',suggestions.id);
   const status=doc.createElement('div');status.className='gloss-draft-status';status.setAttribute('role','status');
   const buttons=doc.createElement('div');buttons.className='gloss-buttons';
   const cancel=doc.createElement('button');cancel.textContent='Close / Cancel';cancel.onclick=()=>this.cancel();buttons.append(cancel);
@@ -126,14 +150,48 @@ export class GlossController {
    highlights.splice(0).forEach(e=>e.remove());for(const r of rects){const mark=doc.createElement('div');mark.className='gloss-anchor-active';Object.assign(mark.style,{left:`${r.left}px`,top:`${r.top}px`,width:`${r.width}px`,height:`${r.height}px`});doc.body.append(mark);highlights.push(mark);}
   };
   const schedule=()=>{if(!frame)frame=win.requestAnimationFrame(position);};
-  const types=new Map(starterTypes.map(t=>[t.toLowerCase(),t]));for(const p of Object.values(this.editor.repository.readState().contents[d.owner].payload.linkedAnnotations as Record<string,any>??{}))if(glossDefinition(p)&&!p.isDeleted){const t=parseGloss(p.value).type;if(t)types.set(t.toLowerCase(),t);}
-  const suggest=()=>{d.raw=input.value;suggestions.replaceChildren();input.rows=Math.min(5,Math.max(2,input.value.split('\n').length));if(input.value.includes(':'))return;const q=input.value.trim().toLowerCase();for(const type of [...types.values()].filter(t=>!q||t.toLowerCase().startsWith(q)).slice(0,5)){const b=doc.createElement('button');b.type='button';b.textContent=type;b.onpointerdown=e=>e.preventDefault();b.onclick=()=>{input.value=type+': ';suggest();input.focus();};suggestions.append(b);}};
-  input.oninput=suggest;let composing=false;input.addEventListener('compositionstart',()=>composing=true);input.addEventListener('compositionend',()=>composing=false);
-  box.onkeydown=e=>{if(e.isComposing||composing||e.keyCode===229)return;if(e.key==='Escape'){e.preventDefault();e.stopPropagation();this.cancel();}else if(e.target===input&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.stopPropagation();if(!this.commit(input.value))status.textContent=this.notice();}};
+  type Suggestion={label:string;search:string;id?:string;expected?:string};
+  let types:Suggestion[]=[],entities:Suggestion[]=[],matches:Suggestion[]=[],active=0;
+  // Build once on open, then only when definitions change. Draft keystrokes
+  // filter these strings without reading canonical records or measuring Cells.
+  const inventory=()=>{
+   const found=new Map(starterTypes.map(t=>[t.toLowerCase(),t]));entities=[];
+   for(const [id,p] of Object.entries(this.editor.repository.readState().contents[d.owner].payload.linkedAnnotations as Record<string,any>??{}))if(glossDefinition(p)&&!p.isDeleted){
+    const parsed=parseGloss(p.value),type=parsed.type.toLowerCase();if(type)found.set(type,parsed.type);
+    if(type==='entity'&&parsed.text.trim())entities.push({id,label:parsed.text.trim(),search:parsed.text.trim().toLowerCase(),expected:JSON.stringify(p)});
+   }
+   types=[...found].map(([search,label])=>({search,label}));
+  };
+  const highlight=()=>{[...suggestions.children].forEach((node,i)=>node.setAttribute('aria-selected',String(i===active)));const option=suggestions.children[active];if(option)input.setAttribute('aria-activedescendant',option.id);else input.removeAttribute('aria-activedescendant');};
+  const accept=()=>{const choice=matches[active];if(!choice)return;
+   if(choice.id){if(!this.attachEntity(choice.id,choice.expected!))status.textContent=this.notice();}
+   else {input.value=choice.label+': ';suggest();input.focus({preventScroll:true});}
+  };
+  const suggest=()=>{
+   d.raw=input.value;suggestions.replaceChildren();input.rows=Math.min(5,Math.max(2,input.value.split('\n').length));active=0;
+   const colon=input.value.indexOf(':'),parsed=parseGloss(input.value),q=(colon<0?input.value:parsed.text).trim().toLowerCase();
+   const source=colon<0?types:parsed.type.toLowerCase()==='entity'&&d.range?entities:[];
+   matches=source.filter(s=>s.search.startsWith(q)).sort((a,b)=>Number(b.search===q)-Number(a.search===q)).slice(0,6);
+   suggestions.hidden=!matches.length;suggestions.setAttribute('aria-label',colon<0?'Gloss types':'Gloss entities');
+   for(const [i,choice] of matches.entries()){
+    const option=doc.createElement('div');option.id=suggestions.id+'-'+i;option.setAttribute('role','option');option.textContent=choice.label;
+    option.onpointerdown=e=>e.preventDefault();option.onpointermove=()=>{active=i;highlight();};option.onclick=()=>{active=i;accept();};suggestions.append(option);
+   }
+   highlight();
+  };
+  inventory();input.oninput=suggest;let composing=false;input.addEventListener('compositionstart',()=>composing=true);input.addEventListener('compositionend',()=>{composing=false;suggest();});
+  box.onkeydown=e=>{if(e.isComposing||composing||e.keyCode===229)return;if(e.key==='Escape'){e.preventDefault();e.stopPropagation();this.cancel();}else if(e.target===input){
+   if((e.key==='ArrowDown'||e.key==='ArrowUp')&&matches.length&&!e.shiftKey){e.preventDefault();e.stopPropagation();active=(active+(e.key==='ArrowDown'?1:-1)+matches.length)%matches.length;highlight();}
+   else if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.stopPropagation();if(matches[active])accept();else if(!this.commit(input.value))status.textContent=this.notice();}
+  }};
   const save=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s')status.textContent='Gloss draft is not saved. Press Enter to commit, or cancel.';};
   win.addEventListener('keydown',save,true);win.addEventListener('scroll',schedule,true);win.addEventListener('resize',schedule);const fontChanged=()=>{this.editor.measurements.invalidateRanges(d.key);schedule();};doc.fonts?.addEventListener('loadingdone',fontChanged);
   const resize=typeof ResizeObserver==='undefined'?undefined:new ResizeObserver(()=>{this.editor.measurements.invalidateRanges(d.key);schedule();});resize?.observe(h.root);
-  const stopChanges=this.editor.repository.subscribeChanges(change=>{if(d.range&&change.previousContents.has(d.range.contentKey))schedule();});
+  const stopChanges=this.editor.repository.subscribeChanges(change=>{
+   const previous=change.previousContents.get(d.owner);
+   if(previous&&(change.structural?.gloss?change.structural.gloss.definitions.length>0:JSON.stringify(previous.payload.linkedAnnotations)!==JSON.stringify(this.editor.repository.readState().contents[d.owner].payload.linkedAnnotations))){inventory();suggest();}
+   if(d.range&&change.previousContents.has(d.range.contentKey))schedule();
+  });
   this.closeUI=()=>{stopChanges();alive=false;if(frame)win.cancelAnimationFrame(frame);resize?.disconnect();win.removeEventListener('keydown',save,true);win.removeEventListener('scroll',schedule,true);win.removeEventListener('resize',schedule);doc.fonts?.removeEventListener('loadingdone',fontChanged);box.remove();highlights.forEach(e=>e.remove());};
   suggest();position();input.focus({preventScroll:true});
  }

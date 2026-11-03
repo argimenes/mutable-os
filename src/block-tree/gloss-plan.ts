@@ -18,8 +18,11 @@ export function glossChangeFor(state:RepositoryState,ops:RepositoryOperation[],e
  if(!ops.length||ops.some(o=>o.kind!=='put-content'))return;
  const records=ops.map(o=>(o as Extract<RepositoryOperation,{kind:'put-content'}>).record);
  if(new Set(records.map(r=>r.key)).size!==records.length)return;
- const roots=records.filter(r=>r.viewType==='document-block');if(roots.length!==1)return;
- const root=roots[0],before=state.contents[root.key];if(!before)return;
+ const roots=records.filter(r=>r.viewType==='document-block');if(roots.length>1)return;
+ // Attaching an existing Gloss changes only its local text occurrence. Resolve
+ // the unchanged registry by indexed ancestry, without a dummy Document write.
+ const owner=roots[0]?.key??glossOwner(state,records[0].key,e);if(!owner)return;
+ const before=state.contents[owner],root=roots[0]??before;if(!before||root.viewType!=='document-block')return;
  const strip=(r:ContentRecord,field:string)=>{const payload={...r.payload};delete payload[field];return {...r,revision:0,payload};};
  if(!same(strip(before,'linkedAnnotations'),strip(root,'linkedAnnotations')))return;
  const a=before.payload.linkedAnnotations??{},b=root.payload.linkedAnnotations??{};
@@ -27,21 +30,21 @@ export function glossChangeFor(state:RepositoryState,ops:RepositoryOperation[],e
  const old=a as Record<string,any>,next=b as Record<string,any>;
  const definitions:string[]=[],edges:{definitionId:string;id:string}[]=[];let linksOnly=true;
  const withoutLinks=(d:any)=>d?{...d,metadata:{...d.metadata,gloss:{...d.metadata.gloss,links:undefined}}}:d;
- for(const id of new Set([...Object.keys(old),...Object.keys(next)]))if(!same(old[id],next[id])) {
+ for(const id of old===next?[]:new Set([...Object.keys(old),...Object.keys(next)]))if(!same(old[id],next[id])) {
   definitions.push(id);if(old[id]&&!glossDefinition(old[id])||next[id]&&!glossDefinition(next[id]))return;
   if(next[id]&&next[id].id!==id)return;
   if(!same(withoutLinks(old[id]),withoutLinks(next[id])))linksOnly=false;
   const a=old[id]?.metadata.gloss.links??{},b=next[id]?.metadata.gloss.links??{};
   for(const edgeId of new Set([...Object.keys(a),...Object.keys(b)]))if(!same(a[edgeId],b[edgeId]))edges.push({definitionId:id,id:edgeId});
  }
- if(!definitions.length)return;
  const texts:string[]=[];
  for(const r of records)if(r!==root) {
   const prior=state.contents[r.key];if(!prior||r.inlineKind!=='standoff'||glossOwner(state,r.key,e)!==root.key||!same(strip(prior,'standoffProperties'),strip(r,'standoffProperties')))return;
   const p=prior.payload.standoffProperties??[],q=r.payload.standoffProperties??[];if(!Array.isArray(p)||!Array.isArray(q))return;
   if(!same(p.filter(x=>x.type!==GLOSS),q.filter(x=>x.type!==GLOSS)))return;
   for(const x of q.filter(x=>x.type===GLOSS))if(!glossDefinition(next[x.annotationId])||!Number.isInteger(x.start)||!Number.isInteger(x.end)||x.start<0||x.end<x.start||x.end>=r.inlineContent.length)return;
-  texts.push(r.key);
+  if(!same(p,q))texts.push(r.key);
  }
+ if(!definitions.length&&!texts.length)return;
  return {owner:root.key,texts,definitions,edges,linksOnly:linksOnly&&!texts.length};
 }

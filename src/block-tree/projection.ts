@@ -89,7 +89,7 @@ export class BlockTreeProjection {
         const {owner,texts}=change.structural.gloss;
         for(const key of texts)if(this.contentNodes.has(key))this.updateInline(key);
         const content=repository.readState().contents[owner];
-        for(const key of this.contentNodes.get(owner)??[])this.setState('nodes',key,'payload',reconcile(clone(content.payload)));
+        if(change.previousContents.has(owner))for(const key of this.contentNodes.get(owner)??[])this.setState('nodes',key,'payload',reconcile(clone(content.payload)));
         return;
       }
       const oriented = change.structural?.tabOrientationOwner;

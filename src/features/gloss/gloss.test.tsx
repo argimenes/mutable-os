@@ -115,3 +115,54 @@ it('keeps the current popup for invalid targets and real drag selections; allows
 });
 
 it('does not reopen a stale scheduled click after the popup is cancelled',()=>{const f=setup(),{e,key}=f,mount=e.mounts.get(key)!;e.gloss.open(key,{anchor:0,head:5});e.gloss.commit('note: first');const id=Object.keys(f.registry())[0];e.gloss.open(key,{anchor:0,head:5},id);const capture=vi.spyOn(mount as any,'captureInlineSelection').mockReturnValue({anchor:0,head:5}),scheduled:FrameRequestCallback[]=[];vi.spyOn(window,'requestAnimationFrame').mockImplementation(fn=>{scheduled.push(fn);return 1;});mount.focusElement.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));e.gloss.cancel();capture.mockReturnValue({anchor:1,head:1});scheduled.forEach(fn=>fn(0));expect(document.querySelector('.gloss-input')).toBeNull();});
+
+const popup=()=>document.querySelector<HTMLTextAreaElement>('.gloss-input textarea')!;
+const typeDraft=(value:string)=>{popup().value=value;popup().dispatchEvent(new InputEvent('input',{bubbles:true}));};
+const pressDraft=(key:string,extra:KeyboardEventInit={})=>popup().dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true,...extra}));
+const options=()=>[...document.querySelectorAll<HTMLElement>('.gloss-suggestions [role="option"]')];
+it('autocompletes types with a listbox, accepts Enter without authoring, and keeps typed unknown prefixes and later colons',()=>{
+ const f=setup();f.e.gloss.open(f.key,{anchor:0,head:5});const revision=f.e.repository.state.revision;
+ typeDraft('en');expect(options().map(o=>o.textContent)).toEqual(['entity']);expect(document.querySelector('.gloss-suggestions button')).toBeNull();
+ pressDraft('Enter',{isComposing:true});expect(popup().value).toBe('en');pressDraft('Enter');expect(popup().value).toBe('entity: ');expect(f.e.repository.state.revision).toBe(revision);
+ typeDraft('c');pressDraft('ArrowDown');const chosen=options().find(o=>o.getAttribute('aria-selected')==='true')!.textContent;pressDraft('Enter');expect(popup().value).toBe(chosen+': ');
+ typeDraft('new-type: A: B');expect(options()).toHaveLength(0);pressDraft('Enter',{shiftKey:true});expect(popup()).toBeTruthy();pressDraft('Enter');expect(Object.values(f.registry()).map((p:any)=>p.value)).toEqual(['new-type: A: B']);
+ f.e.gloss.open(f.key,{anchor:6,head:11});typeDraft('new-t');expect(options()[0].textContent).toBe('new-type');options()[0].click();expect(popup().value).toBe('new-type: ');pressDraft('Escape');expect(popup()).toBeNull();
+});
+it.each([true,false])('reuses entity identity from keyboard/pointer, creates unmatched entities, and replays locally (direct %s)',direct=>{
+ const f=setup(direct),{e,key}=f;e.gloss.open(key,{anchor:0,head:5});e.gloss.commit('entity: Leonardo');const id=Object.keys(f.registry())[0],definition=JSON.stringify(f.registry()[id]),cells=[...e.node(key)!.inlineContent],mount=e.mounts.get(key)!;
+ e.gloss.open(key,{anchor:12,head:17});e.gloss.commit('note: Leonidas');const count=Object.keys(f.registry()).length;
+ const snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(f.v as any,'build'),owners=vi.spyOn(resourceIdentity,'resourceOwner'),changes:any[]=[];cleanup.push(e.repository.subscribeChanges(c=>changes.push(c)));
+ e.gloss.open(key,{anchor:6,head:11});typeDraft('entity: Leo');expect(options().map(o=>o.textContent)).toEqual(['Leonardo']);pressDraft('Enter');
+ const refs=()=> (e.node(key)!.payload.standoffProperties as any[]).filter(p=>p.annotationId===id);
+ expect(refs()).toHaveLength(2);expect(Object.keys(f.registry())).toHaveLength(count);expect(JSON.stringify(f.registry()[id])).toBe(definition);expect(e.mounts.get(key)!.captureInlineSelection!()).toEqual({anchor:6,head:11});
+ expect(changes.at(-1).previousContents.size).toBe(1);expect(changes.at(-1).structural.gloss.definitions).toEqual([]);
+ const unchanged=e.repository.readState().contents[f.owner];e.repository.undo();expect(refs()).toHaveLength(1);e.repository.redo();expect(refs()).toHaveLength(2);expect(e.repository.readState().contents[f.owner]).toBe(unchanged);
+ e.gloss.open(key,{anchor:6,head:11});typeDraft('entity: Leo');options()[0].click();expect(refs()).toHaveLength(2); // same range cannot create a duplicate
+ e.gloss.open(key,{anchor:12,head:17});typeDraft('entity: Ada: Lovelace');expect(options()).toHaveLength(0);pressDraft('Enter');expect(Object.keys(f.registry())).toHaveLength(count+1);expect(Object.values(f.registry()).some((p:any)=>p.value==='entity: Ada: Lovelace')).toBe(true);
+ e.gloss.open(key,{anchor:0,head:5},id);typeDraft('entity: Ada');options()[0].click();expect(refs()).toHaveLength(1);expect(JSON.stringify(f.registry()[id])).toBe(definition);e.repository.undo();expect(refs()).toHaveLength(2);e.repository.redo();
+ expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(owners).not.toHaveBeenCalled();expect(e.mounts.get(key)).toBe(mount);expect(e.node(key)!.inlineContent).toEqual(cells);
+});
+it('filters cached local entity names only, and does no canonical work or geometry reads while drafting',()=>{
+ const f=setup(),{e,key}=f;const create=(raw:string)=>{e.gloss.open(key,{anchor:0,head:5});e.gloss.commit(raw);};create('entity: Leonardo');create('claim: Leonidas');
+ const registry=f.registry(),id=Object.keys(registry)[0];
+ const other=Object.values(f.v.state.nodes).find(n=>n.payload.id==='q')!;e.gloss.open(other.key,{anchor:0,head:5});e.gloss.commit('entity: Leonora');
+ e.gloss.open(key,{anchor:6,head:11});
+ const revision=e.repository.state.revision,snapshot=vi.spyOn(e.repository,'snapshot'),commit=vi.spyOn(e.repository,'commit'),geometry=vi.spyOn(e.measurements,'retainedRangeRects'),values=Object.values,entries=Object.entries,contents=e.repository.readState().contents;let scans=0;
+ vi.spyOn(Object,'values').mockImplementation((o:any)=>{if(o===contents)scans++;return values(o);});vi.spyOn(Object,'entries').mockImplementation((o:any)=>{if(o===contents||o===registry)scans++;return entries(o);});
+ for(const draft of ['e','en','entity: L','entity: Le','entity: Leo'])typeDraft(draft);
+ expect(options().map(o=>o.textContent)).toEqual(['Leonardo']);typeDraft('Leo');expect(options()).toHaveLength(0);typeDraft('claim: Leo');expect(options()).toHaveLength(0);
+ expect(e.repository.state.revision).toBe(revision);expect(commit).not.toHaveBeenCalled();expect(snapshot).not.toHaveBeenCalled();expect(geometry).not.toHaveBeenCalled();expect(scans).toBe(0);
+});
+it('refreshes entity suggestions on definition changes and excludes deleted definitions',()=>{
+ const f=setup(),{e,key}=f;e.gloss.open(key,{anchor:0,head:5});e.gloss.commit('entity: Leonardo');const id=Object.keys(f.registry())[0];e.gloss.open(key,{anchor:6,head:11});typeDraft('entity: Leo');expect(options()).toHaveLength(1);
+ const root=e.repository.readState().contents[f.owner],registry=structuredClone(root.payload.linkedAnnotations as any);registry[id].isDeleted=true;e.repository.commit('Delete entity elsewhere',[{kind:'put-content',record:{...structuredClone(root),payload:{...structuredClone(root.payload),linkedAnnotations:registry}}}]);expect(options()).toHaveLength(0);
+ e.repository.undo();expect(options()).toHaveLength(1);pressDraft('Enter');expect(Object.keys(f.registry())).toHaveLength(1);
+});
+it('admits only local Gloss annotation changes for existing-entity attachment',()=>{
+ const f=setup(),{e,key}=f;e.gloss.open(key,{anchor:0,head:5});e.gloss.commit('entity: Leonardo');const state=e.repository.readState(),c=state.contents[e.node(key)!.contentKey],id=Object.keys(f.registry())[0],evidence={ownedKeys:(k:string)=>e.repository.ownedPlacementKeys(k),locationOf:(k:string)=>e.repository.locationOf(k)},proof=(record:any)=>glossChangeFor(state,[{kind:'put-content',record}],evidence);
+ const next=structuredClone(c);(next.payload.standoffProperties as any[]).push({id:'ref',type:GLOSS,annotationId:id,start:6,end:10});expect(proof(next)?.definitions).toEqual([]);expect(proof(c)).toBeUndefined();
+ const bad=structuredClone(next);(bad.payload.standoffProperties as any[])[0].type='style/italic';expect(proof(bad)).toBeUndefined();
+ expect(proof({...next,payload:{...next.payload,unrelated:1}})).toBeUndefined();expect(proof({...next,inlineContent:next.inlineContent.slice(1)})).toBeUndefined();
+ const missing=structuredClone(next);(missing.payload.standoffProperties as any[]).at(-1).annotationId='missing';expect(proof(missing)).toBeUndefined();
+ const foreign=structuredClone(Object.values(state.contents).find(c=>c.payload.id==='q')!);foreign.payload.standoffProperties=[{id:'foreign',type:GLOSS,annotationId:id,start:0,end:4}];expect(proof(foreign)).toBeUndefined();
+});
