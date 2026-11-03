@@ -10,6 +10,8 @@ const equal=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 const address=(definitionId:string,id:string)=>JSON.stringify([definitionId,id]);
 /** Disposable, Document-local derived data. No canonical writes or DOM work. */
 export class GlossGraphIndex {
+ private changedSignal=createSignal(0);
+ readonly revision=this.changedSignal[0];
  readonly diagnostics={definitionReads:0,edgeDecodes:0,edgeEvaluations:0,nodePublications:0,summaryPublications:0};
  private problemEdges=new Map<string,GlossEdge>();
  private problemSignal=createSignal<GlossEdge[]>([]);
@@ -63,6 +65,7 @@ export class GlossGraphIndex {
     if(!equal(problems,edge.diagnostics)){this.edges.set(key,{...edge,diagnostics:problems,active:!problems.length});}else if(!edge.active&&!problems.length)this.edges.set(key,{...edge,active:true});
     affected.add(edge.sourceGlossId);if(edge.targetGlossId)affected.add(edge.targetGlossId);
    }
+   if(ids.length)this.changedSignal[1](n=>n+1);
    let issuesChanged=false;
    for(const key of problemCandidates){const edge=this.edges.get(key),old=this.problemEdges.get(key);if(edge&&!edge.active){if(!equal(old,edge)){this.problemEdges.set(key,edge);issuesChanged=true;}}else if(this.problemEdges.delete(key))issuesChanged=true;}
    if(issuesChanged)this.problemSignal[1]([...this.problemEdges.values()]);

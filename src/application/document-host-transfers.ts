@@ -1,4 +1,5 @@
 import { batch, createSignal } from 'solid-js';
+import {isRetainedGlossGraphFrame} from '../features/gloss/graph-frame';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import type { LocalCoordinates } from '../runtime/local-coordinates';
 import { existingNativeDocumentSession } from '../persistence/native-session';
@@ -165,7 +166,7 @@ export class DocumentHostTransfers {
     const operation = this.editor.currentTextOperation.active();
     if (operation && Object.values(session.projection.state.nodes).some(n => operation.owns(n.key))) throw Error('Finish the affected text operation before transferring');
     if (this.editor.selectionGestures.owner()) throw Error('Finish the selection gesture before transferring');
-    if (session.element.querySelector('iframe,video,audio,canvas,[data-positioned-block],[data-relation-name], [data-block-type="window-block"], [data-block-type="document-window-block"]'))
+    if ([...session.element.querySelectorAll('iframe,video,audio,canvas,[data-positioned-block],[data-relation-name], [data-block-type="window-block"], [data-block-type="document-window-block"]')].some(element=>!isRetainedGlossGraphFrame(element)))
       throw Error('Document contains an unqualified embedded surface');
     for (const element of session.element.querySelectorAll<HTMLElement>('[data-client-id]')) {
       const n = this.editor.node(element.dataset.clientId!);

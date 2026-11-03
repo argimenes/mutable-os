@@ -8,10 +8,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const commandQualification = true;
+const stageC3=process.env.GLOSS_STAGE==='c3';
 const stageC2=process.env.GLOSS_STAGE==='c2';
 const stageC1=process.env.GLOSS_STAGE==='c1';
-const stageB=process.env.GLOSS_STAGE==='b'||stageC1||stageC2;
-const milestone = stageC2?'gloss-stage-c2'+(process.env.GLOSS_C2_DENSITY==='16'?'-dense':''):stageC1?'gloss-stage-c1':stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
+const stageB=process.env.GLOSS_STAGE==='b'||stageC1||stageC2||stageC3;
+const milestone = stageC3?'gloss-stage-c3-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC2?'gloss-stage-c2'+(process.env.GLOSS_C2_DENSITY==='16'?'-dense':''):stageC1?'gloss-stage-c1':stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
 const vault=stageB?await mkdtemp(path.join(tmpdir(),'mutable-gloss-vault-')):undefined;
 const api=stageB?(await import('express')).default():undefined;
 if(api)api.use('/api/native',(await import('../dist/server/native-document-store.mjs')).createNativeDocumentStoreRouter({root:vault}));
@@ -59,6 +60,7 @@ try {
   await send('Page.enable',{},sessionId);
   socket.addEventListener('message',event=>{const m=JSON.parse(event.data);if(m.method==='Page.javascriptDialogOpening'){console.error('DIALOG',m.params);void send('Page.handleJavaScriptDialog',{accept:false},sessionId);}if(m.method==='Runtime.exceptionThrown')console.error('BROWSER EXCEPTION',m.params.exceptionDetails);});
   socket.addEventListener('message',event=>{const m=JSON.parse(event.data);if(process.env.GLOSS_TRACE&&m.method==='Runtime.consoleAPICalled')console.error(new Date().toISOString(),m.params.args.map(a=>a.value??a.description).join(' '));});
+  if(stageC3)await send('Browser.grantPermissions',{origin:`http://127.0.0.1:${port}`,permissions:['clipboardReadWrite','clipboardSanitizedWrite']});
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/__tab_orientation` }, sessionId);
   await new Promise(resolve => setTimeout(resolve, 250));
   if(milestone!=='a0') {
@@ -68,6 +70,10 @@ try {
       const task=(async()=>{
       const action=JSON.parse(message.params.payload);let result;
       try {
+        if(action.type==='select'){
+          for(const key of action.text){await send('Input.dispatchKeyEvent',{type:'keyDown',key,text:key,windowsVirtualKeyCode:key.toUpperCase().charCodeAt(0)},sessionId);await send('Input.dispatchKeyEvent',{type:'keyUp',key,windowsVirtualKeyCode:key.toUpperCase().charCodeAt(0)},sessionId);}
+
+        }
         if(action.type==='composition')await send('Input.imeSetComposition',{text:action.text,selectionStart:action.text.length,selectionEnd:action.text.length},sessionId);
         if(action.type==='text')await send('Input.insertText',{text:action.text},sessionId);
         if(action.type==='paint') { await send('Page.captureScreenshot',{format:'png'},sessionId); }
@@ -93,8 +99,13 @@ try {
         }
         if(action.type==='viewport')await send('Emulation.setDeviceMetricsOverride',{width:action.width,height:action.height,deviceScaleFactor:action.deviceScaleFactor??1,mobile:false},sessionId);
         const profile=process.env.GLOSS_PROFILE&&!profiled&&action.type==='key'&&action.key==='Enter'&&!action.modifiers;if(profile){profiled=true;await send('Profiler.enable',{},sessionId);await send('Profiler.start',{},sessionId);}
-        if(action.type==='key')for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key:action.key,code:action.key.length===1&&/[a-z]/i.test(action.key)?'Key'+action.key.toUpperCase():action.key,...(type==='keyDown'&&action.key==='Enter'?{text:'\r'}:{}),...(type==='keyDown'&&action.text?{text:action.text}:{}),...(type==='keyDown'&&action.key==='a'&&(action.modifiers===4||action.modifiers===2)?{commands:['selectAll']}:{}),modifiers:action.modifiers??0,windowsVirtualKeyCode:({Tab:9,Backspace:8,Escape:27,Enter:13,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40})[action.key]??(action.key.length===1?action.key.toUpperCase().charCodeAt(0):0)},sessionId);
+        if(action.type==='key')for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key:action.key,code:action.key.length===1&&/[a-z]/i.test(action.key)?'Key'+action.key.toUpperCase():action.key,...(type==='keyDown'&&action.key==='Enter'?{text:'\r'}:{}),...(type==='keyDown'&&action.text?{text:action.text}:{}),...(type==='keyDown'&&action.key==='a'&&(action.modifiers===4||action.modifiers===2)?{commands:['selectAll']}:{}),modifiers:action.modifiers??0,windowsVirtualKeyCode:({Tab:9,Backspace:8,Escape:27,Enter:13,Home:36,End:35,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40})[action.key]??(action.key.length===1?action.key.toUpperCase().charCodeAt(0):0)},sessionId);
         if(profile){const data=await send('Profiler.stop',{},sessionId);await writeFile('/tmp/gloss-cpu.json',JSON.stringify(data.profile));console.error('PROFILE SAVED');}
+        if(action.type==='diagram-proof'){
+          const targets=(await send('Target.getTargets')).targetInfos.filter(t=>t.type==='iframe');const proofs=[];
+          for(const target of targets){const attached=await send('Target.attachToTarget',{targetId:target.targetId,flatten:true});try{const r=await send('Runtime.evaluate',{expression:`({svg:!!document.querySelector('svg'),nodes:document.querySelectorAll('g.node').length,unsafe:document.querySelectorAll('svg script,svg foreignObject,svg image,svg a,svg iframe').length,events:[...document.querySelectorAll('svg *')].some(n=>[...n.attributes].some(a=>/^on/i.test(a.name))),literalMarkup:[...document.querySelectorAll('svg text')].some(t=>t.textContent.includes('<img')),text:[...document.querySelectorAll('svg text')].map(t=>t.textContent).join(' ').slice(0,600),xss:!!window.glossInjected})`,returnByValue:true},attached.sessionId);proofs.push(r.result.value);}finally{await send('Target.detachFromTarget',{sessionId:attached.sessionId});}}
+          result={proofs};
+        }
         if(action.type==='accessibility')result=(await send('Accessibility.getFullAXTree',{},sessionId)).nodes.filter(n=>!n.ignored).map(n=>({role:n.role?.value,name:n.name?.value,properties:n.properties}));
         await send('Runtime.evaluate',{expression:`globalThis.__tabsResume(${JSON.stringify({result})})`},sessionId);
       } catch(error) { await send('Runtime.evaluate',{expression:`globalThis.__tabsResume(${JSON.stringify({error:String(error)})})`},sessionId); }
@@ -102,7 +113,7 @@ try {
     });
   }
   const result = await send('Runtime.evaluate', {
-    expression: `(async()=>{const m=await import('${stageC2?'/src/application/gloss-stage-c2.browser-fixture.tsx':stageC1?'/src/application/gloss-stage-c1.browser-fixture.tsx':stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss(${stageC2?JSON.stringify({density:Number(process.env.GLOSS_C2_DENSITY)||4}):''});})()`,
+    expression: `(async()=>{const m=await import('${stageC3?'/src/application/gloss-stage-c3.browser-fixture.tsx':stageC2?'/src/application/gloss-stage-c2.browser-fixture.tsx':stageC1?'/src/application/gloss-stage-c1.browser-fixture.tsx':stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss(${stageC3?JSON.stringify({size:Number(process.env.GLOSS_GRAPH_SIZE)||10,dense:process.env.GLOSS_GRAPH_DENSE==='1'}):stageC2?JSON.stringify({density:Number(process.env.GLOSS_C2_DENSITY)||4}):''});})()`,
     awaitPromise: true, returnByValue: true,
   }, sessionId);
   // The last input resume can complete the fixture before its own CDP reply.
