@@ -8,8 +8,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const commandQualification = true;
-const stageB=process.env.GLOSS_STAGE==='b';
-const milestone = stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
+const stageC2=process.env.GLOSS_STAGE==='c2';
+const stageC1=process.env.GLOSS_STAGE==='c1';
+const stageB=process.env.GLOSS_STAGE==='b'||stageC1||stageC2;
+const milestone = stageC2?'gloss-stage-c2'+(process.env.GLOSS_C2_DENSITY==='16'?'-dense':''):stageC1?'gloss-stage-c1':stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
 const vault=stageB?await mkdtemp(path.join(tmpdir(),'mutable-gloss-vault-')):undefined;
 const api=stageB?(await import('express')).default():undefined;
 if(api)api.use('/api/native',(await import('../dist/server/native-document-store.mjs')).createNativeDocumentStoreRouter({root:vault}));
@@ -100,7 +102,7 @@ try {
     });
   }
   const result = await send('Runtime.evaluate', {
-    expression: `(async()=>{const m=await import('${stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss();})()`,
+    expression: `(async()=>{const m=await import('${stageC2?'/src/application/gloss-stage-c2.browser-fixture.tsx':stageC1?'/src/application/gloss-stage-c1.browser-fixture.tsx':stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss(${stageC2?JSON.stringify({density:Number(process.env.GLOSS_C2_DENSITY)||4}):''});})()`,
     awaitPromise: true, returnByValue: true,
   }, sessionId);
   // The last input resume can complete the fixture before its own CDP reply.

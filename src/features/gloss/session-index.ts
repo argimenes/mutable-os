@@ -19,6 +19,7 @@ export class GlossSessionIndex {
  readonly rows=createSignal<GlossEntry[]>([]);
  readonly diagnostics={treeVisits:0,segmentReads:0,definitionReads:0,rowPublications:0};
  readonly owner:string;
+ readonly relationships?:import("./relationship-index").GlossGraphIndex;
  private entries=new Map<string,Entry>();
  private members=new Set<string>();
  private nodes=new Set<string>();
@@ -28,7 +29,9 @@ export class GlossSessionIndex {
  private listeners=new Set<(keys:Set<string>,structure:boolean)=>void>();
  private stop:()=>void;private alive=true;private queued=false;
  constructor(readonly editor:ReactiveEditor,readonly projection:BlockTreeProjection,readonly rootKey:string){
-  this.owner=projection.node(rootKey)!.contentKey;this.definitions();this.tree();this.publish();
+  this.owner=projection.node(rootKey)!.contentKey;
+  if(editor.features.glossRelationships)this.relationships=editor.glossRelationships.document(this.owner);
+  this.definitions();this.tree();this.publish();
   this.stop=editor.repository.subscribeChanges(change=>this.changed(change));
  }
  subscribe(fn:(keys:Set<string>,structure:boolean)=>void){this.listeners.add(fn);return()=>{this.listeners.delete(fn);};}
@@ -75,7 +78,7 @@ export class GlossSessionIndex {
  }
  range(anchor?:GlossAnchor){if(!anchor)return;const p=(this.editor.repository.readState().contents[anchor.contentKey]?.payload.standoffProperties as any[]??[]).find(p=>p.id===anchor.segmentId&&p.annotationId===anchor.definitionId&&!p.isDeleted);return p&&Number.isInteger(p.start)&&Number.isInteger(p.end)?{start:p.start as number,end:(p.end as number)+1}:undefined;}
  private changed(change:RepositoryChange){
-  if(!this.alive)return;const state=this.editor.repository.readState(),affected=new Set<string>();let structure=false,membership=false;
+  if(!this.alive||change.structural?.gloss?.linksOnly&&change.structural.gloss.owner===this.owner)return;const state=this.editor.repository.readState(),affected=new Set<string>();let structure=false,membership=false;
   batch(()=>{
    for(const [key,before]of change.previousContents){if(!this.members.has(key))continue;const after=state.contents[key];
     if(!before||!after||before.viewType!==after.viewType||JSON.stringify([before.children,before.ownedRelations])!==JSON.stringify([after.children,after.ownedRelations]))structure=true;

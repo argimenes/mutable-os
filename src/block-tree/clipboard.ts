@@ -1,3 +1,5 @@
+import {copyGlossIdentities} from "../features/gloss/relationships";
+import {glossDefinition} from "../features/gloss/model";
 import { clone } from "./clone";
 import { createBlockId, createContentKey, createPlacementKey } from "./ids";
 import { isAuthoredBlock, readBlockId } from "./identity";
@@ -10,6 +12,7 @@ export interface BlockFragment {
   state: RepositoryState;
   roots: string[];
   linkedAnnotations?: LinkedAnnotationRegistry;
+  originResourceId?: string;
   copyIdentities?: Array<{ source: BlockCommitSubject; copy: BlockCommitSubject }>;
 }
 
@@ -56,13 +59,16 @@ export function captureBlocks(source: RepositoryState, roots: string[]): BlockFr
     if (content.definitionOwnerKey && documents.has(content.definitionOwnerKey)) visitContent(content.key);
   }
   const definitions: LinkedAnnotationRegistry = {};
+  const origins=new Set<string>();
   for (const content of Object.values(state.contents)) {
-    delete content.payload.linkedAnnotations;
+    if(content.viewType!=="document-block")delete content.payload.linkedAnnotations;
     const properties = content.payload.standoffProperties;
     if (Array.isArray(properties)) for (const property of properties) {
       if (property?.annotationId && !externalDefinitionLink(property)) {
         const owner = linkedDefinitionOwner(source, property, content.key);
         if (owner) {
+          if(state.contents[owner.key]?.viewType==="document-block")continue;
+          if(typeof owner.payload.id==="string")origins.add(owner.payload.id);
           const definition = linkedRegistry(source, owner.key)[property.annotationId];
           if (definitions[property.annotationId] && JSON.stringify(definitions[property.annotationId]) !== JSON.stringify(definition)) throw new Error("Ambiguous linked definitions in clipboard selection");
           if (definition) definitions[property.annotationId] = clone(definition);
@@ -70,7 +76,7 @@ export function captureBlocks(source: RepositoryState, roots: string[]): BlockFr
       }
     }
   }
-  return { state, roots: [...roots], linkedAnnotations: definitions };
+  return { state, roots: [...roots], linkedAnnotations: definitions, ...(origins.size===1?{originResourceId:[...origins][0]}:{}) };
 }
 
 export function cloneBlocks(fragment: BlockFragment, preserveIds = false): BlockFragment {
@@ -81,7 +87,7 @@ export function cloneBlocks(fragment: BlockFragment, preserveIds = false): Block
   const authoredIds = new Map<string, string>();
   const seenIds = new Set<string>();
   const copyIdentities: NonNullable<BlockFragment["copyIdentities"]> = [];
-  const annotationIds = new Map(Object.keys(fragment.linkedAnnotations ?? {}).map(id => [id, preserveIds ? id : crypto.randomUUID()]));
+  const annotationIds = new Map([...new Set([...Object.keys(fragment.linkedAnnotations ?? {}),...Object.values(state.contents).flatMap(c=>Object.keys(c.payload.linkedAnnotations??{}))])].map(id => [id, preserveIds ? id : crypto.randomUUID()]));
   for (const content of Object.values(state.contents)) {
     if (!isAuthoredBlock(content)) continue;
     const oldId = readBlockId(content);
@@ -98,6 +104,11 @@ export function cloneBlocks(fragment: BlockFragment, preserveIds = false): Block
   }
   const contents: RepositoryState["contents"] = {};
   for (const content of Object.values(state.contents)) {
+    if(content.payload.linkedAnnotations){
+      const registry=Object.fromEntries(Object.entries(content.payload.linkedAnnotations).map(([id,d])=>[annotationIds.get(id)!,{...(d as JsonObject),id:annotationIds.get(id)!}]));
+      if(!preserveIds)copyGlossIdentities(Object.values(registry).filter(glossDefinition),typeof content.payload.id==='string'?content.payload.id:undefined);
+      content.payload.linkedAnnotations=registry;
+    }
     if (authoredIds.has(content.key)) content.payload.id = authoredIds.get(content.key)!;
     if (content.definitionOwnerKey !== undefined) {
       const owner = contentKeys.get(content.definitionOwnerKey);
@@ -139,6 +150,7 @@ export function cloneBlocks(fragment: BlockFragment, preserveIds = false): Block
     if (!preserveIds) remapKnownBlockReferences(copied, ids);
     return [annotationIds.get(id)!, copied];
   }));
+  if(!preserveIds)copyGlossIdentities(Object.values(definitions).filter(glossDefinition),fragment.originResourceId);
   return { state, roots: fragment.roots.map(key => placementKeys.get(key)!), linkedAnnotations: definitions,
     ...(!preserveIds ? { copyIdentities } : {}),
   };

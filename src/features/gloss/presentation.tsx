@@ -1,3 +1,4 @@
+import {createGlossRegisterState,createRelationshipAuthoring,type GlossRegisterState} from './relationship-authoring';
 import {For,Show,createEffect,createMemo,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
 import {Portal} from 'solid-js/web';
 import type {ReactiveEditor} from '../../reactive-editor/editor';
@@ -13,6 +14,7 @@ import './presentation.css';
 export function GlossPresentation(props:{editor:ReactiveEditor;session:RetainedDocumentSession;children:JSX.Element}){
  const {editor,session}=props,enabled=editor.features.glossMode&&editor.features.glossPresentation;
  const [active,setActive]=createSignal(false),[narrow,setNarrow]=createSignal(false),[drawer,setDrawer]=createSignal(false),[fallback,setFallback]=createSignal(false);
+ const registerState=createGlossRegisterState();
  const controls={active,narrow,references:()=>!narrow()||drawer(),toggle:()=>setActive(v=>!v),toggleReferences:()=>setDrawer(v=>!v)};
  let alive=true;
  onMount(()=>{if(!enabled)return;setFallback(!session.element.querySelector('.reactive-document-occurrence'));
@@ -26,13 +28,13 @@ export function GlossPresentation(props:{editor:ReactiveEditor;session:RetainedD
  return <GlossPresentationContext.Provider value={enabled?controls:undefined}>
   <Show when={enabled&&fallback()}><div class="gloss-mode-strip"><button type="button" data-gloss-toggle aria-pressed={active()} onPointerDown={e=>e.preventDefault()} onClick={controls.toggle}>Gloss Mode</button><Show when={active()&&narrow()}><button type="button" aria-expanded={drawer()} onClick={controls.toggleReferences}>Local References</button></Show></div></Show>
   {props.children}
-  <Show when={enabled&&active()}><GlossViews editor={editor} session={session} narrow={narrow()} references={controls.references()} closeReferences={()=>setDrawer(false)}/></Show>
+  <Show when={enabled&&active()}><GlossViews registerState={registerState} editor={editor} session={session} narrow={narrow()} references={controls.references()} closeReferences={()=>setDrawer(false)}/></Show>
  </GlossPresentationContext.Provider>;
 }
 
-function GlossViews(props:{editor:ReactiveEditor;session:RetainedDocumentSession;narrow:boolean;references:boolean;closeReferences():void}){
+function GlossViews(props:{registerState:GlossRegisterState;editor:ReactiveEditor;session:RetainedDocumentSession;narrow:boolean;references:boolean;closeReferences():void}){
  const {editor,session}=props,index=new GlossSessionIndex(editor,session.projection,session.rootKey);
- const [selected,setSelected]=createSignal(''),[query,setQuery]=createSignal(''),[type,setType]=createSignal(''),[message,setMessage]=createSignal('');
+ const [selected,setSelected]=props.registerState.selected,[query,setQuery]=props.registerState.query,[type,setType]=props.registerState.type,[message,setMessage]=createSignal('');
  const [source,setSource]=createSignal<HTMLElement>(),[scrollport,setScrollport]=createSignal<HTMLElement>();let live=true;
  // Exposed only on this session's DOM for qualification/diagnostics, never persisted.
  (session.element as any).glossIndex=index;
@@ -55,6 +57,8 @@ function GlossViews(props:{editor:ReactiveEditor;session:RetainedDocumentSession
   h.focus();h.restoreInlineSelection?.({anchor:current.start,head:current.end});setMessage('');
   if(edit)editor.gloss.open(anchor.nodeKey,{anchor:current.start,head:current.end},entry.definitionId);
  };
+ const selectRelated=(id:string,reveal=false)=>{setSelected(id);setQuery('');setType('');const entry=index.rows[0]().find(e=>e.localId===id);if(!entry)return;if(reveal&&entry.occurrences().length)void navigate(entry);else{if(!entry.occurrences().length)setMessage('Unanchored Gloss selected. Use Edit to open its definition.');queueMicrotask(()=>{const row=[...session.element.querySelectorAll<HTMLElement>('.gloss-register-row')].find(el=>el.dataset.glossId===id);row?.scrollIntoView({block:'nearest'});row?.focus({preventScroll:true});});}};
+ const relationships=editor.features.glossRelationshipAuthoring&&index.relationships?createRelationshipAuthoring(index,props.registerState,selectRelated):undefined;
  const remove=(entry:GlossEntry,button:HTMLElement)=>{if(!editor.gloss.deleteDefinition(session.rootKey,entry.definitionId,button))setMessage(editor.gloss.notice());};
  const Card=(p:{entry:GlossEntry;occurrence:GlossOccurrence;ref?:(el:HTMLElement)=>void})=>{
   const [expanded,setExpanded]=createSignal(false);
@@ -65,14 +69,17 @@ function GlossViews(props:{editor:ReactiveEditor;session:RetainedDocumentSession
  };
  return <>
   <Show when={scrollport()}>{port=><Show when={props.narrow} fallback={<GlossMargin index={index} session={session} scrollport={port()} card={Card}/>}><GlossBelow index={index} session={session} card={Card}/></Show>}</Show>
-  <aside class="gloss-register" aria-label="Local References" hidden={!props.references}>
+  <aside tabindex="-1" class="gloss-register" aria-label="Local References" hidden={!props.references}>
    <header><h2>Local References</h2><Show when={props.narrow}><button type="button" aria-label="Close Local References" onClick={props.closeReferences}>×</button></Show></header>
+   <Show when={relationships}>{ui=>{const Panel=ui().Panel;return <Panel/>;}}</Show>
    <div class="gloss-register-filters"><input aria-label="Search Glosses" placeholder="Search Glosses" value={query()} onInput={e=>setQuery(e.currentTarget.value)}/><select aria-label="Filter Gloss type" value={type()} onChange={e=>setType(e.currentTarget.value)}><option value="">All types</option><For each={types()}>{t=><option value={t}>{t}</option>}</For></select></div>
    <p class="gloss-register-count">{filtered().length} Glosses</p><Show when={message()}><p role="status">{message()}</p></Show>
-   <div class="gloss-register-rows"><For each={filtered()}>{entry=><article class="gloss-register-row" data-gloss-id={entry.localId} classList={{'gloss-selected':selected()===entry.localId}}>
+   <Show when={relationships}>{ui=>{const Diagnostics=ui().Diagnostics;return <Diagnostics/>;}}</Show>
+   <div class="gloss-register-rows"><For each={filtered()}>{entry=><article tabindex="-1" class="gloss-register-row" data-gloss-id={entry.localId} classList={{'gloss-selected':selected()===entry.localId}}>
     <button type="button" class="gloss-card-main" onClick={e=>void navigate(entry,undefined,true,e.currentTarget)}><strong>{entry.data().type||'Note'}</strong><span class="gloss-card-body">{entry.data().body||'(unfinished Gloss)'}</span></button>
     <Show when={entry.data().alias}><small>{entry.data().alias}</small></Show><small>{entry.occurrences().length?`${new Set(entry.occurrences().map(a=>a.nodeKey)).size} occurrence(s) · ${entry.occurrences().length} segment(s)`:'anchor removed'}</small>
     <div class="gloss-register-actions"><button type="button" disabled={!entry.occurrences().length} onClick={()=>void navigate(entry)}>Navigate</button><button type="button" onClick={e=>void navigate(entry,undefined,true,e.currentTarget)}>Edit</button><button type="button" onClick={e=>remove(entry,e.currentTarget)}>Delete</button></div>
+    <Show when={relationships}>{ui=>{const Groups=ui().Groups;return <Groups entry={entry}/>;}}</Show>
    </article>}</For><Show when={!filtered().length}><p>No matching Glosses.</p></Show></div>
   </aside>
  </>;

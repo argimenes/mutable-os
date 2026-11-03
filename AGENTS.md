@@ -1,5 +1,7 @@
 # Project working conventions
 
+- Read feature briefs before implementation and ask any needed clarifying questions at that point. Questions are welcome; do not invent blockers or require confirmation when the brief is clear.
+
 - Put major new features behind a feature flag, enabled by default unless the user's specification says otherwise. This applies to new features; do not change existing feature defaults without a request.
 - If it is unclear whether a change is substantial enough to warrant a feature flag, ask the user before implementing it.
 - Document saving is manual. Edits mark the Document tab dirty; Command-S/Control-S saves the active Document to its opened filename in Mutable JSON. Do not add background document saves or automatic Markdown sidecars. Dirty indicators must use cheap per-document state, not serialization or document scans during typing.

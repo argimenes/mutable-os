@@ -1,3 +1,4 @@
+import { GlossRelationshipController } from "../features/gloss/relationship-controller";
 import { GlossController } from "../features/gloss/controller";
 import { InitialisController } from '../features/initialis/controller';
 import { TabOperations } from '../runtime/tab-commands';
@@ -139,6 +140,7 @@ export class ReactiveEditor {
   readonly textRanges: TextRanges;
   readonly rangeAnnotations: RangeAnnotations;
   readonly gloss: GlossController;
+  readonly glossRelationships: GlossRelationshipController;
   readonly initialis: InitialisController;
   readonly selectionGestures = new SelectionGestures({
     operations: this.currentTextOperation,
@@ -202,6 +204,7 @@ export class ReactiveEditor {
     }, result => this.showHide.annotationApplied(result));
     this.initialis = new InitialisController(this);
     this.gloss = new GlossController(this);
+    this.glossRelationships = new GlossRelationshipController(this);
     this.persistence = new PersistenceService(this);
     if (loadedWorkspace) this.persistence.attachWorkspace(loadedWorkspace);
     const [viewChildren, setViewChildren] = createStore<Record<string, string | undefined>>({});
@@ -526,6 +529,7 @@ export class ReactiveEditor {
     this.measurements.releaseCaret();
     this.visualEffects.dispose();
     this.gloss.dispose();
+    this.glossRelationships.dispose();
     this.initialis.dispose();
     this.annotationIdentities.dispose();
     this.decorations.dispose();

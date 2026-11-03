@@ -1,3 +1,4 @@
+import {glossDefinition} from "../features/gloss/model";
 import {STRUCTURED_BLOCK} from '../structured/model';
 import { isSourceType } from './source-block';
 import { managedAsset } from './managed-asset';
@@ -52,6 +53,8 @@ export function serializeSelection(state: RepositoryState, slices: Slice[], scop
       return edge;
     }
     const c = state.contents[p.contentKey]; if (!c) throw Error('Missing selected content.');
+    // A whole Document copy owns its unanchored/tombstoned Glosses too.
+    if(c.viewType==='document-block'&&!slice)for(const [annotationId,d]of Object.entries(linkedRegistry(state,c.key)))if(glossDefinition(d))property({type:d.type,annotationId},c.key);
     const localId = !slice && contentIds.get(c.key) || id();
     f.placements.push({ localId: edge, kind: p.kind === 'reference' ? 'reference' : 'owned', target: { kind: 'local', object: 'block', id: localId } });
     if (!slice && contentIds.has(c.key)) return edge;

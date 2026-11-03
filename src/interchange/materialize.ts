@@ -1,3 +1,4 @@
+import {copyGlossIdentities} from '../features/gloss/relationships';
 import {GLOSS,glossDefinition} from '../features/gloss/model';
 import {WEB_BLOCK,webCapture} from '../web-resources/model';
 import {validAcademicAnchor} from '../academic/anchors';
@@ -67,10 +68,7 @@ export function materializeFragment(input: MutableFragment, scope: InterchangeSc
     return [definitions.get(d.localId)!, { ...value, id: definitions.get(d.localId)! }];
   }));
   const glosses=Object.values(linkedAnnotations).filter(glossDefinition) as any[];
-  const glossIds=new Map(glosses.map(d=>[d.metadata.gloss.localId,preserveGlossIds?d.metadata.gloss.localId:crypto.randomUUID()]));
-  for(const def of glosses){const g=def.metadata.gloss;g.localId=glossIds.get(g.localId);
-    if(!preserveGlossIds)g.links=Object.fromEntries(Object.entries(g.links).flatMap(([id,raw])=>{const link=raw as any;return link&&typeof link.type==='string'&&glossIds.has(link.toGlossId)?[[preserveGlossIds?id:crypto.randomUUID(),{...link,toGlossId:glossIds.get(link.toGlossId)}]]:[]}));
-  }
+  if(!preserveGlossIds)copyGlossIdentities(glosses,f.provenance?.resourceId);
   const embeds = new Map(f.embeds.map(e => [e.localId, e]));
   for (const b of f.blocks) {
     let source=false;try{if(isSourceType(b.type)){sourceFormat(b.type,b.data);source=!b.inline;}}catch{}

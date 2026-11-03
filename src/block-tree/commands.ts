@@ -23,6 +23,7 @@ import { createBlockId, createContentKey, createPlacementKey } from "./ids";
 import { deriveLocations, planOperations, type CanonicalRepository } from "./repository";
 import type {
   ContentRecord,
+  JsonObject,
   Destination,
   ExistingBlockDto,
   InlineImageDescriptor,
@@ -451,6 +452,13 @@ export class TreeCommands {
   private insertPreparedFragment(fragment: BlockFragment, destination: Destination, descriptor?: CommandDescriptor, replaceKey?: PlacementKey): PlacementKey[] {
     fragment = clone(fragment);
     prepareNewBlockIdentities(Object.values(fragment.state.contents));
+    // Whole-Document interchange owns its registry; do not attach it to the
+    // destination workspace/Document as if it were a paragraph fragment.
+    const copiedDocument=fragment.roots.length===1&&fragment.state.contents[fragment.state.placements[fragment.roots[0]]?.contentKey];
+    if(copiedDocument&&copiedDocument.viewType==="document-block"&&Object.keys(fragment.linkedAnnotations??{}).length){
+      copiedDocument.payload.linkedAnnotations={...(copiedDocument.payload.linkedAnnotations as JsonObject??{}),...fragment.linkedAnnotations};
+      fragment.linkedAnnotations={};
+    }
     const state = this.current();
     const target = this.resolveInsertion(destination, undefined, state);
     if (Object.keys(fragment.state.contents).some(key => state.contents[key]) || Object.keys(fragment.state.placements).some(key => state.placements[key])) throw new TreeCommandError("Clipboard keys collide with existing Blocks");

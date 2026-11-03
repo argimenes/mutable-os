@@ -81,7 +81,6 @@ export class GlossController {
    if(d.id&&JSON.stringify(registry[d.id])!==d.previous)throw Error('This Gloss changed in another view. Copy your draft before cancelling.');
    const id=d.id??crypto.randomUUID();
    if(d.id){registry[id]={...registry[id],value:remove?registry[id].value:raw,...(remove?{isDeleted:true}:{})};
-    if(remove){const local=registry[id].metadata.gloss.localId;for(const def of Object.values(registry))if(glossDefinition(def))for(const [linkId,link]of Object.entries(def.metadata.gloss.links))if((link as any)?.toGlossId===local||def===registry[id])delete def.metadata.gloss.links[linkId];}
    } else registry[id]={id,type:GLOSS,value:raw,metadata:{gloss:{version:1,localId:crypto.randomUUID(),links:{}}}};
    const operations:RepositoryOperation[]=[{kind:'put-content',record:{...clone(root),payload:{...clone(root.payload),linkedAnnotations:registry}}}];
    if(!d.id&&d.range){const c=state.contents[d.range.contentKey],props=clone(c.payload.standoffProperties as any[]??[]);

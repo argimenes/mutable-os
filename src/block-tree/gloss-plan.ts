@@ -12,7 +12,7 @@ export function glossOwner(state:RepositoryState,key:string,e:Pick<StructuralEvi
   const at=e.locationOf(owned[0]);if(!at)return;key=at.ownerContentKey;
  }
 }
-export interface GlossChange {owner:string;texts:string[]}
+export interface GlossChange {owner:string;texts:string[];definitions:string[];edges:{definitionId:string;id:string}[];linksOnly:boolean}
 /** Proof from record contents, also used for inverse operations. No caller trust. */
 export function glossChangeFor(state:RepositoryState,ops:RepositoryOperation[],e:Pick<StructuralEvidence,'ownedKeys'|'locationOf'>):GlossChange|undefined {
  if(!ops.length||ops.some(o=>o.kind!=='put-content'))return;
@@ -25,12 +25,16 @@ export function glossChangeFor(state:RepositoryState,ops:RepositoryOperation[],e
  const a=before.payload.linkedAnnotations??{},b=root.payload.linkedAnnotations??{};
  if(!a||!b||Array.isArray(a)||Array.isArray(b)||typeof a!=='object'||typeof b!=='object')return;
  const old=a as Record<string,any>,next=b as Record<string,any>;
- let changed=false;
+ const definitions:string[]=[],edges:{definitionId:string;id:string}[]=[];let linksOnly=true;
+ const withoutLinks=(d:any)=>d?{...d,metadata:{...d.metadata,gloss:{...d.metadata.gloss,links:undefined}}}:d;
  for(const id of new Set([...Object.keys(old),...Object.keys(next)]))if(!same(old[id],next[id])) {
-  changed=true;if(old[id]&&!glossDefinition(old[id])||next[id]&&!glossDefinition(next[id]))return;
+  definitions.push(id);if(old[id]&&!glossDefinition(old[id])||next[id]&&!glossDefinition(next[id]))return;
   if(next[id]&&next[id].id!==id)return;
+  if(!same(withoutLinks(old[id]),withoutLinks(next[id])))linksOnly=false;
+  const a=old[id]?.metadata.gloss.links??{},b=next[id]?.metadata.gloss.links??{};
+  for(const edgeId of new Set([...Object.keys(a),...Object.keys(b)]))if(!same(a[edgeId],b[edgeId]))edges.push({definitionId:id,id:edgeId});
  }
- if(!changed)return;
+ if(!definitions.length)return;
  const texts:string[]=[];
  for(const r of records)if(r!==root) {
   const prior=state.contents[r.key];if(!prior||r.inlineKind!=='standoff'||glossOwner(state,r.key,e)!==root.key||!same(strip(prior,'standoffProperties'),strip(r,'standoffProperties')))return;
@@ -39,5 +43,5 @@ export function glossChangeFor(state:RepositoryState,ops:RepositoryOperation[],e
   for(const x of q.filter(x=>x.type===GLOSS))if(!glossDefinition(next[x.annotationId])||!Number.isInteger(x.start)||!Number.isInteger(x.end)||x.start<0||x.end<x.start||x.end>=r.inlineContent.length)return;
   texts.push(r.key);
  }
- return {owner:root.key,texts};
+ return {owner:root.key,texts,definitions,edges,linksOnly:linksOnly&&!texts.length};
 }
