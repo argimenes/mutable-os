@@ -1,3 +1,5 @@
+import {GlossArgumentView} from './argument-view';
+import {createArgumentState,createArgumentDiagnostics,type ArgumentState} from './argument';
 import {GlossGraphView,createGlossGraphState,type GlossGraphState} from './graph-view';
 import {createGlossRegisterState,createRelationshipAuthoring,type GlossRegisterState} from './relationship-authoring';
 import {For,Show,createEffect,createMemo,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
@@ -15,7 +17,7 @@ import './presentation.css';
 export function GlossPresentation(props:{editor:ReactiveEditor;session:RetainedDocumentSession;children:JSX.Element}){
  const {editor,session}=props,enabled=editor.features.glossMode&&editor.features.glossPresentation;
  const [active,setActive]=createSignal(false),[narrow,setNarrow]=createSignal(false),[drawer,setDrawer]=createSignal(false),[fallback,setFallback]=createSignal(false);
- const registerState=createGlossRegisterState(),graphState=createGlossGraphState();
+ const registerState=createGlossRegisterState(),graphState=createGlossGraphState(),argumentState=createArgumentState();
  const controls={active,narrow,references:()=>!narrow()||drawer(),toggle:()=>setActive(v=>!v),toggleReferences:()=>setDrawer(v=>!v)};
  let alive=true;
  onMount(()=>{if(!enabled)return;setFallback(!session.element.querySelector('.reactive-document-occurrence'));
@@ -29,13 +31,17 @@ export function GlossPresentation(props:{editor:ReactiveEditor;session:RetainedD
  return <GlossPresentationContext.Provider value={enabled?controls:undefined}>
   <Show when={enabled&&fallback()}><div class="gloss-mode-strip"><button type="button" data-gloss-toggle aria-pressed={active()} onPointerDown={e=>e.preventDefault()} onClick={controls.toggle}>Gloss Mode</button><Show when={active()&&narrow()}><button type="button" aria-expanded={drawer()} onClick={controls.toggleReferences}>Local References</button></Show></div></Show>
   {props.children}
-  <Show when={enabled&&active()}><GlossViews graphState={graphState} registerState={registerState} editor={editor} session={session} narrow={narrow()} references={controls.references()} closeReferences={()=>setDrawer(false)}/></Show>
+  <Show when={enabled&&active()}><GlossViews argumentState={argumentState} graphState={graphState} registerState={registerState} editor={editor} session={session} narrow={narrow()} references={controls.references()} closeReferences={()=>setDrawer(false)}/></Show>
  </GlossPresentationContext.Provider>;
 }
 
-function GlossViews(props:{graphState:GlossGraphState;registerState:GlossRegisterState;editor:ReactiveEditor;session:RetainedDocumentSession;narrow:boolean;references:boolean;closeReferences():void}){
+function GlossViews(props:{argumentState:ArgumentState;graphState:GlossGraphState;registerState:GlossRegisterState;editor:ReactiveEditor;session:RetainedDocumentSession;narrow:boolean;references:boolean;closeReferences():void}){
  const {editor,session}=props,index=new GlossSessionIndex(editor,session.projection,session.rootKey);
  const graphEnabled=editor.features.glossMermaidGraph&&!!index.relationships,graphSelected=()=>graphEnabled&&props.graphState.tab[0]()==='graph'&&props.references,graphActive=()=>graphSelected()&&session.host.activity().visible;
+ const argumentEnabled=editor.features.glossArgumentExplorer&&!!index.relationships,argumentSelected=()=>argumentEnabled&&props.graphState.tab[0]()==='argument'&&props.references,argumentActive=()=>argumentSelected()&&session.host.activity().visible,exploring=()=>graphSelected()||argumentSelected();
+ const argumentDiagnostics=createArgumentDiagnostics();(session.element as any).glossArgumentDiagnostics=argumentDiagnostics;
+ createEffect(()=>session.element.classList.toggle('gloss-showing-argument',argumentSelected()));
+ onCleanup(()=>{session.element.classList.remove('gloss-showing-argument');delete (session.element as any).glossArgumentDiagnostics;});
  const graphDiagnostics={generations:0,renders:0,generationMs:[] as number[],renderMs:[] as number[]};(session.element as any).glossGraphDiagnostics=graphDiagnostics;
  createEffect(()=>session.element.classList.toggle('gloss-showing-graph',graphSelected()));
  onCleanup(()=>{session.element.classList.remove('gloss-showing-graph');delete (session.element as any).glossGraphDiagnostics;});
@@ -47,7 +53,7 @@ function GlossViews(props:{graphState:GlossGraphState;registerState:GlossRegiste
   setSource(root);const port=session.element.querySelector<HTMLElement>('.reactive-document-occurrence__content')??root;setScrollport(port);port.dataset.glossScrollport='';
   onCleanup(()=>{delete port.dataset.glossScrollport;root?.classList.remove('gloss-source-with-margin');});
  });
- createEffect(()=>source()?.classList.toggle('gloss-source-with-margin',!props.narrow&&!graphSelected()));
+ createEffect(()=>source()?.classList.toggle('gloss-source-with-margin',!props.narrow&&!exploring()));
  onCleanup(()=>{live=false;index.dispose();delete (session.element as any).glossIndex;});
  const types=createMemo(()=>[...new Set(index.rows[0]().map(e=>e.data().type).filter(Boolean))].sort());
  const filtered=createMemo(()=>{const q=query().trim().toLocaleLowerCase(),t=type();return index.rows[0]().filter(e=>{const d=e.data();return (!t||d.type===t)&&(!q||`${d.type} ${d.body} ${d.alias}`.toLocaleLowerCase().includes(q));});});
@@ -73,12 +79,13 @@ function GlossViews(props:{graphState:GlossGraphState;registerState:GlossRegiste
   </article>;
  };
  return <>
-  <Show when={!graphSelected()&&scrollport()}>{port=><Show when={props.narrow} fallback={<GlossMargin index={index} session={session} scrollport={port()} card={Card}/>}><GlossBelow index={index} session={session} card={Card}/></Show>}</Show>
+  <Show when={!exploring()&&scrollport()}>{port=><Show when={props.narrow} fallback={<GlossMargin index={index} session={session} scrollport={port()} card={Card}/>}><GlossBelow index={index} session={session} card={Card}/></Show>}</Show>
   <aside tabindex="-1" class="gloss-register" aria-label="Local References" hidden={!props.references}>
    <header><h2>Local References</h2><Show when={props.narrow}><button type="button" aria-label="Close Local References" onClick={props.closeReferences}>×</button></Show></header>
-   <Show when={graphEnabled}><div class="gloss-view-tabs" role="tablist" aria-label="Local References view"><button type="button" role="tab" aria-selected={props.graphState.tab[0]()==='references'} onPointerDown={e=>e.preventDefault()} onClick={()=>props.graphState.tab[1]('references')}>References</button><button type="button" role="tab" aria-selected={props.graphState.tab[0]()==='graph'} disabled={!!relationships?.draft()} onPointerDown={e=>e.preventDefault()} onClick={()=>props.graphState.tab[1]('graph')}>Graph</button></div></Show>
+   <Show when={graphEnabled||argumentEnabled}><div class="gloss-view-tabs" role="tablist" aria-label="Local References view"><button type="button" role="tab" aria-selected={props.graphState.tab[0]()==='references'} onPointerDown={e=>e.preventDefault()} onClick={()=>props.graphState.tab[1]('references')}>References</button><Show when={graphEnabled}><button type="button" role="tab" aria-selected={props.graphState.tab[0]()==='graph'} disabled={!!relationships?.draft()} onPointerDown={e=>e.preventDefault()} onClick={()=>props.graphState.tab[1]('graph')}>Graph</button></Show><Show when={argumentEnabled}><button type="button" role="tab" aria-selected={props.graphState.tab[0]()==="argument"} disabled={!!relationships?.draft()} onPointerDown={e=>e.preventDefault()} onClick={()=>props.graphState.tab[1]("argument")}>Argument</button></Show></div></Show>
    <Show when={graphActive()}><GlossGraphView hostPort={()=>session.host.port} index={index} state={props.graphState} registerState={props.registerState} diagnostics={graphDiagnostics} select={selectRelated} inspect={id=>{props.graphState.tab[1]('references');selectRelated(id);}}/></Show>
-   <div class="gloss-reference-content" hidden={graphSelected()}>
+   <Show when={argumentActive()}><GlossArgumentView index={index} state={props.argumentState} registerState={props.registerState} diagnostics={argumentDiagnostics} inspect={id=>{props.graphState.tab[1]('references');selectRelated(id);}} reveal={id=>selectRelated(id,true)} definition={(id,invoker)=>{const entry=index.rows[0]().find(row=>row.localId===id);if(entry)void navigate(entry,undefined,true,invoker);}}/></Show>
+   <div class="gloss-reference-content" hidden={exploring()}>
    <Show when={relationships}>{ui=>{const Panel=ui().Panel;return <Panel/>;}}</Show>
    <div class="gloss-register-filters"><input aria-label="Search Glosses" placeholder="Search Glosses" value={query()} onInput={e=>setQuery(e.currentTarget.value)}/><select aria-label="Filter Gloss type" value={type()} onChange={e=>setType(e.currentTarget.value)}><option value="">All types</option><For each={types()}>{t=><option value={t}>{t}</option>}</For></select></div>
    <p class="gloss-register-count">{filtered().length} Glosses</p><Show when={message()}><p role="status">{message()}</p></Show>

@@ -8,11 +8,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const commandQualification = true;
+const stageC4=process.env.GLOSS_STAGE==='c4';
 const stageC3=process.env.GLOSS_STAGE==='c3';
 const stageC2=process.env.GLOSS_STAGE==='c2';
 const stageC1=process.env.GLOSS_STAGE==='c1';
-const stageB=process.env.GLOSS_STAGE==='b'||stageC1||stageC2||stageC3;
-const milestone = stageC3?'gloss-stage-c3-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC2?'gloss-stage-c2'+(process.env.GLOSS_C2_DENSITY==='16'?'-dense':''):stageC1?'gloss-stage-c1':stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
+const stageB=process.env.GLOSS_STAGE==='b'||stageC1||stageC2||stageC3||stageC4;
+const milestone = stageC4?'gloss-stage-c4-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC3?'gloss-stage-c3-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC2?'gloss-stage-c2'+(process.env.GLOSS_C2_DENSITY==='16'?'-dense':''):stageC1?'gloss-stage-c1':stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
 const vault=stageB?await mkdtemp(path.join(tmpdir(),'mutable-gloss-vault-')):undefined;
 const api=stageB?(await import('express')).default():undefined;
 if(api)api.use('/api/native',(await import('../dist/server/native-document-store.mjs')).createNativeDocumentStoreRouter({root:vault}));
@@ -103,7 +104,7 @@ try {
         if(profile){const data=await send('Profiler.stop',{},sessionId);await writeFile('/tmp/gloss-cpu.json',JSON.stringify(data.profile));console.error('PROFILE SAVED');}
         if(action.type==='diagram-proof'){
           const targets=(await send('Target.getTargets')).targetInfos.filter(t=>t.type==='iframe');const proofs=[];
-          for(const target of targets){const attached=await send('Target.attachToTarget',{targetId:target.targetId,flatten:true});try{const r=await send('Runtime.evaluate',{expression:`({svg:!!document.querySelector('svg'),nodes:document.querySelectorAll('g.node').length,unsafe:document.querySelectorAll('svg script,svg foreignObject,svg image,svg a,svg iframe').length,events:[...document.querySelectorAll('svg *')].some(n=>[...n.attributes].some(a=>/^on/i.test(a.name))),literalMarkup:[...document.querySelectorAll('svg text')].some(t=>t.textContent.includes('<img')),text:[...document.querySelectorAll('svg text')].map(t=>t.textContent).join(' ').slice(0,600),xss:!!window.glossInjected})`,returnByValue:true},attached.sessionId);proofs.push(r.result.value);}finally{await send('Target.detachFromTarget',{sessionId:attached.sessionId});}}
+          for(const target of targets){const attached=await send('Target.attachToTarget',{targetId:target.targetId,flatten:true});try{const r=await send('Runtime.evaluate',{expression:`({svg:!!document.querySelector('svg'),nodes:document.querySelectorAll('g.node').length,nodeTokens:[...document.querySelectorAll('g.node')].slice(0,8).map(n=>({id:n.getAttribute('id'),dataId:n.getAttribute('data-id')})),unsafe:document.querySelectorAll('svg script,svg foreignObject,svg image,svg a,svg iframe').length,events:[...document.querySelectorAll('svg *')].some(n=>[...n.attributes].some(a=>/^on/i.test(a.name))),literalMarkup:[...document.querySelectorAll('svg text')].some(t=>t.textContent.includes('<img')),text:[...document.querySelectorAll('svg text')].map(t=>t.textContent).join(' ').slice(0,600),xss:!!window.glossInjected})`,returnByValue:true},attached.sessionId);proofs.push(r.result.value);}finally{await send('Target.detachFromTarget',{sessionId:attached.sessionId});}}
           result={proofs};
         }
         if(action.type==='accessibility')result=(await send('Accessibility.getFullAXTree',{},sessionId)).nodes.filter(n=>!n.ignored).map(n=>({role:n.role?.value,name:n.name?.value,properties:n.properties}));
@@ -113,7 +114,7 @@ try {
     });
   }
   const result = await send('Runtime.evaluate', {
-    expression: `(async()=>{const m=await import('${stageC3?'/src/application/gloss-stage-c3.browser-fixture.tsx':stageC2?'/src/application/gloss-stage-c2.browser-fixture.tsx':stageC1?'/src/application/gloss-stage-c1.browser-fixture.tsx':stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss(${stageC3?JSON.stringify({size:Number(process.env.GLOSS_GRAPH_SIZE)||10,dense:process.env.GLOSS_GRAPH_DENSE==='1'}):stageC2?JSON.stringify({density:Number(process.env.GLOSS_C2_DENSITY)||4}):''});})()`,
+    expression: `(async()=>{const m=await import('${stageC4?'/src/application/gloss-stage-c4.browser-fixture.tsx':stageC3?'/src/application/gloss-stage-c3.browser-fixture.tsx':stageC2?'/src/application/gloss-stage-c2.browser-fixture.tsx':stageC1?'/src/application/gloss-stage-c1.browser-fixture.tsx':stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss(${stageC3||stageC4?JSON.stringify({size:Number(process.env.GLOSS_GRAPH_SIZE)||10,dense:process.env.GLOSS_GRAPH_DENSE==='1'}):stageC2?JSON.stringify({density:Number(process.env.GLOSS_C2_DENSITY)||4}):''});})()`,
     awaitPromise: true, returnByValue: true,
   }, sessionId);
   // The last input resume can complete the fixture before its own CDP reply.

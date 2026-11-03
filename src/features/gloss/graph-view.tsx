@@ -5,7 +5,7 @@ import type {GlossRegisterState} from './relationship-authoring';
 import {glossGraphToMermaid,type GlossMermaidResult} from './mermaid';
 import './graph-view.css';
 import {retainGlossGraphFrame} from './graph-frame';
-export function createGlossGraphState(){return{tab:createSignal<'references'|'graph'>('references'),scope:createSignal<'selected'|'document'>('selected'),root:createSignal(''),depth:createSignal(2),direction:createSignal<'TD'|'LR'>('TD'),predicate:createSignal(''),orphans:createSignal(true),limit:createSignal(60),natural:createSignal(false)};}
+export function createGlossGraphState(){return{tab:createSignal<'references'|'graph'|'argument'>('references'),scope:createSignal<'selected'|'document'>('selected'),root:createSignal(''),depth:createSignal(2),direction:createSignal<'TD'|'LR'>('TD'),predicate:createSignal(''),orphans:createSignal(true),limit:createSignal(60),natural:createSignal(false)};}
 export type GlossGraphState=ReturnType<typeof createGlossGraphState>;
 export function GlossGraphView(props:{hostPort?:()=>unknown;index:GlossSessionIndex;state:GlossGraphState;registerState:GlossRegisterState;select:(id:string,reveal?:boolean)=>void;inspect:(id:string)=>void;diagnostics:{generations:number;renders:number;generationMs:number[];renderMs:number[]}}){
  const graph=props.index.relationships!,s=props.state,[result,setResult]=createSignal<GlossMermaidResult>(),[status,setStatus]=createSignal('Preparing graph…'),[pending,setPending]=createSignal(false),[copied,setCopied]=createSignal(''),[choice,setChoice]=createSignal('');
