@@ -15,9 +15,7 @@ recipes, and day-to-day source map, start with the
 
 Feature-module Stages 1–5 are accepted. Start with the
 [extension architecture and tutorials](./docs/development/EXTENSION_ARCHITECTURE.md)
-for current Block Application, feature, passive standoff-effect and Window presentation
-APIs. The [Stage 5 report](./CODEX_FEATURE_MODULE_STAGE_5_REPORT.md) records the latest
-qualification. Stage 6 / History extraction is deliberately deferred.
+for current Block Application, feature, passive standoff-effect and Window presentation APIs. The [Stage 5 report](./CODEX_FEATURE_MODULE_STAGE_5_REPORT.md) records the latest qualification. Stage 6 / History extraction is deliberately deferred.
 
 Canvas Milestones A–E are accepted and integrated into the main application.
 The home page starts with an empty Desktop workspace. Choose
