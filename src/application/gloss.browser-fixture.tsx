@@ -43,9 +43,9 @@ export async function qualifyGloss(){
   const unrelated=Object.values(session.projection.state.nodes).find(n=>n.payload.id==='gloss-other')!,other=e.createView('gloss-unrelated',unrelated.placementKey);patch(other,'setState','unrelatedUpdates');
   const reset=()=>{counters.snapshots=counters.builds=counters.unrelatedUpdates=0;requests=0;};
   const measure=async(name:string,act:()=>Promise<void>,ready:()=>unknown)=>{const start=performance.now();await act();await until(ready,name);const dom=performance.now()-start;await trusted({type:'paint'});timings.push({name,dispatchToDOMMs:dom,dispatchToScreenshotMs:performance.now()-start});console.log('TIMING',JSON.stringify(timings.at(-1)));};
-  check(!e.bindings.conflicts('gloss.create',e.bindings.effective('gloss.create')).length,'Ctrl+; G has no runtime binding conflicts');
+  check(!e.bindings.conflicts('gloss.create',e.bindings.effective('gloss.create')).length,'Gloss shortcuts have no runtime binding conflicts');
   await select();reset();
-  await trusted({type:'key',key:';',modifiers:2});await measure('shortcut to focused textbox',()=>trusted({type:'key',key:'g'}),()=>document.activeElement?.matches('.gloss-input textarea'));
+  await measure('Cmd/Ctrl+G to focused textbox',()=>trusted({type:'key',key:'g',modifiers:/Mac|iPhone|iPad|iPod/i.test(navigator.platform)?4:2}),()=>document.activeElement?.matches('.gloss-input textarea'));
   const textarea=()=>document.querySelector<HTMLTextAreaElement>('.gloss-input textarea')!;
   check(textarea().value==='','Caret opens an empty draft');check(!native.isDirty('gloss-primary'),'Opening draft does not dirty Document');
   await measure('draft keystroke to visible input',()=>trusted({type:'key',key:'e',text:'e'}),()=>textarea()?.value==='e');await trusted({type:'text',text:'ntity: philosophical sense: not a database object'});await trusted({type:'screenshot',name:'gloss-textbox'});await click(flow().children[200]);check(!!textarea()&&textarea().value.includes('object'),'Outside click retains draft');await click(textarea());

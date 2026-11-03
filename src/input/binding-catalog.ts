@@ -2,9 +2,9 @@ import { BindingRegistry, chord, keyboard as k, mouse, type Trigger } from "./bi
 
 export function registerInputActions(registry: BindingRegistry, platform = typeof navigator === "undefined" ? "" : navigator.platform) {
   const add = (id: string, name: string, description: string, category: string, scope: string, defaults: Trigger[], tags: string[] = []) => registry.register({ id, name, description, category, scope, defaults, tags, handler: context => context.run(id) });
-  add("gloss.create", "Create Gloss", "Annotate selected text or the word at the caret.", "Annotations", "editor/standoff", [chord(k(";", "Ctrl"), k("g"))]);
-  add("character.initialis.apply", "Apply Initialis", "Decorate one selected uppercase Latin character with the bundled Initialis preset.", "Annotations", "editor/standoff", [chord(k(";", "Ctrl"), k("i"))]);
   const primary = /Mac|iPhone|iPad|iPod/i.test(platform) ? "Meta" : "Ctrl";
+  const releaseGloss = add("gloss.create", "Create Gloss", "Annotate selected text or the word at the caret.", "Annotations", "editor/standoff", [k("g", primary), chord(k(";", "Ctrl"), k("g"))]);
+  add("character.initialis.apply", "Apply Initialis", "Decorate one selected uppercase Latin character with the bundled Initialis preset.", "Annotations", "editor/standoff", [chord(k(";", "Ctrl"), k("i"))]);
   add("text.selectAll", "Select Block, then Document text", "Select the active TextBlock; repeat with the whole Block selected to select visible text in this Document.", "Text Selection", "document-select-all", [k("a", "Meta"), k("a", "Ctrl")]);
   add("find.open", "Find in document", "Find text recursively in the current Page, Container, or Document.", "Find", "document-find-open", [k("f", primary)]);
   for (const [id, name, trigger] of [["next", "Next match", k("Enter")], ["previous", "Previous match", k("Enter", "Shift")], ["close", "Close Find", k("Escape")]] as const) add(`find.${id}`, name, "Navigate search matches or close the session without changing document content.", "Find", "document-find", [trigger]);
@@ -59,4 +59,10 @@ export function registerInputActions(registry: BindingRegistry, platform = typeo
   for (const [id, name, key, shift] of [["open", "Open document", "o", false], ["save", "Save document", "s", false], ["saveAs", "Save document as", "s", true]] as const) add(`document.${id}`, name, "Use the document browser/store; unsaved-change and overwrite protections still apply.", "Documents", "workspace", [k(key, "Ctrl", ...(shift ? ["Shift" as const] : [])), k(key, "Meta", ...(shift ? ["Shift" as const] : [])), ...(id === "save" ? [{ kind: "custom" as const, name: "save-document" }] : [])]);
   add("bindings.open", "Input bindings", "Browse, record, reassign and restore application input bindings.", "Windows", "workspace", [{ kind: "custom", name: "toggle-bindings" }]);
   for (const [id, name] of [["bold", "Bold selection"], ["italics", "Italicise selection"], ["left", "Align left"], ["center", "Align centre"], ["right", "Align right"], ["justify", "Justify"], ["h1", "Heading 1"], ["h2", "Heading 2"], ["h3", "Heading 3"], ["h4", "Heading 4"], ["indent", "Increase indent"], ["outdent", "Decrease indent"], ["clear", "Clear formatting"]]) add(`style.${id}`, name, "Apply formatting to the focused Block or selected text using the document formatting toolbar's action.", "Styles", "editor/standoff", []);
+  // A newly added default must not take over an existing user assignment.
+  if (registry.conflicts('gloss.create', [k('g', primary)]).length) {
+    releaseGloss();
+    add('gloss.create', 'Create Gloss', 'Annotate selected text or the word at the caret.', 'Annotations', 'editor/standoff', [chord(k(';', 'Ctrl'), k('g'))]);
+  }
+
 }

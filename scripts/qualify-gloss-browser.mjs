@@ -9,7 +9,7 @@ import path from 'node:path';
 
 const commandQualification = true;
 const stageB=process.env.GLOSS_STAGE==='b';
-const milestone = stageB?'gloss-stage-b':'gloss-stage-a';
+const milestone = stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
 const vault=stageB?await mkdtemp(path.join(tmpdir(),'mutable-gloss-vault-')):undefined;
 const api=stageB?(await import('express')).default():undefined;
 if(api)api.use('/api/native',(await import('../dist/server/native-document-store.mjs')).createNativeDocumentStoreRouter({root:vault}));

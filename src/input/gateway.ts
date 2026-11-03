@@ -543,6 +543,16 @@ export class InputGateway {
     if (!["native-text", "standoff"].includes(resolved.handle.inputPolicy)) return this.runCommand(id, resolved.nodeKey);
     if (resolved.handle.inputPolicy === "native-text" && !(event.target instanceof HTMLTextAreaElement)) return false;
 
+    if (id === 'gloss.create') {
+      const target = event.target instanceof Element ? event.target : undefined;
+      // The browser keeps Find-next outside the actual standoff editing surface.
+      if (resolved.handle.inputPolicy !== 'standoff' || !target ||
+          !resolved.handle.focusElement.contains(target) ||
+          target.closest('input, textarea, select') ||
+          target.closest('[contenteditable]') !== resolved.handle.focusElement) return false;
+      return this.runCommand(id, resolved.nodeKey);
+    }
+
     if (id === "resource.processAtCaret") return this.clipboard?.processAtCaret(event) ?? false;
 
     if (id === 'task.toggle') return event.target instanceof Node && resolved.handle.focusElement.contains(event.target) ? this.listInput.toggleTask?.(resolved.nodeKey) ?? false : false;

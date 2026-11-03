@@ -15,8 +15,8 @@ import {materializeFragment} from '../../interchange/materialize';
 import {glossChangeFor} from '../../block-tree/gloss-plan';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());vi.restoreAllMocks();document.body.replaceChildren();});
-function setup(direct=true){
- const e=new ReactiveEditor({id:'workspace',type:'workspace-block',children:[{id:'doc',type:'document-block',children:[{id:'p',type:'standoff-editor-block',text:'Hello world: again.',standoffProperties:[{id:'bold',type:'style/bold',start:0,end:3}]}]},{id:'other',type:'document-block',children:[{id:'q',type:'standoff-editor-block',text:'Unrelated '.repeat(50)}]}]},{features:{directDomCharacterCells:direct}});registerCoreViews(e);const v=e.createView('test'),host=document.body.appendChild(document.createElement('main'));const dispose=render(()=><ReactiveTreeView editor={e} projection={v}/>,host);cleanup.push(()=>e.dispose(),dispose);const key=Object.values(v.state.nodes).find(n=>n.payload.id==='p')!.key;const owner=Object.values(e.repository.readState().contents).find(c=>c.payload.id==='doc')!.key;
+function setup(direct=true,glossMode=true){
+ const e=new ReactiveEditor({id:'workspace',type:'workspace-block',children:[{id:'doc',type:'document-block',children:[{id:'p',type:'standoff-editor-block',text:'Hello world: again.',standoffProperties:[{id:'bold',type:'style/bold',start:0,end:3}]}]},{id:'other',type:'document-block',children:[{id:'q',type:'standoff-editor-block',text:'Unrelated '.repeat(50)}]}]},{features:{directDomCharacterCells:direct,glossMode}});registerCoreViews(e);const v=e.createView('test'),host=document.body.appendChild(document.createElement('main'));const dispose=render(()=><ReactiveTreeView editor={e} projection={v}/>,host);cleanup.push(()=>e.dispose(),dispose);const key=Object.values(v.state.nodes).find(n=>n.payload.id==='p')!.key;const owner=Object.values(e.repository.readState().contents).find(c=>c.payload.id==='doc')!.key;
  const select=(a=2,b=a)=>{const h=e.mounts.get(key)!;h.focus();h.restoreInlineSelection!({anchor:a,head:b});return key;};
  const registry=()=>e.repository.readState().contents[owner].payload.linkedAnnotations as any;
  return {e,v,key,owner,select,registry};
@@ -72,4 +72,23 @@ it('copies only selected Gloss definitions through the native clipboard with pla
  const fragment=serializeSelection(f.e.repository.readState(),[{placementKey:f.e.node(f.key)!.placementKey,start:0,end:5}]);
  expect(fragment.definitions).toHaveLength(1);expect(exportClipboard(fragment)['text/plain']).toBe('Hello');
  const copied=materializeFragment(fragment);expect(Object.values(copied.linkedAnnotations as any)).toHaveLength(1);expect(JSON.stringify(copied.linkedAnnotations)).toContain('note: selected');expect(JSON.stringify(copied.linkedAnnotations)).not.toContain('note: excluded');
+});
+it.each([['MacIntel','metaKey',true],['MacIntel','metaKey',false],['Win32','ctrlKey',true],['Win32','ctrlKey',false]] as const)('primary G authors through the existing path on %s via %s (direct %s)',(platform,modifier,direct)=>{
+ vi.spyOn(navigator,'platform','get').mockReturnValue(platform);
+ const f=setup(direct),{e,key}=f;cleanup.push(e.installGateway(document));f.select(0,5);
+ const mount=e.mounts.get(key)!,cells=[...mount.focusElement.children],revision=e.repository.state.revision,snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(f.v as any,'build'),owners=vi.spyOn(resourceIdentity,'resourceOwner');
+ mount.focusElement.parentElement!.setAttribute('contenteditable','false'); // An explicit inner editor overrides its outer widget boundary.
+ const event=new KeyboardEvent('keydown',{key:'g',[modifier]:true,bubbles:true,cancelable:true});mount.focusElement.dispatchEvent(event);
+ expect(event.defaultPrevented).toBe(true);expect(document.activeElement?.matches('.gloss-input textarea')).toBe(true);expect(e.repository.state.revision).toBe(revision);
+ expect(e.gloss.commit('evidence: Keyboard-created')).toBe(true);expect(Object.values(f.registry())).toHaveLength(1);expect((e.node(key)!.payload.standoffProperties as any[]).at(-1)).toMatchObject({type:GLOSS,start:0,end:4});
+ e.repository.undo();expect(Object.keys(f.registry()??{})).toHaveLength(0);e.repository.redo();expect(Object.values(f.registry())).toHaveLength(1);
+ expect(e.mounts.get(key)).toBe(mount);expect([...mount.focusElement.children]).toEqual(cells);expect(mount.captureInlineSelection?.()).toEqual({anchor:0,head:5});expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(owners).not.toHaveBeenCalled();
+});
+it('keeps primary G outside text, during composition and with Gloss disabled; retains the old chord',()=>{
+ vi.spyOn(navigator,'platform','get').mockReturnValue('MacIntel');const f=setup(),{e,key}=f;cleanup.push(e.installGateway(document));f.select(0,5);const mount=e.mounts.get(key)!;
+ const press=(target:Element,extra:KeyboardEventInit={})=>{const event=new KeyboardEvent('keydown',{key:'g',metaKey:true,bubbles:true,cancelable:true,...extra});target.dispatchEvent(event);return event;};
+ const field=document.createElement('input');mount.focusElement.append(field);field.focus();expect(press(field).defaultPrevented).toBe(false);expect(press(document.body).defaultPrevented).toBe(false);field.remove();f.select(0,5);expect(press(mount.focusElement,{isComposing:true}).defaultPrevented).toBe(false);
+ expect(document.querySelector('.gloss-input')).toBeNull();
+ press(mount.focusElement,{key:';',ctrlKey:true,metaKey:false});press(mount.focusElement,{metaKey:false});expect(document.querySelector('.gloss-input')).not.toBeNull();e.gloss.cancel();expect(mount.captureInlineSelection?.()).toEqual({anchor:0,head:5});
+ const disabled=setup(true,false);cleanup.push(disabled.e.installGateway(document));disabled.select(0,5);expect(press(disabled.e.mounts.get(disabled.key)!.focusElement).defaultPrevented).toBe(false);expect(document.querySelector('.gloss-input')).toBeNull();
 });

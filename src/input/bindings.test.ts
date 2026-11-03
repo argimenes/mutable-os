@@ -74,3 +74,8 @@ describe("chord bindings", () => {
     registry.dispose();
   });
 });
+
+it('keeps an existing primary-G assignment when registering the new Gloss default',()=>{
+ const saved=JSON.stringify({version:2,overrides:{'sticky.createFloating':[keyboard('g','Meta')]}});localStorage.setItem('speedy.input-bindings.v1',saved);
+ const registry=new BindingRegistry();try{registerInputActions(registry,'MacIntel');expect(registry.effective('gloss.create')).toEqual([chord(keyboard(';','Ctrl'),keyboard('g'))]);expect(registry.effective('sticky.createFloating')).toEqual([keyboard('g','Meta')]);expect(localStorage.getItem('speedy.input-bindings.v1')).toBe(saved);}finally{registry.dispose();}
+});

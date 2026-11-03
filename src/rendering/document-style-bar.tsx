@@ -268,7 +268,7 @@ export function DocumentStyleBar(props: { editor: ReactiveEditor; scopeKey?: Nod
   const glossPresentation=useGlossPresentation();
   const tools = (): CompactTool[] => [
     ...(glossPresentation?[{id:'gloss.mode',label:'Gloss Mode',glyph:'Gloss Mode',toolset:'Annotations' as const,persistent:true,width:94,pressed:glossPresentation.active,run:()=>{glossPresentation.toggle();restore();}},...(glossPresentation.active()&&glossPresentation.narrow()?[{id:'gloss.references',label:'Local References',glyph:'Refs',toolset:'Annotations' as const,persistent:true,width:46,pressed:glossPresentation.references,run:glossPresentation.toggleReferences}]:[])]:[]),
-    ...(editor.features.glossMode?[{id:'gloss.create',label:'Create Gloss (Ctrl+; then G)',glyph:'G',toolset:'Annotations' as const,persistent:true,width:36,run:()=>{capture();const n=target();if(n)void editor.commandRegistry.execute('gloss.create',{targetKey:n.key,args:{selection:savedRange}});},disabled:()=>!target()}]:[]),
+    ...(editor.features.glossMode?[{id:'gloss.create',label:`Create Gloss (${editor.bindings.label('gloss.create')})`,glyph:'G',toolset:'Annotations' as const,persistent:true,width:36,run:()=>{capture();const n=target();if(n)void editor.commandRegistry.execute('gloss.create',{targetKey:n.key,args:{selection:savedRange}});},disabled:()=>!target()}]:[]),
     ...(editor.initialis.enabled?[{id:initialisCommand,label:"Apply Initialis (Ctrl+; then I)",glyph:"𝓘",toolset:"Visual effects" as const,persistent:true,width:36,run:applyInitialis,disabled:()=>!target()}]:[]),
     ...(["undo", "redo"] as const).map(direction => ({ id: `history.${direction}`, label: direction === "undo" ? "Undo" : "Redo", glyph: direction === "undo" ? "↶" : "↷", toolset: "Typography" as const, primary: true, disabled: () => !target() || !historyTrigger(direction), run: () => history(direction) })),
     { id: "colours", label: "Text colour and fill", glyph: "Colour / Fill", width: 104, toolset: "Visual effects", panel: ColourControls },
@@ -341,7 +341,7 @@ export function DocumentStyleBar(props: { editor: ReactiveEditor; scopeKey?: Nod
     <SelectionOption />
     <Show when={editor.crossText.enabled()}><button type="button" disabled={!editor.crossText.range()} onClick={() => editor.crossText.collapseToHead()}>Resume text editing</button></Show>
     <LinkedControls />
-    <Show when={editor.features.glossMode}><button type="button" data-command="gloss.create" title="Create Gloss (Ctrl+; then G)" onClick={()=>{capture();const n=target();if(n)void editor.commandRegistry.execute('gloss.create',{targetKey:n.key,args:{selection:savedRange}});}}>Gloss</button></Show>
+    <Show when={editor.features.glossMode}><button type="button" data-command="gloss.create" title={`Create Gloss (${editor.bindings.label("gloss.create")})`} onClick={()=>{capture();const n=target();if(n)void editor.commandRegistry.execute('gloss.create',{targetKey:n.key,args:{selection:savedRange}});}}>Gloss</button></Show>
     <Show when={editor.initialis.enabled}><button type="button" data-command={initialisCommand} aria-label="Apply Initialis (Ctrl+; then I)" title="Apply Initialis (Ctrl+; then I)" onClick={applyInitialis}>𝓘</button></Show>
     <For each={annotationTools}>{([type, label, glyph]) => <>
       <button type="button" title={label} aria-label={label} aria-pressed={type === "style/show-hide" ? hiddenTextRevealed() : undefined} data-annotation-type={type} onClick={() => type === "style/show-hide" ? showHide() : annotate(type)}>{glyph}</button>
