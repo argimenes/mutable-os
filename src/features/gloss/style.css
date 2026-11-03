@@ -1,6 +1,6 @@
 .gloss-input{position:fixed;z-index:100000;width:min(320px,calc(100vw - 16px));padding:8px;border:1px solid #ad9678;border-radius:6px;background:#fffaf0;color:#342e25;box-shadow:0 3px 14px #0003;font:14px system-ui}
 .gloss-input textarea{box-sizing:border-box;width:100%;min-height:48px;max-height:140px;resize:vertical;background:#fffdf7;color:inherit;border:1px solid #c6bba7;border-radius:3px;padding:6px;font:inherit}
-.gloss-buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.gloss-input button{font:inherit;font-size:12px;color:inherit;background:#eee7d9;border:1px solid #c6bba7;border-radius:3px;padding:3px 6px;cursor:pointer}.gloss-draft-status{font-size:12px;color:#825421}.gloss-anchor-active{position:fixed;pointer-events:none;z-index:99999;background:#d7aa4330;border-bottom:2px solid #aa792d;box-sizing:border-box}
+.gloss-buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.gloss-input button{font:inherit;font-size:12px;color:inherit;background:#eee7d9;border:1px solid #c6bba7;border-radius:3px;padding:3px 6px;cursor:pointer}.gloss-draft-status{font-size:12px;color:#825421}
 .gloss-suggestions{margin-top:3px;border:1px solid #c6bba7;border-radius:3px;background:#fffdf7;max-height:180px;overflow-y:auto}
 .gloss-suggestions[hidden]{display:none}
 .gloss-suggestions [role=option]{padding:5px 7px;cursor:pointer;overflow-wrap:anywhere}

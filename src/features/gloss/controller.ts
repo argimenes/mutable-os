@@ -140,14 +140,18 @@ export class GlossController {
    if(ids.length>1){const choose=doc.createElement('select');choose.setAttribute('aria-label','Gloss at this passage');for(const id of ids){const def=(this.editor.repository.readState().contents[d.owner].payload.linkedAnnotations as any)[id];const option=doc.createElement('option');option.value=id;option.textContent=def.value.slice(0,70)||'(empty Gloss)';choose.append(option);}choose.value=d.id;choose.onchange=()=>{const p=props.find(p=>p.annotationId===choose.value)!;this.open(d.key,{anchor:p.start,head:p.end+1},p.annotationId);};box.append(choose);}
   }
   box.append(input,suggestions,status,buttons);doc.body.append(box);
-  const highlights:HTMLElement[]=[];let frame=0,alive=true,scrolled=false;
-  const position=()=>{frame=0;if(!alive)return;if(!h.root.isConnected){highlights.splice(0).forEach(e=>e.remove());status.textContent='The anchor view closed. Your draft is retained; copy it or cancel.';return;}
+  // Session-only SVG geometry lives in the TextBlock's annotation layer.
+  // Scrolling moves that layer natively; only the viewport popup is repositioned.
+  const highlightOwner=d.range?'gloss-active-'+crypto.randomUUID():undefined;let highlightLive=!!highlightOwner;
+  if(highlightOwner)this.editor.decorations.attachRanges(highlightOwner,[d.range!],{type:'editor/gloss-anchor-active',fill:'#d7aa43'});
+  const releaseHighlight=()=>{if(highlightLive){highlightLive=false;this.editor.decorations.disposeSession(highlightOwner!);}};
+  let frame=0,alive=true,scrolled=false;
+  const position=()=>{frame=0;if(!alive)return;if(!h.root.isConnected){releaseHighlight();status.textContent='The anchor view closed. Your draft is retained; copy it or cancel.';return;}
    if(!d.range){const r=(d.anchorElement?.isConnected?d.anchorElement:h.root).getBoundingClientRect();box.style.left=`${Math.max(8,Math.min(r.left,win.innerWidth-340))}px`;box.style.top=`${Math.max(8,Math.min(r.bottom+7,win.innerHeight-190))}px`;return;}
-   try{this.editor.textRanges.validate([d.range]);}catch{highlights.splice(0).forEach(e=>e.remove());status.textContent='The anchor changed. Copy your draft before cancelling and selecting it again.';return;}
+   try{this.editor.textRanges.validate([d.range]);}catch{releaseHighlight();status.textContent='The anchor changed. Copy your draft before cancelling and selecting it again.';return;}
    const origin=h.root.getBoundingClientRect(),scale=origin.width/((h.root instanceof HTMLElement?h.root.offsetWidth:origin.width)||origin.width||1);const rects=this.editor.measurements.retainedRangeRects(d.key,d.range.start,d.range.end,this.editor.repository.readState().contents[d.range.contentKey].revision,origin,scale||1);const last=rects.at(-1);if(!last)return;
    if(!scrolled&&last.bottom>win.innerHeight-220){scrolled=true;const boundary=h.inlineBoundary?.(d.range.end);const cell=boundary?.node.childNodes[Math.max(0,(boundary?.offset??1)-1)];if(cell instanceof Element&&typeof cell.scrollIntoView==='function'){cell.scrollIntoView({block:'center'});schedule();return;}}
    box.style.left=`${Math.max(8,Math.min(rects.find(r=>Math.abs(r.top-last.top)<2)?.left??last.left,win.innerWidth-340))}px`;box.style.top=`${last.bottom+7}px`;
-   highlights.splice(0).forEach(e=>e.remove());for(const r of rects){const mark=doc.createElement('div');mark.className='gloss-anchor-active';Object.assign(mark.style,{left:`${r.left}px`,top:`${r.top}px`,width:`${r.width}px`,height:`${r.height}px`});doc.body.append(mark);highlights.push(mark);}
   };
   const schedule=()=>{if(!frame)frame=win.requestAnimationFrame(position);};
   type Suggestion={label:string;search:string;id?:string;expected?:string};
@@ -192,7 +196,7 @@ export class GlossController {
    if(previous&&(change.structural?.gloss?change.structural.gloss.definitions.length>0:JSON.stringify(previous.payload.linkedAnnotations)!==JSON.stringify(this.editor.repository.readState().contents[d.owner].payload.linkedAnnotations))){inventory();suggest();}
    if(d.range&&change.previousContents.has(d.range.contentKey))schedule();
   });
-  this.closeUI=()=>{stopChanges();alive=false;if(frame)win.cancelAnimationFrame(frame);resize?.disconnect();win.removeEventListener('keydown',save,true);win.removeEventListener('scroll',schedule,true);win.removeEventListener('resize',schedule);doc.fonts?.removeEventListener('loadingdone',fontChanged);box.remove();highlights.forEach(e=>e.remove());};
+  this.closeUI=()=>{stopChanges();alive=false;if(frame)win.cancelAnimationFrame(frame);resize?.disconnect();win.removeEventListener('keydown',save,true);win.removeEventListener('scroll',schedule,true);win.removeEventListener('resize',schedule);doc.fonts?.removeEventListener('loadingdone',fontChanged);box.remove();releaseHighlight();};
   suggest();position();input.focus({preventScroll:true});
  }
  dispose(){this.cancel();this.releases.splice(0).forEach(f=>f());}

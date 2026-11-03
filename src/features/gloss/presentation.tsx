@@ -92,7 +92,7 @@ function GlossViews(props:{argumentState:ArgumentState;graphState:GlossGraphStat
    <Show when={relationships}>{ui=>{const Diagnostics=ui().Diagnostics;return <Diagnostics/>;}}</Show>
    <div class="gloss-register-rows"><For each={filtered()}>{entry=><article tabindex="-1" class="gloss-register-row" data-gloss-id={entry.localId} classList={{'gloss-selected':selected()===entry.localId}}>
     <button type="button" class="gloss-card-main" onClick={e=>void navigate(entry,undefined,true,e.currentTarget)}><strong>{entry.data().type||'Note'}</strong><span class="gloss-card-body">{entry.data().body||'(unfinished Gloss)'}</span></button>
-    <Show when={entry.data().alias}><small>{entry.data().alias}</small></Show><small>{entry.occurrences().length?`${new Set(entry.occurrences().map(a=>a.nodeKey)).size} occurrence(s) · ${entry.occurrences().length} segment(s)`:'anchor removed'}</small>
+    <Show when={entry.data().alias}><small>{entry.data().alias}</small></Show><small>{entry.occurrences().length?`${entry.occurrences().length} occurrence(s)`:'anchor removed'}</small>
     <div class="gloss-register-actions"><button type="button" disabled={!entry.occurrences().length} onClick={()=>void navigate(entry)}>Navigate</button><button type="button" onClick={e=>void navigate(entry,undefined,true,e.currentTarget)}>Edit</button><button type="button" onClick={e=>remove(entry,e.currentTarget)}>Delete</button></div>
     <Show when={relationships}>{ui=>{const Groups=ui().Groups;return <Groups entry={entry}/>;}}</Show>
    </article>}</For><Show when={!filtered().length}><p>No matching Glosses.</p></Show></div>

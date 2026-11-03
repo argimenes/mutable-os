@@ -166,3 +166,14 @@ it('admits only local Gloss annotation changes for existing-entity attachment',(
  const missing=structuredClone(next);(missing.payload.standoffProperties as any[]).at(-1).annotationId='missing';expect(proof(missing)).toBeUndefined();
  const foreign=structuredClone(Object.values(state.contents).find(c=>c.payload.id==='q')!);foreign.payload.standoffProperties=[{id:'foreign',type:GLOSS,annotationId:id,start:0,end:4}];expect(proof(foreign)).toBeUndefined();
 });
+
+it.each([true,false])('uses an occurrence-local temporary SVG highlight and releases it on cancel or invalidation (direct %s)',direct=>{
+ const f=setup(direct),{e,key}=f,root=Object.values(f.v.state.nodes).find(n=>n.payload.id==='doc')!;
+ const shared=e.commands.transclude(key,{kind:'at',parentKey:root.key,index:1}),other=e.nodeForPlacementInView(shared,f.v.viewId)!.key;
+ const snapshot=vi.spyOn(e.repository,'snapshot'),commit=vi.spyOn(e.repository,'commit'),build=vi.spyOn(f.v as any,'build'),before=e.repository.state.revision;
+ expect(e.gloss.open(key,{anchor:0,head:5})).toBe(true);
+ expect(e.decorations.nodes[key]).toHaveLength(1);expect(e.decorations.nodes[key][0]).toMatchObject({type:'editor/gloss-anchor-active',renderers:[{name:'svg-highlight'}],range:{start:0,end:5}});expect(e.decorations.nodes[other]??[]).toHaveLength(0);expect(document.querySelector('.gloss-anchor-active')).toBeNull();
+ e.gloss.cancel();expect(e.decorations.nodes[key]).toHaveLength(0);expect(e.repository.state.revision).toBe(before);expect(commit).not.toHaveBeenCalled();
+ e.gloss.open(key,{anchor:0,head:5});e.commands.replaceInlineRange(key,0,0,'x');expect(e.decorations.nodes[key]).toHaveLength(0);e.gloss.cancel();
+ expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});
