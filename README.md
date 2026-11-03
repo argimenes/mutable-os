@@ -10,8 +10,7 @@ See [`RESTRUCTURE_PROGRESS.md`](./RESTRUCTURE_PROGRESS.md) for the exact hand-of
 state, verified behavior, known limits, and next migration stage.
 
 For the current reactive architecture, data/input/rendering flows, extension
-recipes, and day-to-day source map, start with the
-[Codex developer guide](./docs/README.md).
+recipes, and day-to-day source map, start with the [Codex developer guide](./docs/README.md).
 
 Feature-module Stages 1–5 are accepted. Start with the
 [extension architecture and tutorials](./docs/development/EXTENSION_ARCHITECTURE.md)
