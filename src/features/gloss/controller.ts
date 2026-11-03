@@ -10,7 +10,7 @@ import './style.css';
 interface Draft {key:string;owner:string;range?:TextRangeSnapshot;selection?:{anchor:number;head:number};anchorElement?:HTMLElement;id?:string;previous?:string;raw:string;viewId:string}
 export class GlossController {
  readonly status=createSignal('');readonly notice=this.status[0];
- private draft?:Draft;private closeUI?:()=>void;private releases:(()=>void)[]=[];
+ private clickEpoch=0;private draft?:Draft;private draftInput?:HTMLTextAreaElement;private closeUI?:()=>void;private releases:(()=>void)[]=[];
  private evidence={locationOf:(key:string)=>this.editor.repository.locationOf(key),ownedKeys:(key:string)=>this.editor.repository.ownedPlacementKeys(key)};
  constructor(private editor:ReactiveEditor){
   this.releases.push(editor.commandRegistry.register<{selection?:{anchor:number;head:number}}>({id:'gloss.create',label:'Create Gloss',canExecute:({targetKey})=>editor.features.glossMode&&editor.node(targetKey)?.viewType==='standoff-editor-block',execute:({targetKey,args})=>{this.open(targetKey,args?.selection);}},'gloss'));
@@ -44,17 +44,17 @@ export class GlossController {
  }
  open(key:string,selection?:{anchor:number;head:number},id?:string) {
   if(!this.editor.features.glossMode)return false;
-  if(this.draft){this.status[1]('Commit or cancel the open Gloss first.');document.querySelector<HTMLTextAreaElement>('.gloss-input textarea')?.focus();return false;}
+  if(this.draft&&!id){this.status[1]('Commit or cancel the open Gloss first.');this.draftInput?.focus();return false;}
   try {const target=this.target(key,selection),def=id?(this.editor.repository.state.contents[target.owner].payload.linkedAnnotations as any)?.[id]:undefined;
    if(id&&(!glossDefinition(def)||def.isDeleted))throw Error('This Gloss is no longer available.');
-   this.draft={key,...target,id,previous:def?JSON.stringify(def):undefined,raw:def?.value??''};this.status[1]('');this.show();return true;
+   return this.activate({key,...target,id,previous:def?JSON.stringify(def):undefined,raw:def?.value??''});
   }catch(error){this.status[1](error instanceof Error?error.message:String(error));return false;}
  }
  click(key:string,event:MouseEvent){
-  if(!this.editor.features.glossMode||event.defaultPrevented||event.detail>1||this.draft)return;
-  const mount=this.editor.mounts.get(key);if(!mount?.focusElement.contains(event.target as Node))return;
+  if(!this.editor.features.glossMode||event.defaultPrevented||event.detail>1)return;
+  const epoch=++this.clickEpoch,mount=this.editor.mounts.get(key);if(!mount?.focusElement.contains(event.target as Node))return;
   const openAt=()=>{
-   if(this.draft||this.editor.mounts.get(key)!==mount||!mount.root.isConnected)return;
+   if(epoch!==this.clickEpoch||this.editor.mounts.get(key)!==mount||!mount.root.isConnected)return;
    const selection=mount.captureInlineSelection?.();if(!selection||selection.anchor!==selection.head)return;
    const at=mount.inlinePointAt?.(event.clientX,event.clientY)??selection.head;
    const p=(this.editor.node(key)?.payload.standoffProperties as any[]??[]).find(p=>p.type===GLOSS&&!this.resolve(p,key).isDeleted&&p.start<=at&&p.end>=at);
@@ -67,10 +67,10 @@ export class GlossController {
  }
  /** Existing unanchored definitions use the same draft UI and canonical commit. */
  openDefinition(rootKey:string,id:string,invoker?:HTMLElement,show=true){
-  if(!this.editor.features.glossMode||this.draft){this.status[1]('Commit or cancel the open Gloss first.');return false;}
+  if(!this.editor.features.glossMode)return false;
   const root=this.editor.node(rootKey),def=root&&(this.editor.repository.readState().contents[root.contentKey]?.payload.linkedAnnotations as any)?.[id];
   if(root?.viewType!=='document-block'||!glossDefinition(def)||def.isDeleted)return false;
-  this.draft={key:rootKey,owner:root.contentKey,viewId:root.viewId,id,previous:JSON.stringify(def),raw:def.value,anchorElement:invoker};this.status[1]('');if(show)this.show();return true;
+  return this.activate({key:rootKey,owner:root.contentKey,viewId:root.viewId,id,previous:JSON.stringify(def),raw:def.value,anchorElement:invoker},show);
  }
  deleteDefinition(rootKey:string,id:string,invoker?:HTMLElement){return this.openDefinition(rootKey,id,invoker,false)&&this.commit('',true);}
  commit(raw:string,remove=false):boolean {
@@ -91,12 +91,20 @@ export class GlossController {
    e.repository.commit(remove?'Delete Gloss':d.id?'Edit Gloss':'Create Gloss',operations);this.cancel();return true;
   }catch(error){this.status[1](error instanceof Error?error.message:String(error));return false;}
  }
- cancel(){const d=this.draft;this.closeUI?.();this.closeUI=undefined;this.draft=undefined;if(d){const h=this.editor.mounts.get(d.key);if(d.selection&&h?.root.isConnected){h.focus();h.restoreInlineSelection?.(d.selection);}else if(d.anchorElement?.isConnected)d.anchorElement.focus({preventScroll:true});}}
+ private activate(next:Draft,show=true){
+  this.clickEpoch++;
+  // Re-selecting the same Gloss keeps its current draft. A different Gloss
+  // replaces it without authoring or restoring focus to the previous anchor.
+  if(show&&next.id&&this.draft?.id===next.id&&this.draft.owner===next.owner){this.draftInput?.focus({preventScroll:true});return true;}
+  this.close(false);this.draft=next;this.status[1]('');if(show)this.show();return true;
+ }
+ cancel(){this.close(true);}
+ private close(restoreSelection:boolean){this.clickEpoch++;const d=this.draft;this.closeUI?.();this.closeUI=undefined;this.draftInput=undefined;this.draft=undefined;if(d&&restoreSelection){const h=this.editor.mounts.get(d.key);if(d.selection&&h?.root.isConnected){h.focus();h.restoreInlineSelection?.(d.selection);}else if(d.anchorElement?.isConnected)d.anchorElement.focus({preventScroll:true});}}
  releaseView(viewId:string){if(this.draft?.viewId===viewId)this.status[1]('The anchor view closed. Your draft is retained; copy it or cancel.');}
  private show(){
   const d=this.draft!,h=this.editor.mounts.get(d.key)!,doc=h.root.ownerDocument,win=doc.defaultView!;
   const box=doc.createElement('div');box.className='gloss-input';box.setAttribute('role','dialog');box.setAttribute('aria-label',d.id?'Edit Gloss':'Create Gloss');
-  const input=doc.createElement('textarea');input.setAttribute('aria-label','Gloss');input.placeholder='type: your thought';input.value=d.raw;input.rows=2;
+  const input=doc.createElement('textarea');input.setAttribute('aria-label','Gloss');input.placeholder='type: your thought';input.value=d.raw;input.rows=2;this.draftInput=input;
   const suggestions=doc.createElement('div');suggestions.className='gloss-suggestions';
   const status=doc.createElement('div');status.className='gloss-draft-status';status.setAttribute('role','status');
   const buttons=doc.createElement('div');buttons.className='gloss-buttons';
@@ -105,7 +113,7 @@ export class GlossController {
   if(d.id&&d.range){
    const activeRange=d.range;const props=(this.editor.node(d.key)?.payload.standoffProperties as any[]??[]).filter(p=>p.type===GLOSS&&!this.resolve(p,d.key).isDeleted&&p.start<activeRange.end&&p.end>=activeRange.start);
    const ids=[...new Set(props.map(p=>p.annotationId))];
-   if(ids.length>1){const choose=doc.createElement('select');choose.setAttribute('aria-label','Gloss at this passage');for(const id of ids){const def=(this.editor.repository.readState().contents[d.owner].payload.linkedAnnotations as any)[id];const option=doc.createElement('option');option.value=id;option.textContent=def.value.slice(0,70)||'(empty Gloss)';choose.append(option);}choose.value=d.id;choose.onchange=()=>{const p=props.find(p=>p.annotationId===choose.value)!;this.cancel();this.open(d.key,{anchor:p.start,head:p.end+1},p.annotationId);};box.append(choose);}
+   if(ids.length>1){const choose=doc.createElement('select');choose.setAttribute('aria-label','Gloss at this passage');for(const id of ids){const def=(this.editor.repository.readState().contents[d.owner].payload.linkedAnnotations as any)[id];const option=doc.createElement('option');option.value=id;option.textContent=def.value.slice(0,70)||'(empty Gloss)';choose.append(option);}choose.value=d.id;choose.onchange=()=>{const p=props.find(p=>p.annotationId===choose.value)!;this.open(d.key,{anchor:p.start,head:p.end+1},p.annotationId);};box.append(choose);}
   }
   box.append(input,suggestions,status,buttons);doc.body.append(box);
   const highlights:HTMLElement[]=[];let frame=0,alive=true,scrolled=false;

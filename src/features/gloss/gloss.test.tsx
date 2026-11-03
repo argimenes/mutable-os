@@ -92,3 +92,26 @@ it('keeps primary G outside text, during composition and with Gloss disabled; re
  press(mount.focusElement,{key:';',ctrlKey:true,metaKey:false});press(mount.focusElement,{metaKey:false});expect(document.querySelector('.gloss-input')).not.toBeNull();e.gloss.cancel();expect(mount.captureInlineSelection?.()).toEqual({anchor:0,head:5});
  const disabled=setup(true,false);cleanup.push(disabled.e.installGateway(document));disabled.select(0,5);expect(press(disabled.e.mounts.get(disabled.key)!.focusElement).defaultPrevented).toBe(false);expect(document.querySelector('.gloss-input')).toBeNull();
 });
+
+it.each([true,false])('switches clicked Gloss popups, discards edits, and preserves canonical/editor state (direct %s)',direct=>{
+ const f=setup(direct),{e,key}=f,mount=e.mounts.get(key)!;
+ e.gloss.open(key,{anchor:0,head:5});e.gloss.commit('note: first');e.gloss.open(key,{anchor:6,head:11});e.gloss.commit('note: second');const [first,second]=Object.keys(f.registry());
+ const cells=[...mount.focusElement.children],revision=e.repository.state.revision,snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(f.v as any,'build'),commit=vi.spyOn(e.repository,'commit'),restore=vi.spyOn(mount as any,'restoreInlineSelection');
+ const caret=vi.spyOn(mount as any,'captureInlineSelection').mockReturnValue({anchor:1,head:1}),point=vi.spyOn(mount as any,'inlinePointAt').mockReturnValue(1);
+ const click=()=>mount.focusElement.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1})),input=()=>document.querySelector<HTMLTextAreaElement>('.gloss-input textarea')!;
+ click();expect(input().value).toBe('note: first');const old=input(),box=old.parentElement;old.value='uncommitted change';old.dispatchEvent(new InputEvent('input',{bubbles:true}));
+ click();expect(input()).toBe(old);expect(input().value).toBe('uncommitted change'); // same identity keeps its draft
+ caret.mockReturnValue({anchor:7,head:7});point.mockReturnValue(7);restore.mockClear();click();
+ expect(input().value).toBe('note: second');expect(document.querySelectorAll('.gloss-input')).toHaveLength(1);expect(box!.isConnected).toBe(false);expect(restore).not.toHaveBeenCalled();expect(document.activeElement).toBe(input());
+ caret.mockReturnValue({anchor:1,head:1});point.mockReturnValue(1);click();expect(input().value).toBe('note: first');expect(f.registry()[first].value).toBe('note: first');expect(f.registry()[second].value).toBe('note: second');
+ expect(e.repository.state.revision).toBe(revision);expect(commit).not.toHaveBeenCalled();expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(e.mounts.get(key)).toBe(mount);expect([...mount.focusElement.children]).toEqual(cells);
+ e.gloss.cancel();expect(restore).toHaveBeenLastCalledWith({anchor:0,head:5});
+});
+it('keeps the current popup for invalid targets and real drag selections; allows definition-to-anchor switching',()=>{
+ const f=setup(),{e,key}=f,mount=e.mounts.get(key)!;e.gloss.open(key,{anchor:0,head:5});e.gloss.commit('note: first');e.gloss.open(key,{anchor:6,head:11});e.gloss.commit('note: second');const [first,second]=Object.keys(f.registry()),root=Object.values(f.v.state.nodes).find(n=>n.payload.id==='doc')!;
+ e.gloss.openDefinition(root.key,first);const old=document.querySelector('.gloss-input');expect(e.gloss.open(key,{anchor:6,head:11},'missing')).toBe(false);expect(document.querySelector('.gloss-input')).toBe(old);
+ vi.spyOn(mount as any,'captureInlineSelection').mockReturnValue({anchor:6,head:11});const scheduled:FrameRequestCallback[]=[];vi.spyOn(window,'requestAnimationFrame').mockImplementation(fn=>{scheduled.push(fn);return 1;});mount.focusElement.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));scheduled.shift()!(0);expect(document.querySelector('.gloss-input')).toBe(old);
+ expect(e.gloss.open(key,{anchor:6,head:11},second)).toBe(true);expect((document.querySelector('.gloss-input textarea') as HTMLTextAreaElement).value).toBe('note: second');expect(old!.isConnected).toBe(false);
+});
+
+it('does not reopen a stale scheduled click after the popup is cancelled',()=>{const f=setup(),{e,key}=f,mount=e.mounts.get(key)!;e.gloss.open(key,{anchor:0,head:5});e.gloss.commit('note: first');const id=Object.keys(f.registry())[0];e.gloss.open(key,{anchor:0,head:5},id);const capture=vi.spyOn(mount as any,'captureInlineSelection').mockReturnValue({anchor:0,head:5}),scheduled:FrameRequestCallback[]=[];vi.spyOn(window,'requestAnimationFrame').mockImplementation(fn=>{scheduled.push(fn);return 1;});mount.focusElement.dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));e.gloss.cancel();capture.mockReturnValue({anchor:1,head:1});scheduled.forEach(fn=>fn(0));expect(document.querySelector('.gloss-input')).toBeNull();});
