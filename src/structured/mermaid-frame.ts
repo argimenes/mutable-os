@@ -1,4 +1,5 @@
 import mermaid from 'mermaid';
+import {installMermaidNavigation,glossNodeStyle} from './mermaid-navigation';
 import {decodeNumericSvgLabels} from './numeric-svg-labels';
 // A self-contained bundle executed only in an opaque sandbox with network denied.
 const input=(window as any).structuredInput;
@@ -18,5 +19,5 @@ const input=(window as any).structuredInput;
  for(const node of [root,...root.querySelectorAll('*')])for(const a of [...node.attributes])if(/^on/i.test(a.name)||/href$/i.test(a.name)&&!a.value.startsWith('#'))node.removeAttribute(a.name);
  if(input.numericLabelEntities)decodeNumericSvgLabels(root);
  if(input.naturalSize){const box=(root.getAttribute('viewBox')??'').trim().split(/\s+/).map(Number);if(box.length===4&&box.every(Number.isFinite)&&box[2]>0&&box[3]>0&&box[2]<=100000&&box[3]<=100000){(root as unknown as SVGElement).style.maxWidth='none';(root as unknown as SVGElement).style.width=box[2]+'px';(root as unknown as SVGElement).style.height=box[3]+'px';}}
- document.body.replaceChildren(document.importNode(root,true));parent.postMessage({token:input.token,ok:true},'*');
+ document.body.replaceChildren(document.importNode(root,true));if(input.navigation){const style=document.createElement('style');style.textContent=glossNodeStyle;document.head.append(style);installMermaidNavigation(document.body.firstElementChild!,{token:input.token,...input.navigation});}parent.postMessage({token:input.token,ok:true},'*');
  }catch(e){document.body.textContent='Diagram unavailable';parent.postMessage({token:input.token,error:String(e).slice(0,1000)},'*');}})();

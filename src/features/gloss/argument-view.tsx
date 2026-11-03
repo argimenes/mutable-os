@@ -6,6 +6,7 @@ import {ARGUMENT_LIMITS,argumentChildren,argumentPath,argumentRootPath,createArg
 import './argument-view.css';
 export function GlossArgumentView(props:{index:GlossSessionIndex;state:ArgumentState;registerState:GlossRegisterState;diagnostics:ReturnType<typeof createArgumentDiagnostics>;inspect:(id:string)=>void;reveal:(id:string)=>void;definition:(id:string,invoker:HTMLElement)=>void;limits?:typeof ARGUMENT_LIMITS}){
  const {index,state:s,diagnostics:d}=props,graph=index.relationships!,limits=props.limits??ARGUMENT_LIMITS;
+ const selectedPathGloss=createMemo(()=>{const path=s.selectedPath[0]();if(!path)return;const last=JSON.parse(path).at(-1);return typeof last==='string'?last:last?.[2];});
  const entries=createMemo(()=>new Map(index.rows[0]().map(row=>[row.localId,row])));
  const eligible=createMemo(()=>index.rows[0]().filter(row=>{const nodes=graph.nodes(row.localId);return nodes.length===1&&!nodes[0].deleted;}));
  const suggestions=createMemo(()=>{const query=s.query[0]().trim().toLocaleLowerCase();return eligible().filter(row=>{const data=row.data();return !query||`${data.raw} ${data.alias}`.toLocaleLowerCase().includes(query);}).sort((a,b)=>Number(b.data().type.toLowerCase()==='thesis')-Number(a.data().type.toLowerCase()==='thesis'));});
@@ -30,7 +31,7 @@ export function GlossArgumentView(props:{index:GlossSessionIndex;state:ArgumentS
   const relevant=createMemo(()=>{if(!open()||cycle||p.depth>=limits.depth||!active())return;const a=graph.relations(p.id),direction=s.direction[0]();return{incoming:direction==='outgoing'?[]:a.incoming,outgoing:direction==='incoming'?[]:a.outgoing,activeIncoming:[],activeOutgoing:[]};},undefined,{equals:(a,b)=>a===b||!!a&&!!b&&a.incoming.length===b.incoming.length&&a.outgoing.length===b.outgoing.length&&a.incoming.every((e,i)=>e===b.incoming[i])&&a.outgoing.every((e,i)=>e===b.outgoing[i])});
   const adjacency=createMemo(()=>{const adjacent=relevant();if(!adjacent)return{links:[] as ArgumentLink[],excluded:0,inspected:0};d.branchReads++;d.byPath[p.path]=(d.byPath[p.path]??0)+1;const result=argumentChildren({relations:()=>adjacent},p.id,s.direction[0](),s.predicate[0](),id=>rank(id)[0]());d.edgesInspected+=result.inspected;return result;});
   const byKey=createMemo(()=>new Map(adjacency().links.map(link=>[link.key,link]))),keys=createMemo(()=>adjacency().links.slice(0,limit()).map(link=>link.key));
-  const selected=()=>s.selectedPath[0]()===p.path&&props.registerState.selected[0]()===p.id;
+  const selected=()=>props.registerState.selected[0]()===p.id&&(selectedPathGloss()!==p.id||s.selectedPath[0]()===p.path);
   const select=()=>{s.selectedPath[1](p.path);props.registerState.selected[1](p.id);};
   return <li class="gloss-argument-row" data-argument-path={p.path} data-gloss-id={p.id} data-cycle={cycle?'true':undefined}>
    <div class="gloss-argument-line" classList={{'argument-selected':selected()}}>

@@ -44,7 +44,7 @@ const vite=await createServer({plugins:[{
  import {materializeLocalWorkspace} from '/src/reactive-editor/workspace-manifest.ts';
  import '/src/index.css';
  import '/src/demo/workspace-demo.css';
- const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{glossArgumentExplorer:${process.env.BENCHMARK_GLOSS_ARGUMENT!=='false'},glossMermaidGraph:${process.env.BENCHMARK_GLOSS_MERMAID!=='false'},glossRelationshipAuthoring:${process.env.BENCHMARK_GLOSS_RELATIONSHIP_AUTHORING!=='false'},glossRelationships:${process.env.BENCHMARK_GLOSS_RELATIONSHIPS!=='false'},glossMode:${process.env.BENCHMARK_GLOSS!=='false'},scryProvisionalCells:${process.env.BENCHMARK_PROVISIONAL_SCRY!=='false'},autocompleteWorkstation:${process.env.BENCHMARK_AUTOCOMPLETE!=='false'},everydayWebResources:${process.env.BENCHMARK_EVERYDAY_WEB!=='false'},webResourceViewers:${process.env.BENCHMARK_WEB_RESOURCES!=='false'},deterministicAcademicResources:${process.env.BENCHMARK_DETERMINISTIC_ACADEMIC!=='false'},flintRecentDocuments:${process.env.BENCHMARK_FLINT_RECENTS!=='false'},webPublishing:${process.env.BENCHMARK_WEB_PUBLISHING!=='false'},applicationServices:${process.env.BENCHMARK_APPLICATION_SERVICES!=='false'},documentInterchange:${process.env.BENCHMARK_DOCUMENT_INTERCHANGE!=='false'},mutableClipboard:${process.env.BENCHMARK_MUTABLE_CLIPBOARD!=='false'},nativeDocumentPersistence:${!!process.env.BENCHMARK_VAULT_SIZE},nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,flintSceneChrome:true,annotationRangeEvents:${process.env.BENCHMARK_ANNOTATION_RANGE_EVENTS!=='false'},caretModes:${process.env.BENCHMARK_CARET_MODES!=='false'},standoffPropertyRendering:${process.env.BENCHMARK_STANDOFF_RENDERING!=='false'}}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{glossGraphNavigation:${process.env.BENCHMARK_GLOSS_NAVIGATION!=='false'},glossArgumentExplorer:${process.env.BENCHMARK_GLOSS_ARGUMENT!=='false'},glossMermaidGraph:${process.env.BENCHMARK_GLOSS_MERMAID!=='false'},glossRelationshipAuthoring:${process.env.BENCHMARK_GLOSS_RELATIONSHIP_AUTHORING!=='false'},glossRelationships:${process.env.BENCHMARK_GLOSS_RELATIONSHIPS!=='false'},glossMode:${process.env.BENCHMARK_GLOSS!=='false'},scryProvisionalCells:${process.env.BENCHMARK_PROVISIONAL_SCRY!=='false'},autocompleteWorkstation:${process.env.BENCHMARK_AUTOCOMPLETE!=='false'},everydayWebResources:${process.env.BENCHMARK_EVERYDAY_WEB!=='false'},webResourceViewers:${process.env.BENCHMARK_WEB_RESOURCES!=='false'},deterministicAcademicResources:${process.env.BENCHMARK_DETERMINISTIC_ACADEMIC!=='false'},flintRecentDocuments:${process.env.BENCHMARK_FLINT_RECENTS!=='false'},webPublishing:${process.env.BENCHMARK_WEB_PUBLISHING!=='false'},applicationServices:${process.env.BENCHMARK_APPLICATION_SERVICES!=='false'},documentInterchange:${process.env.BENCHMARK_DOCUMENT_INTERCHANGE!=='false'},mutableClipboard:${process.env.BENCHMARK_MUTABLE_CLIPBOARD!=='false'},nativeDocumentPersistence:${!!process.env.BENCHMARK_VAULT_SIZE},nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,flintSceneChrome:true,annotationRangeEvents:${process.env.BENCHMARK_ANNOTATION_RANGE_EVENTS!=='false'},caretModes:${process.env.BENCHMARK_CARET_MODES!=='false'},standoffPropertyRendering:${process.env.BENCHMARK_STANDOFF_RENDERING!=='false'}}});
  const editor=session.editor;
  const bank=editor.commands.insert({type:'workspace-object-bank-block',children:[]},{kind:'at',parentKey:session.projection.state.rootKey,index:0});
  const {admitNative}=await import('/src/persistence/native-resource.ts');
@@ -147,7 +147,7 @@ try{
  await send('Profiler.enable',{},sessionId);await send('Profiler.setSamplingInterval',{interval:200},sessionId);await send('Profiler.start',{},sessionId);
  if(process.env.BENCHMARK_PUBLICATION_LOAD==='1')serviceLoad=await (await import('./publication-typing-load.mjs')).startPublicationTypingLoad();
  if(process.env.BENCHMARK_APPLICATION_SERVICE_LOAD==='1')serviceLoad=await (await import('./application-service-typing-load.mjs')).startServiceTypingLoad();
- const result=await evaluate(`(async()=>{
+ const sampleTyping=()=>evaluate(`(async()=>{
    const {editor,flow,mount}=proof;const before=mount.captureText();
    let statusReads=0;const status=proof.native.status.bind(proof.native);proof.native.status=(...args)=>{statusReads++;return status(...args)};
    let snapshots=0;const snapshot=editor.repository.snapshot.bind(editor.repository);editor.repository.snapshot=()=>{snapshots++;return snapshot()};
@@ -166,11 +166,23 @@ try{
    window.fetch=request;window.Worker=OriginalWorker;
    return {argumentWork:argUI?Object.fromEntries(Object.keys(argBefore).map(k=>[k,argUI[k]-argBefore[k]])):null,diagramWork:graphUI?{generations:graphUI.generations-uiBefore.generations,renders:graphUI.renders-uiBefore.renders}:null,graphWork:graph?Object.fromEntries(Object.entries(graph.diagnostics).map(([k,v])=>[k,v-graphBefore[k]])):null,lerOpen:!!document.querySelector('.ler-instrument'),lerReads:proof.lerReads??0,lerSearches:proof.lerSearches??0,webViews:document.querySelectorAll('.web-resource-card').length,workerStarts,academicViews:document.querySelectorAll('.mutable-academic-resource').length,serviceRequests,pointerSpotlight:editor.pointerSpotlight.active(),caretMode:editor.caretModes.active(),characters:before.length,paragraphs:proof.root.querySelectorAll('.reactive-standoff-flow').length,sync:stats(sync),settled:stats(settled),frame:stats(frames),snapshots,statusReads,vaultRows:proof.root.querySelectorAll('.flint-tree-document').length,restored:mount.captureText()===before};
  })()`);
+ const result=await sampleTyping();
  const {profile:cpu}=await send('Profiler.stop',{},sessionId);await writeFile(path.join(artifacts,'typing.cpuprofile'),JSON.stringify(cpu));
  const nodeById=new Map(cpu.nodes.map(n=>[n.id,n]));const totals=new Map();
  for(let i=0;i<cpu.samples.length;i++){const n=nodeById.get(cpu.samples[i]);const f=n.callFrame;const key=f.functionName+' '+f.url.replace(/^http[^/]+\/\//,'')+':'+f.lineNumber;totals.set(key,(totals.get(key)??0)+(cpu.timeDeltas[i]??0)/1000);}
  const hottest=[...totals].sort((a,b)=>b[1]-a[1]).slice(0,35);console.log(JSON.stringify({result,hottest},null,2));
  await writeFile(path.join(artifacts,'results.json'),JSON.stringify({result,hottest},null,2));
+ if(process.env.BENCHMARK_GLOSS_NAVIGATION_COMPARE==='1'){
+  const comparison=[];
+  for(const enabled of [false,true,false,true]){
+   await evaluate(`(()=>{proof.editor.features.glossGraphNavigation=${enabled};const tabs=[...document.querySelectorAll('.gloss-view-tabs button')];tabs.find(b=>b.textContent==='References').click();tabs.find(b=>b.textContent==='Graph').click();})()`);
+   await wait('document.querySelector(".gloss-graph iframe[data-rendered=true]")');
+   await evaluate(`proof.editor.focus.request(proof.text.key);proof.flow.focus();proof.mount.restoreInlineSelection({anchor:100,head:100})`);
+   const measured=await sampleTyping();assert.equal(measured.snapshots,0);assert.ok(Object.values(measured.diagramWork).every(n=>n===0));assert.ok(Object.values(measured.graphWork).every(n=>n===0));
+   comparison.push({enabled,...measured});
+  }
+  await writeFile(path.join(artifacts,'navigation-comparison.json'),JSON.stringify(comparison,null,2));console.log('Same-browser navigation comparison:',JSON.stringify(comparison));
+ }
  if(result.argumentWork)assert.ok(Object.values(result.argumentWork).every(n=>n===0),'Typing must perform zero Argument traversal, row mounting or ranking');
  if(result.diagramWork)assert.ok(Object.values(result.diagramWork).every(n=>n===0),'Typing must perform zero Mermaid generation/rendering');
  if(result.graphWork)assert.ok(Object.values(result.graphWork).every(n=>n===0),'Typing must perform zero relationship index work');

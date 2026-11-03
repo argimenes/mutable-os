@@ -8,12 +8,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const commandQualification = true;
+const stageC5=process.env.GLOSS_STAGE==='c5';
 const stageC4=process.env.GLOSS_STAGE==='c4';
 const stageC3=process.env.GLOSS_STAGE==='c3';
 const stageC2=process.env.GLOSS_STAGE==='c2';
 const stageC1=process.env.GLOSS_STAGE==='c1';
-const stageB=process.env.GLOSS_STAGE==='b'||stageC1||stageC2||stageC3||stageC4;
-const milestone = stageC4?'gloss-stage-c4-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC3?'gloss-stage-c3-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC2?'gloss-stage-c2'+(process.env.GLOSS_C2_DENSITY==='16'?'-dense':''):stageC1?'gloss-stage-c1':stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
+const stageB=process.env.GLOSS_STAGE==='b'||stageC1||stageC2||stageC3||stageC4||stageC5;
+const milestone = stageC5?'gloss-stage-c5-'+(process.env.GLOSS_GRAPH_SIZE||'10'):stageC4?'gloss-stage-c4-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC3?'gloss-stage-c3-'+(process.env.GLOSS_GRAPH_SIZE||'10')+(process.env.GLOSS_GRAPH_DENSE==='1'?'-dense':''):stageC2?'gloss-stage-c2'+(process.env.GLOSS_C2_DENSITY==='16'?'-dense':''):stageC1?'gloss-stage-c1':stageB?'gloss-stage-b':process.env.GLOSS_STAGE==='c'?'gloss-stage-c-shortcut':'gloss-stage-a';
 const vault=stageB?await mkdtemp(path.join(tmpdir(),'mutable-gloss-vault-')):undefined;
 const api=stageB?(await import('express')).default():undefined;
 if(api)api.use('/api/native',(await import('../dist/server/native-document-store.mjs')).createNativeDocumentStoreRouter({root:vault}));
@@ -102,6 +103,25 @@ try {
         const profile=process.env.GLOSS_PROFILE&&!profiled&&action.type==='key'&&action.key==='Enter'&&!action.modifiers;if(profile){profiled=true;await send('Profiler.enable',{},sessionId);await send('Profiler.start',{},sessionId);}
         if(action.type==='key')for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key:action.key,code:action.key.length===1&&/[a-z]/i.test(action.key)?'Key'+action.key.toUpperCase():action.key,...(type==='keyDown'&&action.key==='Enter'?{text:'\r'}:{}),...(type==='keyDown'&&action.text?{text:action.text}:{}),...(type==='keyDown'&&action.key==='a'&&(action.modifiers===4||action.modifiers===2)?{commands:['selectAll']}:{}),modifiers:action.modifiers??0,windowsVirtualKeyCode:({Tab:9,Backspace:8,Escape:27,Enter:13,Home:36,End:35,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40})[action.key]??(action.key.length===1?action.key.toUpperCase().charCodeAt(0):0)},sessionId);
         if(profile){const data=await send('Profiler.stop',{},sessionId);await writeFile('/tmp/gloss-cpu.json',JSON.stringify(data.profile));console.error('PROFILE SAVED');}
+        if(action.type==='diagram-action'){
+          const target=(await send('Target.getTargets')).targetInfos.find(t=>t.type==='iframe');if(!target)throw Error('Missing diagram frame');
+          const attached=await send('Target.attachToTarget',{targetId:target.targetId,flatten:true});
+          const frameEvaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true},attached.sessionId);if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+          try{
+            if(action.op==='proof')result=await frameEvaluate(`({selected:document.querySelector('.mutable-gloss-selected')?.getAttribute('data-gloss-node'),selectedOutline:document.querySelector('.mutable-gloss-selected')?getComputedStyle(document.querySelector('.mutable-gloss-selected')).outlineStyle:null,focus:document.activeElement?.getAttribute('data-gloss-node'),outline:document.activeElement?getComputedStyle(document.activeElement).outlineStyle:null,nodes:[...document.querySelectorAll('[data-gloss-node]')].map(n=>({token:n.getAttribute('data-gloss-node'),label:n.getAttribute('aria-label'),role:n.getAttribute('role'),tab:n.getAttribute('tabindex')})),unsafe:document.querySelectorAll('svg script,svg foreignObject,svg image,svg a').length,handlers:[...document.querySelectorAll('svg *')].some(n=>[...n.attributes].some(a=>/^on/i.test(a.name))),lastTarget:window.lastNodeTarget,lastActivationAt:window.lastActivationAt})`);
+            if(action.op==='click'){
+              const pos=await frameEvaluate(`(()=>{const el=document.querySelector(${JSON.stringify(action.selector)});if(!el)throw Error('Missing diagram target');el.scrollIntoView({block:'center',inline:'center'});document.addEventListener('click',e=>window.lastNodeTarget=e.target.tagName,{once:true,capture:true});if(!window.activationProbe){window.activationProbe=true;for(const type of ['click','keydown'])document.addEventListener(type,e=>{if(type==='click'||e.key==='Enter'||e.key===' ')window.lastActivationAt=performance.timeOrigin+performance.now();},{capture:true});}const r=el.getBoundingClientRect();return{x:r.x+Math.min(r.width/2,8),y:r.y+Math.min(r.height/2,8)};})()`);
+              const framePos=await send('Runtime.evaluate',{expression:`(()=>{const f=document.querySelector('.gloss-graph iframe');const r=f.getBoundingClientRect();return{x:r.x,y:r.y};})()`,returnByValue:true},sessionId);
+              await send('Page.captureScreenshot',{format:'png'},sessionId);
+              await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:pos.x+framePos.result.value.x,y:pos.y+framePos.result.value.y},sessionId);
+              for(const type of ['mousePressed','mouseReleased'])await send('Input.dispatchMouseEvent',{type,x:pos.x+framePos.result.value.x,y:pos.y+framePos.result.value.y,button:'left',clickCount:1},sessionId);
+            }
+            if(action.op==='focus-start')await frameEvaluate(`document.activeElement?.blur();document.body.setAttribute('tabindex','-1');document.body.focus()`);
+            if(action.op==='forge')await frameEvaluate(`(()=>{const token=window.structuredInput.token;for(const data of [{kind:'gloss-node-select',token:'stale',node:'G1',sequence:900},{kind:'gloss-node-select',token,node:'G999',sequence:900},{kind:'gloss-node-select',token,node:'G1',sequence:0},{kind:'gloss-node-select',token,node:'G1',sequence:900,extra:'bad'}])parent.postMessage(data,'*');})()`);
+            if(action.op==='failure')try{await frameEvaluate(`parent.postMessage({token:window.structuredInput.token,error:'Qualification renderer failure'},'*')`);}catch(error){if(!/session|context|target/i.test(String(error)))throw error;}
+            if(action.op==='ax')result=(await send('Accessibility.getFullAXTree',{},attached.sessionId)).nodes.filter(n=>!n.ignored).map(n=>({role:n.role?.value,name:n.name?.value}));
+          }finally{try{await send('Target.detachFromTarget',{sessionId:attached.sessionId});}catch(error){if(action.op!=='failure')throw error;}}
+        }
         if(action.type==='diagram-proof'){
           const targets=(await send('Target.getTargets')).targetInfos.filter(t=>t.type==='iframe');const proofs=[];
           for(const target of targets){const attached=await send('Target.attachToTarget',{targetId:target.targetId,flatten:true});try{const r=await send('Runtime.evaluate',{expression:`({svg:!!document.querySelector('svg'),nodes:document.querySelectorAll('g.node').length,nodeTokens:[...document.querySelectorAll('g.node')].slice(0,8).map(n=>({id:n.getAttribute('id'),dataId:n.getAttribute('data-id')})),unsafe:document.querySelectorAll('svg script,svg foreignObject,svg image,svg a,svg iframe').length,events:[...document.querySelectorAll('svg *')].some(n=>[...n.attributes].some(a=>/^on/i.test(a.name))),literalMarkup:[...document.querySelectorAll('svg text')].some(t=>t.textContent.includes('<img')),text:[...document.querySelectorAll('svg text')].map(t=>t.textContent).join(' ').slice(0,600),xss:!!window.glossInjected})`,returnByValue:true},attached.sessionId);proofs.push(r.result.value);}finally{await send('Target.detachFromTarget',{sessionId:attached.sessionId});}}
@@ -114,7 +134,7 @@ try {
     });
   }
   const result = await send('Runtime.evaluate', {
-    expression: `(async()=>{const m=await import('${stageC4?'/src/application/gloss-stage-c4.browser-fixture.tsx':stageC3?'/src/application/gloss-stage-c3.browser-fixture.tsx':stageC2?'/src/application/gloss-stage-c2.browser-fixture.tsx':stageC1?'/src/application/gloss-stage-c1.browser-fixture.tsx':stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss(${stageC3||stageC4?JSON.stringify({size:Number(process.env.GLOSS_GRAPH_SIZE)||10,dense:process.env.GLOSS_GRAPH_DENSE==='1'}):stageC2?JSON.stringify({density:Number(process.env.GLOSS_C2_DENSITY)||4}):''});})()`,
+    expression: `(async()=>{const m=await import('${stageC5?'/src/application/gloss-stage-c5.browser-fixture.tsx':stageC4?'/src/application/gloss-stage-c4.browser-fixture.tsx':stageC3?'/src/application/gloss-stage-c3.browser-fixture.tsx':stageC2?'/src/application/gloss-stage-c2.browser-fixture.tsx':stageC1?'/src/application/gloss-stage-c1.browser-fixture.tsx':stageB?'/src/application/gloss-stage-b.browser-fixture.tsx':'/src/application/gloss.browser-fixture.tsx'}');return m.qualifyGloss(${stageC3||stageC4||stageC5?JSON.stringify({size:Number(process.env.GLOSS_GRAPH_SIZE)||10,dense:process.env.GLOSS_GRAPH_DENSE==='1'}):stageC2?JSON.stringify({density:Number(process.env.GLOSS_C2_DENSITY)||4}):''});})()`,
     awaitPromise: true, returnByValue: true,
   }, sessionId);
   // The last input resume can complete the fixture before its own CDP reply.
@@ -135,3 +155,8 @@ try {
   if(vault)await rm(vault,{recursive:true,force:true,maxRetries:5,retryDelay:200});
   await rm(profile, { recursive: true, force: true, maxRetries:5, retryDelay:200 });
 }
+
+// The finite qualification has awaited artifacts, input replies and cleanup.
+// Do not retain a Vite/esbuild helper handle after the browser has exited.
+await new Promise(resolve=>process.stdout.write('',resolve));
+process.exit(0);

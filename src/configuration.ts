@@ -147,6 +147,7 @@ export type FeatureFlags = Readonly<{
   glossRelationshipAuthoring: boolean;
   glossMermaidGraph: boolean;
   glossArgumentExplorer: boolean;
+  glossGraphNavigation: boolean;
   initialisCharacterRenderer: boolean;
   /** Transient caret enter/leave events and SVG emphasis for opted-in annotations. */
   annotationRangeEvents: boolean;
@@ -236,6 +237,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   glossRelationshipAuthoring: true,
   glossMermaidGraph: true,
   glossArgumentExplorer: true,
+  glossGraphNavigation: true,
   initialisCharacterRenderer: true,
   annotationRangeEvents: true,
   caretModes: true,
