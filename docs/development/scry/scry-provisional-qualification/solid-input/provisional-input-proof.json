@@ -1,0 +1,132 @@
+{
+  "checks": [
+    "typing remains provisional and renders actual cells",
+    "active source typing has no canonical operations",
+    "shared and keyboard history are suspended",
+    "Escape keeps Flo without markers in one native action",
+    "Undo restores the pre-Scry phrase",
+    "Redo restores plain text without markers",
+    "actual LER autocomplete commits canonical name and annotation together",
+    "one Undo removes both completion and annotation",
+    "one Redo restores completion and annotation",
+    "mention confirmation keeps authored wording",
+    "native IME composition stays provisional",
+    "IME cancellation keeps the composed phrase",
+    "plain-text paste is provisional and Unicode-safe",
+    "copy excludes markers and includes draft text",
+    "non-keyboard Workspace Save is blocked before capture",
+    "owner minimization keeps draft text and releases history guard",
+    "stale source remains available for copying without overwriting newer text",
+    "explicit stale-draft discard reveals newer text and releases history",
+    "actual Flint tab close preserves draft text in canonical content and releases history",
+    "no uncaught browser exceptions"
+  ],
+  "errors": [],
+  "records": [
+    {
+      "phase": "setup",
+      "name": "commit",
+      "ms": 715.3999999761581
+    },
+    {
+      "phase": "setup",
+      "name": "publish",
+      "ms": 715.3999999761581
+    },
+    {
+      "phase": "setup",
+      "name": "commit",
+      "ms": 2.100000023841858
+    },
+    {
+      "phase": "setup",
+      "name": "publish",
+      "ms": 2.100000023841858
+    },
+    {
+      "phase": "setup",
+      "name": "commit",
+      "ms": 606.3999999761581
+    },
+    {
+      "phase": "setup",
+      "name": "publish",
+      "ms": 606.3999999761581
+    },
+    {
+      "phase": "setup",
+      "name": "commit",
+      "ms": 1.7000000476837158
+    },
+    {
+      "phase": "setup",
+      "name": "publish",
+      "ms": 1.7000000476837158
+    },
+    {
+      "phase": "setup",
+      "name": "replaceInlineRange",
+      "ms": 1.8000000715255737
+    },
+    {
+      "phase": "setup",
+      "name": "commit",
+      "ms": 1.1999999284744263
+    },
+    {
+      "phase": "setup",
+      "name": "publish",
+      "ms": 1.2999999523162842
+    },
+    {
+      "phase": "setup",
+      "name": "replaceInlineRange",
+      "ms": 1.399999976158142
+    },
+    {
+      "phase": "setup",
+      "name": "completion.key",
+      "ms": 0.10000002384185791
+    },
+    {
+      "phase": "setup",
+      "name": "completion.key",
+      "ms": 0
+    },
+    {
+      "phase": "setup",
+      "name": "completion.key",
+      "ms": 3.299999952316284
+    },
+    {
+      "phase": "setup",
+      "name": "completion.key",
+      "ms": 0
+    },
+    {
+      "phase": "setup",
+      "name": "commit",
+      "ms": 1
+    },
+    {
+      "phase": "setup",
+      "name": "publish",
+      "ms": 1
+    },
+    {
+      "phase": "setup",
+      "name": "replaceInlineRange",
+      "ms": 1.2000000476837158
+    },
+    {
+      "phase": "setup",
+      "name": "commit",
+      "ms": 4.799999952316284
+    },
+    {
+      "phase": "setup",
+      "name": "publish",
+      "ms": 4.799999952316284
+    }
+  ]
+}

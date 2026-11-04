@@ -1,0 +1,19 @@
+
+ RUN  v2.1.9 /Users/iianneill/Documents/GitHub/speedy-ts-reactive
+
+ ✓ src/features/autocomplete/placement.test.ts (9 tests) 17ms
+ ✓ src/features/autocomplete/authorities.test.ts (3 tests) 28ms
+ ✓ src/features/autocomplete/provisional-cells.test.ts (4 tests) 23ms
+ ✓ src/features/autocomplete/provisional-integration.test.ts (11 tests) 477ms
+ ✓ src/features/autocomplete/autocomplete.test.ts (34 tests) 5425ms
+   ✓ ordinary completed input reads at most the affected Block and one cell, with no snapshots or discovery 4856ms
+ ✓ src/rendering/direct-character-cells.test.tsx (13 tests) 1116ms
+ ✓ src/application/document-save.test.tsx (2 tests) 1022ms
+   ✓ saves a newly created standalone Ink Document directly into the default Vault 503ms
+   ✓ outside-Vault Ink Save asks for a Vault copy, supports cancellation, and retains its editing session 517ms
+
+ Test Files  7 passed (7)
+      Tests  76 passed (76)
+   Start at  22:53:08
+   Duration  14.31s (transform 12.55s, setup 0ms, collect 25.49s, tests 8.11s, environment 11.74s, prepare 1.72s)
+

@@ -1,0 +1,173 @@
+{
+  "result": {
+    "webViews": 0,
+    "workerStarts": 0,
+    "academicViews": 0,
+    "serviceRequests": 0,
+    "pointerSpotlight": false,
+    "caretMode": "normal",
+    "characters": 499,
+    "paragraphs": 8,
+    "sync": {
+      "median": 5.400000095367432,
+      "p95": 11,
+      "max": 11.600000023841858
+    },
+    "settled": {
+      "median": 7.899999976158142,
+      "p95": 13.299999952316284,
+      "max": 15.399999976158142
+    },
+    "frame": {
+      "median": 16.700000047683716,
+      "p95": 91.19999992847443,
+      "max": 120.80000007152557
+    },
+    "snapshots": 0,
+    "statusReads": 0,
+    "vaultRows": 0,
+    "restored": true
+  },
+  "hottest": [
+    [
+      "(idle) :-1",
+      343.63699999999926
+    ],
+    [
+      "(program) :-1",
+      270.4739999999993
+    ],
+    [
+      "addRange :-1",
+      88.05200000000015
+    ],
+    [
+      "clone 127.0.0.1:51353/src/block-tree/clone.ts:0",
+      35.28500000000001
+    ],
+    [
+      "(garbage collector) :-1",
+      22.552999999999994
+    ],
+    [
+      "readSignal 127.0.0.1:51353/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=3b3ce6ed:709",
+      16.371999999999993
+    ],
+    [
+      "runTop 127.0.0.1:51353/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=3b3ce6ed:909",
+      13.411000000000001
+    ],
+    [
+      "nodeKey 127.0.0.1:51353/src/block-tree/projection.ts:54",
+      11.387000000000002
+    ],
+    [
+      "update 127.0.0.1:51353/src/rendering/direct-character-cells.ts:10",
+      10.911999999999999
+    ],
+    [
+      "localFragment 127.0.0.1:51353/src/runtime/local-coordinates.ts:6",
+      10.836000000000004
+    ],
+    [
+      "applyState 127.0.0.1:51353/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:394",
+      10.716999999999999
+    ],
+    [
+      " 127.0.0.1:51353/src/rendering/standoff-editor-view.tsx:1238",
+      10.138000000000002
+    ],
+    [
+      "unwrap 127.0.0.1:51353/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:52",
+      9.519
+    ],
+    [
+      " 127.0.0.1:51353/src/rendering/standoff-editor-view.tsx:1219",
+      9.479999999999999
+    ],
+    [
+      "getClientRects :-1",
+      8.287
+    ],
+    [
+      "inlineOwnerFor 127.0.0.1:51353/src/block-tree/inline-plan.ts:3",
+      8.248000000000001
+    ],
+    [
+      " 127.0.0.1:51353/src/block-tree/repository.ts:575",
+      6.753000000000002
+    ],
+    [
+      "setAttribute :-1",
+      6.526000000000001
+    ],
+    [
+      " 127.0.0.1:51353/src/rendering/standoff-editor-view.tsx:992",
+      6.038
+    ],
+    [
+      "updateInline 127.0.0.1:51353/src/block-tree/projection.ts:170",
+      5.698
+    ],
+    [
+      "replaceInlineRange 127.0.0.1:51353/src/block-tree/commands.ts:786",
+      5.413
+    ],
+    [
+      "get 127.0.0.1:51353/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:120",
+      5.371000000000001
+    ],
+    [
+      "equal 127.0.0.1:51353/src/rendering/range-rendering.tsx:23",
+      4.506
+    ],
+    [
+      " 127.0.0.1:51353/src/rendering/standoff-editor-view.tsx:564",
+      4.484999999999999
+    ],
+    [
+      "cleanNode 127.0.0.1:51353/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=3b3ce6ed:1102",
+      3.617000000000001
+    ],
+    [
+      "graphemeBoundaries 127.0.0.1:51353/src/input/graphemes.ts:0",
+      3.3209999999999997
+    ],
+    [
+      "proxyDescriptor$1 127.0.0.1:51353/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:103",
+      3.016
+    ],
+    [
+      "node 127.0.0.1:51353/src/reactive-editor/editor.ts:430",
+      2.8949999999999996
+    ],
+    [
+      "sequence 127.0.0.1:51353/src/block-tree/undo-storage.ts:93",
+      2.7009999999999996
+    ],
+    [
+      "remove :-1",
+      2.3829999999999996
+    ],
+    [
+      "onBeforeInput 127.0.0.1:51353/src/input/gateway.ts:128",
+      2.3409999999999997
+    ],
+    [
+      "rangeFragments 127.0.0.1:51353/src/rendering/standoff-editor-view.tsx:376",
+      2.334
+    ],
+    [
+      "setProperty 127.0.0.1:51353/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:158",
+      2.2729999999999997
+    ],
+    [
+      "commitInline 127.0.0.1:51353/src/block-tree/repository.ts:545",
+      2.129
+    ],
+    [
+      "_$effect.e 127.0.0.1:51353/src/rendering/visual-effect-renderers.tsx:50",
+      1.8170000000000002
+    ]
+  ]
+}

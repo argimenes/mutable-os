@@ -1,0 +1,173 @@
+{
+  "result": {
+    "webViews": 0,
+    "workerStarts": 0,
+    "academicViews": 0,
+    "serviceRequests": 0,
+    "pointerSpotlight": false,
+    "caretMode": "normal",
+    "characters": 499,
+    "paragraphs": 8,
+    "sync": {
+      "median": 5.299999952316284,
+      "p95": 8.600000023841858,
+      "max": 12.699999928474426
+    },
+    "settled": {
+      "median": 7.5,
+      "p95": 11.100000023841858,
+      "max": 15.699999928474426
+    },
+    "frame": {
+      "median": 16.700000047683716,
+      "p95": 62.5,
+      "max": 85.80000007152557
+    },
+    "snapshots": 0,
+    "statusReads": 0,
+    "vaultRows": 0,
+    "restored": true
+  },
+  "hottest": [
+    [
+      "(idle) :-1",
+      317.3659999999986
+    ],
+    [
+      "(program) :-1",
+      274.8949999999994
+    ],
+    [
+      "addRange :-1",
+      89.14200000000002
+    ],
+    [
+      "clone 127.0.0.1:51794/src/block-tree/clone.ts:0",
+      28.59700000000001
+    ],
+    [
+      "(garbage collector) :-1",
+      20.188000000000002
+    ],
+    [
+      "readSignal 127.0.0.1:51794/node_modules/.vite/deps/chunk-YMFAOBJI.js?v=d07fbebf:709",
+      17.980000000000008
+    ],
+    [
+      "localFragment 127.0.0.1:51794/src/runtime/local-coordinates.ts:6",
+      12.735
+    ],
+    [
+      "runTop 127.0.0.1:51794/node_modules/.vite/deps/chunk-YMFAOBJI.js?v=d07fbebf:909",
+      12.677000000000005
+    ],
+    [
+      "get 127.0.0.1:51794/node_modules/.vite/deps/solid-js_store.js?v=1dd09ea5:120",
+      11.655000000000005
+    ],
+    [
+      "applyState 127.0.0.1:51794/node_modules/.vite/deps/solid-js_store.js?v=1dd09ea5:394",
+      10.18
+    ],
+    [
+      "nodeKey 127.0.0.1:51794/src/block-tree/projection.ts:50",
+      10.168
+    ],
+    [
+      "unwrap 127.0.0.1:51794/node_modules/.vite/deps/solid-js_store.js?v=1dd09ea5:52",
+      9.782
+    ],
+    [
+      " 127.0.0.1:51794/src/block-tree/repository.ts:563",
+      8.886
+    ],
+    [
+      "update 127.0.0.1:51794/src/rendering/direct-character-cells.ts:10",
+      8.649999999999999
+    ],
+    [
+      "equal 127.0.0.1:51794/src/rendering/range-rendering.tsx:23",
+      7.643999999999999
+    ],
+    [
+      "getClientRects :-1",
+      6.883000000000002
+    ],
+    [
+      " 127.0.0.1:51794/src/rendering/standoff-editor-view.tsx:561",
+      6.005000000000001
+    ],
+    [
+      " 127.0.0.1:51794/src/rendering/standoff-editor-view.tsx:1175",
+      5.275000000000001
+    ],
+    [
+      "setAttribute :-1",
+      5.1899999999999995
+    ],
+    [
+      " 127.0.0.1:51794/src/rendering/standoff-editor-view.tsx:1194",
+      4.9079999999999995
+    ],
+    [
+      "proxyDescriptor$1 127.0.0.1:51794/node_modules/.vite/deps/solid-js_store.js?v=1dd09ea5:103",
+      4.878000000000001
+    ],
+    [
+      "updateInline 127.0.0.1:51794/src/block-tree/projection.ts:166",
+      4.239
+    ],
+    [
+      " 127.0.0.1:51794/src/rendering/standoff-editor-view.tsx:958",
+      3.918
+    ],
+    [
+      "graphemeBoundaries 127.0.0.1:51794/src/input/graphemes.ts:0",
+      3.877
+    ],
+    [
+      "setter 127.0.0.1:51794/node_modules/.vite/deps/chunk-YMFAOBJI.js?v=d07fbebf:226",
+      3.8440000000000003
+    ],
+    [
+      "commitInline 127.0.0.1:51794/src/block-tree/repository.ts:533",
+      3.843
+    ],
+    [
+      "inlineOwnerFor 127.0.0.1:51794/src/block-tree/inline-plan.ts:3",
+      3.415
+    ],
+    [
+      "onBeforeInput 127.0.0.1:51794/src/input/gateway.ts:126",
+      3.36
+    ],
+    [
+      "node 127.0.0.1:51794/src/reactive-editor/editor.ts:430",
+      3.259
+    ],
+    [
+      "fragmentsFor 127.0.0.1:51794/src/rendering/standoff-editor-view.tsx:684",
+      3.018
+    ],
+    [
+      "setProperty 127.0.0.1:51794/node_modules/.vite/deps/solid-js_store.js?v=1dd09ea5:158",
+      2.667
+    ],
+    [
+      "getAttribute :-1",
+      2.6359999999999997
+    ],
+    [
+      "rangeFragments 127.0.0.1:51794/src/rendering/standoff-editor-view.tsx:376",
+      2.179
+    ],
+    [
+      "cleanNode 127.0.0.1:51794/node_modules/.vite/deps/chunk-YMFAOBJI.js?v=d07fbebf:1102",
+      2.162
+    ],
+    [
+      "setAttribute 127.0.0.1:51794/src/rendering/direct-character-cells.ts:157",
+      2.125
+    ]
+  ]
+}

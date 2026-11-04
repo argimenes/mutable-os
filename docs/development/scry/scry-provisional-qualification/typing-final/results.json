@@ -1,0 +1,173 @@
+{
+  "result": {
+    "webViews": 0,
+    "workerStarts": 0,
+    "academicViews": 0,
+    "serviceRequests": 0,
+    "pointerSpotlight": false,
+    "caretMode": "normal",
+    "characters": 499,
+    "paragraphs": 8,
+    "sync": {
+      "median": 7.800000071525574,
+      "p95": 11.300000071525574,
+      "max": 12.700000047683716
+    },
+    "settled": {
+      "median": 11,
+      "p95": 18.100000023841858,
+      "max": 19.100000023841858
+    },
+    "frame": {
+      "median": 19.799999952316284,
+      "p95": 132.69999992847443,
+      "max": 172.90000009536743
+    },
+    "snapshots": 0,
+    "statusReads": 0,
+    "vaultRows": 0,
+    "restored": true
+  },
+  "hottest": [
+    [
+      "(idle) :-1",
+      389.14599999999956
+    ],
+    [
+      "(program) :-1",
+      311.7019999999999
+    ],
+    [
+      "addRange :-1",
+      125.57900000000015
+    ],
+    [
+      "clone 127.0.0.1:51865/src/block-tree/clone.ts:0",
+      33.80000000000002
+    ],
+    [
+      "readSignal 127.0.0.1:51865/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=785ddd73:709",
+      24.336999999999993
+    ],
+    [
+      "(garbage collector) :-1",
+      21.49000000000001
+    ],
+    [
+      "update 127.0.0.1:51865/src/rendering/direct-character-cells.ts:10",
+      20.32
+    ],
+    [
+      "unwrap 127.0.0.1:51865/node_modules/.vite/deps/solid-js_store.js?v=a2ec2a76:52",
+      19.803000000000004
+    ],
+    [
+      "localFragment 127.0.0.1:51865/src/runtime/local-coordinates.ts:6",
+      17.6
+    ],
+    [
+      "runTop 127.0.0.1:51865/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=785ddd73:909",
+      17.590999999999998
+    ],
+    [
+      "get 127.0.0.1:51865/node_modules/.vite/deps/solid-js_store.js?v=a2ec2a76:120",
+      16.293
+    ],
+    [
+      "applyState 127.0.0.1:51865/node_modules/.vite/deps/solid-js_store.js?v=a2ec2a76:394",
+      14.583999999999998
+    ],
+    [
+      "nodeKey 127.0.0.1:51865/src/block-tree/projection.ts:54",
+      11.003999999999994
+    ],
+    [
+      "getClientRects :-1",
+      10.705000000000002
+    ],
+    [
+      " 127.0.0.1:51865/src/block-tree/repository.ts:575",
+      9.203999999999999
+    ],
+    [
+      "updateInline 127.0.0.1:51865/src/block-tree/projection.ts:170",
+      8.469999999999999
+    ],
+    [
+      " 127.0.0.1:51865/src/rendering/standoff-editor-view.tsx:992",
+      8.362
+    ],
+    [
+      "proxyDescriptor$1 127.0.0.1:51865/node_modules/.vite/deps/solid-js_store.js?v=a2ec2a76:103",
+      8.270000000000001
+    ],
+    [
+      " 127.0.0.1:51865/src/rendering/standoff-editor-view.tsx:1238",
+      8.169
+    ],
+    [
+      "setAttribute :-1",
+      7.808000000000002
+    ],
+    [
+      " 127.0.0.1:51865/src/rendering/standoff-editor-view.tsx:1219",
+      7.632
+    ],
+    [
+      "node 127.0.0.1:51865/src/reactive-editor/editor.ts:430",
+      7.101000000000001
+    ],
+    [
+      "rangeFragments 127.0.0.1:51865/src/rendering/standoff-editor-view.tsx:376",
+      6.876
+    ],
+    [
+      " 127.0.0.1:51865/src/rendering/standoff-editor-view.tsx:564",
+      5.544
+    ],
+    [
+      "onBeforeInput 127.0.0.1:51865/src/input/gateway.ts:128",
+      5.1690000000000005
+    ],
+    [
+      "inlineOwnerFor 127.0.0.1:51865/src/block-tree/inline-plan.ts:3",
+      5.093000000000001
+    ],
+    [
+      " 127.0.0.1:51865/src/block-tree/projection.ts:181",
+      4.657
+    ],
+    [
+      "cleanNode 127.0.0.1:51865/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=785ddd73:1102",
+      3.9219999999999997
+    ],
+    [
+      "equal 127.0.0.1:51865/src/rendering/range-rendering.tsx:23",
+      3.539
+    ],
+    [
+      "setProperty 127.0.0.1:51865/node_modules/.vite/deps/solid-js_store.js?v=a2ec2a76:158",
+      3.5230000000000006
+    ],
+    [
+      "remove :-1",
+      3.4730000000000003
+    ],
+    [
+      "runUpdates 127.0.0.1:51865/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=785ddd73:943",
+      3.359
+    ],
+    [
+      "get nodeKey 127.0.0.1:51865/src/rendering/block-outlet.tsx:70",
+      3.184
+    ],
+    [
+      "dispatchEvent :-1",
+      2.8949999999999996
+    ],
+    [
+      " :0",
+      2.811
+    ]
+  ]
+}

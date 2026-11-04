@@ -1,0 +1,173 @@
+{
+  "result": {
+    "webViews": 0,
+    "workerStarts": 0,
+    "academicViews": 0,
+    "serviceRequests": 0,
+    "pointerSpotlight": false,
+    "caretMode": "normal",
+    "characters": 499,
+    "paragraphs": 8,
+    "sync": {
+      "median": 11.299999952316284,
+      "p95": 20.299999952316284,
+      "max": 25.299999952316284
+    },
+    "settled": {
+      "median": 16,
+      "p95": 25.199999928474426,
+      "max": 31.399999976158142
+    },
+    "frame": {
+      "median": 30,
+      "p95": 120.39999997615814,
+      "max": 134.69999992847443
+    },
+    "snapshots": 0,
+    "statusReads": 0,
+    "vaultRows": 0,
+    "restored": true
+  },
+  "hottest": [
+    [
+      "(idle) :-1",
+      489.0489999999994
+    ],
+    [
+      "(program) :-1",
+      425.57699999999994
+    ],
+    [
+      "addRange :-1",
+      179.16499999999985
+    ],
+    [
+      "clone 127.0.0.1:51455/src/block-tree/clone.ts:0",
+      49.95299999999999
+    ],
+    [
+      "update 127.0.0.1:51455/src/rendering/direct-character-cells.ts:10",
+      40.27000000000002
+    ],
+    [
+      "readSignal 127.0.0.1:51455/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=3b3ce6ed:709",
+      39.621
+    ],
+    [
+      "(garbage collector) :-1",
+      38.951000000000015
+    ],
+    [
+      "runTop 127.0.0.1:51455/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=3b3ce6ed:909",
+      26.84899999999999
+    ],
+    [
+      "unwrap 127.0.0.1:51455/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:52",
+      26.266
+    ],
+    [
+      "localFragment 127.0.0.1:51455/src/runtime/local-coordinates.ts:6",
+      23.260000000000005
+    ],
+    [
+      " 127.0.0.1:51455/src/block-tree/projection.ts:181",
+      22.216
+    ],
+    [
+      "get 127.0.0.1:51455/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:120",
+      18.589000000000006
+    ],
+    [
+      "nodeKey 127.0.0.1:51455/src/block-tree/projection.ts:54",
+      17.450000000000003
+    ],
+    [
+      "getClientRects :-1",
+      16.709999999999997
+    ],
+    [
+      "applyState 127.0.0.1:51455/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:394",
+      16.685999999999996
+    ],
+    [
+      " 127.0.0.1:51455/src/rendering/standoff-editor-view.tsx:1219",
+      12.89
+    ],
+    [
+      "proxyDescriptor$1 127.0.0.1:51455/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:103",
+      11.427999999999999
+    ],
+    [
+      "updateInline 127.0.0.1:51455/src/block-tree/projection.ts:170",
+      10.881
+    ],
+    [
+      " 127.0.0.1:51455/src/rendering/standoff-editor-view.tsx:1238",
+      10.494
+    ],
+    [
+      "inlineOwnerFor 127.0.0.1:51455/src/block-tree/inline-plan.ts:3",
+      10.436999999999996
+    ],
+    [
+      "setAttribute :-1",
+      10.232
+    ],
+    [
+      " 127.0.0.1:51455/src/block-tree/repository.ts:575",
+      9.630000000000003
+    ],
+    [
+      " 127.0.0.1:51455/src/rendering/standoff-editor-view.tsx:992",
+      9.482
+    ],
+    [
+      "rangeFragments 127.0.0.1:51455/src/rendering/standoff-editor-view.tsx:376",
+      9.344000000000001
+    ],
+    [
+      "cleanNode 127.0.0.1:51455/node_modules/.vite/deps/chunk-I3ZDUWJC.js?v=3b3ce6ed:1102",
+      8.888
+    ],
+    [
+      " 127.0.0.1:51455/src/rendering/standoff-editor-view.tsx:564",
+      7.873
+    ],
+    [
+      "setProperty 127.0.0.1:51455/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:158",
+      7.452
+    ],
+    [
+      "commitInline 127.0.0.1:51455/src/block-tree/repository.ts:545",
+      6.039
+    ],
+    [
+      "onBeforeInput 127.0.0.1:51455/src/input/gateway.ts:128",
+      5.724
+    ],
+    [
+      " 127.0.0.1:51455/src/input/gateway.ts:181",
+      5.695
+    ],
+    [
+      "equal 127.0.0.1:51455/src/rendering/range-rendering.tsx:23",
+      5.417
+    ],
+    [
+      "ownKeys 127.0.0.1:51455/node_modules/.vite/deps/solid-js_store.js?v=3b3ce6ed:115",
+      5.09
+    ],
+    [
+      "node 127.0.0.1:51455/src/reactive-editor/editor.ts:430",
+      4.813000000000001
+    ],
+    [
+      "plainTree 127.0.0.1:51455/src/block-tree/undo-storage.ts:4",
+      4.189
+    ],
+    [
+      "remove :-1",
+      4.124
+    ]
+  ]
+}

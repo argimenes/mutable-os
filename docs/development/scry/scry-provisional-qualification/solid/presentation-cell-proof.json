@@ -1,0 +1,24 @@
+{
+  "fixturePath": "vaults/imported/documents/edgar-allan-poe/masque-of-the-red-death-[1c48f303].ink",
+  "result": {
+    "visible": true,
+    "mappedCaret": true,
+    "unchanged": true,
+    "historyUnchanged": true,
+    "rawCaptureIncludesMarkers": false,
+    "boundaryMismatch": false,
+    "records": [],
+    "sourceCells": 926,
+    "scope": "Literal bracket rendering and boundary movement only; draft typing, annotations, history suspension and Save gating are not implemented."
+  },
+  "checks": [
+    "literal in-flow brackets appear in the actual Flint TextBlock",
+    "moving brackets preserves canonical content, occurrence keys and history",
+    "explicit endpoint mapping preserves a canonical caret",
+    "bracket movement calls no snapshots, commits, transactions or replacement commands",
+    "mount text capture and caret endpoints exclude provisional markers",
+    "removal restores the exact original DOM nodes",
+    "no uncaught browser exceptions"
+  ],
+  "errors": []
+}

@@ -1,0 +1,122 @@
+
+ RUN  v2.1.9 /Users/iianneill/Documents/GitHub/speedy-ts-reactive
+
+ ✓ src/block-tree/block-tree.test.ts (19 tests) 111ms
+ ✓ src/block-tree/identity.test.ts (10 tests) 223ms
+ ❯ src/block-tree/portable-spike/codec.test.ts (31 tests | 2 failed) 371ms
+   × isolated portable authored Document spike > copies allocate fresh Block/placement IDs while preserving sharing inside the copied graph 26ms
+     → Portable spike: unsupported structural field
+   × isolated portable authored Document spike > preserves Unicode, inline images, authored annotation units and rich canonical copies 22ms
+     → Portable spike: unsupported structural field
+ ✓ src/block-tree/resource-boundary.test.ts (13 tests) 794ms
+ ✓ src/block-tree/commit-capture.test.ts (10 tests) 2298ms
+   ✓ repository commit results > replays every intermediate Unicode edit, undo/redo and branch deterministically 670ms
+   ✓ repository commit results > never snapshots, serializes or enumerates the whole graph for strict captured typing and Enter 1081ms
+ ✓ src/input/selection-gestures.test.ts (29 tests) 235ms
+ ✓ src/features/autocomplete/autocomplete.test.ts (34 tests) 10769ms
+   ✓ ordinary completed input reads at most the affected Block and one cell, with no snapshots or discovery 9951ms
+   ✓ active bracket edits do bounded affected-range work, retain transient boundaries and release bindings on cancel 313ms
+ ✓ src/persistence/native-session.test.ts (12 tests) 5781ms
+   ✓ opens canonically without an occurrence, saves/reopens, and blocks tree/extended/Workspace bypasses 1108ms
+   ✓ does not refresh a stale client baseline after a rejected Save or Open 629ms
+   ✓ keeps newer edits dirty when an earlier explicit save completes 1479ms
+   ✓ tracks empty paragraph removal and undo incrementally (retained=false) 781ms
+   ✓ tracks empty paragraph removal and undo incrementally (retained=true) 548ms
+ ✓ src/features/entity-references/entity-candidates.test.ts (11 tests) 2841ms
+   ✓ entity mention candidates > includes margins and hidden tabs, merges original, and excludes/restores independently of Find 306ms
+   ✓ entity mention candidates > batches many Blocks without per-match snapshots and preserves all-or-nothing undo 1437ms
+ ✓ src/block-tree/undo-storage-parity.test.ts (7 tests) 20909ms
+   ✓ ordinary undo storage semantic parity with full-operation snapshots > preserves every intermediate Unicode edit, counter and branch for seed 7129 7905ms
+   ✓ ordinary undo storage semantic parity with full-operation snapshots > preserves every intermediate Unicode edit, counter and branch for seed 305419896 5264ms
+   ✓ ordinary undo storage semantic parity with full-operation snapshots > preserves every intermediate Unicode edit, counter and branch for seed 3735928559 7148ms
+   ✓ ordinary undo storage semantic parity with full-operation snapshots > preserves split/join, moves/copies, shared content, annotations, inline atoms and transactions 351ms
+ ✓ src/reactive-editor/persistence.test.ts (6 tests) 185ms
+ ✓ src/rendering/direct-character-cells.test.tsx (13 tests) 1430ms
+   ✓ does not allocate reactive computations per character in the default renderer 477ms
+ ✓ src/block-tree/definition-ownership.test.ts (11 tests) 144ms
+ ✓ src/block-tree/inline-performance.test.ts (14 tests) 14597ms
+   ✓ incremental inline editing (capture=false) > matches fully planned edits and annotation mapping over a deterministic Unicode edit sequence 2067ms
+   ✓ incremental inline editing (capture=false) > does no whole-document snapshots or occurrence rebuilds in a 25k document, including undo/redo 5067ms
+   ✓ incremental inline editing (capture=true) > matches fully planned edits and annotation mapping over a deterministic Unicode edit sequence 3542ms
+   ✓ incremental inline editing (capture=true) > does no whole-document snapshots or occurrence rebuilds in a 25k document, including undo/redo 3022ms
+ ✓ src/features/autocomplete/provisional-integration.test.ts (10 tests) 463ms
+ ✓ src/application/document-detachment.test.tsx (16 tests) 3723ms
+   ✓ E1.3 product Document detachment > product controls detach, reference and return the same editor without canonical or projection mutations 903ms
+   ✓ E1.3 product Document detachment > source close leaves editing and Save independent; standalone close is guarded and disposes once 324ms
+ ✓ src/block-tree/record-batch.test.ts (6 tests) 355ms
+ ✓ src/block-tree/compact-changes.test.ts (9 tests) 16304ms
+   ✓ compact exact capture > matches full capture and every live revision through text, structure and undo 505ms
+   ✓ compact exact capture > copies only changed sequence keys for 5600 character typing and undo 2490ms
+   ✓ compact exact capture > copies only changed sequence keys for 25000 character typing and undo 13039ms
+ ✓ src/input/bindings.test.ts (4 tests) 37ms
+ ✓ src/features/autocomplete/placement.test.ts (9 tests) 18ms
+ ✓ src/block-tree/cross-text-edit.test.ts (7 tests) 205ms
+ ✓ src/application/document-save.test.tsx (2 tests) 1438ms
+   ✓ saves a newly created standalone Ink Document directly into the default Vault 782ms
+   ✓ outside-Vault Ink Save asks for a Vault copy, supports cancellation, and retains its editing session 654ms
+ ✓ src/block-tree/document-tab-plan.test.ts (2 tests) 81ms
+ ✓ src/input/selection-target.test.ts (6 tests) 53ms
+ ✓ src/block-tree/margin-commands.test.ts (3 tests) 163ms
+ ✓ src/block-tree/undo-storage.test.ts (5 tests) 7893ms
+   ✓ private undo sequence storage > round-trips every stored version across seeded insertion, deletion and replacement 1191ms
+   ✓ private undo sequence storage > shares unchanged 25k sequences and bounds fragmentation across repeated small edits 6680ms
+ ✓ src/features/autocomplete/provisional-cells.test.ts (4 tests) 18ms
+ ✓ src/features/autocomplete/authorities.test.ts (3 tests) 31ms
+ ✓ src/input/graphemes.test.ts (3 tests) 47ms
+ ✓ src/block-tree/compatibility-fixtures.test.ts (2 tests) 11ms
+ ✓ src/block-tree/block-restore.test.ts (16 tests) 237ms
+ ✓ src/block-tree/split-performance.test.ts (12 tests) 28623ms
+   ✓ incremental paragraph splitting (capture=false) > inserts empty siblings across shared parent views without touching existing paragraphs 2151ms
+   ✓ incremental paragraph splitting (capture=false) > rejects a nonempty or detached paragraph from the empty insertion fast path 1324ms
+   ✓ incremental paragraph splitting (capture=false) > splits and restores annotations and Cell identities without snapshots, including redo and another split 3323ms
+   ✓ incremental paragraph splitting (capture=false) > updates transcluded paragraphs in multiple views without rebuilding unrelated occurrences 6729ms
+   ✓ incremental paragraph splitting (capture=false) > rejects Cell theft, duplicate ownership and detached new paragraphs from the fast path 1262ms
+   ✓ incremental paragraph splitting (capture=false) > falls back safely for inline atoms and maintains indexes for the next plain-text split 1940ms
+   ✓ incremental paragraph splitting (capture=true) > inserts empty siblings across shared parent views without touching existing paragraphs 1213ms
+   ✓ incremental paragraph splitting (capture=true) > rejects a nonempty or detached paragraph from the empty insertion fast path 1090ms
+   ✓ incremental paragraph splitting (capture=true) > splits and restores annotations and Cell identities without snapshots, including redo and another split 2343ms
+   ✓ incremental paragraph splitting (capture=true) > updates transcluded paragraphs in multiple views without rebuilding unrelated occurrences 5322ms
+   ✓ incremental paragraph splitting (capture=true) > rejects Cell theft, duplicate ownership and detached new paragraphs from the fast path 1124ms
+   ✓ incremental paragraph splitting (capture=true) > falls back safely for inline atoms and maintains indexes for the next plain-text split 799ms
+ ✓ src/block-tree/large-import.test.ts (1 test) 24445ms
+   ✓ imports a large source as one bulk operation and one inverse, with exact Undo/Redo 24443ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/block-tree/portable-spike/codec.test.ts > isolated portable authored Document spike > copies allocate fresh Block/placement IDs while preserving sharing inside the copied graph
+Error: Portable spike: unsupported structural field
+ ❯ requireValue src/block-tree/portable-spike/codec.ts:36:25
+     34| 
+     35| function requireValue(condition: unknown, message: string): asserts co…
+     36|   if (!condition) throw new Error(`Portable spike: ${message}`);
+       |                         ^
+     37| }
+     38| const own = (object: object, key: string) => Object.prototype.hasOwnPr…
+ ❯ fields src/block-tree/portable-spike/codec.ts:44:3
+ ❯ Module.encodePortable src/block-tree/portable-spike/codec.ts:206:52
+ ❯ roundTrip src/block-tree/portable-spike/codec.test.ts:46:39
+ ❯ src/block-tree/portable-spike/codec.test.ts:115:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/block-tree/portable-spike/codec.test.ts > isolated portable authored Document spike > preserves Unicode, inline images, authored annotation units and rich canonical copies
+Error: Portable spike: unsupported structural field
+ ❯ requireValue src/block-tree/portable-spike/codec.ts:36:25
+     34| 
+     35| function requireValue(condition: unknown, message: string): asserts co…
+     36|   if (!condition) throw new Error(`Portable spike: ${message}`);
+       |                         ^
+     37| }
+     38| const own = (object: object, key: string) => Object.prototype.hasOwnPr…
+ ❯ fields src/block-tree/portable-spike/codec.ts:44:3
+ ❯ Module.encodePortable src/block-tree/portable-spike/codec.ts:206:52
+ ❯ roundTrip src/block-tree/portable-spike/codec.test.ts:46:39
+ ❯ src/block-tree/portable-spike/codec.test.ts:138:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed | 32 passed (33)
+      Tests  2 failed | 338 passed (340)
+   Start at  22:48:02
+   Duration  61.62s (transform 31.92s, setup 0ms, collect 85.11s, tests 144.83s, environment 52.30s, prepare 8.95s)
+
