@@ -55,6 +55,8 @@ export interface DocumentApplicationInstance {
 export interface DocumentApplicationCapabilities {
   register(definition: {
     applicationId?: string;
+    /** Composite applications may provide their own launch/content creation command. */
+    launch?: false;
     type: string;
     create(documents: readonly ApplicationDocument[]): ExistingBlockDto;
     view: Component<{ application: DocumentApplicationInstance; initialView?: "document" | "graph" }>;

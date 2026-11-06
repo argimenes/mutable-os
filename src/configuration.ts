@@ -111,6 +111,8 @@ export type FeatureFlags = Readonly<{
   sqliteSemanticServices: boolean;
   /** Native Proposition authoring with vault-scoped canonical SQLite persistence. */
   thesis: boolean;
+  /** Native Block conversations with explicit context and a deterministic mock assistant. */
+  dialectic: boolean;
   /** Cardex shell and local Entity Card authoring. */
   cardex: boolean;
   cardexIncrement2: boolean;
@@ -221,6 +223,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   sqliteEntities: true,
   sqliteSemanticServices: true,
   thesis: true,
+  dialectic: true,
   cardex: true,
   cardexIncrement2: true,
   legacyCodexImport: true,

@@ -581,7 +581,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
       </div></>;
     };
     scope.own(editor.registry.register({ type: definition.type, capabilities: ["container"], view: props => <Show when={scope.active()}><Instance nodeKey={props.nodeKey} /></Show> }, scope.owner));
-    scope.own(editor.commandRegistry.register({ id: "flint.open", label: "Open Flint", canExecute: () => editor.repository.state.contents[editor.repository.state.placements[editor.repository.state.rootPlacementKey].contentKey].viewType === "workspace-block", execute({ args }) {
+    if (definition.launch !== false) scope.own(editor.commandRegistry.register({ id: "flint.open", label: "Open Flint", canExecute: () => editor.repository.state.contents[editor.repository.state.placements[editor.repository.state.rootPlacementKey].contentKey].viewType === "workspace-block", execute({ args }) {
       requireActive();
       const root = editor.repository.state.rootPlacementKey;
       const existing = catalog();

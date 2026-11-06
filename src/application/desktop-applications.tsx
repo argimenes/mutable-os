@@ -21,7 +21,7 @@ export const desktopApplications = [
   { id: "acetate", name: "Acetate" },
   { id: "cardex", name: "Cardex", command: "cardex.open" },
   { id: "thesis", name: "Thesis", command: "thesis.open" },
-  { id: "dialectic", name: "Dialectic" },
+  { id: "dialectic", name: "Dialectic", command: "dialectic.open" },
   { id: "osmosis", name: "Osmosis" },
   { id: "settings", name: "Settings" },
   { id: "trash", name: "Trash" },
