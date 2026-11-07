@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mutable:dcp:1.0:response-proposal",
   "title": "DCP v1 model response \u2014 design proposal",
-  "description": "Logical response schema, not runtime implementation. Provider adapters select the contribution branch for structured final output and tool argument branches for client tools. Host validation additionally enforces negotiated capabilities, ownership, source fences, reference kinds, unique IDs, exact text and canonical admission. Request/tool-result contracts are illustrated in the companion examples. Proposed hard ceilings: 256 nodes, depth 12, 256 KiB response; individual exchanges may lower them.",
+  "description": "Revision 2 incorporates the separate Symposium argument model. Logical response schema, not runtime implementation. Provider adapters select the contribution branch for structured final output and tool argument branches for client tools. Host validation additionally enforces negotiated capabilities, ownership, source fences, reference kinds, unique IDs, exact text and canonical admission. Request/tool-result contracts are illustrated in the companion examples. Proposed hard ceilings: 256 nodes, depth 12, 256 KiB response; individual exchanges may lower them.",
   "oneOf": [
     {
       "$ref": "#/$defs/Contribution"
@@ -431,27 +431,16 @@
         "anchor": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
-        },
-        "glossType": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "expression": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 8192
+          "maxLength": 128,
+          "description": "An issued passage-anchor handle, a new anchors declaration, or an explicit inline-ID passage-anchor alias. Never a Gloss, Entity, classification type or argument handle."
         }
       },
       "required": [
         "id",
-        "anchor",
-        "glossType",
-        "expression"
+        "anchor"
       ],
       "additionalProperties": false,
-      "description": "Explicit conceptual identity backed by an existing native Gloss definition under the proposed initial profile; not a SQL Claim. No object is inferred merely from a semantic annotation."
+      "description": "Explicit Symposium-owned dialectic/argument definition with its own canonical identity and a link to an existing durable passage anchor. No duplicated text or inherent classification; no Gloss or SQL Claim is created. Owner and provenance are host-stamped at atomic commit."
     },
     "Gloss": {
       "type": "object",
@@ -483,47 +472,18 @@
         "type",
         "text"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Independent general-purpose Mutable Gloss clarifying meaning or authorial intention. Its target may overlap an argument passage; it never provides argument identity or an argument-relationship endpoint."
     },
     "Relation": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ArgumentRelation"
         },
-        "type": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "from": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "to": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "kind": {
-          "enum": [
-            "argument",
-            "entity"
-          ]
+        {
+          "$ref": "#/$defs/EntityRelation"
         }
-      },
-      "required": [
-        "id",
-        "kind",
-        "type",
-        "from",
-        "to"
-      ],
-      "additionalProperties": false,
-      "description": "Discriminated endpoints: argument uses existing Gloss-backed identities and admitted Gloss relation types; entity uses the proposed shared Document-owned Entity-relationship adapter with scoped Entity endpoints. No global mutation or implicit endpoint coercion."
+      ]
     },
     "Suggestion": {
       "type": "object",
@@ -813,6 +773,89 @@
         "calls"
       ],
       "additionalProperties": false
+    },
+    "ArgumentRelation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "type": {
+          "enum": [
+            "supports",
+            "challenges",
+            "qualifies",
+            "contradicts",
+            "elaborates",
+            "answers",
+            "depends-on",
+            "provides-evidence-for"
+          ]
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "An issued or newly declared Symposium argument handle owned by this Symposium; no implicit conversion from an anchor, annotation, Gloss, Entity or SQL Claim."
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "An issued or newly declared Symposium argument handle owned by this Symposium; no implicit conversion from an anchor, annotation, Gloss, Entity or SQL Claim."
+        },
+        "kind": {
+          "const": "argument"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "type",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false,
+      "description": "A Symposium-owned dialectic/argument-relation record with its own identity, typed argument endpoints and host provenance. Reuses native definition/canonical-operation infrastructure, not Gloss relationships or SQL Claim storage. Vocabulary is a proposed Dialectic capability set."
+    },
+    "EntityRelation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "const": "entity"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "type",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false,
+      "description": "Uses the proposed shared Document-owned Entity-relationship adapter with scoped Entity endpoints. Independent of Symposium argument relations and Gloss links; never mutates global records."
     }
   }
 }
