@@ -482,6 +482,7 @@ export class CanonicalRepository {
       this.commitInline(label, operations, undefined, recordHistory, metadata, undefined, undefined, placementDelta, undefined, undefined, undefined, structural);
       return;
     }
+    if(metadata.requireBounded)throw Error('Operation cannot satisfy bounded canonical admission');
     const current = this.readState();
     for (const subscriber of this.beforeChangeSubscribers) subscriber(label, metadata.cause);
     for (const subscriber of this.beforeSubscribers) subscriber(this.snapshot(), label);

@@ -625,7 +625,8 @@
             "maxLength": 128
           },
           "minItems": 0,
-          "maxItems": 12
+          "maxItems": 12,
+          "description": "Additional addressed passages/discursive references. Materialise as contribution.discursiveReferences; never replace the host-selected primary structural reply, which is retained separately in contribution.replies."
         },
         "composition": {
           "type": "array",

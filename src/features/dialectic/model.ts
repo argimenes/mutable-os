@@ -7,6 +7,7 @@ export interface ConsumedContext {version:1;items:{target:ReplyTarget;text:strin
 export interface Contribution {
  version:1;kind:'contribution';state:'draft'|'committed';author:'human'|'mock';
  ordinal?:number;createdUtc?:string;replies:ReplyTarget[];context?:ReplyTarget[];requestId?:string;
+ discursiveReferences?:ReplyTarget[];dcp?:{version:1;profile:string;request:unknown;tools:unknown[];response:string;identityMap:unknown;intent:string};
  replyExcerpts?:{target:ReplyTarget;text:string}[];consumedContext?:ConsumedContext;
 }
 export const conversationMetadata={version:1,kind:'conversation'} as const;

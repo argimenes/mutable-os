@@ -27,3 +27,5 @@
 .textual-workspace .dialectic-textual .native-passive-composition .reactive-tabs[data-tab-orientation=vertical]>.reactive-tabs__labels>button{padding:0 var(--tw-cell-width)!important}
 
 .native-passive-composition .reactive-tabs[data-tab-orientation=vertical]{grid-template-columns:minmax(0,clamp(5rem,25%,7rem)) minmax(0,1fr)}
+
+.dialectic-app .dialectic-dcp-preview pre, .dialectic-app .dialectic-dcp-record { max-height: 14em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

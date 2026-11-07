@@ -20,9 +20,9 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true){
+async function setup(enabled=true,registry=true,dcp=true){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dialectic:enabled,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dialectic:enabled,dialecticDcp:dcp,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -205,4 +205,62 @@ it('keeps Sequence navigation/reveal and repeated-member state out of canonical 
  s.present(seq.id);expect(s.visible(members[0].id)).toBe(true);expect(s.visible(members[1].id)).toBe(false);s.show(members[1].id);expect(s.visible(members[1].id)).toBe(true);s.reset();expect(s.visible(members[1].id)).toBe(false);s.reveal();expect(s.visible(members[1].id)).toBe(true);
  expect(s.memberState(members[0].id)).not.toBe(s.memberState(members[1].id));expect(c.context()).toEqual([]);expect(c.reply()).toBeUndefined();s.chooseGroup(seq.groups[1].id);expect(s.group()!.id).toBe(seq.groups[1].id);s.chooseGroup(seq.groups[0].id);expect(s.visible(members[1].id)).toBe(true);s.leave(false);expect(editor.repository.state.revision).toBe(before);
  editor.commands.remove(c.resolve(t)!.key);expect(c.resolve(t)).toBeUndefined();expect(s.saved()[0].groups[0].members).toHaveLength(2);editor.repository.undo();expect(c.resolve(t)).toBeTruthy();
+});
+
+function dcpResponse(exchange:string){return {protocol:'dcp/1.0',kind:'contribution',exchange,intent:'qualify',replyTargets:[] as string[],composition:[{id:'p',kind:'paragraph',markup:'<annotation type="dialectic/claim" id="generated">A😀</annotation>',ranges:[]}],anchors:[] as any[],entities:[],interpretations:[] as any[],arguments:[],glosses:[],relations:[],suggestions:[],promotionRecommendations:[]};}
+it('materialises DCP atomically with independent reply/discursive references and AI provenance',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,n=f.text!();f.type!('Alpha beta gamma');c.submit();const primary=c.target(c.frontier()!.id),mount=e.mounts.get(n.key),cells=[...n.inlineContent];
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(request,sources,chunk)=>{
+  const parent=await sources.tool({id:'one',tool:'read_source',arguments:{handle:request.primaryReply}});
+  const source=await sources.tool({id:'two',tool:'read_source',arguments:{handle:parent.children[0]}});
+  const search=await sources.tool({id:'three',tool:'search_symposium',arguments:{query:'beta',limit:5}});expect(search.status).toBe('complete');expect(search.items).toHaveLength(1);
+  const value=dcpResponse(request.exchange);value.composition.push({id:'group',kind:'group',children:[{id:'list',kind:'list',style:'ordered',items:[[{id:'item',kind:'paragraph',markup:'Item',ranges:[]}]]}]} as any);value.replyTargets=['human'];value.anchors=[{id:'human',source:source.handle,revision:source.revision,selector:{exact:'beta',prefix:'Alpha ',suffix:' gamma'}}];value.interpretations=[{id:'interpretation',target:'human',type:'dialectic/qualification',ref:null,attributes:[]}];
+  chunk(JSON.stringify(value));expect(c.committed()).toHaveLength(1);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);return JSON.stringify(value);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);const data=c.frontier()!.data;
+ expect(c.resolve(c.target(c.frontier()!.id))!.children.map(k=>c.session()!.projection.node(k)!.viewType)).toEqual(['standoff-editor-block','container-block']);expect(data.replies).toEqual([primary]);expect(data.discursiveReferences).toHaveLength(1);expect(c.resolveReference(data.discursiveReferences![0]).text).toBe('beta');
+ expect(data.dcp?.tools).toHaveLength(3);expect(data.dcp?.request).toMatchObject({protocolKey:{version:'4a-1'}});
+ const properties=n.payload.standoffProperties as any[];expect(properties.find(p=>p.type==='dialectic/qualification')).toMatchObject({start:6,end:9,metadata:{dcp:{actor:'mock',exchangeId:data.requestId,sourceAuthor:'human',appliedTo:'existing-source'}}});
+ expect(Object.values(c.root()!.payload.linkedAnnotations as any).every((d:any)=>d.type==='dialectic/range-anchor')).toBe(true);
+ expect(e.mounts.get(n.key)).toBe(mount);expect(n.inlineContent).toEqual(cells);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ e.repository.undo();expect(c.committed()).toHaveLength(1);expect((n.payload.standoffProperties??[])).toHaveLength(0);e.repository.redo();expect(c.committed()).toHaveLength(2);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const saved=JSON.stringify(decodeNative(nativeBytes(captureNative(e.repository.readState(),c.resourceId()))));expect(saved).toContain('discursiveReferences');expect(saved).toContain('existing-source');expect(saved).not.toContain('dialectic/argument');
+});
+it('rejects ambiguous selectors, unavailable Stage 4B and malformed output without orphan content',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor;f.type!('same same');c.submit();const before=e.repository.state.revision,snapshots=vi.spyOn(e.repository,'snapshot');
+ await c.askMock(async(request,sources)=>{const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:request.primaryReply}}),source=await sources.tool({id:'b',tool:'read_source',arguments:{handle:parent.children[0]}});const v=dcpResponse(request.exchange);v.anchors=[{id:'ambiguous',source:source.handle,revision:source.revision,selector:{exact:'same',prefix:'',suffix:''}}];return JSON.stringify(v);});
+ expect(c.notice()).toContain('Ambiguous');expect(e.repository.state.revision).toBe(before);
+ await c.askMock(async request=>JSON.stringify({...dcpResponse(request.exchange),arguments:[{id:'arg',anchor:'generated'}]}));expect(c.notice()).toContain('Stage 4B');
+ await c.askMock(async()=>'<p>not DCP</p>');expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(before);expect(()=>e.commands.boundedStructuralTransaction('Reject broad edit',()=>e.commands.setPayloadField(c.root()!.key,'metadata',{...JSON.parse(JSON.stringify(c.root()!.payload.metadata)),title:'Must not commit'}))).toThrow(/bounded|broad/);expect(e.repository.state.revision).toBe(before);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);expect(snapshots).not.toHaveBeenCalled();
+});
+it('rejects edit/Undo ABA and releases a cancelled transport that never settles',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,n=f.text!();f.type!('Original');c.submit();
+ let release!:()=>void;const waiting=new Promise<void>(r=>release=r);
+ const pending=c.askMock(async request=>{await waiting;return JSON.stringify(dcpResponse(request.exchange));});
+ e.commands.replaceInlineRange(n.key,0,0,'change');e.repository.undo();release();await pending;expect(c.notice()).toContain('context changed');expect(c.committed()).toHaveLength(1);
+ const cancelled=c.askMock(async()=>new Promise<string>(()=>{}));c.cancel();await cancelled;expect(c.busy()).toBe(false);expect(c.committed()).toHaveLength(1);expect(c.dcpPreview()).toBe('');
+});
+it('keeps retrieval authorized, bounded, cancellable and absent from typing',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor;f.type!('Visible source');c.submit();f.type!('Private draft');
+ const state=e.repository.readState(),bank=state.contents[state.placements[state.rootPlacementKey].contentKey].children.find(k=>state.contents[state.placements[k].contentKey].viewType==='workspace-object-bank-block')!;
+ e.commands.insert({id:'dcp-unrelated',type:'document-block',metadata:{documentId:'dcp-unrelated'},children:[{id:'foreign-text',type:'standoff-editor-block',text:'SECRET '.repeat(2000)}]},{kind:'at',parentKey:bank,index:1});
+ const other=Object.values(e.repository.readState().contents).find(n=>n.payload.id==='foreign-text')!;const snapshots=vi.spyOn(e.repository,'snapshot');
+ const before={...c.dcpDiagnostics};f.type!('typing');expect(c.dcpDiagnostics).toEqual(before);
+ await c.askMock(async(request,sources)=>{
+  expect((await sources.tool({id:'unauthorized',tool:'read_source',arguments:{handle:'foreign-text'}})).status).toBe('unauthorized');
+  const found=await sources.tool({id:'search',tool:'search_symposium',arguments:{query:'Private',limit:1}});expect(found.items).toHaveLength(0);expect(sources.diagnostics.visited).toBeLessThan(5);
+  const limited=await sources.tool({id:'limit',tool:'search_symposium',arguments:{query:'Visible',limit:1}});expect(limited.status).toBe('truncated');expect(limited.items).toHaveLength(1);
+  expect(JSON.stringify(sources.trail)).not.toContain('SECRET');return JSON.stringify(dcpResponse(request.exchange));
+ });
+ expect(c.notice()).toBe('');expect(e.repository.readState().contents[other.key]).toBe(other);expect(snapshots).not.toHaveBeenCalled();expect(c.dcpDiagnostics.searches).toBe(2);
+});
+it('retains the accepted mock fallback when DCP is disabled',async()=>{
+ const f=await setup(true,true,false),c=f.c!;f.type!('Legacy mock');c.submit();await c.askMock();expect(c.notice()).toBe('');expect(c.frontier()!.data.dcp).toBeUndefined();expect(c.committed()).toHaveLength(2);
+});
+it('captures selected-context provenance at request time and rejects draft context',async()=>{
+ const f=await setup(),c=f.c!;f.type!('Committed');c.submit();const target=c.target(c.frontier()!.id);c.pin(target);
+ await c.askMock(async request=>{c.unpin(target);return JSON.stringify(dcpResponse(request.exchange));});
+ expect(c.notice()).toBe('');expect(c.frontier()!.data.consumedContext!.items[0].origins).toEqual(['reply-target','selected']);expect(c.context()).toHaveLength(0);
+ c.pin(c.target(c.draft()!.id));const revision=f.editor.repository.state.revision;await c.askMock();expect(c.notice()).toContain('before replying');expect(f.editor.repository.state.revision).toBe(revision);
 });

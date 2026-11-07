@@ -34,6 +34,7 @@ import type {
 } from "./types";
 
 interface PendingTransaction {
+  requireBounded?:boolean;
   label: string;
   operations: RepositoryOperation[];
   draft: RepositoryState;
@@ -172,6 +173,7 @@ export class TreeCommands {
 
   private current(local = false): RepositoryState {
     if (this.pending?.local && !local) {
+      if(this.pending.requireBounded)throw new TreeCommandError('Operation requires broad transaction planning');
       this.pending.draft = this.pending.local.materialize();
       this.pending.local = undefined;
     }
@@ -272,11 +274,15 @@ export class TreeCommands {
   structuralTransaction(label: string, operation: () => void, descriptor?: CommandDescriptor): void {
     this.runTransaction(label, operation, descriptor, true);
   }
+  boundedStructuralTransaction(label:string, operation:()=>void):void {
+    this.runTransaction(label,operation,undefined,true,true);
+  }
   transaction(label: string, operation: () => void, descriptor?: CommandDescriptor): void {
     this.runTransaction(label, operation, descriptor, false);
   }
-  private runTransaction(label: string, operation: () => void, descriptor: CommandDescriptor | undefined, local: boolean): void {
+  private runTransaction(label: string, operation: () => void, descriptor: CommandDescriptor | undefined, local: boolean, requireBounded=false): void {
     if (this.pending) {
+      if(requireBounded&&!this.pending.requireBounded)throw new TreeCommandError('Bounded transaction cannot join a broader batch');
       const index = this.pending.commands.length;
       operation();
       if (descriptor) this.pending.commands.splice(index, 0, clone(descriptor));
@@ -284,13 +290,13 @@ export class TreeCommands {
     }
     const writeSet = local ? new StructuralDraft(this.repository.readState(), key => this.repository.locationOf(key),
       key => this.repository.contentReferenceCount(key), key => this.repository.ownedPlacementKeys(key)) : undefined;
-    this.pending = { label, operations: [], local: writeSet, draft: writeSet?.state ?? this.repository.snapshot(), commands: descriptor ? [clone(descriptor)] : [] };
+    this.pending = { label, requireBounded, operations: [], local: writeSet, draft: writeSet?.state ?? this.repository.snapshot(), commands: descriptor ? [clone(descriptor)] : [] };
     try {
       operation();
       const operations = this.pending.local?.operations() ?? this.pending.operations;
       const commands = this.pending.commands;
       this.pending = undefined;
-      this.repository.commit(label, operations, true, { commands });
+      this.repository.commit(label, operations, true, { commands, requireBounded });
     } catch (error) {
       this.pending = undefined;
       throw error;

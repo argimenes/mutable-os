@@ -65,6 +65,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
      <For each={c.glosses()}>{g=><div><button onClick={()=>c.editor.gloss.openDefinition(c.root()!.key,g.id)}>{g.value}</button><button onClick={act(()=>c.pinGloss(g.id))}>Include Gloss</button></div>}</For>
     </Show>
     <Show when={row()?.data.replies.length}><details open><summary>Reply sources</summary><For each={row()?.data.replies}>{t=><div><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><For each={row()?.data.replyExcerpts?.filter(x=>JSON.stringify(x.target)===JSON.stringify(t))}>{x=><><small>Text captured for this reply{c.resolveReference(t).text!==x.text?' · Source changed or unavailable':''}</small><blockquote>{x.text}</blockquote></>}</For></div>}</For></details></Show>
+    <Show when={row()?.data.discursiveReferences?.length}><details open><summary>Discursive references</summary><p>Additional passages; the primary reply remains unchanged.</p><For each={row()?.data.discursiveReferences}>{t=><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button>}</For></details></Show>
     <hr/><div class="dialectic-eyebrow">NEXT MOCK INTERACTION</div>
     <p class="dialectic-muted">Target: {selectedTarget()?c.label(selectedTarget()!):'Select a contribution'}. Selected context remains when you return to the present.</p>
     <button disabled={!selected()} onClick={act(()=>{if(selected())c.pin(selected()!);})}>Include in context</button>
@@ -73,7 +74,9 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <ul class="dialectic-pins"><For each={c.context()}>{t=><li><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><button aria-label={`Remove context ${c.label(t)}`} onClick={()=>c.unpin(t)}>×</button></li>}</For></ul>
     <Show when={!c.context().length}><p class="dialectic-muted">No additional context selected.</p></Show>
     <button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={()=>void c.askMock()}>Ask mock assistant</button><Show when={c.busy()}><button onClick={c.cancel}>Cancel response</button></Show>
+    <Show when={c.dcpPreview()}><details open class="dialectic-dcp-preview"><summary>{c.busy()?'Transient DCP response — not committed':'Uncommitted DCP output'}</summary><pre>{c.dcpPreview()}</pre><Show when={!c.busy()}><button onClick={c.cancel}>Dismiss output</button></Show></details></Show>
     <p class="dialectic-footnote">Deterministic example. No AI service or network request. Target plus up to 12 selected items; 6,000 characters maximum.</p>
+    <Show when={row()?.data.dcp}><details><summary>DCP exchange record</summary><p>Structured mock · {row()?.data.dcp?.profile} · {row()?.data.dcp?.tools.length} retrieval calls. Interpretations of source passages are attributed to this exchange, not to the source author.</p><pre class="dialectic-dcp-record">{JSON.stringify(row()?.data.dcp,null,2)}</pre></details></Show>
     <Show when={row()?.data.context?.length}><details><summary>Response provenance</summary><For each={row()?.data.context}>{t=><p>{c.label(t)}</p>}</For></details></Show>
     <Show when={row()?.data.consumedContext}><details><summary>Material supplied to mock</summary><p>Captured input, not evidence of internal model attention.</p><For each={row()?.data.consumedContext?.items}>{item=><div><button onClick={act(()=>c.inspect(item.target))}>{c.label(item.target)}</button><small>{item.origins.join(' + ')}</small><blockquote>{item.text}</blockquote></div>}</For></details></Show>
    </aside>

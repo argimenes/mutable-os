@@ -37,7 +37,7 @@ export function normalizeInputIntent(value: unknown): InputIntent | undefined {
   if (typeof input.occurrenceToken === "string") result.occurrenceToken = input.occurrenceToken;
   return Object.keys(result).length ? result : undefined;
 }
-export interface CommitMetadata { cause?: CommitCause; commands?: CommandDescriptor[]; inputIntent?: InputIntent }
+export interface CommitMetadata { /** Reject unproved local batches before broad fallback. */ requireBounded?:boolean; cause?: CommitCause; commands?: CommandDescriptor[]; inputIntent?: InputIntent }
 export interface RecordDelta<K, T> { key: K; before: T | null; after: T | null }
 export interface RepositoryCommitResult {
   commitId: CommitId;

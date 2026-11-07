@@ -1,6 +1,6 @@
 # Dialectic Increment 4 — DCP investigation and implementation plan
 
-**7 November 2026 · Revision 2: corrected Symposium argument model. Design proposal; no implementation authorised by this report.**
+**7 November 2026 · Revision 2: corrected Symposium argument model. Approved implementation direction; Stage 4A delivered. Stage 4B has not begun.**
 
 Source brief: `/Users/iianneill/.codex/attachments/7f67f593-ba6b-4228-a03f-805da8e6489f/Pasted text.txt`. Increment 3 remains the accepted baseline. This investigation changed documentation only; it did not rerun its qualification.
 
@@ -44,6 +44,8 @@ Paths below are relative to the repository root.
 ### Exchange boundary
 
 Every successful assistant contribution uses DCP, even a single paragraph. A request contains protocol/schema versions, a Protocol Key, the negotiated capability legend, cadence, selected context, a source dictionary and budgets. Provider refusals, malformed responses and incomplete generations are operational outcomes, not plain-text contributions bypassing DCP.
+
+The host-selected primary structural reply is preserved in contribution `replies`. Additional passages addressed by the response are stored in `discursiveReferences`; the current wire field `replyTargets` supplies only those additional references.
 
 The coordinator constructs this provider-neutral request; adapters translate it to provider messages/tools. The same Protocol Key accompanies every independent request, including tool continuations and repair attempts. Retrieved content is explicitly data and cannot grant tools, override policy or amend the legend. Provider-native structured output improves shape reliability; host validation remains authoritative.
 
@@ -133,14 +135,14 @@ For images/PDFs, retain managed original assets locally, send only explicitly in
 
 The semantic registrations and materialisation validators should also be usable by human authoring and future SMT; they must not be AI-only definitions. Literal inline transformation and synthetic marker presentation remain SMT work. No SMT service, content system or scripting language is introduced here.
 
-## Decisions for review
+## Approved direction
 
 1. **Local Entity ownership:** approve the shared scoped Entity/Entity-relationship adapters and typed Document linked-definition carriers, including reference/copy/package integration. This is the principal shared-model addition.
 2. **Remaining semantic policy:** review inert unknown-type storage and the proposed bounded argument-relation vocabulary. The user has already settled `dialectic/*` passage classifications, separate Symposium-owned argument/relationship records and independent Gloss semantics.
 3. **Broker deployment:** use a local broker with environment/session credentials first; defer remotely hosted credential management and OS-vault integration.
 4. **Delivery order and initial capability profile:** qualify semantics/retrieval with the mock before live providers; initially admit paragraphs, generic groups, lists and tables, plus reference/annotation capabilities. Additional native construction adapters are negotiated extensions, not changes to what contributions can contain.
 
-No additional question is necessary to complete this investigation. These choices need review before implementation under the supplied brief.
+No additional question is necessary to complete this investigation. Revision 2 and these architectural directions were subsequently approved; implementation is authorised through Stage 4A only. See [Stage 4A qualification](DIALECTIC_STAGE_4A_QUALIFICATION.md).
 
 ## Bounded implementation and qualification
 

@@ -113,6 +113,8 @@ export type FeatureFlags = Readonly<{
   thesis: boolean;
   /** Native Block conversations with explicit context and a deterministic mock assistant. */
   dialectic: boolean;
+  /** Validated structured mock exchanges; no live provider or Stage 4B authoring. */
+  dialecticDcp: boolean;
   /** Cardex shell and local Entity Card authoring. */
   cardex: boolean;
   cardexIncrement2: boolean;
@@ -224,6 +226,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   sqliteSemanticServices: true,
   thesis: true,
   dialectic: true,
+  dialecticDcp: true,
   cardex: true,
   cardexIncrement2: true,
   legacyCodexImport: true,

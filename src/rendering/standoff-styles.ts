@@ -1,3 +1,4 @@
+import type {SemanticAuthoringDescriptor} from '../runtime/visual-effect-registry';
 import type { EffectDefinition } from "../runtime/effect-contributions";
 import type { JSX } from "solid-js";
 
@@ -12,6 +13,7 @@ export type StandoffAnnotation = Record<string, unknown> & {
 
 type SvgStyle = { kind: "contribution"; definition: EffectDefinition } | { kind: "underline"; colour: string } | { kind: "rainbow" | "highlighter" | "rectangle" | "spiky" };
 export interface StandoffStyleSchema {
+  semantic?:SemanticAuthoringDescriptor;
   cell?: JSX.CSSProperties;
   valueStyle?: "color" | "background-color";
   svg?: SvgStyle;
@@ -22,7 +24,7 @@ export interface StandoffStyleSchema {
   deferred?: "range-wrapper" | "animation-plugin" | "embedded-document";
 }
 
-/** Current TS schemas; appearance only. Reference values are IDs, not colours. */
+/** Current TS style registrations; optional authoring descriptors. Reference values are IDs, not colours. */
 export const standoffStyleSchemas: Readonly<Record<string, StandoffStyleSchema>> = {
   "text/background-colour": { valueStyle: "background-color" },
   "text/colour": { valueStyle: "color" },
@@ -46,12 +48,12 @@ export const standoffStyleSchemas: Readonly<Record<string, StandoffStyleSchema>>
   "style/superscript": { cell: { "vertical-align": "super", "font-size": "0.8rem" } },
   "style/subscript": { cell: { "vertical-align": "sub", "font-size": "0.8rem" } },
   "style/uppercase": { cell: { "text-transform": "uppercase" } },
-  "style/italics": { cell: { "font-style": "italic" } },
+  "style/italics": { semantic: {purpose: "italics text styling", attributes: [], ai: "authorable", rendering: "native text styling", validation: "nonempty Cell range"}, cell: { "font-style": "italic" } },
   "style/strikethrough": { cell: { "text-decoration-line": "line-through" } },
   "style/highlight": { cell: { "background-color": "pink" } },
   "style/show-hide": { projection: "show-hide" },
-  "style/bold": { cell: { "font-weight": "600" } },
-  "style/underline": { cell: { "text-decoration-line": "underline" } },
+  "style/bold": { semantic: {purpose: "bold text styling", attributes: [], ai: "authorable", rendering: "native text styling", validation: "nonempty Cell range"}, cell: { "font-weight": "600" } },
+  "style/underline": { semantic: {purpose: "underline text styling", attributes: [], ai: "authorable", rendering: "native text styling", validation: "nonempty Cell range"}, cell: { "text-decoration-line": "underline" } },
   "reference/url": { cell: { "text-decoration-line": "underline", "text-decoration-color": "blue" } },
   "codex/search/highlight": { cell: { "background-color": "pink" } },
   "codex/block-reference": { svg: { kind: "underline", colour: "green" } },
