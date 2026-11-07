@@ -56,3 +56,9 @@ it.each([401,403])('distinguishes HTTP %s without leaking a key echoed by the pr
  let message='';try{await providerTurn(state,'secret-fixture',new AbortController().signal,()=>{},async()=>new Response(JSON.stringify({error:{code,message:'Incorrect API key secret-fixture'}}),{status}));}catch(e){message=(e as Error).message;}
  expect(message).toContain('HTTP '+status);expect(message).toContain(code);expect(message).not.toContain('secret-fixture');expect(message).toContain(status===401?'authentication failed':'access denied');
 });
+it('sends bounded repair diagnostics and preserves native intent without forwarding raw error text',()=>{
+ const state=conversation({...defaultProviderSettings},request);
+ repair(state,{code:'source',path:'$.anchors[1]',message:'secret credential or source text'});
+ const content=state.input.at(-1).content;expect(content).toContain('$.anchors[1]');expect(content).toContain('unambiguous prefix/suffix');expect(content).toContain('preserve valid requested addressing');expect(content).not.toContain('secret credential');expect(content).not.toContain('Prefer plain paragraphs');
+ repair(state,{code:'arbitrary secret',path:'$.secret'});expect(state.input.at(-1).content).not.toContain('arbitrary secret');expect(state.input.at(-1).content).not.toContain('$.secret');
+});

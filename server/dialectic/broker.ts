@@ -59,7 +59,7 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    if(e.pending.length){
     const results=req.body.results;if(!Array.isArray(results)||results.length!==e.pending.length||results.some((v,i)=>v.id!==e.pending[i].id)||req.body.repair)throw Error('Tool results do not match pending calls.');
     continuation(e.state,e.pending,results.map(v=>v.result));e.pending=[];
-   }else if(e.final){if(!e.state.settings.repair||e.repaired||req.body.repair!==true)throw Error('Only one enabled validation repair is allowed.');repair(e.state);e.repaired=true;e.final=false;}
+   }else if(e.final){if(!e.state.settings.repair||e.repaired||req.body.repair!==true)throw Error('Only one enabled validation repair is allowed.');repair(e.state,req.body.diagnostic);e.repaired=true;e.final=false;}
    else if(e.round||req.body.results||req.body.repair)throw Error('Unexpected continuation.');
    if(JSON.stringify(e.state.input).length>liveLimits.wireBytes)throw Error('Exchange context budget exceeded.');
    e.busy=true;e.round++;res.status(200).setHeader('Content-Type','application/x-ndjson');res.flushHeaders();

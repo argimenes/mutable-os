@@ -5,10 +5,17 @@ import {createDialecticBroker} from './broker';
 import {sse,streamFixture,plainContribution} from './fixtures';
 import {defaultProviderSettings} from '../../src/features/dialectic/dcp/provider-contract';
 const stops:(()=>Promise<void>|void)[]=[];afterEach(async()=>{for(const stop of stops.splice(0).reverse())await stop();});
-async function fixture(fetcher:typeof fetch){const broker=createDialecticBroker({fetcher,environment:{}}),app=express();app.use('/broker',broker.router);const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));stops.push(()=>broker.dispose(),()=>new Promise<void>(r=>server.close(()=>r())));const origin='http://127.0.0.1:'+(server.address() as any).port;let token='';
+async function fixture(fetcher:typeof fetch,environment:Record<string,string|undefined>={}){const broker=createDialecticBroker({fetcher,environment}),app=express();app.use('/broker',broker.router);const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));stops.push(()=>broker.dispose(),()=>new Promise<void>(r=>server.close(()=>r())));const origin='http://127.0.0.1:'+(server.address() as any).port;let token='';
  const call=(p:string,body?:unknown,headers:Record<string,string>={},method='POST')=>fetch(origin+'/broker'+p,{method,headers:{origin,'content-type':'application/json','x-mutable-dialectic':'1','x-dialectic-session':token,...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
  token=(await(await call('/session')).json()).token;return {call,origin,token};}
 const req={protocol:'dcp/1.0',profile:'4b-1',exchange:'exchange',protocolKey:{text:'Semantic markup is optional.'}};
+it('uses server environment credentials without returning them to the browser',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture('openai',JSON.stringify(plainContribution('exchange')))));
+ const f=await fixture(fetcher,{OPENAI_API_KEY:'server-only-fixture-key'});
+ const settings=await(await f.call('/settings',{settings:defaultProviderSettings})).text();expect(JSON.parse(settings).ready).toBe(true);expect(settings).not.toContain('server-only-fixture-key');
+ const id=(await(await f.call('/exchange',{request:req})).json()).id;
+ const output=await(await f.call('/exchange/'+id+'/turn',{round:0})).text();expect(output).not.toContain('server-only-fixture-key');expect(fetcher.mock.calls[0][1]?.headers).toMatchObject({authorization:'Bearer server-only-fixture-key'});
+});
 it('requires loopback matching Origin/Host, custom header and an origin-bound session',async()=>{
  const f=await fixture(vi.fn());expect((await f.call('/session',undefined,{origin:'http://evil.example'})).status).toBe(403);expect((await f.call('/session',undefined,{'x-mutable-dialectic':''})).status).toBe(403);expect((await f.call('/settings',{}, {'x-dialectic-session':'bad'})).status).toBe(401);expect((await f.call('/settings',{}, {origin:'http://localhost:'+new URL(f.origin).port})).status).toBe(403);
 });

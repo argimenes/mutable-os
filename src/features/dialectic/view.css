@@ -30,3 +30,7 @@
 
 .dialectic-app .dialectic-dcp-preview pre, .dialectic-app .dialectic-dcp-record { max-height: 14em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .dialectic-provider-settings{margin:12px 0;font-size:12px}.dialectic-provider-settings fieldset{border:0;padding:0;min-width:0}.dialectic-provider-settings label{display:block;margin:8px 0}.dialectic-provider-settings input:not([type=checkbox]),.dialectic-provider-settings select{display:block;box-sizing:border-box;width:100%;min-width:0;font:inherit}.dialectic-provider-settings p{overflow-wrap:anywhere}.textual-workspace .dialectic-provider-settings{font:inherit;margin:var(--tw-line-height) 0}.textual-workspace .dialectic-provider-settings input,.textual-workspace .dialectic-provider-settings select{font:inherit;color:var(--tw-menu-ink);background:var(--tw-menu);border-radius:0}
+
+.dialectic-native-structures button { display:block; max-width:100%; text-align:left; overflow-wrap:anywhere; margin-block:.3em; }
+.dialectic-native-structures small, .dialectic-annotation-inspection small { overflow-wrap:anywhere; }
+.dialectic-annotation-inspection { border-inline-start:2px solid currentColor; padding-inline-start:.6em; }

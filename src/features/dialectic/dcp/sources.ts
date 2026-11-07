@@ -25,7 +25,7 @@ export class DcpSources {
  private entityRevisions=new Map<string,number>();
  readonly entities:ScopedEntities;
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
- constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:()=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000){
+ constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:()=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[]){
   this.deadline=Date.now()+Math.min(120000,Math.max(1,deadlineMs));
   let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;
   this.entities=new ScopedEntities(editor,rootKey,owner);
@@ -58,12 +58,12 @@ export class DcpSources {
   const found=this.resolve(target);if(found.status!=='resolved')return {status:found.status==='ambiguous'?'ambiguous':found.status==='missing'?'missing':'unavailable',handle,reason:found.reason};
   const n=found.node;
   if(n&&!this.committed(n))return {status:'unauthorized',handle};
-  let sourceAuthor='unknown';
-  if(n){this.fence(n.contentKey);let ancestor:BlockNode|undefined=n;for(let i=0;ancestor&&i<128;i++,ancestor=this.parent(ancestor.key)){const c=contribution((ancestor.payload.metadata as any)?.dialectic);if(c){this.fence(ancestor.contentKey);sourceAuthor=c.author;break;}}}
+  let sourceAuthor='unknown',contributionInfo:any;
+  if(n){this.fence(n.contentKey);let ancestor:BlockNode|undefined=n;for(let i=0;ancestor&&i<128;i++,ancestor=this.parent(ancestor.key)){const c=contribution((ancestor.payload.metadata as any)?.dialectic);if(c){this.fence(ancestor.contentKey);sourceAuthor=c.author;contributionInfo={handle:this.issue({kind:'contribution',resourceId:this.owner,blockId:String(ancestor.payload.id)}),blockId:String(ancestor.payload.id),author:c.author,participant:c.participant??null,ordinal:c.ordinal,createdUtc:c.createdUtc??null,replies:c.replies.slice(0,12).filter(t=>t.resourceId===this.owner).map(t=>this.issue(t)),discursiveReferences:(c.discursiveReferences??[]).slice(0,12).filter(t=>t.resourceId===this.owner).map(t=>this.issue(t))};break;}}}
   if(target.kind==='gloss')this.glossValues.set(handle,found.text??'');
   for(const s of found.segments??[])this.fence(s.contentKey);
   const revision=this.revisions.get(handle)??crypto.randomUUID();this.revisions.set(handle,revision);
-  const base={handle,target,owner:this.owner,revision,kind:target.kind,sourceAuthor};
+  const base={handle,target,owner:this.owner,revision,kind:target.kind,sourceAuthor,contribution:contributionInfo};
   if(target.kind==='gloss'||target.kind==='range')return {status:'complete',...base,text:found.text??'',historical:found.historical};
   if(!n)return {status:'missing',...base};
   if(n.inlineContent.length>12000)return {status:'truncated',...base,reason:'Source Cell budget; select a smaller passage',omissions:['text']};
@@ -71,7 +71,15 @@ export class DcpSources {
   const children:string[]=[];let omitted=false;
   for(const key of edges(n)){if(children.length>=64){omitted=true;break;}const child=this.node(key);if(!child)continue;const t:ReplyTarget={kind:'block',resourceId:this.owner,blockId:String(child.payload.id)};const resolved=this.resolve(t);if(resolved.status!=='resolved'||resolved.node?.contentKey!==child.contentKey){omitted=true;continue;}children.push(this.issue(t));}
   const properties=n.payload.standoffProperties as any[]??[];
-  const annotations=properties.slice(0,128).map(p=>({id:p.id,type:p.type,start:p.start,end:p.end,isDeleted:!!p.isDeleted,...(p.metadata?.dcp?{provenance:{actor:p.metadata.dcp.actor,exchangeId:p.metadata.dcp.exchangeId,protocol:p.metadata.dcp.protocol,sourceAuthor:p.metadata.dcp.sourceAuthor,appliedTo:p.metadata.dcp.appliedTo}}:{}),...(p.metadata?.unknownSemantic?{unknownSemantic:{type:String(p.metadata.unknownSemantic.type).slice(0,128),inert:true}}:{})}));
+  const annotations:any[]=properties.slice(0,128).map(p=>({id:p.id,type:p.type,start:p.start,end:p.end,isDeleted:!!p.isDeleted,...(p.metadata?.dcp?{provenance:{actor:p.metadata.dcp.actor,exchangeId:p.metadata.dcp.exchangeId,protocol:p.metadata.dcp.protocol,sourceAuthor:p.metadata.dcp.sourceAuthor,appliedTo:p.metadata.dcp.appliedTo}}:{}),...(p.metadata?.unknownSemantic?{unknownSemantic:{type:String(p.metadata.unknownSemantic.type).slice(0,128),inert:true}}:{})}));
+  const semanticReferences:string[]=[];
+  for(let i=0;i<annotations.length;i++){
+   const p=properties[i],a=annotations[i];if(p.isDeleted||p.externalDefinition||typeof p.annotationId!=='string')continue;
+   if(p.type==='dialectic/range-anchor'){
+    a.anchorHandle=this.issue({kind:'range',resourceId:this.owner,anchorId:p.annotationId});semanticReferences.push(a.anchorHandle);
+    if(this.editor.features.scopedSemantics){a.arguments=this.argumentsFor(p.annotationId).slice(0,16).map(argumentId=>this.issue({kind:'argument',resourceId:this.owner,argumentId}));semanticReferences.push(...a.arguments);}
+   }else if(p.type==='mutable/gloss'){a.glossHandle=this.issue({kind:'gloss',resourceId:this.owner,definitionId:p.annotationId});semanticReferences.push(a.glossHandle);}
+  }
   if(this.editor.features.scopedSemantics){
    let vaultId:string|undefined,unavailable=false;
    for(let i=0;i<annotations.length;i++){const p=properties[i],a=annotations[i] as any;if(p.isDeleted)continue;
@@ -84,7 +92,29 @@ export class DcpSources {
    }
   }
   const supported=['standoff-editor-block','container-block','table-block','table-row-block','table-cell-block','indented-list-block'].includes(n.viewType);
-  return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
+  return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,semanticReferences:semanticReferences.slice(0,32),omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
+ }
+ /** Prepared once on explicit Ask. Never subscribed to typing or whole-history enumeration. */
+ async manifest(handles:string[]){
+  const limits={sources:64,characters:12000,bytes:64000,depth:12};
+  const queue=handles.map(handle=>({handle,depth:0})),seen=new Set<string>(),items:any[]=[];
+  let characters=0,bytes=0,truncated=false;
+  while(queue.length&&items.length<limits.sources){
+   this.check();const {handle,depth}=queue.shift()!;if(seen.has(handle))continue;seen.add(handle);
+   const source=await this.source(handle);this.check();
+   const length=source.text?.length??0;
+   const item={...source,exactAnchorEligible:source.status==='complete'&&source.kind==='block'&&source.nativeType==='standoff-editor-block'&&!source.hasInlineObjects};
+   const size=new TextEncoder().encode(JSON.stringify(item)).length;
+   if(characters+length>limits.characters||bytes+size>limits.bytes){truncated=true;break;}
+   items.push(item);characters+=length;bytes+=size;
+   if(depth<limits.depth){
+    // Direct children and relevant definitions/relations only; queue is capped too.
+    for(const child of [...source.children??[],...source.semanticReferences??[],...(source.relations??[]).slice(0,32)]){
+     if(queue.length>=128){truncated=true;break;}if(!seen.has(child))queue.push({handle:child,depth:depth+1});
+    }
+   }else if(source.children?.length)truncated=true;
+  }
+  this.check();return {version:1,status:truncated||queue.length?'truncated':'complete',roots:handles,sources:items,limits,coverage:{sources:items.length,characters,bytes},omissions:truncated||queue.length?['Manifest budget reached; use issued handles for detailed retrieval.']:[]};
  }
  private record(call:any,result:any){const size=JSON.stringify(result).length;if((this.bytes+=size)>48000)throw Error('DCP retrieval result budget exceeded');this.trail.push({call,result});return result;}
  async tool(call:any){

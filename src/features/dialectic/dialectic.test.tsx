@@ -359,3 +359,46 @@ it('live source classifications retain human authorship and AI exchange provenan
   let calls:any[]=[],text='';if(body.round===0)calls=[{id:'first',tool:'read_source',arguments:{handle:request.primaryReply}}];else if(body.round===1)calls=[{id:'second',tool:'read_source',arguments:{handle:body.results[0].result.children[0]}}];else{const source=body.results[0].result;text=JSON.stringify({protocol:'dcp/1.0',kind:'contribution',exchange:request.exchange,intent:'reply',replyTargets:[],composition:[{id:'p',kind:'paragraph',markup:'I’d like that.',ranges:[]}],anchors:[{id:'source',source:source.handle,revision:source.revision,selector:{exact:source.text,prefix:'',suffix:''}}],interpretations:[{id:'mark',target:'source',type:'dialectic/suggestion',ref:null,attributes:[]}],entities:[],arguments:[],glosses:[],relations:[],suggestions:[],promotionRecommendations:[]});}return new Response(JSON.stringify({type:'result',text,calls,receipt})+'\n');}return new Response('{}');}));
  await c.configureProvider({provider:'openai',model:'m',maxOutputTokens:1024,repair:false,cadence:'conversational'},'test-secret');await c.ask();expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);const property=(original.payload.standoffProperties as any[]).find(p=>p.type==='dialectic/suggestion');expect(property.metadata.dcp).toMatchObject({actor:'ai',sourceAuthor:'human',appliedTo:'existing-source',exchangeId:c.committed()[1].data.requestId});expect(c.committed()[0].data.author).toBe('human');expect(Object.values(c.root()!.payload.linkedAnnotations??{}).map((d:any)=>d.type)).toEqual(['dialectic/range-anchor']);expect(snapshots).not.toHaveBeenCalled();e.repository.undo();expect((original.payload.standoffProperties as any[]??[]).filter(p=>p.type==='dialectic/suggestion')).toHaveLength(0);e.repository.redo();expect(c.committed()).toHaveLength(2);
 });
+
+it('native authoring sends selected hierarchy and participant context, materialises multiple addresses and inspected semantics with Undo and persistence',async()=>{
+ const {authoringExamples}=await import('./dcp/authoring');
+ const f=await setup(true,true,true,true),c=f.c!,e=f.editor;
+ f.type!('Rain is forecast.');c.submit();const first=c.target(c.frontier()!.id),original=c.session()!.projection.node(c.resolve(first)!.children[0])!,mount=e.mounts.get(original.key);
+ f.type!('We could meet at the library.');c.submit();const second=c.target(c.frontier()!.id);c.pin(first);c.pin(second);
+ f.type!('Address both earlier contributions, annotate the forecast, and explicitly relate the forecast argument to an indoor proposal.');c.submit();const requestTarget=c.target(c.frontier()!.id);
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(req,sources)=>{
+  expect(req.task.participantRequest.text).toContain('Address both');expect(req.task.focus).toBe(req.primaryReply);
+  const manifest=req.structuralContext;expect(manifest.status).toBe('complete');expect(manifest.sources.length).toBe(6);
+  const a=manifest.sources.find((s:any)=>s.target.blockId===first.blockId&&s.kind==='contribution');expect(a.contribution).toMatchObject({ordinal:1,author:'human',participant:{kind:'human'}});expect(a.contribution.createdUtc).toBeTruthy();
+  const b=manifest.sources.find((s:any)=>s.target.blockId===second.blockId&&s.kind==='contribution');
+  const text=manifest.sources.find((s:any)=>s.target.blockId===original.payload.id);expect(text.exactAnchorEligible).toBe(true);expect(a.children).toContain(text.handle);
+  expect(sources.diagnostics.reads).toBe(0);expect(req.authoring.instructions).toContain('Discursive addressing does NOT require an argument');
+  const response=JSON.parse(JSON.stringify(authoringExamples[1].response));response.exchange=req.exchange;response.replyTargets=[a.handle,b.handle];response.anchors[0].source=text.handle;response.anchors[0].revision=text.revision;
+  const {prepare}=await import('./dcp/exchange'),{validationDiagnostic}=await import('./dcp/diagnostics');
+  const invalid=structuredClone(response);invalid.anchors[0].selector.exact='Not in the source';
+  let diagnostic;try{await prepare(JSON.stringify(invalid),req.exchange,c.resourceId(),e.visualEffects,sources,true);}catch(error){diagnostic=validationDiagnostic(error);}
+  expect(diagnostic).toMatchObject({code:'source',path:'$.anchors[0]'});expect(JSON.stringify(diagnostic)).not.toContain('Not in the source');
+  return JSON.stringify(response);
+ });
+ expect(c.notice()).toBe('');const result=c.frontier()!,dcp=result.data.dcp!;
+ expect(result.data.replies).toEqual([requestTarget]);expect(result.data.discursiveReferences).toEqual([first,second]);expect(dcp.annotationRefs).toHaveLength(2);
+ const definitions=Object.values(c.root()!.payload.linkedAnnotations??{}) as any[];expect(definitions.filter(d=>d.type===ARGUMENT)).toHaveLength(2);expect(definitions.filter(d=>d.type===ARGUMENT_RELATION)[0].metadata.dialecticArgumentRelation.relation).toBe('supports');
+ const ref=dcp.annotationRefs!.find(r=>r.blockId===original.payload.id)!;c.inspectAnnotation(ref);expect(c.inspectedAnnotation()?.property.type).toBe('dialectic/claim');expect(c.inspectedAnnotation()?.text).toBe('Rain is forecast.');
+ const rowButton=[...f.host.querySelectorAll<HTMLButtonElement>('.dialectic-entry')].find(b=>b.querySelector('.dialectic-number')?.textContent==='04')!;rowButton.click();await tick();
+ expect(f.host.querySelector('.dialectic-native-structures')?.textContent).toContain('2 discursive addresses · 2 annotations · 1 relationships');
+ const annotationButton=[...f.host.querySelectorAll<HTMLButtonElement>('.dialectic-annotation-link')].find(b=>b.textContent?.includes('dialectic/claim'))!;annotationButton.click();await tick();expect(f.host.querySelector('[aria-label="Annotation inspection"]')?.textContent).toContain('Rain is forecast.');
+ expect(e.mounts.get(original.key)).toBe(mount);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ e.repository.undo();expect(c.committed()).toHaveLength(3);expect((original.payload.standoffProperties as any[]??[])).toHaveLength(0);e.repository.redo();expect(c.committed()).toHaveLength(4);expect(c.annotationDetails(ref)?.property.type).toBe('dialectic/claim');
+ const saved=JSON.stringify(decodeNative(nativeBytes(captureNative(e.repository.readState(),c.resourceId()))));expect(saved).toContain(ref.propertyId);expect(saved).toContain('annotationRefs');expect(saved).toContain('structuralContext');expect(saved).toContain('dialectic/argument-relation');
+ const reads={...c.dcpDiagnostics};f.type!('Ordinary typing');expect(c.dcpDiagnostics).toEqual(reads);
+ c.setReply(c.target(result.id));await c.askMock(async req=>{const sources=req.structuralContext.sources;expect(sources.some((s:any)=>s.kind==='argument')).toBe(true);expect(sources.some((s:any)=>s.kind==='argument-relation'&&s.definition.metadata.dialecticArgumentRelation.relation==='supports')).toBe(true);return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toBe('');
+});
+
+it('bounds the selected structural manifest without fetching unselected history or unrelated Documents',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!,e=f.editor;
+ f.type!('Unselected private history');c.submit();f.type!('Selected content');
+ const draft=c.resolve(c.target(c.draft()!.id))!;
+ for(let i=0;i<75;i++)e.commands.insert({type:'standoff-editor-block',text:'Small '+i},{kind:'at',parentKey:draft.key,index:i+1});c.submit();
+ await c.askMock(async req=>{expect(req.structuralContext.status).toBe('truncated');expect(req.structuralContext.sources).toHaveLength(64);expect(JSON.stringify(req.structuralContext)).not.toContain('Unselected private history');return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toBe('');
+});

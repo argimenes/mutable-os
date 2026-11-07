@@ -1,3 +1,4 @@
+import {validationDiagnostic} from './diagnostics';
 import {defaultProviderSettings,liveLimits,type ProviderSettings,type ProviderTurn,type LiveProvenance} from './provider-contract';
 import type {DcpTransport} from './exchange';
 
@@ -42,7 +43,7 @@ export class DialecticProviderSession {
       next={round,results};continue;
      }
      try{await validate?.(turn.text);return turn.text;}
-     catch(error){sources.check();if(repair||!details.settings.repair)throw error;repair=true;attempt.repair=String(error).slice(0,1000);attempt.rejectedResponse=turn.text;chunk('DCP validation failed; trying the enabled single repair…');next={round,repair:true};}
+     catch(error){sources.check();if(repair||!details.settings.repair)throw error;repair=true;attempt.repair=String(error).slice(0,1000);attempt.rejectedResponse=turn.text;chunk('DCP validation failed; trying the enabled single repair…');next={round,repair:true,diagnostic:validationDiagnostic(error)};}
     }throw Error('DCP continuation limit exceeded.');
    }finally{signal.removeEventListener('abort',close);if(id)await this.closeExchange(id);}
   };

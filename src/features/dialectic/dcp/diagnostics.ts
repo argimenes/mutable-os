@@ -1,0 +1,26 @@
+/** Only host-owned vocabulary crosses into repair instructions; never raw errors. */
+const reasons = {
+ json:'Return a complete JSON object matching the response schema.',
+ fields:'Include exactly the required fields of this object.',
+ identity:'Use unique response-local IDs and issued handles of the required kind.',
+ source:'Use a complete current TextBlock source and its revision; quote exact text with unambiguous prefix/suffix.',
+ markup:'Use only annotation and self-closing boundary tags, valid XML escapes and nonempty spans. Check boundary IDs.',
+ capability:'Use only negotiated types and operations; check the endpoint kinds and allowed attributes.',
+ budget:'Keep the response within the advertised size, nesting and item limits.',
+ structure:'Correct the invalid native structure while preserving valid requested structures.'
+} as const;
+export type ValidationDiagnostic={code:keyof typeof reasons;path:string;message:string};
+export class DcpValidationError extends Error {
+ constructor(readonly diagnostic:ValidationDiagnostic){super(`DCP validation at ${diagnostic.path}: ${diagnostic.message}`);}
+}
+export function validationDiagnostic(error:unknown,path='$'):ValidationDiagnostic {
+ if(error instanceof DcpValidationError)return error.diagnostic;
+ const message=error instanceof Error?error.message:'';
+ const code:keyof typeof reasons=error instanceof SyntaxError?'json':/fields/.test(message)?'fields':/selector|Selector|anchor source|exact anchor|splits a Cell/.test(message)?'source':/markup|Markup|boundary|annotation tag|Empty annotation|closing tag|unclosed/.test(message)?'markup':/Duplicate|provisional ID|Unauthorized|handle|endpoints|owned arguments/.test(message)?'identity':/budget|size|depth|oversized/.test(message)?'budget':/Unsupported|unavailable in|authorable|deferred|admitted|unavailable until/.test(message)?'capability':'structure';
+ return {code,path,message:reasons[code]};
+}
+export function safeDiagnostic(value:any):ValidationDiagnostic {
+ const code=Object.hasOwn(reasons,value?.code)?value.code as keyof typeof reasons:'structure';
+ const path=typeof value?.path==='string'&&/^\$(?:\.(?:composition|anchors|interpretations|arguments|entities|relations|glosses|replyTargets)|\[\d{1,3}\]){0,16}$/.test(value.path)?value.path:'$';
+ return {code,path,message:reasons[code]};
+}
