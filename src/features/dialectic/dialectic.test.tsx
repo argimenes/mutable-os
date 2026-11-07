@@ -1,3 +1,8 @@
+import {registerStandaloneEntityService} from '../../application/entity-service';
+import {documentContextInventory} from '../../interchange/package/document-context';
+import {ScopedEntities} from '../../application/scoped-entities';
+import {LOCAL_ENTITY,LOCAL_ENTITY_RELATION,ENTITY_REFERENCE} from '../../feature-api/scoped-entities';
+import {ARGUMENT,ARGUMENT_RELATION} from './arguments';
 // @vitest-environment jsdom
 import {afterEach,expect,it,vi} from 'vitest';
 import {createRoot} from 'solid-js';
@@ -20,9 +25,9 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dialectic:enabled,dialecticDcp:dcp,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -263,4 +268,69 @@ it('captures selected-context provenance at request time and rejects draft conte
  await c.askMock(async request=>{c.unpin(target);return JSON.stringify(dcpResponse(request.exchange));});
  expect(c.notice()).toBe('');expect(c.frontier()!.data.consumedContext!.items[0].origins).toEqual(['reply-target','selected']);expect(c.context()).toHaveLength(0);
  c.pin(c.target(c.draft()!.id));const revision=f.editor.repository.state.revision;await c.askMock();expect(c.notice()).toContain('before replying');expect(f.editor.repository.state.revision).toBe(revision);
+});
+
+it('4B commits distinct semantic identities atomically and resolves live/unresolved passages without rebuilding inventories',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!,e=f.editor;f.type!('Human evidence');c.submit();const original=c.committed()[0],source=c.session()!.projection.node(c.resolve(c.target(original.id))!.children[0])!,mount=e.mounts.get(source.key)!.root;
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(request,sources)=>{
+  const p=await sources.tool({id:'p',tool:'read_source',arguments:{handle:request.primaryReply}}),source=await sources.tool({id:'s',tool:'read_source',arguments:{handle:p.children[0]}});
+  const v:any=dcpResponse(request.exchange);v.anchors=[{id:'human',source:source.handle,revision:source.revision,selector:{exact:'Human evidence',prefix:'',suffix:''}}];
+  v.interpretations=[{id:'classification',target:'human',type:'dialectic/claim',ref:null,attributes:[]}];
+  v.arguments=[{id:'human-argument',anchor:'human'},{id:'answer-argument',anchor:'generated'}];v.relations=[{id:'edge',kind:'argument',type:'supports',from:'answer-argument',to:'human-argument'},{id:'entity-edge',kind:'entity',type:'related-to',from:'e1',to:'e2'}];
+  v.entities=[{id:'e1',name:'Evidence',typename:'Concept',description:'',aliases:['Support']},{id:'e2',name:'Inference',typename:'Concept',description:'',aliases:[]}];
+  v.glosses=[{id:'gloss',target:'human',type:'clarification',text:'An independent clarification'}];v.composition.push({id:'entity-text',kind:'paragraph',markup:'<annotation type="mutable/entity-reference" ref="e1">Evidence</annotation>',ranges:[]});v.replyTargets=['human-argument','e1'];return JSON.stringify(v);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(e.mounts.get(source.key)!.root).toBe(mount);
+ const definitions:any=c.root()!.payload.linkedAnnotations,values:any[]=Object.values(definitions),data=c.frontier()!.data,aliases:any=data.dcp!.identityMap,arg=aliases['human-argument'];
+ expect(values.filter(d=>d.type===ARGUMENT)).toHaveLength(2);expect(values.filter(d=>d.type===LOCAL_ENTITY)).toHaveLength(2);expect(values.filter(d=>d.type==='mutable/gloss')).toHaveLength(1);
+ expect(values.find(d=>d.type===ARGUMENT_RELATION).metadata.dialecticArgumentRelation).toMatchObject({relation:'supports',from:{argumentId:aliases['answer-argument'].argumentId},to:{argumentId:arg.argumentId}});
+ expect(c.resolveReference(arg)).toMatchObject({status:'resolved',identityExists:true,text:'Human evidence'});expect(c.argumentRelations(arg.argumentId)).toHaveLength(1);expect(c.resolveReference(aliases.e1).text).toBe('Evidence');c.inspect(aliases.e1);expect(c.exchangeTarget()?.kind).toBe('contribution');
+ const defsReads=c.references()!.diagnostics.definitionReads;e.commands.replaceInlineRange(source.key,5,5,'New ');await tick();expect(c.references()!.diagnostics.definitionReads).toBe(defsReads);expect(c.resolveReference(arg).changed).toBe(true);expect(c.committed()).toHaveLength(2);
+ e.repository.undo();e.repository.undo();expect(c.committed()).toHaveLength(1);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);e.repository.redo();expect(c.resolveReference(arg).status).toBe('resolved');
+ expect(()=>captureBlocks(e.repository.readState(),[source.placementKey])).toThrow(/dependency remapping/);expect(()=>serializeSelection(e.repository.readState(),[{placementKey:source.placementKey}])).toThrow(/dependency remapping/);
+ // Removing classifications and the independent Gloss never removes the argument.
+ e.commands.setPayloadField(source.key,'standoffProperties',JSON.parse(JSON.stringify(source.payload.standoffProperties)).filter((p:any)=>p.type==='dialectic/range-anchor'));
+ expect(c.resolveReference(arg).status).toBe('resolved');
+ e.commands.remove(source.key);expect(c.resolveReference(arg)).toMatchObject({status:'unanchored',identityExists:true,historical:'Human evidence'});expect((c.root()!.payload.linkedAnnotations as any)[arg.argumentId].type).toBe(ARGUMENT);
+ const snapshot=captureNative(e.repository.readState(),c.resourceId());const reloaded=decodeNative(nativeBytes(snapshot));expect(JSON.stringify(reloaded)).toContain(arg.argumentId);expect(JSON.stringify(reloaded)).toContain('entityReference');
+});
+it('4B Submit & Ask captures after a multi-Block human commit; Ask does not resubmit edits or force alternation',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!,e=f.editor;f.type!('First');const d=c.resolve(c.target(c.draft()!.id))!;e.commands.insert({type:'container-block',children:[{type:'standoff-editor-block',text:'Nested'}]},{kind:'at',parentKey:d.key,index:1});
+ await c.submitAndAsk(async(req)=>{expect(c.committed()).toHaveLength(1);expect(req.context[0].plainTextExcerpt).toContain('Nested');return JSON.stringify(dcpResponse(req.exchange));});
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);expect(c.committed()[0].data.participant?.kind).toBe('human');expect(c.committed()[1].data.participant?.kind).toBe('ai');
+ f.type!('Second human');c.submit();f.type!('Third human');c.submit();expect(c.committed()).toHaveLength(4);
+ const first=c.resolve(c.target(c.committed()[0].id))!,a=c.session()!.projection.node(first.children[0])!,b=c.session()!.projection.node(c.session()!.projection.node(first.children[1])!.children[0])!;
+ e.commands.replaceInlineRange(a.key,0,0,'Edit ');e.commands.replaceInlineRange(b.key,0,0,'Also ');c.setReply(c.target(c.committed()[0].id));
+ await c.askMock(async(req)=>{expect(c.committed()).toHaveLength(4);expect(req.context[0].plainTextExcerpt).toContain('Edit First');expect(req.context[0].plainTextExcerpt).toContain('Also Nested');return JSON.stringify(dcpResponse(req.exchange));});
+ expect(c.committed()).toHaveLength(5);expect(c.frontier()!.data.replies[0].blockId).toBe(c.committed()[0].id);
+});
+it('4B rejects wrong-kind/foreign semantic endpoints and cancellation without partial definitions',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!;f.type!('Source');c.submit();
+ await c.askMock(async(req)=>{const v:any=dcpResponse(req.exchange);v.entities=[{id:'e',name:'Entity',typename:'Concept',description:'',aliases:[]}];v.arguments=[{id:'a',anchor:'generated'}];v.relations=[{id:'r',kind:'argument',type:'supports',from:'a',to:'e'}];return JSON.stringify(v);});
+ expect(c.notice()).toMatch(/argument/);expect(c.committed()).toHaveLength(1);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ const waiting=c.askMock(()=>new Promise(()=>{}));c.cancel();await waiting;expect(c.committed()).toHaveLength(1);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ const service=new ScopedEntities(f.editor,c.root()!.key,c.resourceId());const e=service.prepare({name:'Local',typename:'Concept',description:'',aliases:[]},{actor:'human'});service.commit({[e.id]:e});expect(service.local({scope:'document',resourceId:c.resourceId(),entityId:e.id})?.name).toBe('Local');expect(()=>service.prepareRelation('supports',{scope:'document',resourceId:'foreign',entityId:e.id},{scope:'document',resourceId:c.resourceId(),entityId:e.id},{})).toThrow(/owned/);service.dispose();
+});
+
+it('4B shared Entity service admits local/Vault relationships through read-only scope-qualified resolution',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!,e=f.editor;f.type!('Source');c.submit();const get=vi.fn(async()=>({id:'global',name:'Global concept',revision:3,aliases:[]})),write=vi.fn(()=>{throw Error('SQL mutation forbidden');});cleanup.push(registerStandaloneEntityService(e,()=>({get,historyScope:async()=>'directory-A',scopeIdentity:async()=>'vault-A',create:write,rename:write,alias:write,dispose(){}} as any)));
+ const original=c.session()!.projection.node(c.resolve(c.target(c.committed()[0].id))!.children[0])!;e.commands.setPayloadField(original.key,'standoffProperties',[{id:'global-mention',type:'codex/entity-reference',value:'global',start:0,end:5}]);
+ await c.askMock(async(req,sources)=>{const parent=await sources.tool({id:'parent',tool:'read_source',arguments:{handle:req.primaryReply}}),source=await sources.tool({id:'text',tool:'read_source',arguments:{handle:parent.children[0]}}),global=source.annotations[0].entityHandle;expect(global).toBeTruthy();expect(global.length).toBeLessThanOrEqual(128);expect((await sources.tool({id:'entity',tool:'read_source',arguments:{handle:global}})).entity.name).toBe('Global concept');const v:any=dcpResponse(req.exchange);v.entities=[{id:'local',name:'Local concept',typename:'Concept',description:'Document owned',aliases:[]}];v.relations=[{id:'r',kind:'entity',type:'related-to',from:'local',to:global}];return JSON.stringify(v);});
+ expect(c.notice()).toBe('');expect(write).not.toHaveBeenCalled();expect(get).toHaveBeenCalled();const values:any[]=Object.values(c.root()!.payload.linkedAnnotations??{}),r=values.find(d=>d.type===LOCAL_ENTITY_RELATION).metadata.scopedEntityRelation;expect(r.to).toEqual({scope:'vault',vaultId:'vault-A',entityId:'global'});
+ const inventory=documentContextInventory(captureNative(e.repository.readState(),c.resourceId()));expect(inventory.entities).not.toContain(r.from.entityId);expect(inventory.localEntities).toHaveLength(1);expect(JSON.stringify(inventory.unresolved)).toContain('vault-A');
+ const service=new ScopedEntities(e,c.root()!.key,c.resourceId());const local=JSON.parse(JSON.stringify(values.find(d=>d.type===LOCAL_ENTITY)));service.commit({[local.id]:{...local,isDeleted:true}});expect(service.local(r.from)).toBeUndefined();expect((c.root()!.payload.linkedAnnotations as any)[values.find(d=>d.type===LOCAL_ENTITY_RELATION).id]).toBeTruthy();e.repository.undo();expect(service.local(r.from)?.name).toBe('Local concept');await expect(service.resolve({scope:'vault',vaultId:'another',entityId:'global'})).rejects.toThrow(/another Vault/);expect(await service.resolve({scope:'document',resourceId:'another',entityId:r.from.entityId})).toBeUndefined();service.dispose();
+});
+it('4B reuses older argument handles without conflating classifications, and preserves unresolved incident edges',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!,e=f.editor;f.type!('Earlier source');c.submit();await c.askMock();expect(c.notice()).toBe('');
+ const registry=()=>c.root()!.payload.linkedAnnotations as any,all:any[]=Object.values(registry()),a=all.find(d=>d.type===ARGUMENT),target:any={kind:'argument',resourceId:c.resourceId(),argumentId:a.id};c.setReply(target);
+ await c.askMock(async(req,sources)=>{const result=await sources.tool({id:'old',tool:'read_source',arguments:{handle:req.primaryReply}});expect(result.kind).toBe('argument');expect(result.identityExists).toBe(true);const v:any=dcpResponse(req.exchange);v.arguments=[{id:'new',anchor:'generated'}];v.relations=[{id:'r',kind:'argument',type:'depends-on',from:'new',to:req.primaryReply}];return JSON.stringify(v);});
+ expect(c.notice()).toBe('');expect(c.frontier()!.data.replies[0]).toEqual(target);expect(c.argumentRelations(a.id).length).toBeGreaterThan(0);
+ const before=c.argumentRelations(a.id).map(d=>d.id);e.commands.boundedStructuralTransaction('Delete argument',()=>e.commands.setPayloadField(c.root()!.key,'linkedAnnotations',{...JSON.parse(JSON.stringify(registry())),[a.id]:{...JSON.parse(JSON.stringify(registry()[a.id])),isDeleted:true}}));expect(c.resolveReference(target).status).toBe('missing');expect(c.argumentRelations(a.id).map(d=>d.id)).toEqual(before);e.repository.undo();expect(c.resolveReference(target).status).toBe('resolved');
+});
+
+it('4B cancellation during asynchronous global-reference validation leaves no local semantic records',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!;f.type!('Human source');c.submit();let entered=false;cleanup.push(registerStandaloneEntityService(f.editor,()=>({scopeIdentity:async()=>'vault',get:()=>{entered=true;return new Promise(()=>{});},dispose(){}} as any)));
+ const task=c.askMock(async(req,sources)=>{const global=sources.issue({kind:'entity',resourceId:c.resourceId(),entity:{scope:'vault',vaultId:'vault',entityId:'global'}}),v:any=dcpResponse(req.exchange);v.entities=[{id:'local',name:'Never committed',typename:'Concept',description:'',aliases:[]}];v.arguments=[{id:'a',anchor:'generated'}];v.relations=[{id:'r',kind:'entity',type:'related-to',from:'local',to:global}];return JSON.stringify(v);});
+ for(let i=0;i<20&&!entered;i++)await tick();expect(entered).toBe(true);c.cancel();await task;expect(c.committed()).toHaveLength(1);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
 });

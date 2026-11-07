@@ -114,6 +114,7 @@ export function entityService(editor:ReactiveEditor,owner:string):EntityService 
  };
  return {
   historyScope:()=>lookupRoot(),
+  async scopeIdentity(signal){const vault=await lookupRoot(signal),result=await request('propositions',{vault,request:{op:'context'}},signal);lookupCurrent();if(typeof result.vaultGuid!=='string'||!result.vaultGuid)throw Error('Vault identity unavailable');return result.vaultGuid;},
   async authorityLookup(record,signal){const vault=await lookupRoot(signal),result=await request('entity-lookup',{vault,request:{op:'authority-lookup',record}},signal);lookupCurrent();if(result.entity?.attributes!==undefined)result.entity.attributes=decodeAuthoredValue(result.entity.attributes);return result.entity;},
   async acquireIdentity(input){return mutate({op:'authority-import',...input});},
   names:async(ids,signal)=>(await listingCall({op:'names',ids},signal)).rows,

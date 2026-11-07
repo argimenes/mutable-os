@@ -1,3 +1,5 @@
+import {assertSemanticFragmentDefinitions,semanticCopyError} from '../block-tree/scoped-semantic-copy';
+import {ENTITY_REFERENCE} from '../feature-api/scoped-entities';
 import {copyGlossIdentities} from '../features/gloss/relationships';
 import {assertCopyableDialectic,RANGE_ANCHOR,rangeDefinition} from '../features/dialectic/anchors';
 import {GLOSS,glossDefinition} from '../features/gloss/model';
@@ -27,6 +29,8 @@ export const contentRecord = (key: string, viewType: string, payload: JsonObject
 /** Two passes: allocate every owned identity, then resolve typed references only. */
 export function materializeFragment(input: MutableFragment, scope: InterchangeScope = {}, availableAssets: ReadonlyMap<string, string> = new Map(), availableBlocks: ReadonlyMap<string, boolean> = new Map(), retainedBlocks: ReadonlySet<string> = new Set(), allowExternalEntities = true, preserveGlossIds = false): BlockFragment {
   const f = validateFragment(input);
+  assertSemanticFragmentDefinitions(Object.fromEntries(f.definitions.map(d=>[d.localId,{...d.attributes,type:d.type}])));
+  if(f.blocks.some(b=>b.inline?.properties.some(p=>p.type===ENTITY_REFERENCE)))throw semanticCopyError();
   for(const b of f.blocks)assertCopyableDialectic(b.data);
   const keys = new Map(f.blocks.map(b => [b.localId, createContentKey()])), ids = new Map(f.blocks.map(b => [b.localId, createBlockId()]));
   const edges = new Map(f.placements.map(p => [p.localId, createPlacementKey()]));

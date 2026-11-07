@@ -1,3 +1,7 @@
+import {waitForQuery} from '../../../application/facts-query-provider';
+import {ScopedEntities} from '../../../application/scoped-entities';
+import {ENTITY_REFERENCE,entityReference,type ScopedEntityReference} from '../../../feature-api/scoped-entities';
+import {argumentDefinition} from '../arguments';
 import {canonicalSearchSource} from '../../../runtime/canonical-search-source';
 import {keys} from './markup';
 import type {ReactiveEditor} from '../../../reactive-editor/editor';
@@ -9,6 +13,7 @@ function* edges(n:BlockNode){yield* n.children;for(const name in n.ownedRelation
 export type SourceStatus='complete'|'truncated'|'missing'|'ambiguous'|'unavailable'|'unauthorized';
 export class DcpSources {
  readonly handles=new Map<string,ReplyTarget>();
+ private issued=new Map<string,string>();
  readonly fences=new Map<string,ContentRecord>();
  readonly revisions=new Map<string,string>();
  readonly diagnostics={visited:0,characters:0,reads:0,searches:0};
@@ -17,17 +22,38 @@ export class DcpSources {
  private glossValues=new Map<string,string>();
  private textCache=new Map<string,ReturnType<typeof canonicalSearchSource>>();
  private text(n:BlockNode){let pending=this.textCache.get(n.contentKey);if(!pending){pending=canonicalSearchSource(this.editor.repository.readState(),n.contentKey,0,this.signal,24000);this.textCache.set(n.contentKey,pending);}return pending;}
+ private entityRevisions=new Map<string,number>();
+ readonly entities:ScopedEntities;
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
- constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:()=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal){
+ constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:()=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[]){
+  let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;
+  this.entities=new ScopedEntities(editor,rootKey,owner);
   this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key))this.stale=true;});
  }
  check(){if(this.signal.aborted)throw Error('DCP cancelled');if(Date.now()>this.deadline)throw Error('DCP deadline exceeded');if(this.stale)throw Error('Selected context changed; request a fresh DCP response.');for(const [h,text]of this.glossValues)if(this.resolve(this.target(h)).text!==text)throw Error('Selected context changed');for(const [key,record]of this.fences)if(this.editor.repository.readState().contents[key]!==record)throw Error('Selected context changed; request a fresh DCP response.');}
  fence(key:string){const c=this.editor.repository.readState().contents[key];if(!c)throw Error('Source unavailable');if(!this.fences.has(key))this.fences.set(key,c);this.check();}
- issue(target:ReplyTarget){if(target.resourceId!==this.owner)throw Error('Outside Symposium');const handle=targetKey(target);this.handles.set(handle,target);return handle;}
+ issue(target:ReplyTarget){if(target.resourceId!==this.owner)throw Error('Outside Symposium');const key=targetKey(target);let handle=this.issued.get(key);if(!handle){handle='source-'+crypto.randomUUID();this.issued.set(key,handle);this.handles.set(handle,target);}return handle;}
  target(handle:string){const target=this.handles.get(handle);if(!target)throw Error('Unauthorized source handle');return target;}
  private committed(n:BlockNode){let cur:BlockNode|undefined=n;for(let depth=0;cur&&depth<128;depth++,cur=this.parent(cur.key)){const c=contribution((cur.payload.metadata as any)?.dialectic);if(c)return c.state==='committed';}return false;}
+ definition(t:ReplyTarget){if(t.resourceId!==this.owner)throw Error('Definition belongs to another Document');this.fence(this.entities.root.contentKey);const id=t.anchorId??t.argumentId??t.definitionId??t.entity?.entityId;return id?this.entities.registry()[id]:undefined;}
+ private async entityWork<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
+  this.check();const abort=new AbortController(),cancel=()=>abort.abort();this.signal.addEventListener('abort',cancel,{once:true});const timeout=setTimeout(cancel,Math.max(0,this.deadline-Date.now()));
+  try{const result=await waitForQuery(work(abort.signal),abort.signal);this.check();return result;}
+  finally{clearTimeout(timeout);this.signal.removeEventListener('abort',cancel);abort.abort();}
+ }
+ private async readEntity(ref:ScopedEntityReference){
+  const e=await this.entityWork(signal=>this.entities.resolve(ref,signal));if(e&&ref.scope==='vault'){const key=JSON.stringify(ref),revision=this.entityRevisions.get(key);if(revision!==undefined&&revision!==e.revision)throw Error('Vault Entity changed; request fresh context');this.entityRevisions.set(key,e.revision);}return e;
+ }
+ async verifyVaultEntity(ref:ScopedEntityReference){const e=await this.readEntity(ref);if(!e)throw Error('Vault Entity unavailable');return e;}
+
  async source(handle:string):Promise<any> {
   this.check();const target=this.handles.get(handle);if(!target)return {status:'unauthorized',handle};
+  if(target.kind==='argument-relation'||target.kind==='entity-relation'){
+   const d=this.definition(target),r=target.kind==='argument-relation'?d?.metadata?.dialecticArgumentRelation:d?.metadata?.scopedEntityRelation;if(!r||d.isDeleted)return {status:'missing',handle};
+   const endpoint=(v:any)=>this.issue(target.kind==='argument-relation'?{kind:'argument',resourceId:this.owner,argumentId:v.argumentId}:{kind:'entity',resourceId:this.owner,entity:v});return {status:'complete',handle,kind:target.kind,definition:d,from:endpoint(r.from),to:endpoint(r.to)};
+  }
+  if(target.kind==='entity'){if(target.entity.scope==='document')this.fence(this.entities.root.contentKey);const entity=await this.readEntity(target.entity);this.check();return entity?{status:'complete',handle,kind:'entity',reference:target.entity,entity}:{status:'missing',handle,kind:'entity'};}
+  if(target.kind==='argument'){const d=this.definition(target);if(!argumentDefinition(d)||d.isDeleted)return {status:'missing',handle};const anchor=this.issue({kind:'range',...d.metadata.dialecticArgument.anchor});const passage=await this.source(anchor);return {status:passage.status,handle,kind:'argument',identityExists:true,definition:d,relations:this.relations(target.argumentId).slice(0,64).map(d=>this.issue({kind:'argument-relation',resourceId:this.owner,definitionId:d.id})),anchor,passage,text:passage.text,historical:passage.historical};}
   const found=this.resolve(target);if(found.status!=='resolved')return {status:found.status==='ambiguous'?'ambiguous':found.status==='missing'?'missing':'unavailable',handle,reason:found.reason};
   const n=found.node;
   if(n&&!this.committed(n))return {status:'unauthorized',handle};
@@ -36,7 +62,7 @@ export class DcpSources {
   if(target.kind==='gloss')this.glossValues.set(handle,found.text??'');
   for(const s of found.segments??[])this.fence(s.contentKey);
   const revision=this.revisions.get(handle)??crypto.randomUUID();this.revisions.set(handle,revision);
-  const base={handle,owner:this.owner,revision,kind:target.kind,sourceAuthor};
+  const base={handle,target,owner:this.owner,revision,kind:target.kind,sourceAuthor};
   if(target.kind==='gloss'||target.kind==='range')return {status:'complete',...base,text:found.text??'',historical:found.historical};
   if(!n)return {status:'missing',...base};
   if(n.inlineContent.length>12000)return {status:'truncated',...base,reason:'Source Cell budget; select a smaller passage',omissions:['text']};
@@ -45,8 +71,19 @@ export class DcpSources {
   for(const key of edges(n)){if(children.length>=64){omitted=true;break;}const child=this.node(key);if(!child)continue;const t:ReplyTarget={kind:'block',resourceId:this.owner,blockId:String(child.payload.id)};const resolved=this.resolve(t);if(resolved.status!=='resolved'||resolved.node?.contentKey!==child.contentKey){omitted=true;continue;}children.push(this.issue(t));}
   const properties=n.payload.standoffProperties as any[]??[];
   const annotations=properties.slice(0,128).map(p=>({id:p.id,type:p.type,start:p.start,end:p.end,isDeleted:!!p.isDeleted,...(p.metadata?.dcp?{provenance:{actor:p.metadata.dcp.actor,exchangeId:p.metadata.dcp.exchangeId,protocol:p.metadata.dcp.protocol,sourceAuthor:p.metadata.dcp.sourceAuthor,appliedTo:p.metadata.dcp.appliedTo}}:{}),...(p.metadata?.unknownSemantic?{unknownSemantic:{type:String(p.metadata.unknownSemantic.type).slice(0,128),inert:true}}:{})}));
+  if(this.editor.features.scopedSemantics){
+   let vaultId:string|undefined,unavailable=false;
+   for(let i=0;i<annotations.length;i++){const p=properties[i],a=annotations[i] as any;if(p.isDeleted)continue;
+    let ref=p.type===ENTITY_REFERENCE&&entityReference(p.metadata?.entityReference)?p.metadata.entityReference:undefined;
+    if(p.type==='codex/entity-reference'&&typeof p.value==='string'&&!p.externalDefinition){
+     try{if(unavailable)throw Error('Vault unavailable');if(!vaultId){const r=await this.entityWork(signal=>this.entities.vaultReference(p.value,signal));if(r.scope==='vault')vaultId=r.vaultId;}ref={scope:'vault',vaultId,entityId:p.value};}
+     catch{this.check();unavailable=true;a.omission='Vault identity unavailable; global Entity handle not issued';}
+    }
+    if(ref)a.entityHandle=this.issue({kind:'entity',resourceId:this.owner,entity:ref});
+   }
+  }
   const supported=['standoff-editor-block','container-block','table-block','table-row-block','table-cell-block','indented-list-block'].includes(n.viewType);
-  return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['annotation values/attributes are not exported by the 4A profile']:[])],hasInlineObjects:objects};
+  return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
  }
  private record(call:any,result:any){const size=JSON.stringify(result).length;if((this.bytes+=size)>48000)throw Error('DCP retrieval result budget exceeded');this.trail.push({call,result});return result;}
  async tool(call:any){
@@ -82,5 +119,5 @@ export class DcpSources {
   const start=boundaries[matches[0]],end=boundaries[matches[0]+exact.length];if(start===undefined||end===undefined||start<0||end<0)throw Error('Selector splits a Cell');
   return {node:n,start,end,text:exact,sourceAuthor:source.sourceAuthor};
  }
- dispose(){this.stop();}
+ dispose(){this.stop();this.entities.dispose();}
 }

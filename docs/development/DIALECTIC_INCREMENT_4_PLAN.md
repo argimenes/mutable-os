@@ -1,6 +1,6 @@
 # Dialectic Increment 4 — DCP investigation and implementation plan
 
-**7 November 2026 · Revision 2: corrected Symposium argument model. Approved implementation direction; Stage 4A delivered. Stage 4B has not begun.**
+**7 November 2026 · Revision 2: corrected Symposium argument model. Approved implementation direction; Stages 4A and 4B delivered. Stage 4C has not begun.**
 
 Source brief: `/Users/iianneill/.codex/attachments/7f67f593-ba6b-4228-a03f-805da8e6489f/Pasted text.txt`. Increment 3 remains the accepted baseline. This investigation changed documentation only; it did not rerun its qualification.
 
@@ -142,7 +142,7 @@ The semantic registrations and materialisation validators should also be usable 
 3. **Broker deployment:** use a local broker with environment/session credentials first; defer remotely hosted credential management and OS-vault integration.
 4. **Delivery order and initial capability profile:** qualify semantics/retrieval with the mock before live providers; initially admit paragraphs, generic groups, lists and tables, plus reference/annotation capabilities. Additional native construction adapters are negotiated extensions, not changes to what contributions can contain.
 
-No additional question is necessary to complete this investigation. Revision 2 and these architectural directions were subsequently approved; implementation is authorised through Stage 4A only. See [Stage 4A qualification](DIALECTIC_STAGE_4A_QUALIFICATION.md).
+No additional question is necessary to complete this investigation. Revision 2 and these architectural directions were subsequently approved; implementation was subsequently authorised through Stage 4B. See [Stage 4A qualification](DIALECTIC_STAGE_4A_QUALIFICATION.md) and [Stage 4B qualification](DIALECTIC_STAGE_4B_QUALIFICATION.md).
 
 ## Bounded implementation and qualification
 

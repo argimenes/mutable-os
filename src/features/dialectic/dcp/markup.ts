@@ -1,26 +1,28 @@
+import {ENTITY_REFERENCE} from '../../../feature-api/scoped-entities';
 import {standoffStyleSchemas,standoffStyleSchema} from '../../../rendering/standoff-styles';
 import {SaxesParser} from 'saxes';
 import type {VisualEffectRegistry} from '../../../runtime/visual-effect-registry';
 export const classifications=['claim','question','speculation','suggestion','objection','qualification'].map(n=>'dialectic/'+n);
 export const INERT='dialectic/unknown-semantic';
-export interface Provenance {version:1;actor:'mock';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string}
+export interface Provenance {version:1;actor:'mock';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string;participantId?:string}
 export interface Mark {id:string;type:string;start:number;end:number;metadata:Record<string,any>}
-export function registerDcpTypes(registry:VisualEffectRegistry){
- const stops= [...classifications,INERT].filter(t=>!registry.type(t)).map(type=>registry.registerType({type,renderers:[],semantic:{purpose:type===INERT?'Preserved inert semantic declaration':`Classify/style a passage: ${type}`,attributes:[],ai:type===INERT?'inert':'authorable',rendering:type.startsWith('style/')?'native text styling':'descriptive annotation',validation:'nonempty Cell range; no additional attributes'}}));
+export function registerDcpTypes(registry:VisualEffectRegistry,semantics=false){
+ const stops= [...classifications,INERT,...(semantics?[ENTITY_REFERENCE]:[])].filter(t=>!registry.type(t)).map(type=>registry.registerType({type,renderers:[],semantic:{purpose:type===INERT?'Preserved inert semantic declaration':`Classify/style a passage: ${type}`,attributes:type===ENTITY_REFERENCE?['ref']:[],ai:type===INERT?'inert':'authorable',rendering:type.startsWith('style/')?'native text styling':'descriptive annotation',validation:'nonempty Cell range; no additional attributes'}}));
  return ()=>stops.reverse().forEach(f=>f());
 }
 export function legend(registry:VisualEffectRegistry){return [...Object.entries(standoffStyleSchemas).filter(([type])=>!registry.type(type)).map(([type,schema])=>({type,semantic:schema.semantic})),...registry.definitions()].filter(t=>t.semantic?.ai==='authorable').map(t=>({type:t.type,...t.semantic}));}
 export function annotation(type:string,attrs:Record<string,string>,registry:VisualEffectRegistry,provenance:Provenance){
+ if(type===ENTITY_REFERENCE)throw Error('Scoped Entity annotations require an admitted reference');
  if(Object.keys(attrs).length>16||Object.entries(attrs).some(([k,v])=>k.length>128||typeof v!=='string'||v.length>4096))throw Error('Annotation attribute budget exceeded');
  const definition=registry.type(type)??standoffStyleSchema(type);
- if(!/^[a-z][a-z0-9/-]{0,127}$/.test(type)||['dialectic/argument','dialectic/argument-relation','dialectic/range-anchor',INERT].includes(type))throw Error('Unsupported annotation type');
+ if(!/^[a-z][a-z0-9/-]{0,127}$/.test(type)||['dialectic/argument','dialectic/argument-relation','dialectic/range-anchor','mutable/entity','mutable/entity-relation',INERT].includes(type))throw Error('Unsupported annotation type');
  if(definition&&!definition.semantic||definition?.semantic?.ai==='inert')throw Error(`Annotation not AI-authorable: ${type}`);
  if(definition&&Object.keys(attrs).some(k=>!definition.semantic!.attributes.includes(k)))throw Error('Unsupported annotation attribute');
  return {type:definition?type:INERT,metadata:{dcp:provenance,...(!definition?{unknownSemantic:{type,attributes:attrs}}:{})}};
 }
 /** XML structural validation + exact decoded text. CR is encoded only in text
  * tokens before SAX parsing; literal line breaks in attributes are forbidden. */
-export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,provenance:Provenance,claim:(id:string)=>void){
+export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,provenance:Provenance,claim:(id:string)=>void,reference?:(type:string,handle:string)=>ReturnType<typeof annotation>){
  if(typeof source!=='string'||source.length>32768||/<!|<\?/.test(source)||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source))throw Error('Invalid or oversized annotation markup');
  // This restricted grammar admits no angle brackets in attributes. XML entities
  // remain available; text CR survives XML's normal line-ending normalization.
@@ -40,15 +42,16 @@ export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,
   }
   if(tag.name!=='annotation'||!attrs.type)throw Error('Unsupported markup element');
   const {type,id,...rest}=attrs;if(id)claim(id);
-  stack.push({tag:tag.name,start:cells,id,spec:annotation(type,rest,registry,provenance)});
+  const spec=rest.ref!==undefined&&reference?(Object.keys(rest).length===1?reference(type,rest.ref):(()=>{throw Error('Unsupported reference attributes');})()):annotation(type,rest,registry,provenance);
+  stack.push({tag:tag.name,start:cells,id,spec});
  });
  parser.on('closetag',()=>{const entry=stack.pop()!;if(!entry.spec)return;if(cells===entry.start)throw Error('Empty annotation');marks.push({id:crypto.randomUUID(),...entry.spec,start:entry.start,end:cells-1});if(entry.id)anchors.set(entry.id,{start:entry.start,end:cells});});
  parser.write('<dcp-root>'+encoded+'</dcp-root>').close();
  for(const r of ranges){
   keys(r,['id','type','from','to','ref','attributes']);claim(r.id);
-  if(r.ref!==null||!Array.isArray(r.attributes)||r.attributes.length)throw Error('Range attributes/references unavailable in 4A');
+  if(r.ref!==null&&!reference||!Array.isArray(r.attributes)||r.attributes.length)throw Error('Range attributes/references unavailable in 4A');
   const start=boundaries.get(r.from),end=boundaries.get(r.to);if(start===undefined||end===undefined||end<=start)throw Error('Missing/reversed/empty range boundary');
-  marks.push({id:crypto.randomUUID(),...annotation(r.type,{},registry,provenance),start,end:end-1});anchors.set(r.id,{start,end});
+  marks.push({id:crypto.randomUUID(),...(r.ref!==null&&reference?reference(r.type,r.ref):annotation(r.type,{},registry,provenance)),start,end:end-1});anchors.set(r.id,{start,end});
  }
  return {text,marks,anchors};
 }

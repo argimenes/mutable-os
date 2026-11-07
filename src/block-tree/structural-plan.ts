@@ -4,7 +4,7 @@ import {dialecticRangeRoot,dialecticRangePayloadOnly} from './dialectic-range-pl
 import { inlineOwnerFor } from './inline-plan';
 import type { ContentRecord, Location, PlacementRecord, RepositoryOperation, RepositoryState } from './types';
 
-export interface StructuralChange { sequenceMetadataOwner?:string; rangePayloadOwners?:string[]; gloss?: import("./gloss-plan").GlossChange; tabOrientationOwner?: string; tabMetadata?: { owners: string[]; inlineOwner?: string }; membership?: { key:string; before?:string; after?:string }[]; contents: string[]; childrenOwners: string[]; inlineOwners: string[] }
+export interface StructuralChange { definitionChanges?:{owner:string;ids:string[]}; sequenceMetadataOwner?:string; rangePayloadOwners?:string[]; gloss?: import("./gloss-plan").GlossChange; tabOrientationOwner?: string; tabMetadata?: { owners: string[]; inlineOwner?: string }; membership?: { key:string; before?:string; after?:string }[]; contents: string[]; childrenOwners: string[]; inlineOwners: string[] }
 export interface StructuralEvidence {
   locationOf(key: string): Location | undefined;
   referenceCount(key: string): number;
@@ -25,7 +25,8 @@ export function structuralChangeFor(state: RepositoryState, operations: Reposito
   if (!operations.length) return;
   const sequenceOwner=sequenceMetadataOwner(state,operations);
   if(sequenceOwner)return {sequenceMetadataOwner:sequenceOwner,contents:[sequenceOwner],childrenOwners:[],inlineOwners:[]};
-  const rangeRoot=dialecticRangeRoot(state,operations,evidence);
+  const definitionIds:string[]=[];
+  const rangeRoot=dialecticRangeRoot(state,operations,evidence,definitionIds);
   const contents = new Map<string, ContentRecord | undefined>(), placements = new Map<string, PlacementRecord | undefined>();
   for (const op of operations) {
     if (op.kind === 'set-root' || op.kind === 'record-batch') return;
@@ -139,6 +140,7 @@ export function structuralChangeFor(state: RepositoryState, operations: Reposito
   const inlineOwner = metadata.length && other.filter(op => op.kind === 'put-content' && state.contents[op.record.key]?.inlineKind === 'standoff').length === 1
     ? inlineOwnerFor(state,other,{get:key=>evidence.referenceCount(key)}) : undefined;
   return {
+    definitionChanges:rangeRoot?{owner:rangeRoot.key,ids:definitionIds}:undefined,
     rangePayloadOwners: [...contents].filter(([key,next])=>next&&dialecticRangePayloadOnly(state.contents[key],next)).map(([key])=>key),
     membership,
     tabMetadata: metadata.length && (!other.length || inlineOwner) ? {

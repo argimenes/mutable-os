@@ -1,3 +1,4 @@
+import {assertScopedSemanticCopy,assertSemanticFragmentDefinitions} from './scoped-semantic-copy';
 import {copyGlossIdentities} from "../features/gloss/relationships";
 import {glossDefinition} from "../features/gloss/model";
 import {assertCopyableDialectic} from '../features/dialectic/anchors';
@@ -43,6 +44,7 @@ export function captureBlocks(source: RepositoryState, roots: string[]): BlockFr
   const visitContent = (contentKey: string) => {
     if (state.contents[contentKey]) return;
     const content = source.contents[contentKey];
+    assertScopedSemanticCopy(source,contentKey);
     assertCopyableDialectic(content.payload); // also protects Cut before source removal
     state.contents[content.key] = clone(content);
     [...content.children, ...content.inlineContent, ...Object.values(content.ownedRelations)].forEach(visit);
@@ -83,6 +85,8 @@ export function captureBlocks(source: RepositoryState, roots: string[]): BlockFr
 
 export function cloneBlocks(fragment: BlockFragment, preserveIds = false): BlockFragment {
   for(const c of Object.values(fragment.state.contents))assertCopyableDialectic(c.payload);
+  assertSemanticFragmentDefinitions(fragment.linkedAnnotations??{});
+  for(const c of Object.values(fragment.state.contents))assertScopedSemanticCopy(fragment.state,c.key);
   const state = clone(fragment.state);
   const contentKeys = new Map(Object.keys(state.contents).map(key => [key, createContentKey()]));
   const placementKeys = new Map(Object.keys(state.placements).map(key => [key, createPlacementKey()]));

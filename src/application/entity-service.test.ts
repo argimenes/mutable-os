@@ -224,3 +224,8 @@ it('listing reads only names and indexed segment counts without Vault discovery 
   const aborted=new AbortController();aborted.abort();await expect(service.names([f.entityId],aborted.signal)).rejects.toThrow();
  }finally{service.dispose();discovery.mockRestore();facts.mockRestore();fetch.mockRestore();serverDiscovery.mockRestore();serverFence.mockRestore();}
 },30000);
+
+it('exposes a durable Vault GUID independently of its directory without discovery',async()=>{
+ const f=await fixture();const discovery=vi.spyOn(f.native,'discoverVault').mockRejectedValue(Error('No discovery for identity'));
+ const id=await f.service.scopeIdentity!();expect(id).toMatch(/^[0-9a-f-]{36}$/i);expect(id).not.toBe(await f.service.historyScope!());expect(await f.service.scopeIdentity!()).toBe(id);expect(discovery).not.toHaveBeenCalled();
+},30000);

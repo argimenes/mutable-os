@@ -6,7 +6,7 @@ import {unwrap} from 'solid-js/store';
 import type {ReactiveEditor} from '../../reactive-editor/editor';
 import type {DocumentApplicationPort} from '../../application/document-application-ports';
 import type {BlockNode} from '../../block-tree/types';
-import {contribution,draftContribution,isConversation,mockComposition,targetKey,type ReplyTarget,type MockContext,type ConsumedContext} from './model';
+import {contribution,defaultParticipant,participantLabel,draftContribution,isConversation,mockComposition,targetKey,type ReplyTarget,type MockContext,type ConsumedContext} from './model';
 import {captureTextSelection} from '../../runtime/selection-snapshot';
 import type {TextRangeSnapshot} from '../../runtime/text-ranges';
 import {glossOwner} from '../../block-tree/gloss-plan';
@@ -56,14 +56,18 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  };
  const resolve=(t:ReplyTarget|undefined):BlockNode|undefined=>{const r=resolveReference(t);return r.status==='resolved'?r.node:undefined;};
  const label=(t:ReplyTarget)=>{
+  if(t.kind==='argument-relation'||t.kind==='entity-relation')return resolveReference(t).text??`Relationship ${t.definitionId.slice(0,8)}`;
+  if(t.kind==='argument')return `Argument ${t.argumentId.slice(0,8)}`;
+  if(t.kind==='entity')return `Entity: ${resolveReference(t).text??t.entity.entityId.slice(0,8)}`;
   if(t.kind==='range')return `Passage ${String(t.anchorId??'?').slice(0,8)}`;
   if(t.kind==='gloss')return `Gloss: ${resolveReference(t).text??String(t.definitionId??'?').slice(0,8)}`;
-  const row=t.resourceId===resourceId()&&rows().find(r=>r.id===t.blockId);return row?row.data.state==='draft'?'Your draft':`#${row.data.ordinal} · ${row.data.author==='mock'?'Mock assistant':'You'}`:`Block ${String(t.blockId??'?').slice(0,8)}`;
+  const row=t.resourceId===resourceId()&&rows().find(r=>r.id===t.blockId);return row?row.data.state==='draft'?'Your draft':`#${row.data.ordinal} · ${participantLabel(row.data)}`:`Block ${String(t.blockId??'?').slice(0,8)}`;
  };
  const preview=editor.decorations.createCollection('dialectic:'+crypto.randomUUID());
  createEffect(()=>{if(!alive)return;const t=inspection(),r=resolveReference(t);preview.replace((r.segments??[]).map((s,i)=>({id:String(i),range:editor.textRanges.snapshot(s.node.key,s.start,s.end),renderers:[{id:'range',name:'svg-highlight',params:{color:'#f3cf7c'}}]})));});
  const run=(action:()=>unknown)=>{try{setNotice('');return action();}catch(e){setNotice(String(e));}};
  const reveal=(t:ReplyTarget,focus=false)=>{
+  if(['entity','argument-relation','entity-relation'].includes(t.kind))return;
   if(t.kind==='gloss'){editor.gloss.openDefinition(root()!.key,t.definitionId);return;}
   const node=resolve(t);if(!node){setNotice('The target is missing, ambiguous, or belongs to another Document. Its reference has been retained.');return;}
   const mount=editor.mounts.get(node.key);mount?.root.scrollIntoView?.({block:'center',behavior:'auto'});
@@ -112,11 +116,11 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   const ordinal=nextOrdinal();
   editor.commands.structuralTransaction('Submit contribution',()=>{
    persistRanges(to?[to]:[]);
-   editor.commands.setPayloadField(n.key,'metadata',{...structuredClone(unwrap(metadata(n))),dialectic:{...structuredClone(unwrap(d.data)),state:'committed',ordinal,createdUtc:new Date().toISOString(),replies:to?[to]:[],replyExcerpts:to?.kind==='range'?[{target:to,text:resolveReference(to).text??''}]:[]}});
+   editor.commands.setPayloadField(n.key,'metadata',{...structuredClone(unwrap(metadata(n))),dialectic:{...structuredClone(unwrap(d.data)),state:'committed',participant:d.data.participant??defaultParticipant(resourceId(),'human'),ordinal,createdUtc:new Date().toISOString(),replies:to?[to]:[],replyExcerpts:to?.kind==='range'||to?.kind==='argument'?[{target:to,text:resolveReference(to).text??''}]:[]}});
    editor.commands.insert(draftContribution(),{kind:'at',parentKey:root()!.key,index:root()!.children.length});
   });
   if(to?.kind==='range')pending.delete(to.anchorId);
-  diagnostics.submissions++;setReply(undefined);setInspection(target(d.id));queueMicrotask(compose);
+  diagnostics.submissions++;setReply(undefined);setInspection(target(d.id));queueMicrotask(compose);return target(d.id);
  });
  const capture=(targets:ReplyTarget[])=>{
   let remaining=6000,visited=0;const revisions=new Map<string,number>(),items:MockContext[]=[],manifest:ConsumedContext['items']=[];
@@ -125,8 +129,8 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    const itemRevisions=new Map<string,number>();
    const record=(key:string)=>{const revision=editor.repository.readState().contents[key].revision;revisions.set(key,revision);itemRevisions.set(key,revision);};
    let text='';
-   if(t.kind==='range'){text=resolved.text!;for(const s of resolved.segments!)record(s.contentKey);record(root()!.contentKey);remaining-=text.length;}
-   else if(t.kind==='gloss'){text=resolved.text!;record(root()!.contentKey);remaining-=text.length;}
+   if(t.kind==='range'||t.kind==='argument'){text=resolved.text!;for(const s of resolved.segments!)record(s.contentKey);record(root()!.contentKey);remaining-=text.length;}
+   else if(t.kind==='gloss'||t.kind==='entity'||t.kind==='argument-relation'||t.kind==='entity-relation'){text=resolved.text!;record(root()!.contentKey);remaining-=text.length;}
    else {
     const seen=new Set<string>();const walk=(n:BlockNode)=>{
      if(seen.has(n.contentKey))return;seen.add(n.contentKey);
@@ -166,6 +170,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   for(const [key,properties]of texts)editor.commands.setPayloadField(key,'standoffProperties',properties);
  };
  const reattach=(t:ReplyTarget,provided?:TextRangeSnapshot)=>run(()=>{
+  if(t.kind==='argument'){const d=(root()!.payload.linkedAnnotations as any)?.[t.argumentId];if(!d)throw Error('Argument unavailable');t={kind:'range',...d.metadata.dialecticArgument.anchor};}
   if(t.kind!=='range'||t.resourceId!==resourceId()||pending.has(t.anchorId))throw Error('Choose a committed range reference to reattach.');
   const range=selectionRange(provided),old=resolveReference(t),registry=structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,any>;
   if(!registry[t.anchorId]||registry[t.anchorId].isDeleted)throw Error('Restore the missing anchor definition with Undo before reattaching.');
@@ -177,24 +182,25 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const createGloss=()=>run(()=>{const segments=resolveReference(inspection()).segments;if(segments?.length!==1)throw Error('Select one passage segment to create a Gloss.');const s=segments[0];void editor.commandRegistry.execute('gloss.create',{targetKey:s.node.key,args:{selection:{anchor:s.start,head:s.end}}});});
  const pinGloss=(id:string)=>pin({kind:'gloss',resourceId:resourceId(),definitionId:id});
  const cancel=()=>{generation++;requestAbort?.abort();clearPreview();setBusy(false);};
- const askDcp=async(transport:DcpTransport)=>{
+ const exchangeTarget=()=>reply()??(inspection()&&!['entity','argument-relation','entity-relation'].includes(inspection()!.kind)?inspection():undefined)??(frontier()?target(frontier()!.id):undefined);
+ const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget)=>{
   if(busy())return;
   let ticket=0,sources:DcpSources|undefined;
   try{
-   setNotice('');clearPreview();guard();const to=reply()??inspection()??(frontier()?target(frontier()!.id):undefined);
+   setNotice('');clearPreview();guard();const to=explicit??exchangeTarget();
    if(!to)throw Error('Submit a contribution or select a reply target first.');requireCommittedTarget(to);
    const selectedTargets=structuredClone(unwrap(context())),targets=[to,...selectedTargets.filter(t=>targetKey(t)!==targetKey(to))];
-   for(const t of targets)if(t.kind!=='gloss')requireCommittedTarget(t);
+   for(const t of targets)if(!['gloss','entity','argument-relation','entity-relation'].includes(t.kind))requireCommittedTarget(t);
    const captured=capture(targets),source=session()!,exchangeId=crypto.randomUUID();
    ticket=++generation;requestAbort=new AbortController();setBusy(true);setDcpPreview('Preparing structured exchange…');
-   sources=new DcpSources(editor,resourceId(),function*(){for(const r of committed())yield source.projection.node(r.key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal);
+   sources=new DcpSources(editor,resourceId(),function*(){for(const r of committed())yield source.projection.node(r.key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id));
    for(const key of captured.revisions.keys())sources.fence(key);
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
-   const request=dcpRequest(exchangeId,primary,selected,captured.items.map(item=>({handle:sources!.issue(item.target),plainTextExcerpt:item.text})),editor.visualEffects);
+   const request=dcpRequest(exchangeId,primary,selected,captured.items.map(item=>({handle:sources!.issue(item.target),plainTextExcerpt:item.text})),editor.visualEffects,editor.features.scopedSemantics);
    const raw=await receive(transport,request,sources,value=>{if(alive&&ticket===generation)streamPreview(value,ticket);},requestAbort);
    if(!alive||ticket!==generation)return;
    if(session()!==source)throw Error('Conversation changed; DCP response discarded');guard();sources.check();
-   const prepared=await prepareDcp(raw,exchangeId,resourceId(),editor.visualEffects,sources),d=draft();if(!d)throw Error('Restore the draft before adding a response');
+   const prepared=await prepareDcp(raw,exchangeId,resourceId(),editor.visualEffects,sources,editor.features.scopedSemantics),d=draft();if(!d)throw Error('Restore the draft before adding a response');
    if(!alive||ticket!==generation||session()!==source)return;guard();sources.check();
    for(const t of targets)if(t.kind==='range'){
     const p=pending.get(t.anchorId);if(!p)continue;editor.textRanges.validate([p.range],'cell');prepared.definitions[t.anchorId]=p.definition;
@@ -202,9 +208,9 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     properties.push({id:crypto.randomUUID(),type:RANGE_ANCHOR,annotationId:t.anchorId,start:p.range.start,end:p.range.end-1});
    }
    for(const item of captured.manifest)item.origins=[...(targetKey(item.target)===targetKey(to)?['reply-target' as const]:[]),...(selectedTargets.some(t=>targetKey(t)===targetKey(item.target))?['selected' as const]:[])];
-   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:'mock',ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:prepared.discursiveReferences,context:targets,requestId:exchangeId,
-    replyExcerpts:to.kind==='range'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
-    dcp:{version:1,profile:'4a-1',request,tools:sources.trail,response:raw,identityMap:prepared.aliases,intent:prepared.intent}};
+   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:'mock',participant:defaultParticipant(resourceId(),'ai'),ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:prepared.discursiveReferences,context:targets,requestId:exchangeId,
+    replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
+    dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,identityMap:prepared.aliases,intent:prepared.intent}};
    const started=performance.now();
    editor.commands.boundedStructuralTransaction('Add DCP mock response',()=>{
     if(Object.keys(prepared.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})),...prepared.definitions});
@@ -216,8 +222,8 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    diagnostics.submissions++;clearPreview();inspect(target(id));
   }catch(e){if(alive&&ticket===generation)setNotice(String(e));else if(!ticket&&alive)setNotice(String(e));}finally{sources?.dispose();if(ticket===generation)setBusy(false);}
  };
- const askMock=async(transport:DcpTransport=mockTransport)=>{
-  if(editor.features.dialecticDcp)return askDcp(transport);
+ const askMock=async(transport:DcpTransport=mockTransport,explicit?:ReplyTarget)=>{
+  if(editor.features.dialecticDcp)return askDcp(transport,explicit);
   if(busy())return;
   let ticket=0;
   try{
@@ -233,13 +239,15 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    guard();for(const [key,revision]of captured.revisions)if(editor.repository.readState().contents[key]?.revision!==revision)throw Error('Selected context changed; request a fresh mock response.');
    const d=draft();if(!d)throw Error('Restore the conversation draft before adding a response.');
    const id=crypto.randomUUID(),ordinal=nextOrdinal();
-   editor.commands.structuralTransaction('Add mock response',()=>{persistRanges(targets);editor.commands.insert({id,type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'committed',author:'mock',ordinal,createdUtc:new Date().toISOString(),replies:[to],context:targets,requestId,replyExcerpts:to.kind==='range'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}}}},children:mockComposition(captured.items)},{kind:'before',anchorKey:d.key});});
+   editor.commands.structuralTransaction('Add mock response',()=>{persistRanges(targets);editor.commands.insert({id,type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'committed',author:'mock',participant:defaultParticipant(resourceId(),'ai'),ordinal,createdUtc:new Date().toISOString(),replies:[to],context:targets,requestId,replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}}}},children:mockComposition(captured.items)},{kind:'before',anchorKey:d.key});});
    for(const t of targets)if(t.kind==='range')pending.delete(t.anchorId);
    diagnostics.submissions++;inspect(target(id));
   }catch(e){if(alive)setNotice(String(e));}finally{if(ticket===generation)setBusy(false);}
  };
  const sequences=createSequenceController(editor,{root,resourceId,session,resolve,inspect,requireCommittedTarget,guard});
- return {sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,
+ const entityDetails=(t:ReplyTarget)=>t.kind==='entity'&&t.entity.scope==='document'?(root()!.payload.linkedAnnotations as any)?.[t.entity.entityId]?.metadata?.scopedEntity?.entity:undefined;
+ const submitAndAsk=async(transport:DcpTransport=mockTransport)=>{const submitted=submit();if(submitted)await askMock(transport,submitted as ReplyTarget);};
+ return {exchangeTarget,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
   references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,
   dispose(){sequences.dispose();alive=false;cancel();choices.clear();pending.clear();preview.dispose();},capture,
  };

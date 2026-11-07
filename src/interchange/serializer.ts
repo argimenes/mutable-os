@@ -1,3 +1,4 @@
+import {assertScopedSemanticCopy} from '../block-tree/scoped-semantic-copy';
 import {glossDefinition} from "../features/gloss/model";
 import {rangeDefinition} from '../features/dialectic/anchors';
 import {STRUCTURED_BLOCK} from '../structured/model';
@@ -54,6 +55,7 @@ export function serializeSelection(state: RepositoryState, slices: Slice[], scop
       return edge;
     }
     const c = state.contents[p.contentKey]; if (!c) throw Error('Missing selected content.');
+    if(!packageDefinitions)assertScopedSemanticCopy(state,c.key);
     // A whole Document copy owns its unanchored/tombstoned Glosses too.
     if(c.viewType==='document-block'&&!slice)for(const [annotationId,d]of Object.entries(linkedRegistry(state,c.key)))if(glossDefinition(d)||rangeDefinition(d))property({type:d.type,annotationId},c.key);
     const localId = !slice && contentIds.get(c.key) || id();

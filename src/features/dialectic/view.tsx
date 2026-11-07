@@ -1,3 +1,4 @@
+import {participantLabel} from './model';
 import {SequenceNavigation,SequenceAuthor,SequenceReader} from './sequence-view';
 import {For,Show,createEffect,createMemo,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
 import type {DocumentApplicationInstance} from '../../feature-api/document-application';
@@ -20,7 +21,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
  });
  const selected=()=>c.inspection(),row=()=>c.rows().find(r=>r.id===selected()?.blockId);
  const resolved=()=>c.resolveReference(selected());
- const selectedTarget=()=>c.reply()??selected()??(c.frontier()?c.target(c.frontier()!.id):undefined);
+ const selectedTarget=c.exchangeTarget;
  return <section ref={root} class="dialectic-app" aria-label="Dialectic conversation">
   <header class="dialectic-bar" data-cross-text-controls>
    <div><strong>Dialectic</strong><span class="dialectic-subtitle"> Compositions in conversation</span></div>
@@ -32,7 +33,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
    <aside class="dialectic-sidebar" aria-label="Contributions">
     <div class="dialectic-eyebrow">CHRONOLOGY</div>
     <p class="dialectic-muted">{c.committed().length} contributions · {c.frontier()?`Present #${c.frontier()!.data.ordinal}`:'Ready to begin'}</p>
-    <For each={c.committed()}>{r=><button class="dialectic-entry" aria-current={selected()?.blockId===r.id?'true':undefined} onClick={act(()=>c.inspect(c.target(r.id)))}><span class="dialectic-number">{String(r.data.ordinal).padStart(2,'0')}</span><span>{r.data.author==='mock'?'Mock assistant':'You'}<small>{r.data.replies.length?`↳ ${r.data.replies.map(t=>c.label(t)).join(', ')}`:'New contribution'}</small></span></button>}</For>
+    <For each={c.committed()}>{r=><button class="dialectic-entry" aria-current={selected()?.blockId===r.id?'true':undefined} onClick={act(()=>c.inspect(c.target(r.id)))}><span class="dialectic-number">{String(r.data.ordinal).padStart(2,'0')}</span><span>{participantLabel(r.data)}<small>{r.data.replies.length?`↳ ${r.data.replies.map(t=>c.label(t)).join(', ')}`:'New contribution'}</small></span></button>}</For>
     <button class="dialectic-entry" onClick={c.compose}>＋ Your draft</button>
     <div class="dialectic-history"><button disabled={c.cursor()<=0} onClick={()=>c.navigate(-1)}>← Back</button><button disabled={c.cursor()>=c.trail().length-1} onClick={()=>c.navigate(1)}>Forward →</button></div>
     <button class="dialectic-present" onClick={c.present}>Return to present</button>
@@ -45,17 +46,17 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <div class="dialectic-retained-source" hidden={!!c.sequences.presenting()} inert={!!c.sequences.presenting()}>{props.children}</div>
     <div hidden={!!c.sequences.presenting()} class="dialectic-compose-bar" data-cross-text-controls onPointerDown={e=>e.preventDefault()}>
      <div><strong>Your next contribution</strong><small>{c.reply()?`Replying to ${c.label(c.reply()!)}`:'New contribution at the chronological frontier'} <Show when={c.reply()}><button onClick={()=>c.setReply(undefined)}>Clear target</button></Show></small></div>
-     <button onClick={c.compose}>Go to draft</button><button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={c.submit}>Submit</button>
+     <button onClick={c.compose}>Go to draft</button><button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={c.submit}>Submit</button><button disabled={!c.valid()||c.busy()} onClick={()=>void c.submitAndAsk()}>Submit &amp; Ask</button>
     </div>
    </main>
    <aside class="dialectic-inspector" inert={!!c.sequences.presenting()} aria-label="Conversation context">
     <div class="dialectic-eyebrow">INSPECTION</div>
     <h3>{selected()?c.label(selected()!):'Explore a contribution'}</h3>
     <Show when={row()}>{r=><p class="dialectic-muted">{r().data.createdUtc?new Date(r().data.createdUtc!).toLocaleString():'Draft'} · Content stays editable.</p>}</Show>
-    <button disabled={!selected()||selected()?.kind==='gloss'} onClick={act(()=>{if(selected())c.setReply(selected());})}>Reply to this</button>
+    <button disabled={!selected()||['gloss','entity','argument-relation','entity-relation'].includes(selected()!.kind)} onClick={act(()=>{if(selected())c.setReply(selected());})}>Reply to this</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={act(()=>{const t=c.focusBlock();c.setReply(t);c.inspect(t);})}>Reply to caret Block</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={()=>c.selectRange('reply')}>Reply to selection</button>
-    <Show when={selected()?.kind==='range'}>
+    <Show when={selected()?.kind==='range'||selected()?.kind==='argument'}>
      <p role="status">{resolved().status==='resolved'?(resolved().changed?'Source changed since anchoring':'Current passage'):`Unresolved: ${resolved().reason??resolved().status}`}</p>
      <blockquote>{resolved().text}</blockquote>
      <details><summary>Text when anchored</summary><blockquote>{resolved().historical}</blockquote></details>
@@ -64,8 +65,11 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
      <button onPointerDown={e=>e.preventDefault()} onClick={c.createGloss}>Create Gloss on passage</button>
      <For each={c.glosses()}>{g=><div><button onClick={()=>c.editor.gloss.openDefinition(c.root()!.key,g.id)}>{g.value}</button><button onClick={act(()=>c.pinGloss(g.id))}>Include Gloss</button></div>}</For>
     </Show>
+    <Show when={selected()?.kind==='entity'}><Show when={c.entityDetails(selected()!)} fallback={<p>Scoped Entity unavailable. Its qualified reference is retained.</p>}>{e=><dl><dt>Type</dt><dd>{e().typename}</dd><dt>Description</dt><dd>{e().description}</dd><dt>Aliases</dt><dd>{e().aliases.map((a:any)=>a.name).join(', ')}</dd></dl>}</Show></Show>
     <Show when={row()?.data.replies.length}><details open><summary>Reply sources</summary><For each={row()?.data.replies}>{t=><div><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><For each={row()?.data.replyExcerpts?.filter(x=>JSON.stringify(x.target)===JSON.stringify(t))}>{x=><><small>Text captured for this reply{c.resolveReference(t).text!==x.text?' · Source changed or unavailable':''}</small><blockquote>{x.text}</blockquote></>}</For></div>}</For></details></Show>
     <Show when={row()?.data.discursiveReferences?.length}><details open><summary>Discursive references</summary><p>Additional passages; the primary reply remains unchanged.</p><For each={row()?.data.discursiveReferences}>{t=><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button>}</For></details></Show>
+    <Show when={selected()?.kind==='argument'}><For each={c.argumentRelations(selected()!.argumentId!)}>{d=>{const r=d.metadata.dialecticArgumentRelation;return <p><button onClick={()=>c.inspect({kind:'argument',...r.from})}>{c.label({kind:'argument',...r.from})}</button> → {r.relation} → <button onClick={()=>c.inspect({kind:'argument',...r.to})}>{c.label({kind:'argument',...r.to})}</button></p>;}}</For></Show>
+    <Show when={row()?.data.dcp}><details><summary>Semantic identities</summary><For each={Object.values(row()?.data.dcp?.identityMap??{}) as any[]}>{t=><button onClick={()=>c.inspect(t)}>{c.label(t)}</button>}</For></details></Show>
     <hr/><div class="dialectic-eyebrow">NEXT MOCK INTERACTION</div>
     <p class="dialectic-muted">Target: {selectedTarget()?c.label(selectedTarget()!):'Select a contribution'}. Selected context remains when you return to the present.</p>
     <button disabled={!selected()} onClick={act(()=>{if(selected())c.pin(selected()!);})}>Include in context</button>
@@ -76,7 +80,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={()=>void c.askMock()}>Ask mock assistant</button><Show when={c.busy()}><button onClick={c.cancel}>Cancel response</button></Show>
     <Show when={c.dcpPreview()}><details open class="dialectic-dcp-preview"><summary>{c.busy()?'Transient DCP response — not committed':'Uncommitted DCP output'}</summary><pre>{c.dcpPreview()}</pre><Show when={!c.busy()}><button onClick={c.cancel}>Dismiss output</button></Show></details></Show>
     <p class="dialectic-footnote">Deterministic example. No AI service or network request. Target plus up to 12 selected items; 6,000 characters maximum.</p>
-    <Show when={row()?.data.dcp}><details><summary>DCP exchange record</summary><p>Structured mock · {row()?.data.dcp?.profile} · {row()?.data.dcp?.tools.length} retrieval calls. Interpretations of source passages are attributed to this exchange, not to the source author.</p><pre class="dialectic-dcp-record">{JSON.stringify(row()?.data.dcp,null,2)}</pre></details></Show>
+    <Show when={row()?.data.dcp}><details><summary>DCP exchange record</summary><p>Structured mock · {row()?.data.dcp?.profile} · {row()?.data.dcp?.tools?.length} retrieval calls. Interpretations of source passages are attributed to this exchange, not to the source author.</p><pre class="dialectic-dcp-record">{JSON.stringify(row()?.data.dcp,null,2)}</pre></details></Show>
     <Show when={row()?.data.context?.length}><details><summary>Response provenance</summary><For each={row()?.data.context}>{t=><p>{c.label(t)}</p>}</For></details></Show>
     <Show when={row()?.data.consumedContext}><details><summary>Material supplied to mock</summary><p>Captured input, not evidence of internal model attention.</p><For each={row()?.data.consumedContext?.items}>{item=><div><button onClick={act(()=>c.inspect(item.target))}>{c.label(item.target)}</button><small>{item.origins.join(' + ')}</small><blockquote>{item.text}</blockquote></div>}</For></details></Show>
    </aside>
@@ -88,7 +92,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
 /** Label existing container mounts without replacing children or creating a renderer fork. */
 function decorate(c:DialecticController){
  createEffect(()=>{
-  const session=c.session(),rows=c.rows().map(r=>({key:r.key,label:r.data.state==='draft'?'YOUR DRAFT':`${r.data.author==='mock'?'MOCK ASSISTANT':'YOU'} · ${r.data.ordinal}`,draft:r.data.state==='draft'}));
+  const session=c.session(),rows=c.rows().map(r=>({key:r.key,label:r.data.state==='draft'?'YOUR DRAFT':`${participantLabel(r.data).toUpperCase()} · ${r.data.ordinal}`,draft:r.data.state==='draft'}));
   let alive=true;const mounts:HTMLElement[]=[];
   queueMicrotask(()=>{if(!alive||session!==c.session())return;for(const r of rows){const element=c.editor.mounts.get(r.key)?.root as HTMLElement|undefined;if(!element)continue;element.dataset.dialecticContribution=r.label;element.dataset.dialecticDraft=String(r.draft);mounts.push(element);}});
   onCleanup(()=>{alive=false;for(const e of mounts){delete e.dataset.dialecticContribution;delete e.dataset.dialecticDraft;}});

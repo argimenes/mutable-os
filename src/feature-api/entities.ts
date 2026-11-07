@@ -10,6 +10,8 @@ export interface EntityResolution {candidates:EntityCandidate[];complete:boolean
 export interface AuthorityRecord { provider:'wikidata'|'gnd'; id:string; name:string; description:string; aliases:string[]; url:string; retrievedAt:string; wikidata?:string; revision?:number }
 export interface EntityService {
  historyScope?():Promise<string>;
+ /** Durable Vault identity for scope-qualified references; not a filesystem location. */
+ scopeIdentity?(signal?:AbortSignal):Promise<string>;
  authorityLookup?(record:{provider:string;id:string},signal:AbortSignal):Promise<CanonicalEntity|undefined>;
  acquireIdentity?(input:{id:string;operationId:string;record:AuthorityRecord;targetId?:string;expected?:number}):Promise<CanonicalEntity>;
  names(ids:string[],signal?:AbortSignal):Promise<Array<{id:string;name:string}>>;

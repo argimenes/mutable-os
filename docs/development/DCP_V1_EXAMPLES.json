@@ -11,7 +11,8 @@
     "Argument declarations contain only a provisional ID and an anchor reference. Neither a classification nor a Gloss implicitly creates an argument. Current passage text is resolved through the anchor, not stored in the argument definition.",
     "Argument relations use Symposium-owned records and argument endpoints. Entity relations remain a separate scoped adapter. Wrong-kind endpoints are rejected rather than converted.",
     "The six proposed classification types are dialectic/claim, dialectic/question, dialectic/speculation, dialectic/suggestion, dialectic/objection and dialectic/qualification. Definition-only dialectic/argument and dialectic/argument-relation are not inline annotation types.",
-    "The host request primaryReply controls the canonical contribution.replies entry. Model response replyTargets are additional discursiveReferences, not replacement structural parents."
+    "The host request primaryReply controls the canonical contribution.replies entry. Model response replyTargets are additional discursiveReferences, not replacement structural parents.",
+    "Stage 4B runtime profile: Document Entities use mutable/entity and mutable/entity-relation; scoped inline mentions use mutable/entity-reference with an issued or provisional Entity ref. Vault references carry the durable Vault GUID. Examples remain illustrative: capability negotiation can reject deferred suggestions, promotion or assets. See DIALECTIC_STAGE_4B_QUALIFICATION.md."
   ],
   "simpleExchange": {
     "hostRequest": {

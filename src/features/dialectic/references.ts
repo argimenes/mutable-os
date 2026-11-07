@@ -1,3 +1,5 @@
+import {argumentDefinition,argumentRelation} from './arguments';
+import {localEntity} from '../../feature-api/scoped-entities';
 import {createSignal,untrack,type Accessor} from 'solid-js';
 import type {ReactiveEditor} from '../../reactive-editor/editor';
 import type {BlockTreeProjection} from '../../block-tree/projection';
@@ -7,12 +9,13 @@ import {glossDefinition,GLOSS} from '../gloss/model';
 import {RANGE_ANCHOR,rangeDefinition} from './anchors';
 import {contribution,type ReplyTarget} from './model';
 export interface Segment {contentKey:string;id:string;start:number;end:number;node:BlockNode}
-export interface Resolution {status:'resolved'|'unanchored'|'missing'|'ambiguous'|'invalid'|'outside-document';reason?:string;node?:BlockNode;segments?:Segment[];text?:string;historical?:string;changed?:boolean}
+export interface Resolution {status:'resolved'|'unanchored'|'missing'|'ambiguous'|'invalid'|'outside-document';reason?:string;node?:BlockNode;segments?:Segment[];text?:string;historical?:string;changed?:boolean;identityExists?:boolean;argumentId?:string}
 type Entry={record:ContentRecord;edges:Map<string,string>;anchors:Set<string>};
 /** One derived index per retained Document session. Only affected canonical
  * records and inserted/removed subtrees are read after initialisation. */
 export class DialecticReferences {
- readonly diagnostics={treeVisits:0,propertyReads:0,recordUpdates:0};
+ readonly diagnostics={treeVisits:0,propertyReads:0,recordUpdates:0,definitionReads:0};
+ private argumentAnchors=new Map<string,string>();private anchorArguments=new Map<string,Set<string>>();private edgeEndpoints=new Map<string,string[]>();private argumentEdges=new Map<string,Set<string>>();
  private entries=new Map<string,Entry>();private blocks=new Map<string,Set<string>>();private anchors=new Map<string,Set<string>>();
  private stamps=new Map<string,{get:Accessor<number>;bump:()=>void}>();private stop:()=>void;
  private evidence={locationOf:(k:string)=>this.editor.repository.locationOf(k),ownedKeys:(k:string)=>this.editor.repository.ownedPlacementKeys(k)};
@@ -25,7 +28,7 @@ export class DialecticReferences {
    for(const [key,old]of change.previousContents){
     const next=editor.repository.readState().contents[key];
     if(next?.viewType==='text-cell'||next?.viewType==='image-cell'||!next&&['text-cell','image-cell'].includes(old?.viewType??''))continue;
-    if(this.entries.has(key)||this.belongs(key))this.update(key);
+    if(this.entries.has(key)||this.belongs(key))this.update(key,change.structural?.definitionChanges?.owner===key?change.structural.definitionChanges.ids:undefined);
    }
   }));
  }
@@ -34,7 +37,7 @@ export class DialecticReferences {
  private edgeMap(c:ContentRecord){const state=this.editor.repository.readState();return new Map([...c.children,...Object.values(c.ownedRelations)].flatMap(k=>{const p=state.placements[k];return p&&!p.externalReference?[[k,p.contentKey] as const]:[];}));}
  private visit(key:string){if(this.entries.has(key)||!this.belongs(key))return;this.diagnostics.treeVisits++;this.update(key);}
  private remove(key:string){const old=this.entries.get(key);if(!old)return;this.entries.delete(key);this.blocks.get(String(old.record.payload.id))?.delete(key);this.stamp('b:'+String(old.record.payload.id)).bump();for(const id of old.anchors){this.anchors.get(id)?.delete(key);this.stamp('a:'+id).bump();}for(const child of old.edges.values())if(!this.belongs(child))this.remove(child);}
- private update(key:string){
+ private update(key:string,definitionIds?:string[]){
   const old=this.entries.get(key),c=this.editor.repository.readState().contents[key];if(!c||!this.belongs(key)){this.remove(key);return;}
   this.diagnostics.recordUpdates++;
   const edges=this.edgeMap(c),ids=new Set<string>();
@@ -43,16 +46,38 @@ export class DialecticReferences {
   const id=String(c.payload.id);if(old&&old.record.payload.id!==id)this.blocks.get(String(old.record.payload.id))?.delete(key);
   let keys=this.blocks.get(id);if(!keys)this.blocks.set(id,keys=new Set());keys.add(key);
   this.entries.set(key,{record:c,edges,anchors:ids});this.stamp('b:'+id).bump();
-  if(key===this.owner){const before:any=old?.record.payload.linkedAnnotations??{},after:any=c.payload.linkedAnnotations??{};if(before!==after)for(const id of new Set([...Object.keys(before),...Object.keys(after)]))if(JSON.stringify(before[id])!==JSON.stringify(after[id]))this.stamp('a:'+id).bump();}
+  if(key===this.owner){const before:any=old?.record.payload.linkedAnnotations??{},after:any=c.payload.linkedAnnotations??{};if(before!==after||definitionIds)for(const id of definitionIds??new Set([...Object.keys(before),...Object.keys(after)])){this.diagnostics.definitionReads++;if(definitionIds||JSON.stringify(before[id])!==JSON.stringify(after[id])){this.indexDefinition(id,after[id]);this.stamp('a:'+id).bump();}}}
   for(const [pk,child]of old?.edges??[])if(!edges.has(pk)&&!this.belongs(child))this.remove(child);
   for(const [pk,child]of edges)if(!old?.edges.has(pk))this.visit(child);
  }
+ private indexDefinition(id:string,d:any){
+  const old=this.argumentAnchors.get(id);if(old){this.anchorArguments.get(old)?.delete(id);this.stamp('a:'+old).bump();}this.argumentAnchors.delete(id);
+  for(const endpoint of this.edgeEndpoints.get(id)??[]){this.argumentEdges.get(endpoint)?.delete(id);this.stamp('edges:'+endpoint).bump();}this.edgeEndpoints.delete(id);
+  if(d?.isDeleted)return;
+  if(argumentDefinition(d)){const anchor=d.metadata.dialecticArgument.anchor.anchorId;this.argumentAnchors.set(id,anchor);let set=this.anchorArguments.get(anchor);if(!set)this.anchorArguments.set(anchor,set=new Set());set.add(id);this.stamp('a:'+anchor).bump();}
+  if(argumentRelation(d)){const r=d.metadata.dialecticArgumentRelation,endpoints=[r.from.argumentId,r.to.argumentId];this.edgeEndpoints.set(id,endpoints);for(const endpoint of endpoints){let set=this.argumentEdges.get(endpoint);if(!set)this.argumentEdges.set(endpoint,set=new Set());set.add(id);this.stamp('edges:'+endpoint).bump();}}
+ }
+ argumentsFor(anchorId:string){this.stamp('a:'+anchorId).get();return [...this.anchorArguments.get(anchorId)??[]];}
+ relationsFor(argumentId:string){this.stamp('edges:'+argumentId).get();const registry:any=this.editor.repository.readState().contents[this.owner]?.payload.linkedAnnotations??{};return [...this.argumentEdges.get(argumentId)??[]].map(id=>registry[id]).filter(Boolean);}
  node(contentKey:string,preferred?:string){const nodes=this.projection.nodesForContent(contentKey);return nodes.find(n=>n.key===preferred)??nodes[0];}
  text(contentKey:string,start=0,end?:number){const state=this.editor.repository.readState(),c=state.contents[contentKey];return c?.inlineContent.slice(start,end).map(pk=>{const cell=state.contents[state.placements[pk]?.contentKey];return cell?.viewType==='text-cell'?String(cell.payload.text??''):'\ufffc';}).join('')??'';}
  resolve(t:ReplyTarget,preferred?:string):Resolution {
-  if(!t||typeof t.resourceId!=='string'||!['range','gloss','block','contribution'].includes(t.kind)||
-   typeof (t.kind==='range'?t.anchorId:t.kind==='gloss'?t.definitionId:t.blockId)!=='string')return {status:'invalid',reason:'Unsupported reference descriptor.'};
+  if(!t||typeof t.resourceId!=='string'||!['range','gloss','block','contribution','argument','entity','argument-relation','entity-relation'].includes(t.kind)||
+   typeof (t.kind==='range'?t.anchorId:['gloss','argument-relation','entity-relation'].includes(t.kind)?t.definitionId:t.kind==='argument'?t.argumentId:t.kind==='entity'?t.entity?.entityId:t.blockId)!=='string')return {status:'invalid',reason:'Unsupported reference descriptor.'};
   if(t.resourceId!==this.resourceId)return {status:'outside-document',reason:'Target belongs to another Document.'};
+  if(t.kind==='argument-relation'||t.kind==='entity-relation'){
+   this.stamp('a:'+t.definitionId).get();const d=(this.editor.repository.readState().contents[this.owner]?.payload.linkedAnnotations as any)?.[t.definitionId];
+   const r=t.kind==='argument-relation'?d?.metadata?.dialecticArgumentRelation:d?.metadata?.scopedEntityRelation;
+   if(!r||d.isDeleted||d.type!==(t.kind==='argument-relation'?'dialectic/argument-relation':'mutable/entity-relation'))return {status:'missing',reason:'Relationship unavailable'};
+   return {status:'resolved',identityExists:true,text:`${r.from.argumentId??r.from.entityId} → ${r.relation} → ${r.to.argumentId??r.to.entityId}`};
+  }
+  if(t.kind==='argument'||t.kind==='entity'){
+   const id=t.kind==='argument'?t.argumentId:t.entity.entityId;this.stamp('a:'+id).get();
+   const d=(this.editor.repository.readState().contents[this.owner]?.payload.linkedAnnotations as any)?.[id];
+   if(t.kind==='entity'){if(t.entity.scope!=='document'||t.entity.resourceId!==this.resourceId)return {status:'outside-document',reason:'Vault Entity needs the scoped reader.'};return localEntity(d)&&!d.isDeleted?{status:'resolved',identityExists:true,text:d.metadata.scopedEntity.entity.name}:{status:'missing',reason:'Entity unavailable'};}
+   if(!argumentDefinition(d)||d.isDeleted)return {status:'missing',reason:'Argument unavailable'};
+   return {...this.resolve({kind:'range',...d.metadata.dialecticArgument.anchor},preferred),identityExists:true,argumentId:id};
+  }
   if(t.kind==='range'||t.kind==='gloss'){
    const id=t.kind==='range'?t.anchorId:t.definitionId;this.stamp('a:'+id).get();
    const registry=this.editor.repository.readState().contents[this.owner]?.payload.linkedAnnotations as Record<string,any>|undefined;
@@ -76,11 +101,12 @@ export class DialecticReferences {
    let text='';segments.forEach((s,i)=>{const prior=segments[i-1];if(prior&&(prior.contentKey!==s.contentKey||prior.end!==s.start))text+='\n';text+=this.text(s.contentKey,s.start,s.end);});
    return {status:'resolved',segments,node:segments[0].node,text,historical,changed:text!==historical};
   }
+  if(typeof t.blockId!=='string')return {status:'invalid',reason:'Block identity unavailable'};
   this.stamp('b:'+t.blockId).get();const keys=[...this.blocks.get(t.blockId)??[]];if(keys.length!==1)return {status:keys.length?'ambiguous':'missing',reason:'Block identity is missing or ambiguous.'};
   const node=this.node(keys[0],preferred);if(!node)return {status:'missing'};
   if(t.kind==='contribution'&&!contribution((node.payload.metadata as any)?.dialectic))return {status:'invalid',reason:'Target is no longer a contribution.'};
   return {status:'resolved',node};
  }
  overlapping(segments:Segment[]){const definitions:any=this.editor.repository.readState().contents[this.owner]?.payload.linkedAnnotations??{},ids=new Set<string>();for(const s of segments)for(const p of (this.editor.repository.readState().contents[s.contentKey]?.payload.standoffProperties??[]) as any[])if(p.type===GLOSS&&!p.isDeleted&&p.start<s.end&&p.end>=s.start&&glossDefinition(definitions[p.annotationId])&&!definitions[p.annotationId].isDeleted)ids.add(p.annotationId);return [...ids].map(id=>({id,value:String(definitions[id].value)}));}
- dispose(){this.stop();this.entries.clear();this.blocks.clear();this.anchors.clear();this.stamps.clear();}
+ dispose(){this.stop();this.entries.clear();this.blocks.clear();this.anchors.clear();this.stamps.clear();this.argumentAnchors.clear();this.anchorArguments.clear();this.edgeEndpoints.clear();this.argumentEdges.clear();}
 }

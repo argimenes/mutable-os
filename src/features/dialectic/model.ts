@@ -1,11 +1,13 @@
 import type {ExistingBlockDto} from '../../block-tree/types';
 
-export type ReplyTarget = {kind:'contribution'|'block';resourceId:string;blockId:string;anchorId?:never;definitionId?:never} |
- {kind:'range';resourceId:string;anchorId:string;blockId?:never;definitionId?:never} |
- {kind:'gloss';resourceId:string;definitionId:string;blockId?:never;anchorId?:never};
+export type ReplyTarget = {resourceId:string;blockId?:string;anchorId?:string;definitionId?:string;argumentId?:string;entity?:import('../../feature-api/scoped-entities').ScopedEntityReference} & (
+ {kind:'contribution'|'block';blockId:string}|{kind:'range';anchorId:string}|{kind:'gloss'|'argument-relation'|'entity-relation';definitionId:string}|{kind:'argument';argumentId:string}|{kind:'entity';entity:import('../../feature-api/scoped-entities').ScopedEntityReference});
+export interface Participant {id:string;kind:'human'|'ai';name:string}
+export const defaultParticipant=(owner:string,kind:'human'|'ai'):Participant=>({id:owner+':'+kind,kind,name:kind==='human'?'Local author':'Mock assistant'});
+export const participantLabel=(c:Contribution)=>c.participant?.name??(c.author==='human'?'You':'Mock assistant');
 export interface ConsumedContext {version:1;items:{target:ReplyTarget;text:string;origins:('reply-target'|'selected')[];revisions:{contentKey:string;revision:number}[]}[];limits:{characters:number;blocks:number};}
 export interface Contribution {
- version:1;kind:'contribution';state:'draft'|'committed';author:'human'|'mock';
+ version:1;kind:'contribution';state:'draft'|'committed';author:'human'|'mock'|'ai';participant?:Participant;
  ordinal?:number;createdUtc?:string;replies:ReplyTarget[];context?:ReplyTarget[];requestId?:string;
  discursiveReferences?:ReplyTarget[];dcp?:{version:1;profile:string;request:unknown;tools:unknown[];response:string;identityMap:unknown;intent:string};
  replyExcerpts?:{target:ReplyTarget;text:string}[];consumedContext?:ConsumedContext;
@@ -13,7 +15,7 @@ export interface Contribution {
 export const conversationMetadata={version:1,kind:'conversation'} as const;
 export function contribution(value:unknown):Contribution|undefined {
  const v=value as Contribution|undefined;
- return v?.version===1&&v.kind==='contribution'&&['draft','committed'].includes(v.state)&&['human','mock'].includes(v.author)&&Array.isArray(v.replies)?v:undefined;
+ return v?.version===1&&v.kind==='contribution'&&['draft','committed'].includes(v.state)&&['human','mock','ai'].includes(v.author)&&Array.isArray(v.replies)?v:undefined;
 }
 export function isConversation(value:unknown){const v=value as typeof conversationMetadata|undefined;return v?.version===1&&v.kind==='conversation';}
 export const textBlock=(text=''):ExistingBlockDto=>({id:crypto.randomUUID(),type:'standoff-editor-block',text});
@@ -26,7 +28,7 @@ export function conversationDocument():ExistingBlockDto {
 export function conversationTabs(documents:readonly {id:string;title:string}[]):ExistingBlockDto {
  return {id:crypto.randomUUID(),type:'dialectic-application-block',children:[{id:crypto.randomUUID(),type:'tab-row-block',children:documents.map(d=>({id:crypto.randomUUID(),type:'tab-block',metadata:{name:d.title,documentTarget:{version:1,documentId:d.id}}}))}]};
 }
-export const targetKey=(t:ReplyTarget)=>JSON.stringify([t.resourceId,t.kind,t.blockId??t.anchorId??t.definitionId]);
+export const targetKey=(t:ReplyTarget)=>JSON.stringify([t.resourceId,t.kind,t.blockId??t.anchorId??t.definitionId??t.argumentId??(t.entity&&[t.entity.scope,t.entity.scope==='document'?t.entity.resourceId:t.entity.vaultId,t.entity.entityId])]);
 export interface MockContext {target:ReplyTarget;text:string}
 /** Deterministic native composition; IDs are allocated by the host, never by a provider. */
 export function mockComposition(context:readonly MockContext[]):ExistingBlockDto[] {

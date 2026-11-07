@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mutable:dcp:1.0:response-proposal",
   "title": "DCP v1 model response \u2014 design proposal",
-  "description": "Revision 2 incorporates the separate Symposium argument model. Logical response schema, not runtime implementation. Provider adapters select the contribution branch for structured final output and tool argument branches for client tools. Host validation additionally enforces negotiated capabilities, ownership, source fences, reference kinds, unique IDs, exact text and canonical admission. Request/tool-result contracts are illustrated in the companion examples. Proposed hard ceilings: 256 nodes, depth 12, 256 KiB response; individual exchanges may lower them.",
+  "description": "Revision 2 incorporates the separate Symposium argument model. Logical protocol schema. Runtime profile 4b-1 admits native composition, scoped Entities/relationships, arguments/relationships, explicit Glosses and anchored classifications; assets, continuation suggestions and promotion remain unnegotiated. See DIALECTIC_STAGE_4B_QUALIFICATION.md for implementation boundaries. Provider adapters select the contribution branch for structured final output and tool argument branches for client tools. Host validation additionally enforces negotiated capabilities, ownership, source fences, reference kinds, unique IDs, exact text and canonical admission. Request/tool-result contracts are illustrated in the companion examples. Proposed hard ceilings: 256 nodes, depth 12, 256 KiB response; individual exchanges may lower them.",
   "oneOf": [
     {
       "$ref": "#/$defs/Contribution"

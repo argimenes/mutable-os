@@ -25,7 +25,7 @@ export function createDialecticTextualFeature(editor:ReactiveEditor,get:(app:Doc
 }
 export function createDialecticFeature(editor:ReactiveEditor):CodexFeature {
  return {id:'dialectic',activate(scope){
-  if(editor.features.dialecticDcp)scope.own(registerDcpTypes(editor.visualEffects));
+  if(editor.features.dialecticDcp)scope.own(registerDcpTypes(editor.visualEffects,editor.features.scopedSemantics));
   scope.own(editor.visualEffects.registerType({type:RANGE_ANCHOR,renderers:[]}));
   const controllers=new Map<DocumentApplicationInstance,{value:DialecticController;dispose:()=>void;registered:boolean}>();
   const ports=documentApplicationPorts(editor);
