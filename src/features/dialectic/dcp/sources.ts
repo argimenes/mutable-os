@@ -25,7 +25,8 @@ export class DcpSources {
  private entityRevisions=new Map<string,number>();
  readonly entities:ScopedEntities;
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
- constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:()=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[]){
+ constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:()=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000){
+  this.deadline=Date.now()+Math.min(120000,Math.max(1,deadlineMs));
   let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;
   this.entities=new ScopedEntities(editor,rootKey,owner);
   this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key))this.stale=true;});

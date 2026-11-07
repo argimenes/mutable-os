@@ -1,6 +1,6 @@
 # Dialectic Increment 4 — DCP investigation and implementation plan
 
-**7 November 2026 · Revision 2: corrected Symposium argument model. Approved implementation direction; Stages 4A and 4B delivered. Stage 4C has not begun.**
+**7 November 2026 · Revision 2: corrected Symposium argument model. Approved implementation direction; Stages 4A and 4B accepted. Stage 4C implemented; see its qualification for live-account verification status. Stage 4D has not begun.**
 
 Source brief: `/Users/iianneill/.codex/attachments/7f67f593-ba6b-4228-a03f-805da8e6489f/Pasted text.txt`. Increment 3 remains the accepted baseline. This investigation changed documentation only; it did not rerun its qualification.
 
@@ -143,6 +143,8 @@ The semantic registrations and materialisation validators should also be usable 
 4. **Delivery order and initial capability profile:** qualify semantics/retrieval with the mock before live providers; initially admit paragraphs, generic groups, lists and tables, plus reference/annotation capabilities. Additional native construction adapters are negotiated extensions, not changes to what contributions can contain.
 
 No additional question is necessary to complete this investigation. Revision 2 and these architectural directions were subsequently approved; implementation was subsequently authorised through Stage 4B. See [Stage 4A qualification](DIALECTIC_STAGE_4A_QUALIFICATION.md) and [Stage 4B qualification](DIALECTIC_STAGE_4B_QUALIFICATION.md).
+
+Stage 4C incorporates the subsequently approved general-purpose communication clarification: ordinary replies need no semantic classification, argument or Gloss. See [Stage 4C qualification](DIALECTIC_STAGE_4C_QUALIFICATION.md).
 
 ## Bounded implementation and qualification
 

@@ -4,7 +4,7 @@ import {SaxesParser} from 'saxes';
 import type {VisualEffectRegistry} from '../../../runtime/visual-effect-registry';
 export const classifications=['claim','question','speculation','suggestion','objection','qualification'].map(n=>'dialectic/'+n);
 export const INERT='dialectic/unknown-semantic';
-export interface Provenance {version:1;actor:'mock';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string;participantId?:string}
+export interface Provenance {version:1;actor:'mock'|'ai';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string;participantId?:string}
 export interface Mark {id:string;type:string;start:number;end:number;metadata:Record<string,any>}
 export function registerDcpTypes(registry:VisualEffectRegistry,semantics=false){
  const stops= [...classifications,INERT,...(semantics?[ENTITY_REFERENCE]:[])].filter(t=>!registry.type(t)).map(type=>registry.registerType({type,renderers:[],semantic:{purpose:type===INERT?'Preserved inert semantic declaration':`Classify/style a passage: ${type}`,attributes:type===ENTITY_REFERENCE?['ref']:[],ai:type===INERT?'inert':'authorable',rendering:type.startsWith('style/')?'native text styling':'descriptive annotation',validation:'nonempty Cell range; no additional attributes'}}));

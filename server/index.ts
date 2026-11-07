@@ -1,3 +1,4 @@
+import { createDialecticBroker } from "./dialectic/broker.js";
 import express, { type Request, type Response } from "express";
 import path from "path";
 import multer, { type FileFilterCallback } from 'multer';
@@ -233,6 +234,8 @@ if (!featureFlags.cavernStartup && process.env.SPEEDY_DISABLE_DATABASE !== "1") 
 }
 
 const app = express();
+// Must precede general body parsing, static routes and Cavern routing.
+if (featureFlags.dialecticProviders) app.use("/api/dialectic", createDialecticBroker().router);
 // 1) Use an absolute path
 const assetsDir = path.resolve(__dirname, 'dist', 'assets');
 

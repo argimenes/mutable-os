@@ -5,7 +5,7 @@ import {RANGE_ANCHOR,rangeDefinition} from '../features/dialectic/anchors';
 import {glossOwner} from './gloss-plan';
 import type {StructuralEvidence} from './structural-plan';
 import type {ContentRecord,RepositoryOperation,RepositoryState} from './types';
-const dcpProperty=(p:any)=>(p?.type===ENTITY_REFERENCE&&entityReference(p.metadata?.entityReference)||p?.type===GLOSS&&p.metadata?.dcp?.protocol==='dcp/1.0')||typeof p?.type==='string'&&/^dialectic\/(claim|question|speculation|suggestion|objection|qualification|unknown-semantic)$/.test(p.type)&&p.metadata?.dcp?.protocol==='dcp/1.0'&&p.metadata.dcp.actor==='mock'&&typeof p.metadata.dcp.exchangeId==='string';
+const dcpProperty=(p:any)=>(p?.type===ENTITY_REFERENCE&&entityReference(p.metadata?.entityReference)||p?.type===GLOSS&&p.metadata?.dcp?.protocol==='dcp/1.0')||typeof p?.type==='string'&&/^dialectic\/(claim|question|speculation|suggestion|objection|qualification|unknown-semantic)$/.test(p.type)&&p.metadata?.dcp?.protocol==='dcp/1.0'&&['mock','ai'].includes(p.metadata.dcp.actor)&&typeof p.metadata.dcp.exchangeId==='string';
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 export function dialecticRangePayloadOnly(old:ContentRecord|undefined,next:ContentRecord):boolean {
  if(!old||next.inlineKind!=='standoff')return false;

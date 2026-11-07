@@ -1,3 +1,5 @@
+import {DialecticProviderSession} from './dcp/live';
+import {liveLimits,type ProviderSettings,type LiveProvenance} from './dcp/provider-contract';
 import {DcpSources} from './dcp/sources';
 import {request as dcpRequest,prepare as prepareDcp,mockTransport,receive,type DcpTransport} from './dcp/exchange';
 import {createSequenceController} from './sequence-controller';
@@ -16,6 +18,10 @@ const metadata=(n:BlockNode|undefined)=>(n?.payload.metadata??{}) as Record<stri
 
 /** One controller per application owner; workspace views share these session choices. */
 export function createDialecticController(editor:ReactiveEditor,port:Accessor<DocumentApplicationPort|undefined>){
+ const providers=new DialecticProviderSession();
+ const [providerMode,setProviderMode]=createSignal<'mock'|'live'>('mock'),[providerReady,setProviderReady]=createSignal(false),[providerSettings,setProviderSettings]=createSignal({...providers.settings}),[providerNotice,setProviderNotice]=createSignal(''),[providerConfiguring,setProviderConfiguring]=createSignal(false);
+ const configureProvider=async(settings:ProviderSettings,key?:string)=>{if(busy()||providerConfiguring())return;setProviderConfiguring(true);try{const ready=await providers.configure(settings,key);if(!alive)return;setProviderReady(ready);setProviderSettings({...providers.settings});setProviderNotice(ready?'Session provider ready.':'Enter a session key; no server environment key is configured.');setProviderMode(ready?'live':'mock');}catch(e){if(alive){setProviderReady(providers.ready);if(!providers.ready)setProviderMode('mock');setProviderNotice(String(e));}}finally{if(alive)setProviderConfiguring(false);}};
+ const forgetProvider=async()=>{cancel();await providers.forget();setProviderReady(false);setProviderMode('mock');setProviderNotice('Session keys forgotten.');};
  const [inspection,setInspection]=createSignal<ReplyTarget>(),[reply,setReply]=createSignal<ReplyTarget>();
  const [context,setContext]=createSignal<ReplyTarget[]>([]),[notice,setNotice]=createSignal(''),[busy,setBusy]=createSignal(false);
  const [trail,setTrail]=createSignal<ReplyTarget[]>([]),[cursor,setCursor]=createSignal(-1);
@@ -23,6 +29,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  let alive=true,generation=0;
  let requestAbort:AbortController|undefined;
  const [dcpPreview,setDcpPreview]=createSignal('');
+ const [lastProviderExchange,setLastProviderExchange]=createSignal<LiveProvenance>();
  let previewTimer:ReturnType<typeof setTimeout>|undefined,previewText='';
  const clearPreview=()=>{if(previewTimer!==undefined)clearTimeout(previewTimer);previewTimer=undefined;previewText='';setDcpPreview('');};
  const streamPreview=(value:string,ticket:number)=>{previewText=value.slice(0,262144);if(previewTimer===undefined)previewTimer=setTimeout(()=>{previewTimer=undefined;if(alive&&ticket===generation)setDcpPreview(previewText);},32);};
@@ -183,7 +190,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const pinGloss=(id:string)=>pin({kind:'gloss',resourceId:resourceId(),definitionId:id});
  const cancel=()=>{generation++;requestAbort?.abort();clearPreview();setBusy(false);};
  const exchangeTarget=()=>reply()??(inspection()&&!['entity','argument-relation','entity-relation'].includes(inspection()!.kind)?inspection():undefined)??(frontier()?target(frontier()!.id):undefined);
- const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget)=>{
+ const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget,live?:LiveProvenance)=>{
   if(busy())return;
   let ticket=0,sources:DcpSources|undefined;
   try{
@@ -192,35 +199,38 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    const selectedTargets=structuredClone(unwrap(context())),targets=[to,...selectedTargets.filter(t=>targetKey(t)!==targetKey(to))];
    for(const t of targets)if(!['gloss','entity','argument-relation','entity-relation'].includes(t.kind))requireCommittedTarget(t);
    const captured=capture(targets),source=session()!,exchangeId=crypto.randomUUID();
-   ticket=++generation;requestAbort=new AbortController();setBusy(true);setDcpPreview('Preparing structured exchange…');
-   sources=new DcpSources(editor,resourceId(),function*(){for(const r of committed())yield source.projection.node(r.key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id));
+   ticket=++generation;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setDcpPreview('Preparing structured exchange…');
+   sources=new DcpSources(editor,resourceId(),function*(){for(const r of committed())yield source.projection.node(r.key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),live?liveLimits.deadlineMs:30000);
    for(const key of captured.revisions.keys())sources.fence(key);
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
    const request=dcpRequest(exchangeId,primary,selected,captured.items.map(item=>({handle:sources!.issue(item.target),plainTextExcerpt:item.text})),editor.visualEffects,editor.features.scopedSemantics);
-   const raw=await receive(transport,request,sources,value=>{if(alive&&ticket===generation)streamPreview(value,ticket);},requestAbort);
+   if(live){request.cadence=live.settings.cadence;request.protocolKey={...request.protocolKey,version:request.protocolKey.version+'-c1'};}
+   let prepared:Awaited<ReturnType<typeof prepareDcp>>|undefined;
+   const validate=async(raw:string)=>{sources!.check();prepared=await prepareDcp(raw,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock');};
+   const raw=await receive(transport,request,sources,value=>{if(alive&&ticket===generation)streamPreview(value,ticket);},requestAbort,live?validate:undefined,live?liveLimits.deadlineMs:30000);
    if(!alive||ticket!==generation)return;
    if(session()!==source)throw Error('Conversation changed; DCP response discarded');guard();sources.check();
-   const prepared=await prepareDcp(raw,exchangeId,resourceId(),editor.visualEffects,sources,editor.features.scopedSemantics),d=draft();if(!d)throw Error('Restore the draft before adding a response');
+   if(!prepared)await validate(raw);const result=prepared!,d=draft();if(!d)throw Error('Restore the draft before adding a response');
    if(!alive||ticket!==generation||session()!==source)return;guard();sources.check();
    for(const t of targets)if(t.kind==='range'){
-    const p=pending.get(t.anchorId);if(!p)continue;editor.textRanges.validate([p.range],'cell');prepared.definitions[t.anchorId]=p.definition;
-    let properties=prepared.annotations.get(p.range.nodeKey);if(!properties)prepared.annotations.set(p.range.nodeKey,properties=[]);
+    const p=pending.get(t.anchorId);if(!p)continue;editor.textRanges.validate([p.range],'cell');result.definitions[t.anchorId]=p.definition;
+    let properties=result.annotations.get(p.range.nodeKey);if(!properties)result.annotations.set(p.range.nodeKey,properties=[]);
     properties.push({id:crypto.randomUUID(),type:RANGE_ANCHOR,annotationId:t.anchorId,start:p.range.start,end:p.range.end-1});
    }
    for(const item of captured.manifest)item.origins=[...(targetKey(item.target)===targetKey(to)?['reply-target' as const]:[]),...(selectedTargets.some(t=>targetKey(t)===targetKey(item.target))?['selected' as const]:[])];
-   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:'mock',participant:defaultParticipant(resourceId(),'ai'),ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:prepared.discursiveReferences,context:targets,requestId:exchangeId,
+   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...defaultParticipant(resourceId(),'ai'),name:live?'AI participant':'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,
     replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
-    dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,identityMap:prepared.aliases,intent:prepared.intent}};
+    dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,identityMap:result.aliases,intent:result.intent,...(live?{provider:live}:{})}};
    const started=performance.now();
-   editor.commands.boundedStructuralTransaction('Add DCP mock response',()=>{
-    if(Object.keys(prepared.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})),...prepared.definitions});
-    for(const [key,added]of prepared.annotations){const n=source.projection.node(key);if(!n)throw Error('Anchor source unavailable');editor.commands.setPayloadField(key,'standoffProperties',[...structuredClone(unwrap(n.payload.standoffProperties??[])) as any[],...added]);}
-    editor.commands.insert({id,type:'container-block',metadata:{dialectic:JSON.parse(JSON.stringify(data))},children:prepared.children},{kind:'before',anchorKey:d.key});
+   editor.commands.boundedStructuralTransaction(live?'Add DCP AI response':'Add DCP mock response',()=>{
+    if(Object.keys(result.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})),...result.definitions});
+    for(const [key,added]of result.annotations){const n=source.projection.node(key);if(!n)throw Error('Anchor source unavailable');editor.commands.setPayloadField(key,'standoffProperties',[...structuredClone(unwrap(n.payload.standoffProperties??[])) as any[],...added]);}
+    editor.commands.insert({id,type:'container-block',metadata:{dialectic:JSON.parse(JSON.stringify(data))},children:result.children},{kind:'before',anchorKey:d.key});
    });
    dcpDiagnostics.commitMs=performance.now()-started;dcpDiagnostics.exchanges++;dcpDiagnostics.reads+=sources.diagnostics.reads;dcpDiagnostics.searches+=sources.diagnostics.searches;dcpDiagnostics.visited+=sources.diagnostics.visited;
    for(const t of targets)if(t.kind==='range')pending.delete(t.anchorId);
    diagnostics.submissions++;clearPreview();inspect(target(id));
-  }catch(e){if(alive&&ticket===generation)setNotice(String(e));else if(!ticket&&alive)setNotice(String(e));}finally{sources?.dispose();if(ticket===generation)setBusy(false);}
+  }catch(e){if(alive&&ticket===generation)setNotice(String(e));else if(!ticket&&alive)setNotice(String(e));}finally{sources?.dispose();if(ticket===generation){if(live)setLastProviderExchange(structuredClone(live));setBusy(false);}}
  };
  const askMock=async(transport:DcpTransport=mockTransport,explicit?:ReplyTarget)=>{
   if(editor.features.dialecticDcp)return askDcp(transport,explicit);
@@ -246,10 +256,11 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  };
  const sequences=createSequenceController(editor,{root,resourceId,session,resolve,inspect,requireCommittedTarget,guard});
  const entityDetails=(t:ReplyTarget)=>t.kind==='entity'&&t.entity.scope==='document'?(root()!.payload.linkedAnnotations as any)?.[t.entity.entityId]?.metadata?.scopedEntity?.entity:undefined;
- const submitAndAsk=async(transport:DcpTransport=mockTransport)=>{const submitted=submit();if(submitted)await askMock(transport,submitted as ReplyTarget);};
- return {exchangeTarget,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
+ const ask=async(explicit?:ReplyTarget)=>{if(providerConfiguring())return;if(providerMode()==='mock'||!editor.features.dialecticProviders||!editor.features.dialecticDcp)return askMock(mockTransport,explicit);const live=providers.transport();return askDcp(live.run,explicit,live.details);};
+ const submitAndAsk=async(transport?:DcpTransport)=>{if(providerConfiguring())return;const submitted=submit();if(submitted){if(transport)await askMock(transport,submitted as ReplyTarget);else await ask(submitted as ReplyTarget);}};
+ return {lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
   references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,
-  dispose(){sequences.dispose();alive=false;cancel();choices.clear();pending.clear();preview.dispose();},capture,
+  dispose(){sequences.dispose();alive=false;cancel();providers.dispose();choices.clear();pending.clear();preview.dispose();},capture,
  };
 }
 export type DialecticController=ReturnType<typeof createDialecticController>;

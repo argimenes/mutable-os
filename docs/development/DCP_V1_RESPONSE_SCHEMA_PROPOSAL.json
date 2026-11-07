@@ -605,6 +605,10 @@
         },
         "intent": {
           "enum": [
+            "reply",
+            "acknowledge",
+            "share",
+            "create",
             "propose",
             "challenge",
             "qualify",
@@ -735,7 +739,7 @@
         "promotionRecommendations"
       ],
       "additionalProperties": false,
-      "description": "All fields present, with empty arrays when unused. Provider identity/provenance is host-stamped, never trusted from model output."
+      "description": "All fields present, with empty arrays when unused. Ordinary conversation requires no semantic annotation, argument, Entity or Gloss. Default intent is reply. Provider identity/provenance is host-stamped, never trusted from model output. Runtime provider schemas are compiled separately for the bounded text-only profile."
     },
     "ContextRequest": {
       "type": "object",

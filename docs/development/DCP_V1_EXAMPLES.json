@@ -12,7 +12,8 @@
     "Argument relations use Symposium-owned records and argument endpoints. Entity relations remain a separate scoped adapter. Wrong-kind endpoints are rejected rather than converted.",
     "The six proposed classification types are dialectic/claim, dialectic/question, dialectic/speculation, dialectic/suggestion, dialectic/objection and dialectic/qualification. Definition-only dialectic/argument and dialectic/argument-relation are not inline annotation types.",
     "The host request primaryReply controls the canonical contribution.replies entry. Model response replyTargets are additional discursiveReferences, not replacement structural parents.",
-    "Stage 4B runtime profile: Document Entities use mutable/entity and mutable/entity-relation; scoped inline mentions use mutable/entity-reference with an issued or provisional Entity ref. Vault references carry the durable Vault GUID. Examples remain illustrative: capability negotiation can reject deferred suggestions, promotion or assets. See DIALECTIC_STAGE_4B_QUALIFICATION.md."
+    "Stage 4B runtime profile: Document Entities use mutable/entity and mutable/entity-relation; scoped inline mentions use mutable/entity-reference with an issued or provisional Entity ref. Vault references carry the durable Vault GUID. Examples remain illustrative: capability negotiation can reject deferred suggestions, promotion or assets. See DIALECTIC_STAGE_4B_QUALIFICATION.md.",
+    "Stage 4C: Dialectic is a general-purpose structured communication medium. Reply, acknowledge, share and create are ordinary intents. Semantic markup is selective and optional; empty semantic arrays are normal, not incomplete responses."
   ],
   "simpleExchange": {
     "hostRequest": {
@@ -615,5 +616,31 @@
       "promotionRecommendations": []
     },
     "expected": "One native discursive classification; no argument definition, relation, Gloss or new passage anchor is implicitly created."
+  },
+  "ordinaryConversation": {
+    "description": "Illustrative ordinary correspondence; no claims, arguments, Glosses or classifications are required.",
+    "response": {
+      "protocol": "dcp/1.0",
+      "kind": "contribution",
+      "exchange": "exchange-picnic",
+      "intent": "reply",
+      "replyTargets": [],
+      "composition": [
+        {
+          "id": "reply",
+          "kind": "paragraph",
+          "markup": "Sounds lovely! I can bring fruit and a book to share.",
+          "ranges": []
+        }
+      ],
+      "anchors": [],
+      "entities": [],
+      "interpretations": [],
+      "arguments": [],
+      "glosses": [],
+      "relations": [],
+      "suggestions": [],
+      "promotionRecommendations": []
+    }
   }
 }

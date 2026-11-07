@@ -1,3 +1,4 @@
+import {ProviderSettingsView} from './provider-settings';
 import {participantLabel} from './model';
 import {SequenceNavigation,SequenceAuthor,SequenceReader} from './sequence-view';
 import {For,Show,createEffect,createMemo,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
@@ -70,22 +71,23 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <Show when={row()?.data.discursiveReferences?.length}><details open><summary>Discursive references</summary><p>Additional passages; the primary reply remains unchanged.</p><For each={row()?.data.discursiveReferences}>{t=><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button>}</For></details></Show>
     <Show when={selected()?.kind==='argument'}><For each={c.argumentRelations(selected()!.argumentId!)}>{d=>{const r=d.metadata.dialecticArgumentRelation;return <p><button onClick={()=>c.inspect({kind:'argument',...r.from})}>{c.label({kind:'argument',...r.from})}</button> → {r.relation} → <button onClick={()=>c.inspect({kind:'argument',...r.to})}>{c.label({kind:'argument',...r.to})}</button></p>;}}</For></Show>
     <Show when={row()?.data.dcp}><details><summary>Semantic identities</summary><For each={Object.values(row()?.data.dcp?.identityMap??{}) as any[]}>{t=><button onClick={()=>c.inspect(t)}>{c.label(t)}</button>}</For></details></Show>
-    <hr/><div class="dialectic-eyebrow">NEXT MOCK INTERACTION</div>
+    <hr/><div class="dialectic-eyebrow">NEXT INTERACTION</div>
     <p class="dialectic-muted">Target: {selectedTarget()?c.label(selectedTarget()!):'Select a contribution'}. Selected context remains when you return to the present.</p>
     <button disabled={!selected()} onClick={act(()=>{if(selected())c.pin(selected()!);})}>Include in context</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={act(()=>c.pin(c.focusBlock()))}>Include caret Block</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={()=>c.selectRange('context')}>Include selection</button>
     <ul class="dialectic-pins"><For each={c.context()}>{t=><li><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><button aria-label={`Remove context ${c.label(t)}`} onClick={()=>c.unpin(t)}>×</button></li>}</For></ul>
     <Show when={!c.context().length}><p class="dialectic-muted">No additional context selected.</p></Show>
-    <button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={()=>void c.askMock()}>Ask mock assistant</button><Show when={c.busy()}><button onClick={c.cancel}>Cancel response</button></Show>
+    <Show when={c.editor.features.dialecticProviders&&c.editor.features.dialecticDcp}><ProviderSettingsView c={c}/><label>Assistant <select aria-label="Assistant mode" disabled={c.busy()||c.providerConfiguring()} value={c.providerMode()} onChange={e=>c.setProviderMode(e.currentTarget.value as 'mock'|'live')}><option value="mock">Deterministic mock</option><option value="live" disabled={!c.providerReady()}>Configured AI provider</option></select></label></Show><button class="dialectic-primary" disabled={!c.valid()||c.busy()||c.providerConfiguring()} onClick={()=>void c.ask()}>{c.providerMode()==='live'?'Ask AI':'Ask mock assistant'}</button><Show when={c.busy()}><button onClick={c.cancel}>Cancel response</button></Show>
     <Show when={c.dcpPreview()}><details open class="dialectic-dcp-preview"><summary>{c.busy()?'Transient DCP response — not committed':'Uncommitted DCP output'}</summary><pre>{c.dcpPreview()}</pre><Show when={!c.busy()}><button onClick={c.cancel}>Dismiss output</button></Show></details></Show>
-    <p class="dialectic-footnote">Deterministic example. No AI service or network request. Target plus up to 12 selected items; 6,000 characters maximum.</p>
-    <Show when={row()?.data.dcp}><details><summary>DCP exchange record</summary><p>Structured mock · {row()?.data.dcp?.profile} · {row()?.data.dcp?.tools?.length} retrieval calls. Interpretations of source passages are attributed to this exchange, not to the source author.</p><pre class="dialectic-dcp-record">{JSON.stringify(row()?.data.dcp,null,2)}</pre></details></Show>
+    <Show when={c.lastProviderExchange()}><details><summary>Last provider attempt (session only)</summary><p>Reported usage when available; cost unknown. Failed or cancelled output is not authored content.</p><pre class="dialectic-dcp-record">{JSON.stringify(c.lastProviderExchange(),null,2)}</pre></details></Show>
+    <p class="dialectic-footnote">{c.providerMode()==='live'?`${c.providerSettings().provider} · ${c.providerSettings().model}. Only explicit requests contact the provider.`:'Deterministic example. No AI service or network request.'} Target plus up to 12 selected items; 6,000 characters maximum.</p>
+    <Show when={row()?.data.dcp}><details><summary>DCP exchange record</summary><p>{row()?.data.dcp?.provider?`${row()?.data.dcp?.provider?.settings.provider} · ${row()?.data.dcp?.provider?.settings.model}`:'Structured mock'} · {row()?.data.dcp?.profile} · {row()?.data.dcp?.tools?.length} retrieval calls. Interpretations of source passages are attributed to this exchange, not to the source author.</p><pre class="dialectic-dcp-record">{JSON.stringify(row()?.data.dcp,null,2)}</pre></details></Show>
     <Show when={row()?.data.context?.length}><details><summary>Response provenance</summary><For each={row()?.data.context}>{t=><p>{c.label(t)}</p>}</For></details></Show>
-    <Show when={row()?.data.consumedContext}><details><summary>Material supplied to mock</summary><p>Captured input, not evidence of internal model attention.</p><For each={row()?.data.consumedContext?.items}>{item=><div><button onClick={act(()=>c.inspect(item.target))}>{c.label(item.target)}</button><small>{item.origins.join(' + ')}</small><blockquote>{item.text}</blockquote></div>}</For></details></Show>
+    <Show when={row()?.data.consumedContext}><details><summary>Material supplied to assistant</summary><p>Captured input, not evidence of internal model attention.</p><For each={row()?.data.consumedContext?.items}>{item=><div><button onClick={act(()=>c.inspect(item.target))}>{c.label(item.target)}</button><small>{item.origins.join(' + ')}</small><blockquote>{item.text}</blockquote></div>}</For></details></Show>
    </aside>
   </div>
-  <footer class="dialectic-status"><span>{c.busy()?'Preparing mock composition…':c.port()?.application.files?.status()??'Ready'}{c.port()?.application.properties()?.unsaved?' · Unsaved changes':''}</span><span>Chronology ≠ context ≠ presentation</span></footer>
+  <footer class="dialectic-status"><span>{c.busy()?'Preparing response…':c.port()?.application.files?.status()??'Ready'}{c.port()?.application.properties()?.unsaved?' · Unsaved changes':''}</span><span>Chronology ≠ context ≠ presentation</span></footer>
  </section>;
 }
 
