@@ -1,11 +1,10 @@
-import {For,Show,createEffect,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
+import {For,Show,createEffect,createMemo,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
 import type {DocumentApplicationInstance} from '../../feature-api/document-application';
 import type {DocumentApplicationPort} from '../../application/document-application-ports';
 import {DocumentBrowser} from '../../demo/document-browser';
 import {useTextualApplicationHost} from '../textual/applications';
 import {TextualSavePrompt} from '../textual/flint';
 import type {DialecticController} from './controller';
-import {targetKey} from './model';
 
 function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.Element;textual?:boolean}){
  const c=props.c;
@@ -17,6 +16,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
   window.addEventListener('keydown',shortcut,true);onCleanup(()=>window.removeEventListener('keydown',shortcut,true));
  });
  const selected=()=>c.inspection(),row=()=>c.rows().find(r=>r.id===selected()?.blockId);
+ const resolved=()=>c.resolveReference(selected());
  const selectedTarget=()=>c.reply()??selected()??(c.frontier()?c.target(c.frontier()!.id):undefined);
  return <section ref={root} class="dialectic-app" aria-label="Dialectic conversation">
   <header class="dialectic-bar" data-cross-text-controls>
@@ -24,6 +24,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
    <nav aria-label="Conversation actions" onPointerDown={e=>e.preventDefault()}>{props.actions}<button onClick={()=>void save()}>Save</button><button onClick={()=>void c.port()?.saveAs?.().catch(e=>c.run(()=>{throw e;}))}>Save as…</button><button onClick={act(()=>c.editor.repository.undo())}>Undo</button><button onClick={act(()=>c.editor.repository.redo())}>Redo</button></nav>
   </header>
   <Show when={c.notice()}><div class="dialectic-notice" role="alert">{c.notice()}</div></Show>
+  <Show when={c.root()&&!c.valid()}><p class="dialectic-notice">This Document is not a Dialectic conversation. Its content is unchanged. Open a conversation or choose New.</p></Show>
   <div class="dialectic-body">
    <aside class="dialectic-sidebar" aria-label="Contributions">
     <div class="dialectic-eyebrow">CHRONOLOGY</div>
@@ -45,17 +46,30 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <div class="dialectic-eyebrow">INSPECTION</div>
     <h3>{selected()?c.label(selected()!):'Explore a contribution'}</h3>
     <Show when={row()}>{r=><p class="dialectic-muted">{r().data.createdUtc?new Date(r().data.createdUtc!).toLocaleString():'Draft'} · Content stays editable.</p>}</Show>
-    <button disabled={!selected()} onClick={act(()=>{if(selected())c.setReply(selected());})}>Reply to this</button>
+    <button disabled={!selected()||selected()?.kind==='gloss'} onClick={act(()=>{if(selected())c.setReply(selected());})}>Reply to this</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={act(()=>{const t=c.focusBlock();c.setReply(t);c.inspect(t);})}>Reply to caret Block</button>
+    <button onPointerDown={e=>e.preventDefault()} onClick={()=>c.selectRange('reply')}>Reply to selection</button>
+    <Show when={selected()?.kind==='range'}>
+     <p role="status">{resolved().status==='resolved'?(resolved().changed?'Source changed since anchoring':'Current passage'):`Unresolved: ${resolved().reason??resolved().status}`}</p>
+     <blockquote>{resolved().text}</blockquote>
+     <details><summary>Text when anchored</summary><blockquote>{resolved().historical}</blockquote></details>
+     <button title="All references to this anchor will follow the selected passage" onPointerDown={e=>e.preventDefault()} onClick={()=>c.reattach(selected()!)}>Reattach to selection</button>
+     <small>Reattachment changes the source for every reply sharing this anchor.</small>
+     <button onPointerDown={e=>e.preventDefault()} onClick={c.createGloss}>Create Gloss on passage</button>
+     <For each={c.glosses()}>{g=><div><button onClick={()=>c.editor.gloss.openDefinition(c.root()!.key,g.id)}>{g.value}</button><button onClick={act(()=>c.pinGloss(g.id))}>Include Gloss</button></div>}</For>
+    </Show>
+    <Show when={row()?.data.replies.length}><details open><summary>Reply sources</summary><For each={row()?.data.replies}>{t=><div><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><For each={row()?.data.replyExcerpts?.filter(x=>JSON.stringify(x.target)===JSON.stringify(t))}>{x=><><small>Text captured for this reply{c.resolveReference(t).text!==x.text?' · Source changed or unavailable':''}</small><blockquote>{x.text}</blockquote></>}</For></div>}</For></details></Show>
     <hr/><div class="dialectic-eyebrow">NEXT MOCK INTERACTION</div>
     <p class="dialectic-muted">Target: {selectedTarget()?c.label(selectedTarget()!):'Select a contribution'}. Selected context remains when you return to the present.</p>
     <button disabled={!selected()} onClick={act(()=>{if(selected())c.pin(selected()!);})}>Include in context</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={act(()=>c.pin(c.focusBlock()))}>Include caret Block</button>
+    <button onPointerDown={e=>e.preventDefault()} onClick={()=>c.selectRange('context')}>Include selection</button>
     <ul class="dialectic-pins"><For each={c.context()}>{t=><li><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><button aria-label={`Remove context ${c.label(t)}`} onClick={()=>c.unpin(t)}>×</button></li>}</For></ul>
     <Show when={!c.context().length}><p class="dialectic-muted">No additional context selected.</p></Show>
     <button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={()=>void c.askMock()}>Ask mock assistant</button><Show when={c.busy()}><button onClick={c.cancel}>Cancel response</button></Show>
     <p class="dialectic-footnote">Deterministic example. No AI service or network request. Target plus up to 12 selected items; 6,000 characters maximum.</p>
     <Show when={row()?.data.context?.length}><details><summary>Response provenance</summary><For each={row()?.data.context}>{t=><p>{c.label(t)}</p>}</For></details></Show>
+    <Show when={row()?.data.consumedContext}><details><summary>Material supplied to mock</summary><p>Captured input, not evidence of internal model attention.</p><For each={row()?.data.consumedContext?.items}>{item=><div><button onClick={act(()=>c.inspect(item.target))}>{c.label(item.target)}</button><small>{item.origins.join(' + ')}</small><blockquote>{item.text}</blockquote></div>}</For></details></Show>
    </aside>
   </div>
   <footer class="dialectic-status"><span>{c.busy()?'Preparing mock composition…':c.port()?.application.files?.status()??'Ready'}{c.port()?.application.properties()?.unsaved?' · Unsaved changes':''}</span><span>Chronology ≠ context ≠ presentation</span></footer>
@@ -82,8 +96,11 @@ export function DialecticTextual(props:{controller:DialecticController;port:Docu
  const host=useTextualApplicationHost(),c=props.controller,editor=c.editor;
  let slot!:HTMLDivElement,surface!:HTMLDivElement,viewport!:HTMLDivElement,root!:HTMLDivElement;
  const [mounted,setMounted]=createSignal(false);
+ // Host rebinding changes the port, not the retained session identity. Match
+ // Flint's identity memo so leasing cannot retrigger its own cleanup/release.
+ const retained=createMemo(()=>props.port.session());
  onMount(()=>{props.port.presented(true);setMounted(true);onCleanup(()=>props.port.presented(false));});
- createEffect(()=>{if(!mounted())return;const s=props.port.session();if(!s)return;untrack(()=>{
+ createEffect(()=>{if(!mounted())return;const s=retained();if(!s)return;untrack(()=>{
   const restore=editor.documentSessions!.presentations.present(s,{container:slot,scrollport:viewport,surfaceContainer:surface,activity:()=>({mounted:true,visible:props.active(),active:props.active()})});
   onCleanup(restore);queueMicrotask(()=>editor.documentSessions?.presentations.restorePosition(s,true));
  });});

@@ -16,15 +16,17 @@ try{
  import {materializeLocalWorkspace} from '/src/reactive-editor/workspace-manifest.ts';
  import {documentApplicationPorts} from '/src/application/document-application-ports.ts';
  import {nativeDocumentSession} from '/src/persistence/native-session.ts';
- import {captureNative,nativeBytes,decodeNative} from '/src/persistence/native-resource.ts';
+ import {captureNative,nativeBytes,decodeNative,admitNative} from '/src/persistence/native-resource.ts';
  import '/src/index.css';import '/src/demo/workspace-demo.css';
  const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}}),editor=session.editor,native=nativeDocumentSession(editor);
  native.defaultVault=async()=>'isolated';native.establishVault=async()=>({vault:'isolated'});native.list=async()=>['conversation.ink'];
  native.browseVault=native.discoverVault=async()=>({vault:'isolated',folders:['isolated'],documents:[],markdown:[],diagnostics:[],operations:[],readOnly:false,complete:true});
+ let restoredId;if(location.search.includes('reload')){const bank=editor.commands.insert({type:'workspace-object-bank-block',children:[]},{kind:'at',parentKey:session.projection.state.rootKey,index:0});const bytes=new Uint8Array(await(await fetch('/__saved')).arrayBuffer());restoredId=decodeNative(bytes).resourceId;admitNative(editor.repository,bytes,editor.repository.readState().placements[bank].contentKey);}
  await editor.commandRegistry.execute('dialectic.open',{targetKey:session.projection.state.rootKey,args:undefined});
  const selector=document.body.appendChild(document.createElement('div'));selector.style.cssText='position:fixed;top:0;left:0;z-index:2147483646';render(()=>createComponent(WorkspacePresentations,{session}),selector);
  const host=document.body.appendChild(document.createElement('div'));host.className='workspace-demo';render(()=>createComponent(WorkspacePresentationView,{session}),host);editor.installGateway(document);
  const port=()=>documentApplicationPorts(editor).ports().find(p=>p.applicationId==='dialectic');
+ if(restoredId)port().application.openDocument(restoredId);
  window.proof={session,editor,native,port,captureNative,nativeBytes,decodeNative,snapshots:0,rebuilds:0,creates:0};
  proof.root=()=>port().session().projection.node(port().session().rootKey);proof.rows=()=>proof.root().children.map(k=>port().session().projection.node(k)).filter(n=>n.payload.metadata?.dialectic?.kind==='contribution');proof.committed=()=>proof.rows().filter(n=>n.payload.metadata.dialectic.state==='committed');
  proof.draft=()=>proof.rows().find(n=>n.payload.metadata.dialectic.state==='draft');proof.text=()=>port().session().projection.node(proof.draft().children[0]);
@@ -33,7 +35,8 @@ try{
  for(const p of editor.projections.values()){const build=p.build.bind(p);p.build=(...a)=>{proof.rebuilds++;return build(...a)}}
  native.bind(String(proof.root().payload.id),{folder:'isolated',filename:'conversation.ink'},{nativeHash:'initial',markdownHash:null,generation:null});
  `;},configureServer(s){s.middlewares.use(async(req,res,next)=>{
-  if(req.url==='/__dialectic'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><html><body><script type="module" src="/__dialectic.js"></script></body></html>');return;}
+  if(req.url?.startsWith('/__dialectic')&&!req.url.startsWith('/__dialectic.js')){res.setHeader('Content-Type','text/html');res.end('<!doctype html><html><body><script type="module" src="/__dialectic.js"></script></body></html>');return;}
+  if(req.url==='/__saved'){res.end(saved.generation.native);return;}
   if(req.url==='/api/native/save'){let body='';for await(const chunk of req)body+=chunk;saved=JSON.parse(body);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({Success:true,Data:{result:{phase:'saved',generation:saved.generation.generation},baseline:{nativeHash:'saved',markdownHash:null,generation:saved.generation.generation}}}));return;}
   if(req.url?.startsWith('/api/listFolders')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({Success:true,Data:['isolated']}));return;}next();
  });}}]});await server.listen();
@@ -67,12 +70,23 @@ try{
  console.log('Native editing, history, mock and earlier reply passed');
  await click(button('Go to draft'));await key('s','KeyS',4);await wait('!proof.native.isDirty(String(proof.root().payload.id))');assert(saved);report.save={nativeRequest:true,filename:saved.location?.filename??saved.generation?.location?.filename};console.log('Save passed');
  report.roundTrip=await evaluate(`(()=>{const source=proof.captureNative(proof.editor.repository.readState(),String(proof.root().payload.id));const loaded=proof.decodeNative(proof.nativeBytes(source));const rows=Object.values(loaded.contents).filter(c=>c.payload.metadata?.dialectic?.state==='committed');return {contributions:rows.length,ordinals:rows.map(c=>c.payload.metadata.dialectic.ordinal),sameIds:rows.every(c=>proof.committed().some(n=>n.payload.id===c.payload.id))};})()`);assert.equal(report.roundTrip.contributions,3);assert(report.roundTrip.sameIds);
- await evaluate('proof.retained=proof.port().session();proof.parent=proof.retained.element.parentElement;proof.creates=0;proof.snapshots=0;proof.rebuilds=0');
+ await click('proof.mount.focusElement');await key('ArrowLeft','ArrowLeft',8);await key('ArrowLeft','ArrowLeft',8);
+ await evaluate('proof.selection=proof.mount.captureInlineSelection();proof.retained=proof.port().session();proof.parent=proof.retained.element.parentElement;proof.creates=0;proof.snapshots=0;proof.rebuilds=0');
  console.log('Switching to Textual');await click(`[...document.querySelectorAll('button')].find(e=>e.textContent==='Textual')`);await wait('document.querySelector(".dialectic-textual .reactive-standoff-flow")');console.log('Textual ready');
+ assert.deepEqual(await evaluate('proof.mount.captureInlineSelection()'),await evaluate('proof.selection'));
+ await click(button('Go to draft'));
+ await send('Input.insertText',{text:'Textual '},sessionId);
+ await send('Input.imeSetComposition',{text:'é',selectionStart:1,selectionEnd:1},sessionId);await send('Input.insertText',{text:'é'},sessionId);
+ await wait('proof.editor.mounts.get(proof.text().key).captureText().includes("é") && !proof.editor.mounts.get(proof.text().key).composing');
+ await key('z','KeyZ',4);await wait('!proof.editor.mounts.get(proof.text().key).captureText().includes("é")');if(await evaluate('proof.editor.mounts.get(proof.text().key).captureText().includes("Textual")'))await key('z','KeyZ',4);report.textualEditing={selectionRetained:true,compositionCommitted:true,undo:true};
  await writeFile('docs/development/DIALECTIC_INCREMENT_1_TEXTUAL.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
  await evaluate(`proof.session.editor.commandRegistry.execute('workspace.presentation.desktop',{targetKey:proof.session.projection.state.rootKey,args:undefined})`);await wait('!document.querySelector(".dialectic-textual")');
  report.presentation=await evaluate('({sameSession:proof.port().session()===proof.retained,sameMount:proof.editor.mounts.get(proof.original.key)===proof.mount,restored:proof.retained.element.parentElement===proof.parent,creates:proof.creates,snapshots:proof.snapshots,rebuilds:proof.rebuilds,contextRetained:document.querySelector(".dialectic-pins").children.length===1})');assert(report.presentation.sameSession&&report.presentation.sameMount&&report.presentation.restored&&report.presentation.contextRetained);assert.equal(report.presentation.creates,0);assert.equal(report.presentation.snapshots,0);
  await click('document.querySelector(".dialectic-entry")');
+ await click(button('Save'));await wait('!proof.native.isDirty(String(proof.root().payload.id))');
+ assert.equal(await evaluate('document.querySelector(".dialectic-compose-bar").getBoundingClientRect().bottom <= document.querySelector(".reactive-window").getBoundingClientRect().bottom'),true);
  await writeFile('docs/development/DIALECTIC_INCREMENT_1_DESKTOP.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
+ const before=await evaluate('performance.timeOrigin');await send('Page.navigate',{url:`http://127.0.0.1:${server.httpServer.address().port}/__dialectic?reload`},sessionId);await wait(`performance.timeOrigin!==${before} && window.proof?.port()?.session() && proof.committed().length===3`);
+ report.reopened=await evaluate('({count:proof.committed().length,text:proof.port().session().element.textContent.includes("historical interpretations"),replyPreserved:proof.committed()[2].payload.metadata.dialectic.replies[0].blockId===proof.committed()[0].payload.id})');assert(report.reopened.text&&report.reopened.replyPreserved);
  report.result='passed';await writeFile('docs/development/DIALECTIC_INCREMENT_1_BROWSER.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
 }finally{socket?.close();browser?.kill('SIGTERM');await server?.close();await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});}

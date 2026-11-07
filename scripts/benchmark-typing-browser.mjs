@@ -8,6 +8,7 @@
 // BENCHMARK_ENCYCLOPEDIA=off|idle|pending uses the Wikipedia dispatcher instead.
 // BENCHMARK_ACADEMIC=off|idle|pending qualifies DOI loader isolation (pending uses a controlled service response).
 // BENCHMARK_CODE=5|50|200|embedded adds a standoff CodeBlock to the real editor fixture.
+// BENCHMARK_DIALECTIC=1 adds linked range anchors and the incremental Dialectic index.
 // Requires Node 22+ (WebSocket).
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -49,6 +50,8 @@ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) =
    const documentUrl = ${JSON.stringify(process.env.BENCHMARK_DOCUMENT_URL ?? "")};
    const dto = documentUrl ? (await (await fetch(documentUrl)).json()).Data.document : {id:'typing-benchmark-document',type:'document-block',children:Array.from({length:250},(_,i)=>({id:'bench-'+i,type:'standoff-editor-block',text:'x'.repeat(100),standoffProperties:[{type:'style/bold',start:40,end:60}]}))};
    const codeMode=${JSON.stringify(process.env.BENCHMARK_CODE??'')}, codeEnabled=${JSON.stringify(process.env.BENCHMARK_CODE_HIGHLIGHT!=='off')};
+   const dialecticRanges=${JSON.stringify(process.env.BENCHMARK_DIALECTIC === '1')};
+   if(dialecticRanges){dto.linkedAnnotations={...(dto.linkedAnnotations??{})};for(const b of dto.children??[])if(b.type==='standoff-editor-block'&&b.text){const id='bench-range-'+b.id;dto.linkedAnnotations[id]={id,type:'dialectic/range-anchor',metadata:{dialecticRange:{version:1,excerpt:b.text,source:{resourceId:dto.id,blockId:b.id}}}};b.standoffProperties=[...(b.standoffProperties??[]),{id:id+'-segment',type:'dialectic/range-anchor',annotationId:id,start:0,end:[...b.text].length-1}];}}
    if(codeMode){const lines=Array.from({length:codeMode==='embedded'?200:Number(codeMode)},(_,i)=>'const value'+i+': number = '+i+'; // code with a stable trailing comment for trusted caret tests');dto.children.unshift({id:'syntax-code',type:'standoff-code-block',metadata:{markdownCode:{language:'typescript'}},children:(codeMode==='embedded'?[lines.join(String.fromCharCode(10))]:lines).map((text,i)=>({id:'code-line-'+i,type:'standoff-editor-block',text}))});}
    const structuredMode=${JSON.stringify(process.env.BENCHMARK_STRUCTURED??'')};let structuredWorkers=0;
    if(structuredMode){dto.children.push(...[{filename:'data.json',presentation:'json',text:JSON.stringify({values:Array.from({length:1000},(_,i)=>({id:i,name:'Example'}))})},{filename:'code.ts',presentation:'source',text:'const value: number = 42;'}, {filename:'flow.mmd',presentation:'mermaid',text:'flowchart TD; A-->B'}].map((r,i)=>({id:'structured-'+i,type:'mutable/structured-resource-block',structured:{version:1,filename:r.filename,presentation:r.presentation},text:r.text})));}
@@ -146,6 +149,8 @@ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) =
      const data=new DataTransfer();data.setData('text/plain',${JSON.stringify(process.env.BENCHMARK_ENCYCLOPEDIA?'https://en.wikipedia.org/wiki/Typing':'10.1234/typing')});flow.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));
      await Promise.resolve();if(academicRequests!==1)throw Error('Academic preparation did not start');
    }
+   let dialecticIndex;if(dialecticRanges){const {DialecticReferences}=await import('/src/features/dialectic/references.ts');dialecticIndex=new DialecticReferences(editor,projection,projection.state.rootKey);}
+   const dialecticBefore={...dialecticIndex?.diagnostics};
    const pdfBefore=pdfCalls;const iiifBefore=iiifCalls;const samples=[];let snapshots=0; const snapshot=editor.repository.snapshot.bind(editor.repository);
    editor.repository.snapshot=()=>{snapshots++;return snapshot();};
    const before=flow.textContent;
@@ -162,9 +167,9 @@ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) =
    }
    finishAcademic?.();await Promise.resolve();
    const restored=flow.textContent===before;
-   window.typingBench={editor,projection,host,flow,dispose:()=>{stopBacklinks();dispose();},stopMarkdown,caret,midpoint,before,originalCell,unrelated};
+   window.typingBench={editor,projection,host,flow,dispose:()=>{dialecticIndex?.dispose();stopBacklinks();dispose();},stopMarkdown,caret,midpoint,before,originalCell,unrelated};
    samples.sort((a,b)=>a-b);
-   window.Worker=previousWorker;return {codeMode,codeInitial,codeRefresh:codeMode&&codeEnabled?[...codeSyntaxDiagnostics.get(editor).values()][0]:undefined,structuredMode,structuredWorkersDuringTyping:structuredWorkers,pdfMode,pdfCallsDuringTyping:pdfCalls-pdfBefore,iiifMode,iiifCallsDuringTyping:iiifCalls-iiifBefore,academicMode,academicRequests,backlinks:${JSON.stringify(process.env.BENCHMARK_BACKLINKS === '1')},markdownExperiment:${JSON.stringify(process.env.BENCHMARK_MARKDOWN === '1')},presentation:presentation||"standalone",sceneFramesDuringTyping:Number(study?.dataset.frames??0)-sceneFramesBefore,characters:[...flows].reduce((n,f)=>n+[...f.textContent].length,0),paragraphCharacters:[...before].length,paragraphs:flows.length,edits:samples.length,meanMs:samples.reduce((a,b)=>a+b)/samples.length,medianMs:samples[20],p95Ms:samples[38],maxMs:samples[39],snapshots,restored,unrelatedCellStable:unrelated.firstChild===originalCell};
+   window.Worker=previousWorker;return {dialecticRanges,dialecticIndex:dialecticIndex&&Object.fromEntries(Object.entries(dialecticIndex.diagnostics).map(([key,value])=>[key,value-dialecticBefore[key]])),codeMode,codeInitial,codeRefresh:codeMode&&codeEnabled?[...codeSyntaxDiagnostics.get(editor).values()][0]:undefined,structuredMode,structuredWorkersDuringTyping:structuredWorkers,pdfMode,pdfCallsDuringTyping:pdfCalls-pdfBefore,iiifMode,iiifCallsDuringTyping:iiifCalls-iiifBefore,academicMode,academicRequests,backlinks:${JSON.stringify(process.env.BENCHMARK_BACKLINKS === '1')},markdownExperiment:${JSON.stringify(process.env.BENCHMARK_MARKDOWN === '1')},presentation:presentation||"standalone",sceneFramesDuringTyping:Number(study?.dataset.frames??0)-sceneFramesBefore,characters:[...flows].reduce((n,f)=>n+[...f.textContent].length,0),paragraphCharacters:[...before].length,paragraphs:flows.length,edits:samples.length,meanMs:samples.reduce((a,b)=>a+b)/samples.length,medianMs:samples[20],p95Ms:samples[38],maxMs:samples[39],snapshots,restored,unrelatedCellStable:unrelated.firstChild===originalCell};
  })()`);
  console.log(JSON.stringify(result,null,2)); assert.equal(result.restored,true);if(result.pdfMode)assert.equal(result.pdfCallsDuringTyping,0);if(result.iiifMode)assert.equal(result.iiifCallsDuringTyping,0);assert.equal(result.snapshots,0);assert.equal(result.unrelatedCellStable,true);
  const before = await evaluate('window.typingBench.before');

@@ -10,6 +10,7 @@ import {conversationDocument,conversationTabs} from './model';
 import {createDialecticController,type DialecticController} from './controller';
 import {DialecticDesktop,DialecticTextual} from './view';
 import './view.css';
+import {RANGE_ANCHOR} from './anchors';
 
 export const dialecticApplication=applicationKey<DocumentApplicationPort>('dialectic');
 /** Presentation contribution is independent of the application registration. */
@@ -23,6 +24,7 @@ export function createDialecticTextualFeature(editor:ReactiveEditor,get:(app:Doc
 }
 export function createDialecticFeature(editor:ReactiveEditor):CodexFeature {
  return {id:'dialectic',activate(scope){
+  scope.own(editor.visualEffects.registerType({type:RANGE_ANCHOR,renderers:[]}));
   const controllers=new Map<DocumentApplicationInstance,{value:DialecticController;dispose:()=>void;registered:boolean}>();
   const ports=documentApplicationPorts(editor);
   const get=(app:DocumentApplicationInstance)=>{

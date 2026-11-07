@@ -8,7 +8,13 @@ import {materializeLocalWorkspace} from '../../reactive-editor/workspace-manifes
 import {documentApplicationPorts} from '../../application/document-application-ports';
 import {applicationPresentations} from '../../application/application-presentations';
 import {nativeDocumentSession} from '../../persistence/native-session';
-import {captureNative} from '../../persistence/native-resource';
+import {watchDocumentEntities} from '../../application/document-entity-changes';
+import {liveDocumentEntities} from '../../application/live-document-entities';
+import * as resourceIdentity from '../../block-tree/resource-identity';
+import {captureBlocks,cloneBlocks} from '../../block-tree/clipboard';
+import {serializeSelection} from '../../interchange/serializer';
+import {materializeFragment} from '../../interchange/materialize';
+import {captureNative,nativeBytes,decodeNative} from '../../persistence/native-resource';
 import {createDialecticController} from './controller';
 import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
@@ -67,4 +73,118 @@ it('makes one undoable mock composition and rejects stale, cancelled and missing
  c.inspect(first);const stale=c.askMock();const t=c.session()!.projection.node(c.resolve(first)!.children[0])!;f.editor.commands.replaceInlineRange(t.key,0,0,'Changed');await stale;expect(c.notice()).toContain('context changed');expect(c.committed()).toHaveLength(2);
  const pending=c.askMock();c.cancel();await pending;expect(c.committed()).toHaveLength(2);expect(c.busy()).toBe(false);
  c.pin({kind:'block',resourceId:c.resourceId(),blockId:'missing'});await c.askMock();expect(c.notice()).toContain('unavailable');expect(c.context()).toHaveLength(2);
+});
+it('keeps context per conversation and rejects empty drafts and self-replies',async()=>{
+ const f=await setup(),c=f.c!;c.submit();expect(c.notice()).toContain('Write a contribution');
+ f.type!('First conversation');c.setReply(c.target(c.draft()!.id));c.submit();expect(c.notice()).toContain('before replying');c.setReply(undefined);c.submit();
+ const firstId=c.resourceId(),target=c.target(c.frontier()!.id);c.pin(target);c.inspect(target);c.setReply(target);
+ [...f.host.querySelectorAll<HTMLButtonElement>('.dialectic-app button')].find(b=>b.textContent==='New')!.click();await tick();
+ expect(c.resourceId()).not.toBe(firstId);expect(c.valid()).toBe(true);expect(c.context()).toHaveLength(0);expect(c.reply()).toBeUndefined();
+ f.port!.application.openDocument(firstId);await tick();expect(c.context()).toEqual([target]);expect(c.reply()).toEqual(target);expect(c.inspection()).toEqual(target);
+});
+it('keeps unrelated annotated Documents outside typing and submission work',async()=>{
+ const f=await setup(),c=f.c!,state=f.editor.repository.readState();
+ const bank=state.contents[state.placements[state.rootPlacementKey].contentKey].children.find(k=>state.contents[state.placements[k].contentKey].viewType==='workspace-object-bank-block')!;
+ f.editor.commands.insert({id:'unrelated',type:'document-block',metadata:{documentId:'unrelated',title:'Unrelated'},children:[{id:'large-text',type:'standoff-editor-block',text:'annotated passage '.repeat(600),standoffProperties:[{id:'unrelated-bold',type:'style/bold',start:0,end:50}]}]},{kind:'at',parentKey:bank,index:1});
+ const other=Object.values(f.editor.repository.readState().contents).find(c=>c.payload.id==='large-text')!;
+ const revisions=other.revision,builds=c.diagnostics.rowBuilds,snapshots=vi.spyOn(f.editor.repository,'snapshot');
+ f.type!('Independent typing');expect(c.diagnostics.rowBuilds).toBe(builds);c.submit();expect(c.committed()).toHaveLength(1);expect(snapshots).not.toHaveBeenCalled();
+ expect(f.editor.repository.readState().contents[other.key]).toBe(other);expect(other.revision).toBe(revisions);
+});
+
+it('commits a range with its reply atomically, retains editor/Cell identity and incrementally rebases it',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,source=f.text!();f.type!('Alpha beta gamma');c.submit();
+ const mount=e.mounts.get(source.key),cells=[...source.inlineContent],revision=e.repository.state.revision;
+ c.selectRange('reply',e.textRanges.snapshot(source.key,6,10));const t=c.reply()!;
+ expect(e.repository.state.revision).toBe(revision);expect(c.resolveReference(t).text).toBe('beta');
+ f.type!('Reply to beta');const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');c.submit();
+ expect(c.notice()).toBe('');expect(c.frontier()!.data.replyExcerpts?.[0].text).toBe('beta');expect(c.resolveReference(t).status).toBe('resolved');
+ expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(e.mounts.get(source.key)).toBe(mount);expect(source.inlineContent).toEqual(cells);
+ e.repository.undo();expect(c.resolveReference(t).status).toBe('missing');expect(c.committed()).toHaveLength(1);
+ e.repository.redo();expect(c.resolveReference(t).text).toBe('beta');expect(c.committed()).toHaveLength(2);
+ const notify=vi.fn(),watch=watchDocumentEntities(e,source.key,notify),inventory=liveDocumentEntities(e,c.root()!.contentKey);cleanup.push(watch.dispose,()=>inventory.dispose());await tick();notify.mockClear();
+ const index=c.references()!,counts={...index.diagnostics},owners=vi.spyOn(resourceIdentity,'resourceOwner');
+ e.commands.replaceInlineRange(source.key,7,7,'X');expect(c.resolveReference(t)).toMatchObject({text:'bXeta',historical:'beta',changed:true});
+ await tick();expect(notify).not.toHaveBeenCalled();expect(inventory.read().rows).toHaveLength(0);expect(owners).not.toHaveBeenCalled();expect(index.diagnostics.treeVisits).toBe(counts.treeVisits);expect(index.diagnostics.propertyReads-counts.propertyReads).toBe(1);expect(index.diagnostics.recordUpdates-counts.recordUpdates).toBe(1);
+ expect(c.frontier()!.data.replyExcerpts?.[0].text).toBe('beta');expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const saved=captureNative(e.repository.readState(),c.resourceId());expect(JSON.stringify(decodeNative(nativeBytes(saved)))).toContain('dialectic/range-anchor');
+});
+
+it('follows split/join, keeps an orphan excerpt, and explicitly reattaches with Undo',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,source=f.text!();f.type!('Alpha beta gamma');c.submit();c.selectRange('reply',e.textRanges.snapshot(source.key,6,10));const t=c.reply()!;f.type!('Reply');c.submit();
+ const right=e.commands.splitStandoff(source.key,8);expect(c.resolveReference(t).segments).toHaveLength(2);expect(c.resolveReference(t).text).toBe('be\nta');
+ e.commands.joinStandoff(source.key,right);expect(c.resolveReference(t).text).toBe('beta');
+ e.commands.replaceInlineRange(source.key,6,10,'');expect(c.resolveReference(t)).toMatchObject({status:'unanchored',historical:'beta'});
+ e.repository.undo();expect(c.resolveReference(t).text).toBe('beta');e.repository.redo();
+ c.reattach(t,e.textRanges.snapshot(source.key,0,5));expect(c.notice()).toBe('');expect(c.resolveReference(t)).toMatchObject({text:'Alpha',historical:'beta',changed:true});
+ expect(c.frontier()!.data.replyExcerpts?.[0].text).toBe('beta');e.repository.undo();expect(c.resolveReference(t).status).toBe('unanchored');
+ e.repository.redo();expect(c.resolveReference(t).text).toBe('Alpha');
+});
+
+it('does not author stale/cancelled selections and records precisely supplied range and Gloss context',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,source=f.text!();f.type!('Alpha beta gamma');c.submit();
+ c.selectRange('reply',e.textRanges.snapshot(source.key,6,10));e.commands.replaceInlineRange(source.key,0,0,'!');f.type!('Reply');c.submit();expect(c.notice()).toContain('unavailable');expect(c.committed()).toHaveLength(1);
+ c.selectRange('reply',e.textRanges.snapshot(source.key,7,11));const t=c.reply()!;c.pin(t);
+ const revision=e.repository.state.revision,pending=c.askMock();c.cancel();await pending;expect(e.repository.state.revision).toBe(revision);
+ expect(e.gloss.open(source.key,{anchor:7,head:11})).toBe(true);expect(e.gloss.commit('entity: Beta')).toBe(true);
+ const id=Object.keys(c.root()!.payload.linkedAnnotations as any)[0];c.pinGloss(id);
+ // Gloss authoring may change the snapshot revision; explicitly select again.
+ c.selectRange('reply',e.textRanges.snapshot(source.key,7,11));c.unpin(t);c.pin(c.reply()!);
+ await c.askMock();expect(c.notice()).toBe('');const manifest=c.frontier()!.data.consumedContext!;
+ expect(manifest.items.map(i=>i.text)).toEqual(['beta','entity: Beta']);expect(manifest.items[0].origins).toEqual(['reply-target','selected']);
+ e.commands.replaceInlineRange(source.key,8,8,'X');expect(manifest.items[0].text).toBe('beta');expect(c.frontier()!.data.replyExcerpts?.[0].text).toBe('beta');
+});
+
+
+it('copies ordinary anchored compositions through both paths and rejects wrappers before mutation',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,source=f.text!();f.type!('Alpha beta gamma');c.submit();c.selectRange('reply',e.textRanges.snapshot(source.key,6,10));const t=c.reply()!;f.type!('Reply');c.submit();
+ const revision=e.repository.state.revision,state=e.repository.readState();
+ const native=cloneBlocks(captureBlocks(state,[source.placementKey]));
+ const sliced=materializeFragment(serializeSelection(state,[{placementKey:source.placementKey,start:7,end:9}],{resourceId:c.resourceId()}),{resourceId:c.resourceId()});
+ for(const fragment of [native,sliced]){
+  const text=fragment.state.contents[fragment.state.placements[fragment.roots[0]].contentKey],p=(text.payload.standoffProperties as any[])[0];
+  expect(p.type).toBe('dialectic/range-anchor');expect(p.annotationId).not.toBe(t.anchorId);expect(fragment.linkedAnnotations?.[p.annotationId].metadata).toBeTruthy();
+  expect(text.payload.id).not.toBe(source.payload.id);
+ }
+ const wrapper=c.resolve(c.target(c.frontier()!.id))!;
+ expect(()=>cloneBlocks(captureBlocks(state,[wrapper.placementKey]))).toThrow('content Blocks');
+ expect(()=>materializeFragment(serializeSelection(state,[{placementKey:wrapper.placementKey}],{resourceId:c.resourceId()}))).toThrow('content Blocks');
+ expect(()=>(e.clipboard as any).write({slices:[{placementKey:wrapper.placementKey}],scope:{}},true)).toThrow('content Blocks');
+ expect(e.repository.state.revision).toBe(revision);
+ const placement=e.commands.insertFragment(native,{kind:'at',parentKey:c.resolve(c.target(c.draft()!.id))!.key,index:1})[0];
+ const copied=c.session()!.projection.nodeForPlacement(placement)!;
+ const p=(copied.payload.standoffProperties as any[])[0];expect(c.resolveReference({kind:'range',resourceId:c.resourceId(),anchorId:p.annotationId}).text).toBe('beta');
+ expect(c.resolveReference(t).text).toBe('beta');
+});
+
+it('rejects stale async range context and leaves cancelled anchors unauthored',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,source=f.text!();f.type!('Alpha beta gamma');c.submit();c.selectRange('reply',e.textRanges.snapshot(source.key,6,10));
+ const pending=c.askMock();e.commands.replaceInlineRange(source.key,7,7,'X');await pending;
+ expect(c.notice()).toContain('context changed');expect(c.committed()).toHaveLength(1);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ expect(c.resolveReference({...c.reply()!,resourceId:'foreign'}).status).not.toBe('resolved');
+});
+
+it('uses a persisted reactive reply descriptor after history replay without leaking proxies into authoring',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor,source=f.text!();f.type!('Alpha beta gamma');c.submit();c.selectRange('reply',e.textRanges.snapshot(source.key,6,10));f.type!('Reply');c.submit();e.repository.undo();e.repository.redo();
+ c.inspect(c.frontier()!.data.replies[0]);await c.askMock();expect(c.notice()).toBe('');expect(c.frontier()!.data.consumedContext?.items[0].text).toBe('beta');
+});
+
+it('anchors nested table content with shared occurrences without rebuilding either editor',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor;
+ const wrapper=c.resolve(c.target(c.draft()!.id))!;
+ e.commands.insert({id:'nested-table',type:'table-block',children:[{type:'table-row-block',children:[{type:'table-cell-block',children:[{id:'nested-source',type:'standoff-editor-block',text:'Nested source',standoffProperties:[{id:'bold-source',type:'style/bold',start:0,end:5}]}]}]}]},{kind:'at',parentKey:wrapper.key,index:1});c.submit();
+ let source=Object.values(c.session()!.projection.state.nodes).find(n=>n.payload.id==='nested-source')!;
+ e.commands.transclude(source.key,{kind:'at',parentKey:wrapper.key,index:2});
+ source=c.session()!.projection.nodesForContent(source.contentKey)[0];const occurrences=c.session()!.projection.nodesForContent(source.contentKey),mounts=occurrences.map(n=>e.mounts.get(n.key)),cells=occurrences.map(n=>[...n.inlineContent]);
+ expect(occurrences).toHaveLength(2);c.selectRange('reply',e.textRanges.snapshot(source.key,0,6));const t=c.reply()!;f.type!('Nested reply');
+ const build=vi.spyOn(c.session()!.projection as any,'build'),snapshots=vi.spyOn(e.repository,'snapshot');c.submit();expect(c.notice()).toBe('');
+ expect(c.resolveReference(t).segments).toHaveLength(1);expect(c.resolveReference(t).text).toBe('Nested');expect(build).not.toHaveBeenCalled();expect(snapshots).not.toHaveBeenCalled();
+ occurrences.forEach((n,i)=>{expect(e.mounts.get(n.key)).toBe(mounts[i]);expect(n.inlineContent).toEqual(cells[i]);expect((n.payload.standoffProperties as any[])[0]).toMatchObject({id:'bold-source',type:'style/bold'});});
+ e.repository.undo();e.repository.redo();expect(c.resolveReference(t).segments).toHaveLength(1);expect(build).not.toHaveBeenCalled();
+});
+
+it('rejects oversized supplied context before reading its complete text',async()=>{
+ const f=await setup(),c=f.c!;f.type!('x'.repeat(6000));c.submit();
+ const read=vi.spyOn(c.references()!,'text'),revision=f.editor.repository.state.revision;
+ await c.askMock();expect(c.notice()).toContain('6,000 characters');expect(read).not.toHaveBeenCalled();expect(f.editor.repository.state.revision).toBe(revision);
 });

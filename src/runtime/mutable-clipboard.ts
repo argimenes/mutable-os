@@ -18,6 +18,7 @@ import type { ReactiveEditor } from '../reactive-editor/editor';
 import type { Destination } from '../block-tree/types';
 import { resourceOwner, resourceSource } from '../block-tree/resource-identity';
 import { serializeSelection, plainFragment, type Slice } from '../interchange/serializer';
+import {assertCopyableDialectic} from '../features/dialectic/anchors';
 import { materializeFragment } from '../interchange/materialize';
 import { inlineMergePredicate } from '../interchange/insertion';
 import { fragmentGroup, validateFragment, type InterchangeScope, type MutableFragment } from '../interchange/fragment';
@@ -385,6 +386,7 @@ export class MutableClipboard {
   }
   private write(b: Bookmark, cut: boolean, event?: ClipboardEvent, cross = false) {
     const fragment = serializeSelection(this.editor.repository.readState(), b.slices, b.scope);
+    for(const block of fragment.blocks)assertCopyableDialectic(block.data); // reject before clipboard write or Cut
     const representations = exportClipboard(fragment);
     if (canWriteAsync() && (!event || event.isTrusted)) {
       // Start the write within the activation callback; don't await a resolver first.

@@ -6,10 +6,20 @@ import type { JsonObject, RepositoryOperation } from "../block-tree/types";
 import type { ReactiveEditor } from "../reactive-editor/editor";
 import { resourceOwner } from "../block-tree/resource-identity";
 import type { AnnotationAction, AnnotationPatch } from "../block-tree/annotation-commands";
+import {glossOwner} from '../block-tree/gloss-plan';
+import {RANGE_ANCHOR,rangeDefinition} from '../features/dialectic/anchors';
 
 export class LinkedAnnotations {
   constructor(private editor: ReactiveEditor) {}
-  resolve(property: JsonObject, contentKey?: string) { return property.type === "mutable/gloss" ? this.editor.gloss.resolveContent(property, contentKey) : resolveLinkedProperty(this.editor.repository.state, property, contentKey); }
+  resolve(property: JsonObject, contentKey?: string) {
+    if(property.type===RANGE_ANCHOR){
+      const state=this.editor.repository.readState();
+      const owner=contentKey&&!property.externalDefinition&&glossOwner(state,contentKey,{locationOf:k=>this.editor.repository.locationOf(k),ownedKeys:k=>this.editor.repository.ownedPlacementKeys(k)});
+      const definition=owner&&(state.contents[owner].payload.linkedAnnotations as any)?.[String(property.annotationId)];
+      return rangeDefinition(definition)?{...definition,...property,isDeleted:!!property.isDeleted||!!definition.isDeleted}:{...property,isDeleted:true};
+    }
+    return property.type === "mutable/gloss" ? this.editor.gloss.resolveContent(property, contentKey) : resolveLinkedProperty(this.editor.repository.state, property, contentKey);
+  }
   private owner(id: string, property?: JsonObject, contentKey?: string) {
     const state = this.editor.repository.readState();
     if (property) return linkedDefinitionOwner(state, property, contentKey);

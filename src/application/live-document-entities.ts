@@ -121,6 +121,7 @@ class Inventory {
     this.clearCells(key);const linkedCells=new Set<string>();
     let invalid = 0;
     for (const [index,p] of properties(content).entries()) {
+      if(p.type==='dialectic/range-anchor')continue; // passive reply identity, never an Entity mention
       if (p.type !== 'codex/entity-reference' && !p.annotationId) continue;
       const localId = String(p.id ?? `index:${index}`), prior = old.get(localId);
       const {start,end,...identity} = p, signature = JSON.stringify(identity);

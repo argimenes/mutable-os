@@ -113,7 +113,15 @@ export class BlockTreeProjection {
         }
         return;
       }
-      if (change.structural && this.updateStructural(change.structural)) return;
+      if(change.structural?.rangePayloadOwners?.length){
+        // The proof guarantees unchanged topology/Cells for these annotation-only
+        // records. Reuse inline projection maintenance for every shared occurrence.
+        const owners=new Set(change.structural.rangePayloadOwners);
+        if(this.updateStructural({...change.structural,contents:change.structural.contents.filter(k=>!owners.has(k))})){
+          for(const key of owners)if(this.contentNodes.has(key))this.updateInline(key);
+          return;
+        }
+      } else if (change.structural && this.updateStructural(change.structural)) return;
       const next = this.build();
       this.unregister();
       this.setState(reconcile(next));
@@ -487,6 +495,9 @@ export class BlockTreeProjection {
   node(key: NodeKey): BlockNode | undefined {
     return this.state.nodes[key];
   }
+
+  /** Indexed mounted occurrences; does not enumerate unrelated projected nodes. */
+  nodesForContent(key: ContentKey): BlockNode[] { return [...this.contentNodes.get(key) ?? []].map(k=>this.state.nodes[k]).filter(Boolean); }
 
   occurrenceCount(placementKey: PlacementKey): number { return this.placementNodes.get(placementKey)?.size ?? 0; }
 
