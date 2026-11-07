@@ -188,3 +188,21 @@ it('rejects oversized supplied context before reading its complete text',async()
  const read=vi.spyOn(c.references()!,'text'),revision=f.editor.repository.state.revision;
  await c.askMock();expect(c.notice()).toContain('6,000 characters');expect(read).not.toHaveBeenCalled();expect(f.editor.repository.state.revision).toBe(revision);
 });
+it('authors Sequence metadata locally with Undo, native persistence and unchanged chronology',async()=>{
+ const f=await setup(),c=f.c!,editor=f.editor;f.type!('First perspective');c.submit();f.type!('Second perspective');c.submit();
+ const order=c.committed().map(r=>r.id),s=c.sequences,source=c.committed()[0],mount=editor.mounts.get(source.key)!.root;
+ const native=nativeDocumentSession(editor);(native as any).bind(c.resourceId(),{folder:'isolated',filename:'sequence.ink'},{nativeHash:'initial',markdownHash:null,generation:null});
+ const snapshot=vi.spyOn(editor.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ const refs={...c.references()!.diagnostics};s.create();const g=s.draft()!.groups[0].id;s.add(g,c.target(order[0]));s.add(g,c.target(order[1]));s.save();
+ expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(c.references()!.diagnostics).toEqual(refs);expect(s.saved()).toHaveLength(1);expect(native.isDirty(c.resourceId())).toBe(true);expect(c.committed().map(r=>r.id)).toEqual(order);expect(editor.mounts.get(source.key)!.root).toBe(mount);
+ const saved=captureNative(editor.repository.readState(),c.resourceId());expect(JSON.stringify(saved)).toContain('New Sequence');
+ editor.repository.undo();expect(s.saved()).toHaveLength(0);editor.repository.redo();expect(s.saved()).toHaveLength(1);expect(snapshot).not.toHaveBeenCalled();
+});
+it('keeps Sequence navigation/reveal and repeated-member state out of canonical history/context',async()=>{
+ const f=await setup(),c=f.c!,editor=f.editor;f.type!('Evidence');c.submit();const s=c.sequences,t=c.target(c.committed()[0].id);s.create();const g=s.draft()!.groups[0].id;s.add(g,t);s.add(g,t);s.change(d=>{d.groups[0].presentation={reveal:'in-order'};d.groups.push({id:crypto.randomUUID(),title:'Alternative',members:[]});});s.save();
+ const seq=s.saved()[0],members=seq.groups[0].members,before=editor.repository.state.revision;
+ s.duplicate(seq.id);expect(s.draft()!.id).not.toBe(seq.id);expect(s.draft()!.groups[0].id).not.toBe(seq.groups[0].id);expect(s.draft()!.groups[0].members[0].id).not.toBe(members[0].id);expect(s.draft()!.groups[0].members[0].source).toEqual(members[0].source);s.cancel();
+ s.present(seq.id);expect(s.visible(members[0].id)).toBe(true);expect(s.visible(members[1].id)).toBe(false);s.show(members[1].id);expect(s.visible(members[1].id)).toBe(true);s.reset();expect(s.visible(members[1].id)).toBe(false);s.reveal();expect(s.visible(members[1].id)).toBe(true);
+ expect(s.memberState(members[0].id)).not.toBe(s.memberState(members[1].id));expect(c.context()).toEqual([]);expect(c.reply()).toBeUndefined();s.chooseGroup(seq.groups[1].id);expect(s.group()!.id).toBe(seq.groups[1].id);s.chooseGroup(seq.groups[0].id);expect(s.visible(members[1].id)).toBe(true);s.leave(false);expect(editor.repository.state.revision).toBe(before);
+ editor.commands.remove(c.resolve(t)!.key);expect(c.resolve(t)).toBeUndefined();expect(s.saved()[0].groups[0].members).toHaveLength(2);editor.repository.undo();expect(c.resolve(t)).toBeTruthy();
+});

@@ -21,6 +21,7 @@ export class DialecticReferences {
   const root=projection.node(rootKey)!;this.owner=root.contentKey;this.resourceId=String((root.payload.metadata as any)?.documentId??root.payload.id);
   this.visit(this.owner);
   this.stop=editor.repository.subscribeChanges(change=>untrack(()=>{
+   if(change.structural?.sequenceMetadataOwner)return;
    for(const [key,old]of change.previousContents){
     const next=editor.repository.readState().contents[key];
     if(next?.viewType==='text-cell'||next?.viewType==='image-cell'||!next&&['text-cell','image-cell'].includes(old?.viewType??''))continue;

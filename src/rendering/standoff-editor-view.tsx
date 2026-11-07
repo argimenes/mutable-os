@@ -328,7 +328,7 @@ function ProjectedAlternative(props: { nodeKey: NodeKey; sourceIndex: number; so
 }
 
 export function StandoffEditorView(props: BlockViewProps) {
-  const { editor, projection, coordinates, activity } = useReactiveView();
+  const { editor, projection, coordinates, activity, passive } = useReactiveView();
   const node = () => projection.state.nodes[props.nodeKey];
   const [draft,setDraft]=createSignal<ProvisionalCells>();
   const logical=(at:number)=>draft()?.fromPresentation(at)??at;
@@ -341,7 +341,7 @@ export function StandoffEditorView(props: BlockViewProps) {
   const annotationKey = (annotation: StandoffAnnotation, index: number) => identities?.keys()[index]
     ? JSON.stringify([props.nodeKey,identities.keys()[index]])
     : `${props.nodeKey}:${annotation.id ?? annotation.type ?? "property"}:${index}`;
-  const rendering = createRangeRendering({registry:editor.visualEffects, events:editor.annotationEvents, nodeKey:props.nodeKey, eventsEnabled:editor.features.annotationRangeEvents, visible:source=>source.owner.kind==='annotation'||searchVisible,
+  const rendering = createRangeRendering({registry:editor.visualEffects, events:editor.annotationEvents, nodeKey:props.nodeKey, eventsEnabled:!passive && editor.features.annotationRangeEvents, visible:source=>source.owner.kind==='annotation'||searchVisible,
     sources:()=>{
       if(!editor.features.standoffPropertyRendering)return [];
       const count=node()?.inlineContent.length??0;
@@ -619,7 +619,7 @@ export function StandoffEditorView(props: BlockViewProps) {
     disposeMount = editor.mounts.register(props.nodeKey, {
       root,
       focusElement: flow,
-      inputPolicy: "standoff",
+      inputPolicy: passive ? "opaque-widget" : "standoff",
       focus: () => flow.focus({ preventScroll: true }),
       captureInlineSelection: captureSelection,
       restoreInlineSelection: restoreSelection,
@@ -667,7 +667,7 @@ export function StandoffEditorView(props: BlockViewProps) {
           : String(flow.children[index]?.textContent ?? projection.state.nodes[cellKey]?.payload.text ?? "");
       }).join(""),
     });
-    if (editor.features.caretModes) {
+    if (!passive && editor.features.caretModes) {
       caretSurface = editor.caretModes.mount(props.nodeKey, flow, root.closest('[data-block-type="document-block"], [data-block-type="main-list-block"], [data-block-type="membrane-block"]') ?? root.parentElement ?? root, () => coordinates?.scale() ?? 1);
       caretSurface.visible((!activity || activity().visible) && typeof IntersectionObserver === "undefined");
     }
@@ -739,9 +739,9 @@ export function StandoffEditorView(props: BlockViewProps) {
         <div
           ref={flow}
           class="reactive-standoff-flow"
-          contentEditable={!editor.crossText.segments[props.nodeKey]}
+          contentEditable={!passive && !editor.crossText.segments[props.nodeKey]}
           tabIndex={0}
-          aria-readonly={!!editor.crossText.segments[props.nodeKey]}
+          aria-readonly={passive || !!editor.crossText.segments[props.nodeKey]}
           role="textbox"
           aria-multiline="true"
           spellcheck={true}
@@ -793,11 +793,11 @@ export function StandoffEditorView(props: BlockViewProps) {
                           if (managedAsset(cell()?.payload.asset)) { scheduleMeasure(); return; }
                           // A cached image can finish after its transient view is disposed.
                           if (!event.currentTarget.isConnected || !cell()?.payload.src || !editor.node(cellKey)) return;
-                          editor.commands.updateInlineImage(cellKey, { status: "ready" });
+                          if(!passive)editor.commands.updateInlineImage(cellKey, { status: "ready" });
                           scheduleMeasure();
                         }}
                         onError={event => {
-                          if (event.currentTarget.isConnected && cell()?.payload.src && editor.node(cellKey)) editor.commands.updateInlineImage(cellKey, { status: "failed" });
+                          if (event.currentTarget.isConnected && cell()?.payload.src && editor.node(cellKey)) if(!passive)editor.commands.updateInlineImage(cellKey, { status: "failed" });
                         }}
                       />
                     </span>
@@ -818,7 +818,7 @@ export function StandoffEditorView(props: BlockViewProps) {
       const cells = new DirectCharacterCells(element, (key, status) => {
         if (managedAsset(editor.node(key)?.payload.asset)) { if (status === "ready") scheduleMeasure(); return; }
         if (!editor.node(key)?.payload.src) return;
-        editor.commands.updateInlineImage(key, { status });
+        if(!passive)editor.commands.updateInlineImage(key, { status });
         if (status === "ready") scheduleMeasure();
       }, (image, asset) => editor.clipboard.assets.bind(image, asset));
       createRenderEffect(() => {
@@ -872,7 +872,12 @@ export function StandoffEditorView(props: BlockViewProps) {
       data-block-type="standoff-editor-block"
     >
       <Show when={editor.features.taskLists && taskState(node()) !== undefined}><StandaloneTaskDisclosure nodeKey={props.nodeKey} /><TaskControl nodeKey={props.nodeKey} /></Show>
-      <div ref={surface} class="reactive-standoff-surface" onClick={event => editor.gloss.click(props.nodeKey,event)} onPointerMove={hoverCandidate} onPointerLeave={() => setHovered(undefined)}>
+      <div ref={surface} class="reactive-standoff-surface" onClick={event => {
+        if(!passive){editor.gloss.click(props.nodeKey,event);return;}
+        const index=Number((event.target as Element).closest<HTMLElement>('[data-inline-index]')?.dataset.inlineIndex);
+        const link=annotations().find(p=>p.type==='reference/url'&&!p.isDeleted&&p.start!==undefined&&p.end!==undefined&&p.start<=index&&p.end>=index);
+        if(link){try{const url=new URL(String(link.value));if(['http:','https:','mailto:'].includes(url.protocol)){event.preventDefault();window.open(url.href,'_blank','noopener,noreferrer');}}catch{/* Invalid links remain inert. */}}
+      }} onPointerMove={hoverCandidate} onPointerLeave={() => setHovered(undefined)}>
         <DecorationLayer class="reactive-annotation-layer reactive-annotation-layer--foreground" shapes={highlighterShapes().filter(shape=>!shape.annotationKey||legacySvgKeys().has(shape.annotationKey))} blendMode="color-dodge" />
         <DecorationLayer class="reactive-selection-layer" shapes={selectionShapes()} />
         <DecorationLayer class="reactive-selection-layer reactive-search-layer" shapes={searchShapes()} />

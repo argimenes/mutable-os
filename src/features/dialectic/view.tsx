@@ -1,3 +1,4 @@
+import {SequenceNavigation,SequenceAuthor,SequenceReader} from './sequence-view';
 import {For,Show,createEffect,createMemo,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
 import type {DocumentApplicationInstance} from '../../feature-api/document-application';
 import type {DocumentApplicationPort} from '../../application/document-application-ports';
@@ -8,10 +9,12 @@ import type {DialecticController} from './controller';
 
 function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.Element;textual?:boolean}){
  const c=props.c;
- let root!:HTMLElement;
+ let root!:HTMLElement;const [mounted,setMounted]=createSignal(false);
+ const hosting=()=>mounted()&&!!c.session()?.host.port&&root.contains(c.session()!.host.port!.container)&&c.session()!.host.activity().visible;
  const act=(fn:()=>unknown)=>()=>c.run(fn);
  const save=async()=>{try{await c.port()?.application.files?.save();}catch(e){c.run(()=>{throw e;});}};
  onMount(()=>{
+  queueMicrotask(()=>setMounted(true));
   const shortcut=(e:KeyboardEvent)=>{if(!root.contains(e.target as Node)||e.isComposing||e.altKey||e.shiftKey||!(e.metaKey||e.ctrlKey)||e.key.toLowerCase()!=='s'||(e.target as Element)?.closest('[role="dialog"]'))return;e.preventDefault();e.stopPropagation();void save();};
   window.addEventListener('keydown',shortcut,true);onCleanup(()=>window.removeEventListener('keydown',shortcut,true));
  });
@@ -21,7 +24,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
  return <section ref={root} class="dialectic-app" aria-label="Dialectic conversation">
   <header class="dialectic-bar" data-cross-text-controls>
    <div><strong>Dialectic</strong><span class="dialectic-subtitle"> Compositions in conversation</span></div>
-   <nav aria-label="Conversation actions" onPointerDown={e=>e.preventDefault()}>{props.actions}<button onClick={()=>void save()}>Save</button><button onClick={()=>void c.port()?.saveAs?.().catch(e=>c.run(()=>{throw e;}))}>Save as…</button><button onClick={act(()=>c.editor.repository.undo())}>Undo</button><button onClick={act(()=>c.editor.repository.redo())}>Redo</button></nav>
+   <nav aria-label="Conversation actions" onPointerDown={e=>e.preventDefault()}>{props.actions}<button onClick={()=>void save()}>Save</button><button onClick={()=>void c.port()?.saveAs?.().catch(e=>c.run(()=>{throw e;}))}>Save as…</button><button disabled={!!c.sequences.presenting()} onClick={act(()=>c.editor.repository.undo())}>Undo</button><button disabled={!!c.sequences.presenting()} onClick={act(()=>c.editor.repository.redo())}>Redo</button></nav>
   </header>
   <Show when={c.notice()}><div class="dialectic-notice" role="alert">{c.notice()}</div></Show>
   <Show when={c.root()&&!c.valid()}><p class="dialectic-notice">This Document is not a Dialectic conversation. Its content is unchanged. Open a conversation or choose New.</p></Show>
@@ -33,16 +36,19 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <button class="dialectic-entry" onClick={c.compose}>＋ Your draft</button>
     <div class="dialectic-history"><button disabled={c.cursor()<=0} onClick={()=>c.navigate(-1)}>← Back</button><button disabled={c.cursor()>=c.trail().length-1} onClick={()=>c.navigate(1)}>Forward →</button></div>
     <button class="dialectic-present" onClick={c.present}>Return to present</button>
+    <SequenceNavigation c={c}/>
    </aside>
    <main class="dialectic-main">
     <div class="dialectic-reading-header"><span>{c.port()?.application.properties()?.title??'Conversation'}</span><span class="dialectic-muted">Native Mutable Document</span></div>
-    {props.children}
-    <div class="dialectic-compose-bar" data-cross-text-controls onPointerDown={e=>e.preventDefault()}>
+    <Show when={c.sequences.draft()&&hosting()}><SequenceAuthor c={c}/></Show>
+    <Show when={c.sequences.presenting()&&hosting()}><SequenceReader c={c} textual={props.textual}/></Show>
+    <div class="dialectic-retained-source" hidden={!!c.sequences.presenting()} inert={!!c.sequences.presenting()}>{props.children}</div>
+    <div hidden={!!c.sequences.presenting()} class="dialectic-compose-bar" data-cross-text-controls onPointerDown={e=>e.preventDefault()}>
      <div><strong>Your next contribution</strong><small>{c.reply()?`Replying to ${c.label(c.reply()!)}`:'New contribution at the chronological frontier'} <Show when={c.reply()}><button onClick={()=>c.setReply(undefined)}>Clear target</button></Show></small></div>
      <button onClick={c.compose}>Go to draft</button><button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={c.submit}>Submit</button>
     </div>
    </main>
-   <aside class="dialectic-inspector" aria-label="Conversation context">
+   <aside class="dialectic-inspector" inert={!!c.sequences.presenting()} aria-label="Conversation context">
     <div class="dialectic-eyebrow">INSPECTION</div>
     <h3>{selected()?c.label(selected()!):'Explore a contribution'}</h3>
     <Show when={row()}>{r=><p class="dialectic-muted">{r().data.createdUtc?new Date(r().data.createdUtc!).toLocaleString():'Draft'} · Content stays editable.</p>}</Show>

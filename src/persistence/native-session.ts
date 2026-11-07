@@ -74,7 +74,7 @@ export class NativeDocumentSession {
     const warn = (event: BeforeUnloadEvent) => { if (this.candidates.size || this.relocations.size || [...this.compatibleSources.values()].some(s=>s.dirty||s.pending) || [...this.bindings].some(([id,b]) => b.pending || b.relocation || this.isDirty(id))) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', warn);
     const stop = editor.repository.subscribeChanges(change => {
-      const oriented = change.structural?.tabOrientationOwner;
+      const oriented = change.structural?.tabOrientationOwner ?? change.structural?.sequenceMetadataOwner;
       const tabMetadata = change.structural?.tabMetadata;
       const membership = change.structural?.membership;
       const gloss = change.structural?.gloss;

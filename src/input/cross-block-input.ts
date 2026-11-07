@@ -1,3 +1,4 @@
+import { passiveElement } from '../runtime/passive-presentation';
 import type { ReactiveEditor } from "../reactive-editor/editor";
 import type { ViewPosition } from "../block-tree/types";
 import { graphemeBoundaries } from "./graphemes";
@@ -142,6 +143,7 @@ export class CrossBlockInput {
     this.begin(event, event.pointerId);
   };
   private begin = (event: MouseEvent, pointerId?: number) => {
+    if(passiveElement(event.target))return;
     const byWord = event.detail === 2 && !event.ctrlKey && !event.shiftKey;
     if ((!byWord && !this.editor.crossText.enabled() && !this.editor.selectionGestures.selecting("pointer")) || event.button !== 0 || event.metaKey || event.altKey) return;
     const target = event.target instanceof Element ? event.target : undefined;
@@ -381,6 +383,7 @@ export class CrossBlockInput {
     }
   };
   private guard = (event: Event) => {
+    if(passiveElement(event.target))return;
     if (event.type === "dragstart" && this.drag) { this.stop(event); return; }
     if (!this.editor.crossText.range()) return;
     const target = event.target instanceof Element ? event.target : undefined;

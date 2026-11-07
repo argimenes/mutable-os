@@ -92,7 +92,7 @@ export class BlockTreeProjection {
         if(change.previousContents.has(owner))for(const key of this.contentNodes.get(owner)??[])this.setState('nodes',key,'payload',reconcile(clone(content.payload)));
         return;
       }
-      const oriented = change.structural?.tabOrientationOwner;
+      const oriented = change.structural?.tabOrientationOwner ?? change.structural?.sequenceMetadataOwner;
       if (oriented) {
         const content = repository.readState().contents[oriented];
         // All mounted occurrences share this authored setting. Their child trees,

@@ -1,3 +1,4 @@
+import { passiveFocus } from '../runtime/passive-presentation';
 import { MarkdownInput } from '../runtime/markdown-input';
 import { GlossRelationshipController } from "../features/gloss/relationship-controller";
 import { GlossController } from "../features/gloss/controller";
@@ -188,7 +189,11 @@ export class ReactiveEditor {
     }, this.features.caretModes, this.features.readingSpotlight);
     this.pointerSpotlight = new PointerSpotlight(this.visualEffects, this.features.pointerSpotlight, () => this.caretModes.select('normal'), this.caretModes.active);
     this.viewVisibility = new ViewVisibility(this.repository);
-    this.commands = new TreeCommands(this.repository, (key) => this.occurrences.resolve(key));
+    this.commands = new TreeCommands(this.repository, (key) => {
+      if(this.isPassiveOccurrence(key)) throw new Error('Open source to edit this composition.');
+      return this.occurrences.resolve(key);
+    });
+    this.commandRegistry.authoringAllowed = (key,id) => ['workspace.presentation.desktop','workspace.presentation.textual'].includes(id) || !this.isPassiveOccurrence(key) && !passiveFocus();
     this.textRanges = new TextRanges(key => {
       const node = this.node(key), content = node && this.repository.readState().contents[node.contentKey];
       if (!node || !content || !["standoff-editor-block", "plain-text-block", ...sourceTextTypes].includes(node.viewType)) return;
@@ -256,6 +261,12 @@ export class ReactiveEditor {
     });
   }
 
+  readonly passiveViews = new Set<string>();
+  isPassiveOccurrence(key: string): boolean {
+    for (const id of this.passiveViews) if (this.projections.get(id)?.state.nodes[key]) return true;
+    return false;
+  }
+
   createView(
     viewId: ViewId = createViewId(),
     rootPlacementKey: PlacementKey = this.repository.state.rootPlacementKey,
@@ -292,6 +303,7 @@ export class ReactiveEditor {
       this.setViewChild(key, undefined);
     }
     projection.dispose();
+    this.passiveViews.delete(projection.viewId);
     this.projections.delete(projection.viewId);
   }
 

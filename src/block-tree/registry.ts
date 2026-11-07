@@ -45,6 +45,8 @@ export class BlockRegistry {
 
 export class CommandRegistry {
   permit?: (targetKey:string,commandId:string)=>boolean;
+  /** Independent of the owning window lifecycle permit. */
+  authoringAllowed?: (targetKey:string,commandId:string)=>boolean;
   private commands = new Map<string, CommandDefinition<any>>();
   private owners = new Map<string, string>();
 
@@ -59,7 +61,7 @@ export class CommandRegistry {
   owner(id: string): string | undefined { return this.owners.get(id); }
 
   canExecute<TArgs>(id: string, context: CommandContext<TArgs>): boolean {
-    return this.permit?.(context.targetKey,id) !== false && (this.commands.get(id)?.canExecute(context) ?? false);
+    return this.authoringAllowed?.(context.targetKey,id) !== false && this.permit?.(context.targetKey,id) !== false && (this.commands.get(id)?.canExecute(context) ?? false);
   }
 
   execute<TArgs>(id: string, context: CommandContext<TArgs>): void | Promise<void> {

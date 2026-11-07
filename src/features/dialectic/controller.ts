@@ -1,3 +1,4 @@
+import {createSequenceController} from './sequence-controller';
 import {batch,createEffect,createMemo,createSignal,onCleanup,untrack,type Accessor} from 'solid-js';
 import {unwrap} from 'solid-js/store';
 import type {ReactiveEditor} from '../../reactive-editor/editor';
@@ -69,8 +70,8 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   reveal(t);
  };
  const navigate=(delta:number)=>{const i=cursor()+delta;if(i>=0&&i<trail().length){setCursor(i);inspect(trail()[i],false);}};
- const present=()=>{const row=frontier()??draft();if(row)inspect(target(row.id));};
- const compose=()=>{const d=draft();if(d)reveal(target(d.id),true);};
+ const present=()=>{sequences.leave(false);const row=frontier()??draft();if(row)inspect(target(row.id));};
+ const compose=()=>{sequences.leave(false);const d=draft();if(d)reveal(target(d.id),true);};
  const guard=()=>{
   if(!alive||!session()?.current()||!valid())throw Error('Open a Dialectic conversation first.');
   editor.documentSessions?.presentations.check(session()!);
@@ -80,6 +81,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   if(ordinals.some(n=>!Number.isSafeInteger(n)||Number(n)<=0)||new Set(ordinals).size!==ordinals.length)throw Error('Contribution chronology is invalid or duplicated. Restore the original contribution containers before submitting.');
  };
  const focusBlock=()=>{
+  if(sequences.presenting())throw Error('Open source before choosing an authoring target.');
   const key=[editor.focus.state.focusedKey,editor.focus.state.lastFocusedKey].find(k=>k&&session()?.projection.node(k));
   const n=key&&session()?.projection.node(key);if(!n||n.key===root()?.key)throw Error('Place the caret in a Block first.');
   return target(String(n.payload.id),'block');
@@ -187,9 +189,10 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    diagnostics.submissions++;inspect(target(id));
   }catch(e){if(alive)setNotice(String(e));}finally{if(ticket===generation)setBusy(false);}
  };
- return {editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,
+ const sequences=createSequenceController(editor,{root,resourceId,session,resolve,inspect,requireCommittedTarget,guard});
+ return {sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,
   references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,
-  dispose(){alive=false;cancel();choices.clear();pending.clear();preview.dispose();},capture,
+  dispose(){sequences.dispose();alive=false;cancel();choices.clear();pending.clear();preview.dispose();},capture,
  };
 }
 export type DialecticController=ReturnType<typeof createDialecticController>;

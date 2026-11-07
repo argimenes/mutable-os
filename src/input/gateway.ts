@@ -1,3 +1,4 @@
+import { passiveElement } from '../runtime/passive-presentation';
 import { openBlockContextMenu } from "../runtime/open-block-context-menu";
 import type { MutableClipboard } from '../runtime/mutable-clipboard';
 import type { NodeKey, PlacementKey, ViewId } from "../block-tree/types";
@@ -121,6 +122,7 @@ export class InputGateway {
   }
 
   private scopes(event: Event) {
+    if(passiveElement(event.target))return [];
     if (event.target instanceof Element && event.target.closest('[data-block-selection-handle], [data-block-selection-inspector], [data-candidate-exclusion], [data-table-controls]')) return [];
     const resolved = this.mounts.resolveEvent(event);
     if (!resolved || resolved.handle.composing || resolved.handle.inputPolicy === "opaque-widget" || (event.target instanceof Element && event.target.closest('[data-bindings-window], [role="dialog"]'))) return [];
@@ -292,6 +294,7 @@ export class InputGateway {
   };
 
   private onFocusIn = (event: FocusEvent) => {
+    if(passiveElement(event.target))return;
     if (this.bindings.pendingHint()) this.bindings.cancelChord();
     if (event.target instanceof Element && event.target.closest('[data-block-selection-handle], [data-block-selection-inspector], [data-table-controls]')) return;
     const resolved = this.mounts.resolveEvent(event);
@@ -363,6 +366,7 @@ export class InputGateway {
   };
 
   private onPointerDown = (event: PointerEvent) => {
+    if(passiveElement(event.target))return;
     this.markdown?.cancel();
     this.listInput.cancelTask?.();
     if (this.bindings.pendingHint()) this.bindings.cancelChord();
