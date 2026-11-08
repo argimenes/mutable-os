@@ -42,3 +42,30 @@ it('accepts the real Vite development proxy while rejecting foreign Origins',asy
  const post=(requestOrigin:string)=>fetch(origin+'/api/dialectic/session',{method:'POST',headers:{origin:requestOrigin,'x-mutable-dialectic':'1'}});
  expect((await post(origin)).status).toBe(200);expect((await post('http://evil.example')).status).toBe(403);
 });
+
+it('allows read-only discovery and reading during source repair, but never a second repair',async()=>{
+ const fetcher=vi.fn<typeof fetch>()
+ .mockResolvedValueOnce(sse(streamFixture('openai','expired candidate')))
+ .mockResolvedValueOnce(sse(streamFixture('openai','',{id:'discover',name:'list_text_blocks',arguments:{cursor:null,limit:3,contributionId:null,participantId:null,fromOrdinal:1}})))
+ .mockResolvedValueOnce(sse(streamFixture('openai','',{id:'read',name:'read_source',arguments:{handle:'fresh'}})))
+ .mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify(plainContribution('exchange')))));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});const id=(await(await f.call('/exchange',{request:req})).json()).id;
+ await(await f.call('/exchange/'+id+'/turn',{round:0})).text();
+ expect(await(await f.call('/exchange/'+id+'/turn',{round:1,repair:true,diagnostic:{code:'source-identity',path:'$.anchors[0]',message:'UNTRUSTED'}})).text()).toContain('discover');
+ expect(await(await f.call('/exchange/'+id+'/turn',{round:2,results:[{id:'discover',result:{items:[{blockId:'native',handle:'fresh'}]}}]})).text()).toContain('read');
+ expect(await(await f.call('/exchange/'+id+'/turn',{round:3,results:[{id:'read',result:{handle:'fresh',revision:'fresh-revision',text:'Rain is forecast.'}}]})).text()).toContain('picnic');
+ expect((await f.call('/exchange/'+id+'/turn',{round:4,repair:true,diagnostic:{code:'source'}})).status).toBe(400);expect(fetcher).toHaveBeenCalledTimes(4);
+ const wire=JSON.parse(String(fetcher.mock.calls[3][1]?.body));expect(JSON.stringify(wire)).not.toContain('UNTRUSTED');expect(JSON.stringify(wire)).toContain('capabilityScope');expect(wire.instructions).toContain('Active DCP exchange: exchange');expect(JSON.stringify(wire)).toContain('single repair may use');
+});
+it.each(['json','budget'])('does not grant source tools during %s repair',async code=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai','invalid'))).mockResolvedValueOnce(sse(streamFixture('openai','',{id:'read',name:'read_source',arguments:{handle:'s'}})));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});const id=(await(await f.call('/exchange',{request:req})).json()).id;await(await f.call('/exchange/'+id+'/turn',{round:0})).text();const result=await(await f.call('/exchange/'+id+'/turn',{round:1,repair:true,diagnostic:{code}})).text();expect(result).toContain('budget');expect(result).not.toContain('"type":"result"');expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('shares the six-call budget across initial work and source recovery',async()=>{
+ const initial:any[]=streamFixture('openai','',{id:'old-0',name:'read_source',arguments:{handle:'old'}});
+ const template=initial.at(-1).response.output[0];initial.at(-1).response.output=Array.from({length:6},(_,i)=>({...template,call_id:'old-'+i}));
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(initial)).mockResolvedValueOnce(sse(streamFixture('openai','expired candidate'))).mockResolvedValueOnce(sse(streamFixture('openai','',{id:'seventh',name:'read_source',arguments:{handle:'new'}})));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});const id=(await(await f.call('/exchange',{request:req})).json()).id;
+ await(await f.call('/exchange/'+id+'/turn',{round:0})).text();await(await f.call('/exchange/'+id+'/turn',{round:1,results:Array.from({length:6},(_,i)=>({id:'old-'+i,result:{status:'complete'}}))})).text();
+ const output=await(await f.call('/exchange/'+id+'/turn',{round:2,repair:true,diagnostic:{code:'source-identity'}})).text();expect(output).toContain('tool budget exceeded');expect(output).not.toContain('"type":"result"');expect(fetcher).toHaveBeenCalledTimes(3);
+});

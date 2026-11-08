@@ -1,3 +1,5 @@
+import {DcpTestLog} from './test-log.js';
+import {allowsSourceRecovery,sourceRecoveryTools} from '../../src/features/dialectic/dcp/diagnostics.js';
 import express from 'express';
 import {OpenAIConversations,type CavernScope} from './conversations.js';
 import type {ContinuityManifest,ContinuityReceipt} from '../../src/features/dialectic/dcp/continuity-contract.js';
@@ -6,13 +8,14 @@ import {conversation,continuation,providerTurn,repair,type ProviderConversation}
 import {liveLimits,providerSettings,type Provider,type ProviderCall,type ProviderSettings} from '../../src/features/dialectic/dcp/provider-contract.js';
 
 const loopback=(host:string)=>['localhost','127.0.0.1','[::1]','::1','::ffff:127.0.0.1'].includes(host);
-interface Session {origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
-interface Exchange {state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
-/** Local-only credential broker. No filesystem, SQL, logging, CORS or remote deployment mode. */
-export function createDialecticBroker(options:{fetcher?:typeof fetch;environment?:Record<string,string|undefined>;currentCavern?:()=>CavernScope|undefined;continuity?:boolean}={}){
+interface Session {diagnosticId:string;origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
+interface Exchange {state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;recoverSources?:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
+/** Local-only credential broker. No credential persistence, SQL, CORS or remote deployment mode. Optional diagnostics redact credentials. */
+export function createDialecticBroker(options:{fetcher?:typeof fetch;environment?:Record<string,string|undefined>;currentCavern?:()=>CavernScope|undefined;continuity?:boolean;testLogging?:boolean;logRoot?:string}={}){
  const router=express.Router(),sessions=new Map<string,Session>(),environment=options.environment??process.env;
- const continuity=options.currentCavern&&options.continuity!==false?new OpenAIConversations(options.currentCavern,options.fetcher):undefined;
- const release=(s:Session,id:string)=>{const e=s.exchanges.get(id);if(e){e.abort.abort();clearTimeout(e.timer);s.exchanges.delete(id);if(e.manifest&&e.receipt&&!e.acknowledged)void continuity?.abandon(e.manifest,e.key,e.receipt.exchangeId).catch(()=>undefined);}};
+ const testLog=new DcpTestLog(()=>options.logRoot??options.currentCavern?.()?.path??process.cwd(),options.testLogging===true),fetcher=testLog.fetch(options.fetcher??fetch);
+ const continuity=options.currentCavern&&options.continuity!==false?new OpenAIConversations(options.currentCavern,fetcher):undefined;
+ const release=(s:Session,id:string)=>{const e=s.exchanges.get(id);if(e){void testLog.write('exchange.closed',{exchangeId:e.state.exchangeId,final:e.final,repaired:e.repaired,acknowledged:e.acknowledged??false}).catch(()=>undefined);e.abort.abort();clearTimeout(e.timer);s.exchanges.delete(id);if(e.manifest&&e.receipt&&!e.acknowledged)void continuity?.abandon(e.manifest,e.key,e.receipt.exchangeId).catch(()=>undefined);}};
  const forget=(token:string,s:Session)=>{for(const id of s.exchanges.keys())release(s,id);s.keys={};sessions.delete(token);};
  const sweep=setInterval(()=>{const now=Date.now();for(const [token,s]of sessions)if(s.expires<now||s.created+8*3600000<now)forget(token,s);},60000);sweep.unref();
  router.use((req,res,next)=>{
@@ -24,13 +27,19 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
  router.use(express.json({limit:'2mb'}));
  router.post('/session',(req,res)=>{
   if(sessions.size>=32){res.status(429).json({error:'Too many local provider sessions.'});return;}
-  const token=randomBytes(32).toString('hex');sessions.set(token,{origin:String(req.headers.origin),keys:{},expires:Date.now()+1800000,created:Date.now(),exchanges:new Map()});res.json({token});
+  const token=randomBytes(32).toString('hex');sessions.set(token,{diagnosticId:randomBytes(16).toString('hex'),origin:String(req.headers.origin),keys:{},expires:Date.now()+1800000,created:Date.now(),exchanges:new Map()});res.json({token});
  });
  router.use((req,res,next)=>{
   const token=String(req.headers['x-dialectic-session']??''),s=sessions.get(token);
   if(!s||s.origin!==req.headers.origin||s.expires<Date.now()||s.created+8*3600000<Date.now()){if(s)forget(token,s);res.status(401).json({error:'Provider session expired. Reopen AI settings and enter the key again.'});return;}
-  s.expires=Date.now()+1800000;res.locals.session=s;next();
+  s.expires=Date.now()+1800000;res.locals.session=s;
+  const context={secrets:[token,...Object.values(s.keys)],sessionId:s.diagnosticId,documentId:req.body?.continuity?.manifest?.documentId??req.body?.manifest?.documentId??req.body?.documentId,exchangeId:req.body?.request?.exchange??req.body?.exchangeId};
+  testLog.context.run(context,()=>{
+   const json=res.json.bind(res);res.json=(body:any)=>{void testLog.write('broker.response',{path:req.path,body}).catch(()=>console.error('DCP diagnostic log write failed'));return json(body);};
+   void testLog.write('broker.request',{path:req.path,method:req.method,body:req.path==='/settings'?{settings:req.body?.settings}:req.body}).then(()=>next(),()=>res.status(503).json({error:'DCP diagnostic logging failed; check local disk access.'}));
+  });
  });
+ router.post('/diagnostics',(req,res)=>{res.json({logged:testLog.enabled});});
  router.post('/settings',(req,res)=>{
   const s:Session=res.locals.session;
   try{
@@ -71,6 +80,7 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
  });
  router.post('/exchange/:id/turn',async(req,res)=>{
   const s:Session=res.locals.session,id=String(req.params.id),e=s.exchanges.get(id);
+  if(e){const context=testLog.context.getStore();if(context){context.exchangeId=e.state.exchangeId;context.documentId=e.manifest?.documentId??context.documentId;}}
   if(!e||e.abort.signal.aborted){res.status(410).json({error:'Exchange expired or cancelled.'});return;}
   if(e.busy){res.status(409).json({error:'Provider round already running.'});return;}
   try{
@@ -78,22 +88,22 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    if(e.pending.length){
     const results=req.body.results;if(!Array.isArray(results)||results.length!==e.pending.length||results.some((v,i)=>v.id!==e.pending[i].id)||req.body.repair)throw Error('Tool results do not match pending calls.');
     continuation(e.state,e.pending,results.map(v=>v.result));e.pending=[];
-   }else if(e.final){if(!e.state.settings.repair||e.repaired||req.body.repair!==true)throw Error('Only one enabled validation repair is allowed.');repair(e.state,req.body.diagnostic);e.repaired=true;e.final=false;}
+   }else if(e.final){if(!e.state.settings.repair||e.repaired||req.body.repair!==true)throw Error('Only one enabled validation repair is allowed.');e.recoverSources=allowsSourceRecovery(req.body.diagnostic);repair(e.state,req.body.diagnostic);e.repaired=true;e.final=false;}
    else if(e.round||req.body.results||req.body.repair)throw Error('Unexpected continuation.');
    if(JSON.stringify(e.state.input).length>liveLimits.wireBytes)throw Error('Exchange context budget exceeded.');
    e.busy=true;e.round++;res.status(200).setHeader('Content-Type','application/x-ndjson');res.flushHeaders();
    const emit=(value:unknown)=>{if(!res.destroyed)res.write(JSON.stringify(value)+'\n');};
    const closed=()=>{if(!res.writableEnded)release(s,id);};res.on('close',closed);
    try{
-    let emitted=0;const turn=await providerTurn(e.state,e.key,e.abort.signal,text=>{emit({type:'delta',text:text.slice(emitted)});emitted=text.length;},options.fetcher);
+    let emitted=0;const turn=await providerTurn(e.state,e.key,e.abort.signal,text=>{emit({type:'delta',text:text.slice(emitted)});emitted=text.length;},fetcher);
     if(e.abort.signal.aborted)throw Error('Exchange cancelled or timed out.');
-    e.calls+=turn.calls.length;if(e.calls>liveLimits.calls||e.repaired&&turn.calls.length)throw Error('Provider tool budget exceeded.');
-    e.pending=turn.calls;e.final=!turn.calls.length;
+    e.calls+=turn.calls.length;if(e.calls>liveLimits.calls||e.repaired&&turn.calls.length&&(!e.recoverSources||turn.calls.some(c=>!sourceRecoveryTools.includes(c.tool))))throw Error('Provider tool budget exceeded.');
+    await testLog.write('provider.turn',turn);e.pending=turn.calls;e.final=!turn.calls.length;
     if(e.final&&e.manifest&&e.receipt)await continuity!.prepared(e.manifest,e.key,e.receipt.exchangeId,e.repaired);
     emit({type:'result',...turn});res.end();
    }finally{res.off('close',closed);e.busy=false;}
   }catch(error){
-   release(s,id);
+   await testLog.write('exchange.error',{error:String(error)}).catch(()=>undefined);release(s,id);
    // Never forward provider/network errors: their messages may contain credentials or source text.
    const message=(error as Error).message;
    const safe=/^(Provider |Exchange |Unsupported provider|Invalid provider|Incomplete provider|Tool results|Stale provider|Only one enabled|Unexpected continuation)/.test(message)?message:'Provider exchange failed. Nothing was committed; usage/cost may be unknown.';
@@ -101,5 +111,5 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
   }
  });
  router.use((error:any,_req:any,res:any,_next:any)=>{res.status(400).json({error:'Invalid or oversized broker request.'});});
- return {router,dispose(){clearInterval(sweep);for(const [t,s]of sessions)forget(t,s);}};
+ return {router,testLog,dispose(){clearInterval(sweep);for(const [t,s]of sessions)forget(t,s);}};
 }

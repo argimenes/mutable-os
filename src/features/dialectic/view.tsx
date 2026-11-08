@@ -1,3 +1,4 @@
+import {render} from 'solid-js/web';
 import {ProviderSettingsView} from './provider-settings';
 import {participantLabel} from './model';
 import {SequenceNavigation,SequenceAuthor,SequenceReader} from './sequence-view';
@@ -35,7 +36,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <div class="dialectic-eyebrow">CHRONOLOGY</div>
     <p class="dialectic-muted">{c.committed().length} contributions · {c.frontier()?`Present #${c.frontier()!.data.ordinal}`:'Ready to begin'}</p>
     <For each={c.committed()}>{r=><button class="dialectic-entry" aria-current={selected()?.blockId===r.id?'true':undefined} onClick={act(()=>c.inspect(c.target(r.id)))}><span class="dialectic-number">{String(r.data.ordinal).padStart(2,'0')}</span><span>{participantLabel(r.data)}<small>{r.data.replies.length?`↳ ${r.data.replies.map(t=>c.label(t)).join(', ')}`:'New contribution'}</small></span></button>}</For>
-    <button class="dialectic-entry" onClick={c.compose}>＋ Your draft</button>
+    <button class="dialectic-entry" onClick={c.compose}>＋ New contribution</button>
     <div class="dialectic-history"><button disabled={c.cursor()<=0} onClick={()=>c.navigate(-1)}>← Back</button><button disabled={c.cursor()>=c.trail().length-1} onClick={()=>c.navigate(1)}>Forward →</button></div>
     <button class="dialectic-present" onClick={c.present}>Return to present</button>
     <SequenceNavigation c={c}/>
@@ -47,7 +48,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <div class="dialectic-retained-source" hidden={!!c.sequences.presenting()} inert={!!c.sequences.presenting()}>{props.children}</div>
     <div hidden={!!c.sequences.presenting()} class="dialectic-compose-bar" data-cross-text-controls onPointerDown={e=>e.preventDefault()}>
      <div><strong>Your next contribution</strong><small>{c.reply()?`Replying to ${c.label(c.reply()!)}`:'New contribution at the chronological frontier'} <Show when={c.reply()}><button onClick={()=>c.setReply(undefined)}>Clear target</button></Show></small></div>
-     <button onClick={c.compose}>Go to draft</button><button class="dialectic-primary" disabled={!c.valid()||c.busy()} onClick={c.submit}>Submit</button><button disabled={!c.valid()||c.busy()} onClick={()=>void c.submitAndAsk()}>Submit &amp; Ask</button>
+     <button onClick={c.compose}>Write</button><button class="dialectic-primary" disabled={!c.valid()||c.busy()||c.providerConfiguring()||c.resending()} onClick={()=>void c.submitAndAsk()}>Submit</button>
     </div>
    </main>
    <aside class="dialectic-inspector" inert={!!c.sequences.presenting()} aria-label="Conversation context">
@@ -87,9 +88,9 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <button onPointerDown={e=>e.preventDefault()} onClick={()=>c.selectRange('context')}>Include selection</button>
     <ul class="dialectic-pins"><For each={c.context()}>{t=><li><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><button aria-label={`Remove context ${c.label(t)}`} onClick={()=>c.unpin(t)}>×</button></li>}</For></ul>
     <Show when={!c.context().length}><p class="dialectic-muted">No additional context selected.</p></Show>
-    <Show when={c.editor.features.dialecticProviders&&c.editor.features.dialecticDcp}><ProviderSettingsView c={c}/><label>Assistant <select aria-label="Assistant mode" disabled={c.busy()||c.providerConfiguring()} value={c.providerMode()} onChange={e=>c.setProviderMode(e.currentTarget.value as 'mock'|'live')}><option value="mock">Deterministic mock</option><option value="live" disabled={!c.providerReady()}>Configured AI provider</option></select></label></Show><button class="dialectic-primary" disabled={!c.valid()||c.busy()||c.providerConfiguring()} onClick={()=>void c.ask()}>{c.providerMode()==='live'?'Ask AI':'Ask mock assistant'}</button><Show when={c.busy()}><button onClick={c.cancel}>Cancel response</button></Show>
+    <Show when={c.editor.features.dialecticProviders&&c.editor.features.dialecticDcp}><ProviderSettingsView c={c}/><label>Assistant <select aria-label="Assistant mode" disabled={c.busy()||c.providerConfiguring()} value={c.providerMode()} onChange={e=>c.setProviderMode(e.currentTarget.value as 'mock'|'live')}><option value="live">AI assistant</option><option value="mock">Deterministic mock</option></select></label></Show><button class="dialectic-primary" disabled={!c.valid()||c.busy()||c.providerConfiguring()} onClick={()=>void c.ask()}>{c.providerMode()==='live'?'Ask AI':'Ask mock assistant'}</button><Show when={c.busy()}><button onClick={c.cancel}>Cancel response</button></Show>
     <Show when={c.dcpPreview()}><details open class="dialectic-dcp-preview"><summary>{c.busy()?'Transient DCP response — not committed':'Uncommitted DCP output'}</summary><pre>{c.dcpPreview()}</pre><Show when={!c.busy()}><button onClick={c.cancel}>Dismiss output</button></Show></details></Show>
-    <Show when={c.lastProviderExchange()}><details><summary>Last provider attempt (session only)</summary><p>Reported usage when available; cost unknown. Failed or cancelled output is not authored content.</p><pre class="dialectic-dcp-record">{JSON.stringify(c.lastProviderExchange(),null,2)}</pre></details></Show>
+    <Show when={c.lastProviderExchange()}><details open={!!c.lastProviderExchange()?.failure}><summary>Last provider attempt (session only)</summary><Show when={c.lastProviderExchange()?.failure}>{failure=><p role="status" aria-label="Exchange failure">Exchange failure: {failure().message}<Show when={failure().diagnostic}>{d=><span> ({d().code} at {d().path}): {d().message}</span>}</Show></p>}</Show><p>Reported usage when available; cost unknown. Failed or cancelled output is not authored content.</p><pre class="dialectic-dcp-record">{JSON.stringify(c.lastProviderExchange(),null,2)}</pre></details></Show>
     <p class="dialectic-footnote">{c.providerMode()==='live'?`${c.providerSettings().provider} · ${c.providerSettings().model}. Only explicit requests contact the provider.`:'Deterministic example. No AI service or network request.'} Target plus up to 12 selected items; 6,000 characters maximum.</p>
     <Show when={row()?.data.dcp}><details><summary>DCP exchange record</summary><p>{row()?.data.dcp?.provider?`${row()?.data.dcp?.provider?.settings.provider} · ${row()?.data.dcp?.provider?.settings.model}`:'Structured mock'} · {row()?.data.dcp?.profile} · {row()?.data.dcp?.tools?.length} retrieval calls. Interpretations of source passages are attributed to this exchange, not to the source author.</p><pre class="dialectic-dcp-record">{JSON.stringify(row()?.data.dcp,null,2)}</pre></details></Show>
     <Show when={row()?.data.context?.length}><details><summary>Response provenance</summary><For each={row()?.data.context}>{t=><p>{c.label(t)}</p>}</For></details></Show>
@@ -102,19 +103,41 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
 
 /** Label existing container mounts without replacing children or creating a renderer fork. */
 function decorate(c:DialecticController){
+ const documents=new Set<HTMLElement>();
+ const decorated=new Map<HTMLElement,{dispose:()=>void;slot:HTMLElement;host:HTMLElement}>();
+ const clear=(element:HTMLElement)=>{const d=decorated.get(element);if(!d)return;d.dispose();d.host.remove();delete element.dataset.dialecticContribution;delete element.dataset.dialecticDraft;delete d.slot.dataset.dialecticDraftSlot;decorated.delete(element);};
  createEffect(()=>{
-  const session=c.session(),rows=c.rows().map(r=>({key:r.key,label:r.data.state==='draft'?'YOUR DRAFT':`${participantLabel(r.data).toUpperCase()} · ${r.data.ordinal}`,draft:r.data.state==='draft'}));
-  let alive=true;const mounts:HTMLElement[]=[];
-  queueMicrotask(()=>{if(!alive||session!==c.session())return;for(const r of rows){const element=c.editor.mounts.get(r.key)?.root as HTMLElement|undefined;if(!element)continue;element.dataset.dialecticContribution=r.label;element.dataset.dialecticDraft=String(r.draft);mounts.push(element);}});
-  onCleanup(()=>{alive=false;for(const e of mounts){delete e.dataset.dialecticContribution;delete e.dataset.dialecticDraft;}});
+  const session=c.session(),rows=c.rows().map(r=>({key:r.key,id:r.id,label:r.data.state==='draft'?'':`${participantLabel(r.data).toUpperCase()} · ${r.data.ordinal}`,draft:r.data.state==='draft'}));
+  let alive=true;
+  queueMicrotask(()=>{if(!alive||session!==c.session())return;const keep=new Set<HTMLElement>();for(const r of rows){
+   const element=c.editor.mounts.get(r.key)?.root as HTMLElement|undefined;if(!element)continue;keep.add(element);const doc=element.closest<HTMLElement>('[data-block-type="document-block"]');if(doc){doc.dataset.dialecticDocument='true';documents.add(doc);}element.dataset.dialecticContribution=r.label;element.dataset.dialecticDraft=String(r.draft);
+   const slot=element.closest<HTMLElement>('.block-selectable')??element;slot.dataset.dialecticDraftSlot=String(r.draft);
+   if(!decorated.has(element)){
+    const host=document.createElement('div');host.className='dialectic-contribution-menu';host.contentEditable='false';host.setAttribute('data-cross-text-controls','');element.appendChild(host);
+    const dispose=render(()=>{let menu!:HTMLDetailsElement;return <details ref={menu} onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape'){menu.open=false;menu.querySelector('summary')?.focus();}}}><summary aria-label={`Contribution actions ${r.id}`} title="Contribution actions">☰</summary><button disabled={c.busy()||c.providerConfiguring()||c.resending()} onClick={e=>{e.stopPropagation();menu.open=false;void c.resend(r.id);}}>Resend this text</button></details>;},host);
+    decorated.set(element,{dispose,slot,host});
+   }
+  }for(const element of decorated.keys())if(!keep.has(element))clear(element);});
+  onCleanup(()=>{alive=false;});
  });
+ onCleanup(()=>{for(const element of decorated.keys())clear(element);for(const doc of documents)delete doc.dataset.dialecticDocument;});
 }
+
 export function DialecticDesktop(props:{application:DocumentApplicationInstance;controller:DialecticController;create:()=>void}){
  const [open,setOpen]=createSignal(false),[opening,setOpening]=createSignal(false),[error,setError]=createSignal('');
+ let alive=true;onCleanup(()=>{alive=false;});
  decorate(props.controller);
- return <><Chrome c={props.controller} actions={<><button onClick={()=>props.controller.run(props.create)}>New</button><button onClick={()=>setOpen(true)}>Open…</button><button onClick={()=>void props.application.vault?.choose?.()}>Vault…</button></>}>
+ return <><Chrome c={props.controller} actions={<><button disabled={opening()} onClick={()=>props.controller.run(props.create)}>New</button><button disabled={opening()} onClick={()=>{setError('');setOpen(true);}}>Open…</button><button disabled={opening()} onClick={()=>void props.application.vault?.choose?.()}>Vault…</button><Show when={opening()}><span role="status">Opening Document…</span></Show></>}>
   <div class="dialectic-canvas"><props.application.tabs/></div>
- </Chrome><Show when={open()}><DocumentBrowser mode="open" initialLocation={props.application.files?.location()} busy={opening()} error={error()} onClose={()=>setOpen(false)} onChoose={async location=>{setOpening(true);setError('');try{await props.application.files?.open(location);setOpen(false);return true;}catch(e){setError(String(e));return false;}finally{setOpening(false);}}}/></Show></>;
+ </Chrome><Show when={open()}><DocumentBrowser mode="open" initialLocation={props.application.files?.location()} busy={opening()} error={error()} onClose={()=>setOpen(false)} onChoose={async location=>{
+   if(opening())return false;setOpening(true);setError('');
+   // Release this chooser's modal before the retained host selects the loaded tab.
+   // Its ordinary composition, close and other-modal guards remain authoritative.
+   setOpen(false);
+   try{await Promise.resolve();if(!alive)return false;if(!props.application.files)throw Error('Native Document opening is unavailable.');await props.application.files.open(location);return true;}
+   catch(e){if(alive){setError(String(e));setOpen(true);}return false;}
+   finally{if(alive)setOpening(false);}
+  }}/></Show></>;
 }
 export function DialecticTextual(props:{controller:DialecticController;port:DocumentApplicationPort;active:()=>boolean}){
  const host=useTextualApplicationHost(),c=props.controller,editor=c.editor;

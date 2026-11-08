@@ -1,4 +1,4 @@
-import {validationDiagnostic} from './diagnostics';
+import {validationDiagnostic,allowsSourceRecovery,sourceRecoveryTools} from './diagnostics';
 import {defaultProviderSettings,liveLimits,type ProviderSettings,type ProviderTurn,type LiveProvenance} from './provider-contract';
 import type {DcpTransport} from './exchange';
 import type {ContinuityManifest,HistoryItem} from './continuity-contract';
@@ -8,7 +8,7 @@ export class DialecticProviderSession {
  private token='';private pending?:Promise<void>;private disposed=false;
  settings:ProviderSettings={...defaultProviderSettings};ready=false;
  private pagehide=()=>{void this.forget();};
- constructor(){window.addEventListener('pagehide',this.pagehide);}
+ constructor(readonly testLogging=false){window.addEventListener('pagehide',this.pagehide);}
  private async connect(){
   if(this.disposed)throw Error('Provider session closed.');if(this.token)return;
   if(!this.pending)this.pending=(async()=>{const r=await fetch('/api/dialectic/session',{method:'POST',signal:AbortSignal.timeout(10000),headers:{'x-mutable-dialectic':'1'}});const data=await r.json();if(!r.ok)throw Error(data.error??'Local provider broker unavailable.');this.token=data.token;if(this.disposed){await this.forget();throw Error('Provider session closed.');}})().finally(()=>{this.pending=undefined;});
@@ -18,6 +18,7 @@ export class DialecticProviderSession {
   await this.connect();const response=await fetch('/api/dialectic'+path,{method,signal:signal??AbortSignal.timeout(10000),headers:{'content-type':'application/json','x-mutable-dialectic':'1','x-dialectic-session':this.token},...(body===undefined?{}:{body:JSON.stringify(body)})});
   if(!response.ok){if(response.status===401){this.token='';this.ready=false;}const e=await response.json().catch(()=>({}));throw Error(e.error??'Local provider broker request failed.');}return response;
  }
+ async diagnostic(event:unknown){if(!this.testLogging)return false;const r=await this.call('/diagnostics',event);return (await r.json()).logged===true;}
  async configure(settings:ProviderSettings,key?:string){const response=await this.call('/settings',{settings,...(key?{key}:{})});const data=await response.json();this.settings=data.settings;this.ready=data.ready;return this.ready;}
  private async closeExchange(id:string){if(!this.token)return;await fetch('/api/dialectic/exchange/'+id,{method:'DELETE',signal:AbortSignal.timeout(2000),headers:{'x-mutable-dialectic':'1','x-dialectic-session':this.token},keepalive:true}).catch(()=>undefined);}
  async forget(){const token=this.token;this.token='';this.ready=false;if(token)await fetch('/api/dialectic/session',{method:'DELETE',headers:{'x-mutable-dialectic':'1','x-dialectic-session':token},keepalive:true}).catch(()=>undefined);}
@@ -26,8 +27,9 @@ export class DialecticProviderSession {
   let retainedId='';
   const details:LiveProvenance={version:1,adapterVersion:'4c-1',settings:{...this.settings},attempts:[],cost:{status:'unknown'}};
   const run:DcpTransport=async(request,sources,chunk,signal,validate)=>{
+   details.exchangeId=request.exchange;details.resourceId=sources.owner;
    if(!this.ready)throw Error('Configure an API key and model in AI settings first.');
-   let id='',round=0,calls=0,repair=false,next:any={round:0},prepared=false;
+   let id='',round=0,calls=0,repair=false,recoverSources=false,next:any={round:0},prepared=false;
    const close=()=>{if(id)void this.closeExchange(id);};signal.addEventListener('abort',close,{once:true});
    try{
     let continuity:any;
@@ -48,14 +50,14 @@ export class DialecticProviderSession {
      if(buffer.trim()||!turn)throw Error('Broker stream interrupted; no contribution committed.');sources.check();
      const attempt:LiveProvenance['attempts'][number]={receipt:turn.receipt,toolCalls:turn.calls,toolResultIds:[]};details.attempts.push(attempt);round++;
      if(turn.calls.length){
-      calls+=turn.calls.length;if(calls>liveLimits.calls||repair)throw Error('DCP tool budget exceeded.');const results=[];
+      calls+=turn.calls.length;if(calls>liveLimits.calls||repair&&(!recoverSources||turn.calls.some(c=>!sourceRecoveryTools.includes(c.tool))))throw Error('DCP tool budget exceeded.');const results=[];
       for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`,result=await sources.tool({...call,id:toolId});attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
       next={round,results};continue;
      }
      try{await validate?.(turn.text);prepared=!!details.continuity;if(prepared)retainedId=id;return turn.text;}
-     catch(error){sources.check();if(repair||!details.settings.repair)throw error;repair=true;attempt.repair=String(error).slice(0,1000);attempt.rejectedResponse=turn.text;chunk('DCP validation failed; trying the enabled single repair…');next={round,repair:true,diagnostic:validationDiagnostic(error)};}
+     catch(error){const diagnostic=validationDiagnostic(error);attempt.diagnostic=diagnostic;attempt.rejectedResponse=turn.text;sources.check();if(repair||!details.settings.repair){details.failure={message:String(error).slice(0,1000),diagnostic};throw error;}repair=true;recoverSources=allowsSourceRecovery(diagnostic);attempt.repair=String(error).slice(0,1000);chunk('DCP validation failed; trying the enabled single repair…');next={round,repair:true,diagnostic};}
     }throw Error('DCP continuation limit exceeded.');
-   }finally{signal.removeEventListener('abort',close);if(id&&!prepared)await this.closeExchange(id);}
+   }catch(error){details.failure??={message:String(error).slice(0,1000)};details.request=request;details.tools=sources.trail;await this.diagnostic({kind:'exchange.failure',documentId:sources.owner,exchangeId:request.exchange,details}).catch(()=>undefined);throw error;}finally{signal.removeEventListener('abort',close);if(id&&!prepared)await this.closeExchange(id);}
   };
   return {run,details,
    commit:async()=>{if(!retainedId||!history)return;const id=retainedId;const native=await history();await this.call('/exchange/'+id+'/ack',{manifest:native.manifest});retainedId='';},

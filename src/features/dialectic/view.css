@@ -34,3 +34,23 @@
 .dialectic-native-structures button { display:block; max-width:100%; text-align:left; overflow-wrap:anywhere; margin-block:.3em; }
 .dialectic-native-structures small, .dialectic-annotation-inspection small { overflow-wrap:anywhere; }
 .dialectic-annotation-inspection { border-inline-start:2px solid currentColor; padding-inline-start:.6em; }
+
+/* Keep the one retained native composer at the bottom of the conversation viewport. */
+.dialectic-canvas>.reactive-tabs{display:flex;flex-direction:column}
+.dialectic-canvas>.reactive-tabs>.reactive-tabs__panel{display:flex;flex-direction:column;flex:1;padding-bottom:0}
+.dialectic-canvas .reactive-document-occurrence{display:flex;flex-direction:column;flex:1}
+.dialectic-canvas .reactive-document-occurrence__content{display:flex;flex-direction:column;flex:1;padding-bottom:0}
+.dialectic-canvas [data-dialectic-document]{display:flex;flex-direction:column;flex:1}
+.dialectic-canvas [data-dialectic-contribution]{padding-inline-end:48px}
+.dialectic-canvas [data-dialectic-draft="true"]{position:sticky;bottom:0;z-index:5;margin-top:auto;margin-bottom:0;max-height:35vh;overflow:auto;border-style:solid;background:#fcfefa;box-shadow:0 -5px 12px #263c3810}
+.dialectic-canvas [data-dialectic-draft="true"]::before{display:none}
+.dialectic-contribution-menu{position:absolute;inset-block-start:10px;inset-inline-end:10px;z-index:6;font:14px/1.5 system-ui,sans-serif}
+.dialectic-contribution-menu summary{list-style:none;cursor:pointer;padding:2px 6px;border-radius:4px}
+.dialectic-contribution-menu summary::-webkit-details-marker{display:none}
+.dialectic-contribution-menu summary:hover{background:#e8eee8}
+.dialectic-contribution-menu details>button{position:absolute;inset-inline-end:0;white-space:nowrap;box-shadow:2px 3px 8px #0002}
+.textual-workspace .dialectic-contribution-menu{font:inherit;inset-block-start:0;inset-inline-end:0}
+.textual-workspace .dialectic-contribution-menu summary{border-radius:0;padding:0 1ch}
+.textual-workspace .dialectic-contribution-menu details>button{background:var(--tw-menu);color:var(--tw-menu-ink)}
+.textual-workspace .dialectic-canvas [data-dialectic-draft="true"]{background:var(--tw-bg);margin-bottom:0}
+.textual-workspace .dialectic-canvas [data-dialectic-contribution]{padding-inline-end:4ch}

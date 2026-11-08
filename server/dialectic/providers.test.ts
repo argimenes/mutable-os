@@ -78,3 +78,9 @@ it.each(['openai','anthropic'] as Provider[])('%s keeps inventory and source too
  const final=await providerTurn(state,'fixture',signal,()=>{},fetcher);expect(final.calls).toEqual([]);expect(JSON.parse(final.text).kind).toBe('contribution');
  for(const [,init]of fetcher.mock.calls.slice(1)){const body=JSON.parse(String(init?.body));expect(body.tools.map((t:any)=>t.name)).toContain('list_text_blocks');expect(body.instructions??body.system).toContain('Further advertised tool calls remain available');}
 });
+
+it.each(['gpt-5.4-mini','gpt-5.4-mini-2026-03-17','gpt-4.1','custom-model'])('configures bounded native-authoring reasoning only for the qualified Mini model: %s',async model=>{
+ const state=conversation({...defaultProviderSettings,model},request),fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture('openai',JSON.stringify(plainContribution('exchange')))));
+ await providerTurn(state,'fixture-key',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(body.reasoning).toEqual(model.startsWith('gpt-5.4-mini')?{effort:'low'}:undefined);expect(body.max_output_tokens).toBe(defaultProviderSettings.maxOutputTokens);
+});

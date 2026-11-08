@@ -25,6 +25,6 @@ export function ProviderSettingsView(props:{c:DialecticController}){
    </fieldset>
   </form>
   <Show when={c.providerNotice()}><p role="status">{c.providerNotice()}</p></Show>
-  <p>No request is sent until Ask or Submit &amp; Ask. Selected content and requested source reads are sent to the chosen provider. Cost is reported as unknown; the token limit is not a currency cap.</p>
+  <p>No request is sent until Ask or Submit. Selected content and requested source reads are sent to the chosen provider. Cost is reported as unknown; the token limit is not a currency cap.</p>
  </details>;
 }

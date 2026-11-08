@@ -117,6 +117,8 @@ export type FeatureFlags = Readonly<{
   dialecticDcp: boolean;
   dialecticProviders: boolean;
   dialecticProviderContinuity: boolean;
+  /** Temporary local wire/contribution diagnostics; disable after DCP qualification. */
+  dcpTestPhaseLogging: boolean;
   nativeTextProtection: boolean;
   scopedSemantics: boolean;
   /** Cardex shell and local Entity Card authoring. */
@@ -233,6 +235,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialecticDcp: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
+  dcpTestPhaseLogging: true,
   nativeTextProtection: true,
   scopedSemantics: true,
   cardex: true,

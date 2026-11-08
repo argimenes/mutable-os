@@ -25,9 +25,9 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -453,4 +453,136 @@ it('bounds inventory previews and layout traversal, excludes drafts and foreign 
   return JSON.stringify(dcpResponse(req.exchange));
  });expect(c.notice()).toBe('');
  await c.askMock(async(req,sources)=>{await expect(sources.tool({id:'foreign',tool:'list_text_blocks',arguments:{...inventoryArgs,cursor}})).rejects.toThrow(/cursor/);const p=await sources.tool({id:'new',tool:'list_text_blocks',arguments:{...inventoryArgs,limit:1}});const n=c.resolve(c.target(p.items[0].blockId,'block'))!;e.commands.replaceInlineRange(n.key,0,0,'changed');await expect(sources.tool({id:'stale',tool:'read_source',arguments:{handle:p.items[0].handle}})).rejects.toThrow(/changed/);return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toMatch(/changed/);
+});
+
+it('Submit defaults to the live assistant and sends the newly committed contribution once',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!,e=f.editor;
+ const selector=f.host.querySelector('[aria-label="Assistant mode"]') as HTMLSelectElement;
+ expect(selector.value).toBe('live');expect(c.providerMode()).toBe('live');
+ expect([...f.host.querySelectorAll('button')].some(b=>b.textContent==='Submit & Ask')).toBe(false);
+ let request:any,settings:any;
+ const fetcher=vi.fn(async(url:any,init:any)=>{const body=init?.body&&JSON.parse(init.body);
+  if(url.endsWith('/session'))return Response.json({token:'fixture'});
+  if(url.endsWith('/settings')){settings=body.settings;expect(body.key).toBeUndefined();return Response.json({settings,ready:true});}
+  if(url.endsWith('/exchange')){request=body.request;expect(c.committed()).toHaveLength(1);return Response.json({id:'submit-fixture',settings});}
+  if(url.endsWith('/turn'))return new Response(JSON.stringify({type:'result',text:JSON.stringify(dcpResponse(request.exchange)),calls:[],receipt:{provider:'openai',model:settings.model,usage:null,cost:{status:'unknown'}}})+'\n');
+  return Response.json({});
+ });vi.stubGlobal('fetch',fetcher);
+ const snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ f.type!('Hello from Submit');expect(fetcher).not.toHaveBeenCalled();
+ const submit=[...f.host.querySelectorAll('button')].find(b=>b.textContent==='Submit')!;submit.click();submit.click();
+ await vi.waitFor(()=>expect(c.committed()).toHaveLength(2));
+ expect(c.committed().map(r=>r.data.author)).toEqual(['human','ai']);expect(request.task.participantRequest.text).toContain('Hello from Submit');
+ expect(fetcher.mock.calls.filter(([url])=>url.endsWith('/exchange'))).toHaveLength(1);
+ expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});
+it('missing credentials keep the AI choice and human contribution without silently using the mock',async()=>{
+ const f=await setup(),c=f.c!;
+ const fetcher=vi.fn(async(url:any,init:any)=>url.endsWith('/session')?Response.json({token:'fixture'}):url.endsWith('/settings')?Response.json({settings:JSON.parse(init.body).settings,ready:false}):Response.json({}));vi.stubGlobal('fetch',fetcher);
+ f.type!('Keep this contribution');await c.submitAndAsk();
+ expect(c.committed()).toHaveLength(1);expect(c.committed()[0].data.author).toBe('human');expect(c.providerMode()).toBe('live');expect(c.notice()).toContain('session key');
+ expect(fetcher.mock.calls.some(([url])=>url.endsWith('/exchange'))).toBe(false);
+ await c.forgetProvider();expect(c.providerMode()).toBe('live');
+ c.setProviderMode('mock');await c.ask();expect(c.committed()).toHaveLength(2);expect(c.frontier()!.data.author).toBe('mock');
+});
+
+it('repairs Test5 expired capabilities through bounded discovery and an exact 55-Cell annotation; retains terminal diagnostics',async()=>{
+ const f=await setup(true,true,true,true,true),c=f.c!,e=f.editor;
+ const exact='A map is useful precisely because it omits information.';
+ const text=exact+' A perfectly detailed map would be indistinguishable from the territory itself, and therefore practically useless.';
+ f.type!(text);const original=f.text!(),mount=e.mounts.get(original.key);c.submit();
+ for(let i=2;i<=10;i++){f.type!(i===10?'Classify the first sentence of my opening passage as dialectic/claim.':'Small contribution '+i);c.submit();}
+ let historical:any;await c.askMock(async(_request,sources)=>{historical=await sources.source(sources.issue({kind:'block',resourceId:c.resourceId(),blockId:String(original.payload.id)}));throw Error('Synthetic earlier exchange ended without authoring');});expect(c.committed()).toHaveLength(10);
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ let request:any,rounds=0,fail=false,fresh:any;
+ const receipt={provider:'openai',model:'fixture',startedUtc:'start',completedUtc:'end',usage:null,stop:'completed',cost:{status:'unknown'}};
+ vi.stubGlobal('fetch',vi.fn(async(url:any,init:any)=>{
+  const body=init?.body&&JSON.parse(init.body);
+  if(url.endsWith('/session'))return new Response(JSON.stringify({token:'token'}));
+  if(url.endsWith('/settings'))return new Response(JSON.stringify({settings:body.settings,ready:true}));
+  if(url.endsWith('/exchange')){request=body.request;rounds=0;return new Response(JSON.stringify({id:'e',settings:c.providerSettings()}));}
+  if(!url.endsWith('/turn'))return new Response('{}');
+  rounds++;let calls:any[]=[],output='';
+  if(body.round===1){expect(body.repair).toBe(true);expect(body.diagnostic).toMatchObject({code:'source-identity',path:'$.anchors[0]'});expect(JSON.stringify(body.diagnostic).length).toBeLessThan(400);calls=[{id:'discover',tool:'list_text_blocks',arguments:{cursor:null,limit:3,contributionId:null,participantId:null,fromOrdinal:1}}];}
+  else if(body.round===2){const item=body.results[0].result.items.find((i:any)=>i.blockId===original.payload.id);expect(item).toBeTruthy();expect(item.handle).not.toBe(historical.handle);calls=[{id:'read',tool:'read_source',arguments:{handle:item.handle}}];}
+  else{
+   if(body.round===3){fresh=body.results[0].result;expect(fresh.text).toBe(text);expect(fresh.target.blockId).toBe(original.payload.id);expect(fresh.revision).not.toBe(historical.revision);}
+   const v:any=dcpResponse(request.exchange);v.anchors=[{id:'a1',source:body.round===0||fail?historical.handle:fresh.handle,revision:body.round===0||fail?historical.revision:fresh.revision,selector:{exact:body.round===0?text:exact,prefix:'',suffix:''}}];v.interpretations=[{id:'i1',target:'a1',type:'dialectic/claim',ref:null,attributes:[]}];output=JSON.stringify(v);
+  }
+  expect(c.committed()).toHaveLength(fail?11:10);
+  return new Response(JSON.stringify({type:'result',text:output,calls,receipt})+'\n');
+ }));
+ await c.configureProvider({provider:'openai',model:'fixture',maxOutputTokens:1024,repair:true,cadence:'conversational'},'fixture-only');await c.ask();
+ expect(c.notice()).toBe('');expect(rounds).toBe(4);expect(c.committed()).toHaveLength(11);
+ const marks=original.payload.standoffProperties as any[];expect(marks.filter(p=>p.type==='dialectic/claim')).toHaveLength(1);
+ const anchor=marks.find(p=>p.type==='dialectic/range-anchor');expect(anchor).toMatchObject({start:0,end:54});expect(exact.length).toBe(55);
+ const {canonicalSearchSource}=await import('../../runtime/canonical-search-source');expect((await canonicalSearchSource(e.repository.readState(),original.contentKey,0)).runs[0].text).toBe(text);expect(e.mounts.get(original.key)).toBe(mount);
+ expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ fail=true;await c.ask();expect(rounds).toBe(4);expect(c.committed()).toHaveLength(11);expect((original.payload.standoffProperties as any[]).filter(p=>p.type==='dialectic/claim')).toHaveLength(1);
+ const failure=c.lastProviderExchange()!;expect(failure.failure?.diagnostic?.code).toBe('source-identity');expect(failure.attempts.at(-1)?.rejectedResponse).toContain(historical.handle);expect(failure.tools).toHaveLength(2);
+ c.selectRange('reply');expect(c.notice()).toContain('Select one nonempty range');expect(c.lastProviderExchange()).toBe(failure);expect(failure.failure?.message).toContain('Unauthorized source handle');
+ e.repository.undo();expect(c.committed()).toHaveLength(10);expect((original.payload.standoffProperties as any[]??[]).filter(p=>p.type==='dialectic/claim')).toHaveLength(0);e.repository.redo();expect(c.committed()).toHaveLength(11);
+});
+
+it('keeps the exchange failure visible in its existing inspector after a manual selection error',async()=>{
+ const f=await setup(true,true,true,true);f.type!('A small UI diagnosis fixture.');let request:any;
+ vi.stubGlobal('fetch',vi.fn(async(url:any,init:any)=>{const body=init?.body&&JSON.parse(init.body);
+  if(url.endsWith('/session'))return Response.json({token:'token'});
+  if(url.endsWith('/settings'))return Response.json({settings:body.settings,ready:true});
+  if(url.endsWith('/exchange')){request=body.request;return Response.json({id:'e',settings:{provider:'openai',model:'fixture',maxOutputTokens:1024,repair:true,cadence:'conversational'}});}
+  if(url.endsWith('/turn')){const v:any=dcpResponse(request.exchange);v.replyTargets=['source-expired'];return new Response(JSON.stringify({type:'result',text:JSON.stringify(v),calls:[],receipt:{provider:'openai',model:'fixture',startedUtc:'start',completedUtc:'end',usage:null,stop:'completed',cost:{status:'unknown'}}})+'\n');}
+  return Response.json({});
+ }));
+ const button=(label:string)=>[...f.host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!;
+ button('Submit').click();await vi.waitFor(()=>expect(f.host.querySelector('[aria-label="Exchange failure"]')?.textContent).toContain('Unauthorized source handle'));
+ const inspector=f.host.querySelector('[aria-label="Exchange failure"]')!;expect(inspector.closest('details')?.open).toBe(true);
+ button('Reply to selection').click();await tick();expect(f.host.textContent).toContain('Select one nonempty range');expect(inspector.textContent).toContain('source-identity at $.replyTargets');expect(f.host.querySelector('.dialectic-dcp-record')?.textContent).toContain('source-expired');
+});
+
+it('opens a saved conversation from the modal chooser, retaining the previous unsaved editor and reopening without remounts',async()=>{
+ const saved=await setup(true,true,true,true,true);saved.type!('A saved conversation to reopen.');saved.c!.submit();
+ const resource=captureNative(saved.editor.repository.readState(),saved.c!.resourceId()),native=new TextDecoder().decode(nativeBytes(resource));
+ const f=await setup(true,true,true,true,true),c=f.c!,e=f.editor,before=c.resourceId(),oldSession=c.session(),oldText=f.text!(),oldMount=e.mounts.get(oldText.key);f.type!('Keep my unsaved draft.');cleanup.push(e.installGateway(document));
+ const fetcher=vi.fn(async(url:any)=>Response.json(String(url).endsWith('/api/native/open')?{Success:true,Data:{kind:'native',resourceId:resource.resourceId,native,baseline:{nativeHash:'fixture',markdownHash:null,generation:null}}}:String(url).includes('listDocuments')?{files:['conversation.ink']}:String(url).includes('listFolders')?{folders:[]}:{Success:false,Error:'No auxiliary services in fixture'}));vi.stubGlobal('fetch',fetcher);
+ const open=async()=>{
+  [...f.host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Open…')!.click();
+  await vi.waitFor(()=>expect(document.querySelector('[role="option"]')).toBeTruthy());
+  (document.querySelector('[role="option"]') as HTMLButtonElement).click();
+  [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(b=>b.textContent==='Open')!.click();
+  await vi.waitFor(()=>expect(c.resourceId()).toBe(resource.resourceId));
+  await vi.waitFor(()=>expect([...f.host.querySelectorAll('button')].find(b=>b.textContent==='Open…')?.hasAttribute('disabled')).toBe(false));
+ };
+ await open();expect(c.committed()).toHaveLength(1);expect(f.host.textContent).toContain('A saved conversation to reopen.');expect(document.querySelector('[role="dialog"]')).toBeNull();
+ expect(e.mounts.get(oldText.key)).toBe(oldMount);expect(oldSession?.projection.node(oldText.key)).toBeTruthy();expect(nativeDocumentSession(e).isDirty(before)).toBe(true);
+ const retained=c.session(),snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(retained!.projection as any,'build');await open();expect(c.session()).toBe(retained);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const calls=fetcher.mock.calls.length;f.type!('A local new draft');expect(fetcher.mock.calls).toHaveLength(calls);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(fetcher.mock.calls.some(([url])=>String(url).includes('/api/native/save'))).toBe(false);
+});
+it('reopens the Dialectic chooser with a loading error and preserves the active conversation',async()=>{
+ const f=await setup(true,true,true,true,true),c=f.c!,session=c.session(),id=c.resourceId();cleanup.push(f.editor.installGateway(document));f.type!('Retain this draft.');
+ vi.stubGlobal('fetch',vi.fn(async(url:any)=>Response.json(String(url).endsWith('/api/native/open')?{Success:false,Error:'Fixture file unavailable'}:String(url).includes('listDocuments')?{files:['missing.ink']}:String(url).includes('listFolders')?{folders:[]}:{Success:false,Error:'No auxiliary services in fixture'})));
+ [...f.host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Open…')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('[role="option"]')).toBeTruthy());(document.querySelector('[role="option"]') as HTMLButtonElement).click();
+ [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(b=>b.textContent==='Open')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toContain('Fixture file unavailable'));
+ expect(c.resourceId()).toBe(id);expect(c.session()).toBe(session);expect(f.host.textContent).toContain('Retain this draft.');expect(document.querySelector<HTMLButtonElement>('[role="dialog"] button[aria-label="Close dialog"]')?.disabled).toBe(false);
+});
+
+it('test-phase logging records committed native contributions but does no logging or projection work while typing',async()=>{
+ const f=await setup(true,true,true,true,true,true),c=f.c!,e=f.editor;
+ e.setAssetContext(()=>({cavernId:'fixture-cavern',session:'fixture-session'}));
+ const messages:any[]=[];vi.stubGlobal('fetch',vi.fn(async(url:any,init:any)=>{if(String(url).endsWith('/session'))return Response.json({token:'fixture-session-token'});if(String(url).endsWith('/diagnostics')){messages.push(JSON.parse(init.body));return Response.json({logged:true});}return Response.json({});}));
+ const projected=c.historyDiagnostics.projected,snapshots=vi.spyOn(e.repository,'snapshot');f.type!('Small human contribution.');await tick();expect(messages).toEqual([]);expect(c.historyDiagnostics.projected).toBe(projected);expect(snapshots).not.toHaveBeenCalled();
+ c.submit();await vi.waitFor(()=>expect(messages.some(m=>m.kind==='contribution.committed')).toBe(true));
+ const record=messages.find(m=>m.kind==='contribution.committed'),content=JSON.parse(record.items[0].content);expect(content.participant.kind).toBe('human');expect(content.composition.children[0].text).toBe('Small human contribution.');
+ const count=messages.length,after=c.historyDiagnostics.projected;f.type!('Unsubmitted typing.');await tick();expect(messages).toHaveLength(count);expect(c.historyDiagnostics.projected).toBe(after);
+});
+
+it('resends text as new native identities, preserving the original and an unfinished draft',async()=>{
+ const f=await setup(true,true,true,true,true),c=f.c!,e=f.editor;c.setProviderMode('mock');
+ f.type!('Repeat this request.');const source=f.text!(),sourceId=source.payload.id,mount=e.mounts.get(source.key);c.submit();const original=c.committed()[0];f.type!('Keep this unfinished draft.');const draftId=c.draft()!.id,draftText=f.text!();
+ const snapshots=vi.spyOn(e.repository,'snapshot');await Promise.all([c.resend(original.id),c.resend(original.id)]);
+ expect(c.committed()).toHaveLength(3);const resent=c.committed()[1],node=c.resolve(c.target(resent.id))!,text=c.session()!.projection.node(node.children[0])!;
+ expect(resent.id).not.toBe(original.id);expect(text.payload.id).not.toBe(sourceId);expect(c.references()!.text(text.contentKey)).toBe('Repeat this request.');expect(resent.data.author).toBe('human');expect(c.committed()[2].data.replies[0].blockId).toBe(resent.id);
+ expect(c.draft()!.id).toBe(draftId);expect(c.references()!.text(draftText.contentKey)).toBe('Keep this unfinished draft.');expect(e.mounts.get(source.key)).toBe(mount);expect(c.references()!.text(source.contentKey)).toBe('Repeat this request.');expect(snapshots).not.toHaveBeenCalled();
+ e.repository.undo();expect(c.committed()).toHaveLength(2);e.repository.undo();expect(c.committed()).toHaveLength(1);expect(c.draft()!.id).toBe(draftId);
 });

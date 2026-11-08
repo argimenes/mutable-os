@@ -236,7 +236,7 @@ if (!featureFlags.cavernStartup && process.env.SPEEDY_DISABLE_DATABASE !== "1") 
 const app = express();
 const cavern = featureFlags.cavernStartup ? createCavernLifecycle() : undefined;
 // Must precede general body parsing, static routes and Cavern routing.
-if (featureFlags.dialecticProviders) app.use("/api/dialectic", createDialecticBroker({currentCavern:()=>cavern?.current(),continuity:featureFlags.dialecticProviderContinuity}).router);
+if (featureFlags.dialecticProviders) app.use("/api/dialectic", createDialecticBroker({currentCavern:()=>cavern?.current(),continuity:featureFlags.dialecticProviderContinuity,testLogging:featureFlags.dcpTestPhaseLogging}).router);
 // 1) Use an absolute path
 const assetsDir = path.resolve(__dirname, 'dist', 'assets');
 
