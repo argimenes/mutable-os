@@ -25,9 +25,9 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -401,4 +401,56 @@ it('bounds the selected structural manifest without fetching unselected history 
  const draft=c.resolve(c.target(c.draft()!.id))!;
  for(let i=0;i<75;i++)e.commands.insert({type:'standoff-editor-block',text:'Small '+i},{kind:'at',parentKey:draft.key,index:i+1});c.submit();
  await c.askMock(async req=>{expect(req.structuralContext.status).toBe('truncated');expect(req.structuralContext.sources).toHaveLength(64);expect(JSON.stringify(req.structuralContext)).not.toContain('Unselected private history');return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toBe('');
+});
+
+it('protects submitted base text canonically while retaining annotations, drafts and history',async()=>{
+ const f=await setup(true,true,true,true,true),e=f.editor,c=f.c!,n=f.text!();f.type!('Protected evidence');c.submit();await tick();
+ const native=nativeDocumentSession(e);(native as any).bind(c.resourceId(),{folder:'isolated',filename:'protected.ink'},{nativeHash:'initial',markdownHash:null,generation:null});
+ const before=e.repository.state.revision,mount=e.mounts.get(n.key)!,snapshots=vi.spyOn(e.repository,'snapshot'),rebuild=vi.spyOn(c.session()!.projection as any,'build'),changes=vi.fn(),stop=e.repository.subscribeChanges(changes);cleanup.push(stop);
+ expect(mount.focusElement?.getAttribute('contenteditable')).toBe('false');
+ expect(()=>e.commands.replaceInlineRange(n.key,0,1,'X')).toThrow(/protected/);
+ expect(()=>e.commands.completeProvisionalText(n.key,e.repository.readState().contents[n.contentKey].inlineRevision,[{start:0,end:1,text:'X'}])).toThrow(/protected/);
+ expect(()=>e.commands.remove(n.key)).toThrow(/protected/);
+ const cell=e.repository.readState().contents[e.repository.readState().placements[e.repository.readState().contents[n.contentKey].inlineContent[0]].contentKey];
+ expect(()=>e.repository.commit('Direct cell edit',[{kind:'put-content',record:{...cell,payload:{text:'X'}}}])).toThrow(/protected/);
+ expect(e.repository.state.revision).toBe(before);expect(changes).not.toHaveBeenCalled();expect(native.isDirty(c.resourceId())).toBe(false);
+ const input=new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertText',data:'X'});mount.focusElement!.dispatchEvent(input);expect(input.defaultPrevented).toBe(true);
+ e.rangeAnnotations.apply([e.textRanges.snapshot(n.key,0,9)],'style/bold');expect(n.payload.standoffProperties).toHaveLength(1);e.repository.undo();expect(n.payload.standoffProperties??[]).toHaveLength(0);e.repository.redo();expect(n.payload.standoffProperties).toHaveLength(1);
+ f.type!('Draft remains editable');expect(f.text!().inlineContent.length).toBeGreaterThan(0);expect(e.mounts.get(n.key)).toBe(mount);expect(snapshots).not.toHaveBeenCalled();expect(rebuild).not.toHaveBeenCalled();
+ e.repository.undo();e.repository.undo();e.repository.undo();expect(c.draft()!.id).toBe(c.rows()[0].id);expect(e.textProtection.isProtected(n.contentKey)).toBe(false);e.repository.redo();expect(e.textProtection.isProtected(n.contentKey)).toBe(true);
+});
+
+const inventoryArgs={cursor:null,limit:20,contributionId:null,participantId:null,fromOrdinal:null};
+it('discovers earlier native TextBlocks after twelve contributions, pages and resolves a protected source for a remark',async()=>{
+ const f=await setup(true,true,true,true,true),c=f.c!,e=f.editor,ids:string[]=[];
+ for(let i=0;i<12;i++){ids.push(String(f.text!().payload.id));f.type!(i===0?'First garden sample.':`Sample ${i+1}.`);if(i===4){const n=c.resolve(c.target(c.draft()!.id))!;e.commands.setPayloadField(n.key,'metadata',{dialectic:{...JSON.parse(JSON.stringify(n.payload.metadata)).dialectic,participant:{id:'guest',kind:'human',name:'Guest'}}});}c.submit();expect(c.notice(), 'submit '+i).toBe('');}
+ const original=c.resolve(c.target(ids[0],'block'))!,mount=e.mounts.get(original.key),cells=[...original.inlineContent],before=e.repository.state.revision,snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(req,sources)=>{
+  expect(req.legend.tools).toContain('list_text_blocks');expect(req.structuralContext.sources.some((s:any)=>s.target.blockId===ids[0])).toBe(false);
+  const a=await sources.tool({id:'page1',tool:'list_text_blocks',arguments:{...inventoryArgs,limit:5}});expect(a.items.map((i:any)=>i.blockId)).toEqual(ids.slice(0,5));const expired=await sources.tool({id:'expired-read',tool:'read_source',arguments:{handle:'source-from-an-earlier-exchange'}});expect(expired).toMatchObject({status:'unauthorized',recovery:{tool:'list_text_blocks'}});expect(expired.text).toBeUndefined();expect(expired.revision).toBeUndefined();expect(expired.recovery.inventory.items).toHaveLength(5);expect(expired.recovery.inventory.items[0].blockId).toBe(ids[0]);
+  expect(a.items[0]).toMatchObject({position:1,preview:'First garden sample.',readRequired:true,contribution:{ordinal:1,author:'human'}});expect(a.items[0].revision).toBeUndefined();
+  const b=await sources.tool({id:'page2',tool:'list_text_blocks',arguments:{...inventoryArgs,limit:20,cursor:a.nextCursor}});expect(b.items.map((i:any)=>i.blockId)).toEqual(ids.slice(5));expect(b.status).toBe('complete');
+  const guest=await sources.tool({id:'guest',tool:'list_text_blocks',arguments:{...inventoryArgs,participantId:'guest'}});expect(guest.items.map((i:any)=>i.blockId)).toEqual([ids[4]]);
+  const later=await sources.tool({id:'position',tool:'list_text_blocks',arguments:{...inventoryArgs,fromOrdinal:11}});expect(later.items.map((i:any)=>i.blockId)).toEqual(ids.slice(10));expect(later.coverage.visited).toBe(4);
+  const source=await sources.tool({id:'read',tool:'read_source',arguments:{handle:a.items[0].handle}});expect(source.target.blockId).toBe(ids[0]);expect(e.repository.state.revision).toBe(before);
+  const v:any=dcpResponse(req.exchange);v.replyTargets=[source.handle];v.anchors=[{id:'first',source:source.handle,revision:source.revision,selector:{exact:source.text,prefix:'',suffix:''}}];v.glosses=[{id:'remark',target:'first',type:'remark',text:'This is a test remark.'}];return JSON.stringify(v);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(13);const mark=(original.payload.standoffProperties as any[]).find(p=>p.type==='mutable/gloss');expect(mark).toBeTruthy();expect((c.root()!.payload.linkedAnnotations as any)[mark.annotationId].value).toBe('remark: This is a test remark.');expect(original.inlineContent).toEqual(cells);expect(e.mounts.get(original.key)).toBe(mount);expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ e.repository.undo();expect(original.payload.standoffProperties??[]).toHaveLength(0);e.repository.redo();expect((original.payload.standoffProperties as any[]).some(p=>p.type==='mutable/gloss')).toBe(true);
+});
+it('bounds inventory previews and layout traversal, excludes drafts and foreign Documents, and rejects stale/foreign cursors',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor;f.type!('First '+ 'x'.repeat(200));const draft=c.resolve(c.target(c.draft()!.id))!;
+ for(let i=0;i<135;i++)e.commands.insert({type:'container-block',children:[]},{kind:'at',parentKey:draft.key,index:i+1});c.submit();f.type!('Private draft');
+ const root=e.repository.readState(),bank=root.contents[root.placements[root.rootPlacementKey].contentKey].children.find(k=>root.contents[root.placements[k].contentKey].viewType==='workspace-object-bank-block')!;
+ e.commands.insert({id:'inventory-other',type:'document-block',metadata:{documentId:'inventory-other'},children:[{id:'inventory-secret',type:'standoff-editor-block',text:'Other Document text'}]},{kind:'at',parentKey:bank,index:0});
+ let cursor:string;
+ await c.askMock(async(req,sources)=>{
+  const p=await sources.tool({id:'bounded',tool:'list_text_blocks',arguments:inventoryArgs});cursor=p.nextCursor;expect(p.coverage.visited).toBe(128);expect(p.coverage.previewCells).toBe(160);expect(p.items).toHaveLength(1);expect(p.items[0].previewTruncated).toBe(true);expect(JSON.stringify(p)).not.toMatch(/Private draft|Other Document text/);expect(sources.diagnostics.reads).toBe(0);
+  await expect(sources.tool({id:'changed-filter',tool:'list_text_blocks',arguments:{...inventoryArgs,cursor,participantId:'different'}})).rejects.toThrow(/cursor/);
+  const scoped=await sources.tool({id:'scope',tool:'list_text_blocks',arguments:{...inventoryArgs,contributionId:'inventory-other'}});expect(scoped.items).toEqual([]);
+  const end=await sources.tool({id:'resume',tool:'list_text_blocks',arguments:{...inventoryArgs,cursor}});expect(end.status).toBe('complete');expect(end.items).toEqual([]);
+  await expect(sources.tool({id:'repeat',tool:'list_text_blocks',arguments:{...inventoryArgs,cursor}})).rejects.toThrow(/cursor/);
+  return JSON.stringify(dcpResponse(req.exchange));
+ });expect(c.notice()).toBe('');
+ await c.askMock(async(req,sources)=>{await expect(sources.tool({id:'foreign',tool:'list_text_blocks',arguments:{...inventoryArgs,cursor}})).rejects.toThrow(/cursor/);const p=await sources.tool({id:'new',tool:'list_text_blocks',arguments:{...inventoryArgs,limit:1}});const n=c.resolve(c.target(p.items[0].blockId,'block'))!;e.commands.replaceInlineRange(n.key,0,0,'changed');await expect(sources.tool({id:'stale',tool:'read_source',arguments:{handle:p.items[0].handle}})).rejects.toThrow(/changed/);return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toMatch(/changed/);
 });

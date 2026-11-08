@@ -53,7 +53,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
    <aside class="dialectic-inspector" inert={!!c.sequences.presenting()} aria-label="Conversation context">
     <div class="dialectic-eyebrow">INSPECTION</div>
     <h3>{selected()?c.label(selected()!):'Explore a contribution'}</h3>
-    <Show when={row()}>{r=><p class="dialectic-muted">{r().data.createdUtc?new Date(r().data.createdUtc!).toLocaleString():'Draft'} · Content stays editable.</p>}</Show>
+    <Show when={row()}>{r=><p class="dialectic-muted">{r().data.createdUtc?new Date(r().data.createdUtc!).toLocaleString():'Draft'} · {c.editor.features.nativeTextProtection&&r().data.state==='committed'?'Original content protected · annotations welcome':'Content stays editable'}</p>}</Show>
     <button disabled={!selected()||['gloss','entity','argument-relation','entity-relation'].includes(selected()!.kind)} onClick={act(()=>{if(selected())c.setReply(selected());})}>Reply to this</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={act(()=>{const t=c.focusBlock();c.setReply(t);c.inspect(t);})}>Reply to caret Block</button>
     <button onPointerDown={e=>e.preventDefault()} onClick={()=>c.selectRange('reply')}>Reply to selection</button>

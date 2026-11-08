@@ -1,4 +1,5 @@
 import {DialecticProviderSession} from './dcp/live';
+import {ConversationHistory} from './continuity';
 import {liveLimits,type ProviderSettings,type LiveProvenance} from './dcp/provider-contract';
 import {DcpSources} from './dcp/sources';
 import {request as dcpRequest,prepare as prepareDcp,mockTransport,receive,type DcpTransport} from './dcp/exchange';
@@ -19,6 +20,8 @@ const metadata=(n:BlockNode|undefined)=>(n?.payload.metadata??{}) as Record<stri
 /** One controller per application owner; workspace views share these session choices. */
 export function createDialecticController(editor:ReactiveEditor,port:Accessor<DocumentApplicationPort|undefined>){
  const providers=new DialecticProviderSession();
+ const history=new ConversationHistory(editor);
+ const [selectedAi,setSelectedAi]=createSignal<string>();
  const [providerMode,setProviderMode]=createSignal<'mock'|'live'>('mock'),[providerReady,setProviderReady]=createSignal(false),[providerSettings,setProviderSettings]=createSignal({...providers.settings}),[providerNotice,setProviderNotice]=createSignal(''),[providerConfiguring,setProviderConfiguring]=createSignal(false);
  const configureProvider=async(settings:ProviderSettings,key?:string)=>{if(busy()||providerConfiguring())return;setProviderConfiguring(true);try{const ready=await providers.configure(settings,key);if(!alive)return;setProviderReady(ready);setProviderSettings({...providers.settings});setProviderNotice(ready?'Session provider ready.':'Enter a session key; no server environment key is configured.');setProviderMode(ready?'live':'mock');}catch(e){if(alive){setProviderReady(providers.ready);if(!providers.ready)setProviderMode('mock');setProviderNotice(String(e));}}finally{if(alive)setProviderConfiguring(false);}};
  const forgetProvider=async()=>{cancel();await providers.forget();setProviderReady(false);setProviderMode('mock');setProviderNotice('Session keys forgotten.');};
@@ -133,7 +136,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   const ordinal=nextOrdinal();
   editor.commands.structuralTransaction('Submit contribution',()=>{
    persistRanges(to?[to]:[]);
-   editor.commands.setPayloadField(n.key,'metadata',{...structuredClone(unwrap(metadata(n))),dialectic:{...structuredClone(unwrap(d.data)),state:'committed',participant:d.data.participant??defaultParticipant(resourceId(),'human'),ordinal,createdUtc:new Date().toISOString(),replies:to?[to]:[],replyExcerpts:to?.kind==='range'||to?.kind==='argument'?[{target:to,text:resolveReference(to).text??''}]:[]}});
+   editor.commands.setPayloadField(n.key,'metadata',{...structuredClone(unwrap(metadata(n))),dialectic:{...structuredClone(unwrap(d.data)),state:'committed',participant:d.data.participant?structuredClone(unwrap(d.data.participant)):defaultParticipant(resourceId(),'human'),ordinal,createdUtc:new Date().toISOString(),replies:to?[to]:[],replyExcerpts:to?.kind==='range'||to?.kind==='argument'?[{target:to,text:resolveReference(to).text??''}]:[]}});
    editor.commands.insert(draftContribution(),{kind:'at',parentKey:root()!.key,index:root()!.children.length});
   });
   if(to?.kind==='range')pending.delete(to.anchorId);
@@ -177,7 +180,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  });
  const persistRanges=(targets:ReplyTarget[])=>{
   const selected=[...new Set(targets.filter(t=>t.kind==='range').map(t=>t.anchorId!))].flatMap(id=>{const p=pending.get(id);return p?[{id,...p}]:[];});if(!selected.length)return;
-  const registry:any=structuredClone(unwrap(root()!.payload.linkedAnnotations??{}));
+  const registry:any=structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,unknown>;
   const texts=new Map<string,any[]>();
   for(const p of selected){editor.textRanges.validate([p.range],'cell');registry[p.id]=p.definition;const n=session()!.projection.node(p.range.nodeKey)!;
    let properties=texts.get(n.key);if(!properties)texts.set(n.key,properties=structuredClone(unwrap(n.payload.standoffProperties??[])) as any[]);
@@ -189,7 +192,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const reattach=(t:ReplyTarget,provided?:TextRangeSnapshot)=>run(()=>{
   if(t.kind==='argument'){const d=(root()!.payload.linkedAnnotations as any)?.[t.argumentId];if(!d)throw Error('Argument unavailable');t={kind:'range',...d.metadata.dialecticArgument.anchor};}
   if(t.kind!=='range'||t.resourceId!==resourceId()||pending.has(t.anchorId))throw Error('Choose a committed range reference to reattach.');
-  const range=selectionRange(provided),old=resolveReference(t),registry=structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,any>;
+  const range=selectionRange(provided),old=resolveReference(t),registry=structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,unknown> as Record<string,any>;
   if(!registry[t.anchorId]||registry[t.anchorId].isDeleted)throw Error('Restore the missing anchor definition with Undo before reattaching.');
   const texts=new Map<string,any[]>();for(const s of old.segments??[])texts.set(s.node.key,(structuredClone(unwrap(s.node.payload.standoffProperties??[])) as any[]).filter((p:any)=>p.annotationId!==t.anchorId||p.type!==RANGE_ANCHOR));
   const n=session()!.projection.node(range.nodeKey)!;const properties=texts.get(n.key)??structuredClone(unwrap(n.payload.standoffProperties??[])) as any[];properties.push({id:crypto.randomUUID(),type:RANGE_ANCHOR,annotationId:t.anchorId,start:range.start,end:range.end-1});texts.set(n.key,properties);
@@ -200,9 +203,9 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const pinGloss=(id:string)=>pin({kind:'gloss',resourceId:resourceId(),definitionId:id});
  const cancel=()=>{generation++;requestAbort?.abort();clearPreview();setBusy(false);};
  const exchangeTarget=()=>reply()??(inspection()&&!['entity','argument-relation','entity-relation'].includes(inspection()!.kind)?inspection():undefined)??(frontier()?target(frontier()!.id):undefined);
- const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget,live?:LiveProvenance)=>{
+ const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget,live?:LiveProvenance,lifecycle?:{commit():Promise<void>;cancel():Promise<void>})=>{
   if(busy())return;
-  let ticket=0,sources:DcpSources|undefined;
+  const participant={...aiParticipant()};let ticket=0,sources:DcpSources|undefined;
   try{
    setNotice('');clearPreview();guard();const to=explicit??exchangeTarget();
    if(!to)throw Error('Submit a contribution or select a reply target first.');requireCommittedTarget(to);
@@ -210,7 +213,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    for(const t of targets)if(!['gloss','entity','argument-relation','entity-relation'].includes(t.kind))requireCommittedTarget(t);
    const captured=capture(targets),source=session()!,exchangeId=crypto.randomUUID();
    ticket=++generation;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setDcpPreview('Preparing structured exchange…');
-   sources=new DcpSources(editor,resourceId(),function*(){for(const r of committed())yield source.projection.node(r.key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),live?liveLimits.deadlineMs:30000,id=>references()!.argumentsFor(id));
+   sources=new DcpSources(editor,resourceId(),function*(fromOrdinal=1){const rows=committed();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((rows[mid].data.ordinal??0)<fromOrdinal)lo=mid+1;else hi=mid;}for(let i=lo;i<rows.length;i++)yield source.projection.node(rows[i].key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),live?liveLimits.deadlineMs:30000,id=>references()!.argumentsFor(id));
    for(const key of captured.revisions.keys())sources.fence(key);
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
    const structuralContext=await sources.manifest([primary,...selected]);
@@ -231,19 +234,20 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     properties.push({id:crypto.randomUUID(),type:RANGE_ANCHOR,annotationId:t.anchorId,start:p.range.start,end:p.range.end-1});
    }
    for(const item of captured.manifest)item.origins=[...(targetKey(item.target)===targetKey(to)?['reply-target' as const]:[]),...(selectedTargets.some(t=>targetKey(t)===targetKey(item.target))?['selected' as const]:[])];
-   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...defaultParticipant(resourceId(),'ai'),name:live?'AI participant':'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,
+   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...participant,name:live?participant.name:'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,
     replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
     dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,identityMap:result.aliases,annotationRefs:result.annotationRefs,intent:result.intent,...(live?{provider:live}:{})}};
    const started=performance.now();
    editor.commands.boundedStructuralTransaction(live?'Add DCP AI response':'Add DCP mock response',()=>{
-    if(Object.keys(result.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})),...result.definitions});
+    if(Object.keys(result.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,unknown>,...result.definitions});
     for(const [key,added]of result.annotations){const n=source.projection.node(key);if(!n)throw Error('Anchor source unavailable');editor.commands.setPayloadField(key,'standoffProperties',[...structuredClone(unwrap(n.payload.standoffProperties??[])) as any[],...added]);}
     editor.commands.insert({id,type:'container-block',metadata:{dialectic:JSON.parse(JSON.stringify(data))},children:result.children},{kind:'before',anchorKey:d.key});
    });
    dcpDiagnostics.commitMs=performance.now()-started;dcpDiagnostics.exchanges++;dcpDiagnostics.reads+=sources.diagnostics.reads;dcpDiagnostics.searches+=sources.diagnostics.searches;dcpDiagnostics.visited+=sources.diagnostics.visited;
    for(const t of targets)if(t.kind==='range')pending.delete(t.anchorId);
    diagnostics.submissions++;clearPreview();inspect(target(id));
-  }catch(e){if(alive&&ticket===generation)setNotice(String(e));else if(!ticket&&alive)setNotice(String(e));}finally{sources?.dispose();if(ticket===generation){if(live)setLastProviderExchange(structuredClone(live));setBusy(false);}}
+   try{await lifecycle?.commit();}catch{setNotice('Contribution committed locally. Provider memory acknowledgement is pending; the next Ask will reconcile or rebuild from this Document.');}
+  }catch(e){if(alive&&ticket===generation)setNotice(String(e));else if(!ticket&&alive)setNotice(String(e));}finally{await lifecycle?.cancel();sources?.dispose();if(ticket===generation){if(live)setLastProviderExchange(structuredClone(live));setBusy(false);}}
  };
  const askMock=async(transport:DcpTransport=mockTransport,explicit?:ReplyTarget)=>{
   if(editor.features.dialecticDcp)return askDcp(transport,explicit);
@@ -276,11 +280,13 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   return {relation:r.relation,from:endpoint(r.from),to:endpoint(r.to)};
  };
  const entityDetails=(t:ReplyTarget)=>t.kind==='entity'&&t.entity.scope==='document'?(root()!.payload.linkedAnnotations as any)?.[t.entity.entityId]?.metadata?.scopedEntity?.entity:undefined;
- const ask=async(explicit?:ReplyTarget)=>{if(providerConfiguring())return;if(providerMode()==='mock'||!editor.features.dialecticProviders||!editor.features.dialecticDcp)return askMock(mockTransport,explicit);const live=providers.transport();return askDcp(live.run,explicit,live.details);};
+ const aiParticipants=()=>{const initial={...defaultParticipant(resourceId(),'ai'),name:'AI participant'},entries=new Map([[initial.id,initial]]);for(const row of committed())if(row.data.author==='ai'&&row.data.participant?.kind==='ai')entries.set(row.data.participant.id,row.data.participant);return [...entries.values()];};
+ const aiParticipant=()=>aiParticipants().find(p=>p.id===selectedAi())??aiParticipants()[0];
+ const ask=async(explicit?:ReplyTarget)=>{if(providerConfiguring())return;if(providerMode()==='mock'||!editor.features.dialecticProviders||!editor.features.dialecticDcp)return askMock(mockTransport,explicit);const participant=aiParticipant().id,doc=resourceId();const live=providers.transport(editor.features.dialecticProviderContinuity&&providerSettings().provider==='openai'?()=>{if(resourceId()!==doc)throw Error('Conversation changed');return history.build(doc,participant,committed().map(row=>session()!.projection.node(row.key)!.contentKey));}:undefined);return askDcp(live.run,explicit,live.details,live);};
  const submitAndAsk=async(transport?:DcpTransport)=>{if(providerConfiguring())return;const submitted=submit();if(submitted){if(transport)await askMock(transport,submitted as ReplyTarget);else await ask(submitted as ReplyTarget);}};
  return {annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
-  references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,
-  dispose(){sequences.dispose();alive=false;cancel();providers.dispose();choices.clear();pending.clear();preview.dispose();},capture,
+  references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,aiParticipants,aiParticipant,setSelectedAi,historyDiagnostics:history.diagnostics,
+  dispose(){sequences.dispose();alive=false;cancel();providers.dispose();history.dispose();choices.clear();pending.clear();preview.dispose();},capture,
  };
 }
 export type DialecticController=ReturnType<typeof createDialecticController>;

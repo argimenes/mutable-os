@@ -128,6 +128,7 @@ export class TreeCommands {
 
 
   replaceAcrossBlocks(segments: CrossTextSegment[], text: string) {
+    for(const segment of segments)this.assertContentEdit?.(segment.placementKey);
     const state = this.current();
     const resolved = segments.map(segment => ({ ...segment, placementKey: this.placementKey(segment.placementKey, state) }));
     const result = planCrossTextEdit(state, resolved, text);
@@ -169,6 +170,7 @@ export class TreeCommands {
   constructor(
     private readonly repository: CanonicalRepository,
     private readonly resolveOccurrence: (key: NodeKey | PlacementKey) => PlacementKey | undefined,
+    private readonly assertContentEdit?: (key: NodeKey | PlacementKey) => void,
   ) {}
 
   private current(local = false): RepositoryState {
@@ -654,6 +656,7 @@ export class TreeCommands {
     return true;
   }
   remove(key: NodeKey | PlacementKey): void {
+    this.assertContentEdit?.(key);
     if (this.removeLocal(key)) return;
     if (this.removeEmptyParagraph(key)) return;
     const state = this.state();

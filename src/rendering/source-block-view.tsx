@@ -65,7 +65,7 @@ export function SourceBlockView(props:BlockViewProps) {
   </div>
   <Show when={!format()}><p>Unsupported source schema. Authored data is retained without interpretation.</p></Show>
   <Show when={error()}><p role="status">{error()}</p></Show>
-  <textarea ref={textarea} hidden={mode()!=='source'} aria-label="Authoritative source" spellcheck={false} readOnly={!format()}
+  <textarea ref={textarea} hidden={mode()!=='source'} aria-label="Authoritative source" spellcheck={false} readOnly={!format()||!editor.canEditText(props.nodeKey)}
    onBeforeInput={capture}
    onCompositionStart={()=>{before=selection();compositionSource=text();composition=true;}}
    onCompositionEnd={()=>{composition=false;}}

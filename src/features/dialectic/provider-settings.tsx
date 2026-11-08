@@ -9,9 +9,11 @@ export function ProviderSettingsView(props:{c:DialecticController}){
  const [custom,setCustom]=createSignal(!modelPresets[settings().provider].some(m=>m.id===settings().model));
  const change=(patch:Partial<ProviderSettings>)=>setSettings(v=>({...v,...patch}));
  return <details class="dialectic-provider-settings"><summary>AI settings</summary>
-  <p>Keys entered here stay in the local server’s session memory. Server environment credentials remain available after reload or Forget keys. Nothing is saved in this Document.</p>
+  <p>Keys entered here stay in the local server’s session memory. Server environment credentials remain available after reload or Forget keys. Credentials are never saved in this Document.</p>
+  <Show when={c.editor.features.dialecticProviderContinuity&&settings().provider==='openai'}><p>Ask includes preceding contributions in this Document. OpenAI retains conversation memory; forgetting keys does not delete it. The Document remains authoritative.</p></Show>
   <form onSubmit={e=>{e.preventDefault();const secret=key.value;key.value='';void c.configureProvider(settings(),secret||undefined);}}>
    <fieldset disabled={c.busy()||c.providerConfiguring()}>
+    <Show when={c.aiParticipants().length>1}><label>AI participant <select aria-label="AI participant" value={c.aiParticipant().id} onChange={e=>c.setSelectedAi(e.currentTarget.value)}><For each={c.aiParticipants()}>{p=><option value={p.id}>{p.name}</option>}</For></select></label></Show>
     <label>Provider <select aria-label="AI provider" value={settings().provider} onChange={e=>{const provider=e.currentTarget.value as Provider;setCustom(false);change({provider,model:defaultModel(provider)});}}><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option></select></label>
     <label>Model <select aria-label="AI model" value={custom()?'custom':settings().model} onChange={e=>{const value=e.currentTarget.value;setCustom(value==='custom');change({model:value==='custom'?'':value});}}><For each={modelPresets[settings().provider]}>{m=><option value={m.id}>{m.label}</option>}</For><option value="custom">Custom model…</option></select></label>
     <Show when={custom()}><label>Custom model ID <input aria-label="AI model ID" required maxLength={128} placeholder="Model supporting structured output and tools" value={settings().model} onInput={e=>change({model:e.currentTarget.value})}/></label></Show>

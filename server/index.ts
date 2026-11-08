@@ -234,8 +234,9 @@ if (!featureFlags.cavernStartup && process.env.SPEEDY_DISABLE_DATABASE !== "1") 
 }
 
 const app = express();
+const cavern = featureFlags.cavernStartup ? createCavernLifecycle() : undefined;
 // Must precede general body parsing, static routes and Cavern routing.
-if (featureFlags.dialecticProviders) app.use("/api/dialectic", createDialecticBroker().router);
+if (featureFlags.dialecticProviders) app.use("/api/dialectic", createDialecticBroker({currentCavern:()=>cavern?.current(),continuity:featureFlags.dialecticProviderContinuity}).router);
 // 1) Use an absolute path
 const assetsDir = path.resolve(__dirname, 'dist', 'assets');
 
@@ -254,7 +255,6 @@ app.use('/image-backgrounds', express.static(path.join(__dirname, baseBackground
 app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({limit: '50mb'}));
 
-const cavern = featureFlags.cavernStartup ? createCavernLifecycle() : undefined;
 if (cavern) {
   app.use('/api/cavern', cavern.router);
   app.use('/api', cavern.middleware, (_req, res) => { res.status(404).json({ Success: false, Error: 'This service is unavailable in the current Cavern.' }); });

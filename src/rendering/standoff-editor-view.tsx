@@ -623,7 +623,7 @@ export function StandoffEditorView(props: BlockViewProps) {
       focus: () => flow.focus({ preventScroll: true }),
       captureInlineSelection: captureSelection,
       restoreInlineSelection: restoreSelection,
-      presentProvisional: value=>{setDraft(value);scheduleMeasure();},
+      presentProvisional: value=>{if(value&&!editor.canEditText(props.nodeKey))throw Error('Base text is protected; annotate the existing selection instead.');setDraft(value);scheduleMeasure();},
       finishProvisionalComposition:()=>{
         // Native composition can insert unowned Text nodes or alter an existing
         // text span. Reconcile within the character owner before applying the
@@ -739,9 +739,9 @@ export function StandoffEditorView(props: BlockViewProps) {
         <div
           ref={flow}
           class="reactive-standoff-flow"
-          contentEditable={!passive && !editor.crossText.segments[props.nodeKey]}
+          contentEditable={!passive && editor.canEditText(props.nodeKey) && !editor.crossText.segments[props.nodeKey]}
           tabIndex={0}
-          aria-readonly={passive || !!editor.crossText.segments[props.nodeKey]}
+          aria-readonly={passive || !editor.canEditText(props.nodeKey) || !!editor.crossText.segments[props.nodeKey]}
           role="textbox"
           aria-multiline="true"
           spellcheck={true}

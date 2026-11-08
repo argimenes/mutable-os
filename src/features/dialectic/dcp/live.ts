@@ -1,6 +1,7 @@
 import {validationDiagnostic} from './diagnostics';
 import {defaultProviderSettings,liveLimits,type ProviderSettings,type ProviderTurn,type LiveProvenance} from './provider-contract';
 import type {DcpTransport} from './exchange';
+import type {ContinuityManifest,HistoryItem} from './continuity-contract';
 
 /** Application-session memory only. Disposal/reload forgets the local bearer token. */
 export class DialecticProviderSession {
@@ -21,14 +22,23 @@ export class DialecticProviderSession {
  private async closeExchange(id:string){if(!this.token)return;await fetch('/api/dialectic/exchange/'+id,{method:'DELETE',signal:AbortSignal.timeout(2000),headers:{'x-mutable-dialectic':'1','x-dialectic-session':this.token},keepalive:true}).catch(()=>undefined);}
  async forget(){const token=this.token;this.token='';this.ready=false;if(token)await fetch('/api/dialectic/session',{method:'DELETE',headers:{'x-mutable-dialectic':'1','x-dialectic-session':token},keepalive:true}).catch(()=>undefined);}
  dispose(){window.removeEventListener('pagehide',this.pagehide);this.disposed=true;void this.forget();}
- transport(){
+ transport(history?:()=>Promise<{manifest:ContinuityManifest;items:HistoryItem[]}>) {
+  let retainedId='';
   const details:LiveProvenance={version:1,adapterVersion:'4c-1',settings:{...this.settings},attempts:[],cost:{status:'unknown'}};
   const run:DcpTransport=async(request,sources,chunk,signal,validate)=>{
    if(!this.ready)throw Error('Configure an API key and model in AI settings first.');
-   let id='',round=0,calls=0,repair=false,next:any={round:0};
+   let id='',round=0,calls=0,repair=false,next:any={round:0},prepared=false;
    const close=()=>{if(id)void this.closeExchange(id);};signal.addEventListener('abort',close,{once:true});
    try{
-    const response=await this.call('/exchange',{request},signal),start=await response.json();id=start.id;details.settings=start.settings;details.system=start.system;if(signal.aborted)throw Error('DCP cancelled');
+    let continuity:any;
+    if(history&&this.settings.provider==='openai'){
+     const native=await history();sources.check();
+     const response=await this.call('/continuity/prepare',{manifest:native.manifest},signal),preflight=await response.json();
+     if(!preflight.supported)throw Error('Persistent provider memory is unavailable on this server. Disable continuity explicitly to use stateless mode.');
+     continuity={manifest:native.manifest,plan:preflight.plan,items:native.items.slice(preflight.plan.start)};
+     if(preflight.plan.recovery)chunk('Rebuilding provider memory from native conversation history…');
+    }
+    const response=await this.call('/exchange',{request,...(continuity?{continuity}:{})},signal),start=await response.json();id=start.id;details.settings=start.settings;details.system=start.system;details.continuity=start.continuity;if(signal.aborted)throw Error('DCP cancelled');
     while(round<liveLimits.rounds){
      sources.check();const response=await this.call('/exchange/'+id+'/turn',next,signal);if(!response.body)throw Error('Missing broker stream.');
      const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',wire=0,preview='',turn:ProviderTurn|undefined;
@@ -42,11 +52,14 @@ export class DialecticProviderSession {
       for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`,result=await sources.tool({...call,id:toolId});attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
       next={round,results};continue;
      }
-     try{await validate?.(turn.text);return turn.text;}
+     try{await validate?.(turn.text);prepared=!!details.continuity;if(prepared)retainedId=id;return turn.text;}
      catch(error){sources.check();if(repair||!details.settings.repair)throw error;repair=true;attempt.repair=String(error).slice(0,1000);attempt.rejectedResponse=turn.text;chunk('DCP validation failed; trying the enabled single repair…');next={round,repair:true,diagnostic:validationDiagnostic(error)};}
     }throw Error('DCP continuation limit exceeded.');
-   }finally{signal.removeEventListener('abort',close);if(id)await this.closeExchange(id);}
+   }finally{signal.removeEventListener('abort',close);if(id&&!prepared)await this.closeExchange(id);}
   };
-  return {run,details};
+  return {run,details,
+   commit:async()=>{if(!retainedId||!history)return;const id=retainedId;const native=await history();await this.call('/exchange/'+id+'/ack',{manifest:native.manifest});retainedId='';},
+   cancel:async()=>{if(retainedId){const id=retainedId;retainedId='';await this.closeExchange(id);}},
+  };
  }
 }

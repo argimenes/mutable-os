@@ -1,4 +1,5 @@
 import { passiveFocus } from '../runtime/passive-presentation';
+import {NativeTextProtection} from '../block-tree/text-protection';
 import { MarkdownInput } from '../runtime/markdown-input';
 import { GlossRelationshipController } from "../features/gloss/relationship-controller";
 import { GlossController } from "../features/gloss/controller";
@@ -115,6 +116,9 @@ export class ReactiveEditor {
   private disposeFindInput?: () => void;
   readonly bindings = new BindingRegistry();
   readonly repository: CanonicalRepository;
+  readonly textProtection: NativeTextProtection;
+  private disposeTextProtectionInput?:()=>void;
+  canEditText(key:string){const n=this.node(key);return !n||!this.textProtection.isProtected(n.contentKey);}
   readonly occurrences = new OccurrenceIndex();
   readonly commands: TreeCommands;
   readonly registry = new BlockRegistry();
@@ -174,6 +178,18 @@ export class ReactiveEditor {
     if ((loadedWorkspace?.localContainer || loadedWorkspace?.manifest?.schemaVersion === 2) && !this.features.mutableWindowManager) throw new Error("Enable the Mutable Window Manager to open a managed Workspace.");
     const decoded = loadedWorkspace ? { state: loadedWorkspace.state } : isHistoryDocument(dto) ? decodeHistoryDocument(dto) : decodeBlockTree(dto as ExistingBlockDto);
     this.repository = new CanonicalRepository(this.features.reversibleBlocks ? upgradeLegacySurfaces(decoded.state) : decoded.state);
+    this.textProtection = new NativeTextProtection(this.repository);
+    const protectedInput=(event:Event)=>{
+      const resolved=this.mounts.resolveEvent(event);if(!resolved||this.canEditText(resolved.nodeKey))return;
+      if(event instanceof KeyboardEvent){
+        const command=event.metaKey||event.ctrlKey;
+        if(command?!['x','v'].includes(event.key.toLowerCase()):!(['Backspace','Delete','Enter'].includes(event.key)||event.key.length===1&&!event.altKey))return;
+      }
+      event.preventDefault();event.stopImmediatePropagation();
+    };
+    const inputEvents=['keydown','beforeinput','input','cut','paste','drop','compositionstart','compositionend'];
+    inputEvents.forEach(name=>window.addEventListener(name,protectedInput,true));
+    this.disposeTextProtectionInput=()=>inputEvents.forEach(name=>window.removeEventListener(name,protectedInput,true));
     this.annotationIdentities = new AnnotationIdentities(this.repository);
     registerVisualEffectRenderers(this.visualEffects);
     registerFocusFade(this.visualEffects);
@@ -192,6 +208,9 @@ export class ReactiveEditor {
     this.commands = new TreeCommands(this.repository, (key) => {
       if(this.isPassiveOccurrence(key)) throw new Error('Open source to edit this composition.');
       return this.occurrences.resolve(key);
+    }, key=>{
+      const contentKey=this.node(key)?.contentKey??this.repository.readState().placements[key]?.contentKey;
+      if(contentKey&&this.textProtection.isProtected(contentKey))throw Error('Base content is protected; annotations remain available.');
     });
     this.commandRegistry.authoringAllowed = (key,id) => ['workspace.presentation.desktop','workspace.presentation.textual'].includes(id) || !this.isPassiveOccurrence(key) && !passiveFocus();
     this.textRanges = new TextRanges(key => {
@@ -536,6 +555,7 @@ export class ReactiveEditor {
   }
 
   dispose(): void {
+    this.disposeTextProtectionInput?.();this.textProtection.dispose();
     this.tables.dispose();
     this.tabs.dispose();
     this.viewCloseGuards.clear();

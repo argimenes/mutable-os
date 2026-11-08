@@ -291,6 +291,11 @@ export interface RepositoryChange {
 }
 
 export class CanonicalRepository {
+  private admission = new Set<(operations: readonly RepositoryOperation[], state: Readonly<RepositoryState>, metadata: CommitMetadata) => void>();
+  /** Synchronous, read-only veto before validation/publication. No snapshots. */
+  beforeCommit(guard: (operations: readonly RepositoryOperation[], state: Readonly<RepositoryState>, metadata: CommitMetadata) => void) {
+    this.admission.add(guard); return () => { this.admission.delete(guard); };
+  }
   private historyGuards=createSignal(0);
   /** Shared Document history lease; does not modify either stack. */
   suspendHistory(){this.historyGuards[1](n=>n+1);let live=true;return()=>{if(live){live=false;this.historyGuards[1](n=>n-1);}};}
@@ -442,6 +447,7 @@ export class CanonicalRepository {
   commit(label: string, operations: RepositoryOperation[], recordHistory = true, metadata: CommitMetadata = {}): void {
     this.assertNotCaptureCallback();
     if (!operations.length) return;
+    for (const guard of this.admission) guard(operations, this.readState(), metadata);
     const placementDelta = this.placementIdentity.validateCommit(operations);
     const bulk = operations.some(op => op.kind === "record-batch");
     const gloss = !bulk && glossChangeFor(this.readState(), operations, {locationOf:key=>this.locationOf(key),ownedKeys:key=>this.ownedPlacementKeys(key)});

@@ -62,3 +62,19 @@ it('sends bounded repair diagnostics and preserves native intent without forward
  const content=state.input.at(-1).content;expect(content).toContain('$.anchors[1]');expect(content).toContain('unambiguous prefix/suffix');expect(content).toContain('preserve valid requested addressing');expect(content).not.toContain('secret credential');expect(content).not.toContain('Prefer plain paragraphs');
  repair(state,{code:'arbitrary secret',path:'$.secret'});expect(state.input.at(-1).content).not.toContain('arbitrary secret');expect(state.input.at(-1).content).not.toContain('$.secret');
 });
+it('reports context exhaustion explicitly without retrying or leaking provider text',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(Response.json({error:{code:'context_length_exceeded',message:'private source and credential'}},{status:400}));
+ await expect(providerTurn(conversation(defaultProviderSettings,request),'fixture',new AbortController().signal,()=>{},fetcher)).rejects.toThrow('History was not truncated and no stateless retry was sent');expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it.each(['openai','anthropic'] as Provider[])('%s keeps inventory and source tools available across successive continuations',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},request),signal=new AbortController().signal;
+ const fetcher=vi.fn<typeof fetch>()
+  .mockResolvedValueOnce(sse(streamFixture(provider,'',{id:'list',name:'list_text_blocks',arguments:{cursor:null,limit:1,contributionId:null,participantId:null,fromOrdinal:1}})))
+  .mockResolvedValueOnce(sse(streamFixture(provider,'',{id:'read',name:'read_source',arguments:{handle:'fresh'}})))
+  .mockResolvedValueOnce(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ const first=await providerTurn(state,'fixture',signal,()=>{},fetcher);continuation(state,first.calls,[{items:[{handle:'fresh',blockId:'native-block',readRequired:true}]}]);
+ const second=await providerTurn(state,'fixture',signal,()=>{},fetcher);expect(second.calls[0].tool).toBe('read_source');continuation(state,second.calls,[{status:'complete',handle:'fresh',revision:'current',text:'Garden.'}]);
+ const final=await providerTurn(state,'fixture',signal,()=>{},fetcher);expect(final.calls).toEqual([]);expect(JSON.parse(final.text).kind).toBe('contribution');
+ for(const [,init]of fetcher.mock.calls.slice(1)){const body=JSON.parse(String(init?.body));expect(body.tools.map((t:any)=>t.name)).toContain('list_text_blocks');expect(body.instructions??body.system).toContain('Further advertised tool calls remain available');}
+});

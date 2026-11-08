@@ -116,6 +116,8 @@ export type FeatureFlags = Readonly<{
   /** Validated structured mock exchanges; no live provider or Stage 4B authoring. */
   dialecticDcp: boolean;
   dialecticProviders: boolean;
+  dialecticProviderContinuity: boolean;
+  nativeTextProtection: boolean;
   scopedSemantics: boolean;
   /** Cardex shell and local Entity Card authoring. */
   cardex: boolean;
@@ -230,6 +232,8 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialectic: true,
   dialecticDcp: true,
   dialecticProviders: true,
+  dialecticProviderContinuity: true,
+  nativeTextProtection: true,
   scopedSemantics: true,
   cardex: true,
   cardexIncrement2: true,
