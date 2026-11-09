@@ -1,3 +1,5 @@
+import {blockMenuItems} from '../../runtime/block-menu-actions';
+import {headingProperty,prepareGrid,prepareHeading} from '../../block-tree/native-authoring';
 import {registerStandaloneEntityService} from '../../application/entity-service';
 import {documentContextInventory} from '../../interchange/package/document-context';
 import {ScopedEntities} from '../../application/scoped-entities';
@@ -25,9 +27,9 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -213,6 +215,50 @@ it('keeps Sequence navigation/reveal and repeated-member state out of canonical 
 });
 
 function dcpResponse(exchange:string){return {protocol:'dcp/1.0',kind:'contribution',exchange,intent:'qualify',replyTargets:[] as string[],composition:[{id:'p',kind:'paragraph',markup:'<annotation type="dialectic/claim" id="generated">A😀</annotation>',ranges:[]}],anchors:[] as any[],entities:[],interpretations:[] as any[],arguments:[],glosses:[],relations:[],suggestions:[],promotionRecommendations:[]};}
+it('catalogue discovery shares retrieval budgets and prepares native tables, groups, exact anchors and Glosses',async()=>{
+ const f=await setup(true,true,true,true,false,false,true),c=f.c!,e=f.editor;
+ f.type!('Historical objects preserve evidence.');c.submit();
+ const snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(request,sources)=>{
+  expect(request.capabilities.version).toBe(1);expect(request.legend.tools).toContain('describe_capabilities');
+  expect(request.authoring.instructions).toContain('communicative purpose');expect(request.budgets.calls).toBe(6);
+  const before={...sources.diagnostics},handles=sources.handles.size,fences=sources.fences.size,revision=e.repository.state.revision;
+  const details=await sources.tool({id:'capabilities',tool:'describe_capabilities',arguments:{ids:['composition.table','composition.group','source.anchor','semantic.gloss']}});
+  expect(details.status).toBe('complete');expect(details.items.every((i:any)=>i.authorable)).toBe(true);
+  expect(sources.diagnostics).toEqual(before);expect(sources.handles.size).toBe(handles);expect(sources.fences.size).toBe(fences);expect(e.repository.state.revision).toBe(revision);
+  const source=request.structuralContext.sources.find((s:any)=>s.nativeType==='standoff-editor-block');
+  const v:any=dcpResponse(request.exchange);
+  v.composition=[{id:'new:b1',kind:'group',children:[{id:'new:b2',kind:'table',rows:[[[{id:'new:b3',kind:'paragraph',markup:'Material evidence',ranges:[]}]],[[{id:'new:b4',kind:'paragraph',markup:'Historical interpretation',ranges:[]}]]]}]}];
+  v.anchors=[{id:'new:r1',source:source.handle,revision:source.revision,selector:{exact:'Historical objects',prefix:'',suffix:''}}];
+  v.glosses=[{id:'new:g1',target:'new:r1',type:'commentary',text:'The object provides evidence, while its interpretation depends on context.'}];
+  v.replyTargets=['new:r1'];
+  for(let i=0;i<5;i++)await sources.tool({id:'remaining-'+i,tool:i===0?'read_source':'describe_capabilities',arguments:i===0?{handle:source.handle}:{ids:['media.image','media.youtube','composition.card-grid','composition.markdown-fallback']}});
+  await expect(sources.tool({id:'seventh',tool:'describe_capabilities',arguments:{ids:['composition.table']}})).rejects.toThrow('tool-call budget');
+  return JSON.stringify(v);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const data=c.frontier()!.data,group=c.session()!.projection.node(c.resolve(c.target(c.frontier()!.id))!.children[0])!;
+ expect(group.viewType).toBe('container-block');expect(c.session()!.projection.node(group.children[0])!.viewType).toBe('table-block');
+ expect(c.resolveReference(data.discursiveReferences![0]).text).toBe('Historical objects');
+ expect(Object.values(c.root()!.payload.linkedAnnotations??{}).filter((d:any)=>d.type==='mutable/gloss')).toHaveLength(1);
+ expect(data.dcp!.tools).toHaveLength(6);expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const lookups=vi.spyOn(e.registry,'resolve'),before={...c.dcpDiagnostics};f.type!('Draft typing');
+ expect(c.dcpDiagnostics).toEqual(before);expect(lookups.mock.calls.some(([type])=>type==='table-cell-block'||type==='youtube-video-block')).toBe(false);
+});
+it('omits catalogue when disabled and rejects unsupported media even with discovery enabled',async()=>{
+ const f=await setup(true,true,true,false,false,false,false),c=f.c!;f.type!('A request');c.submit();
+ await c.askMock(async(request,sources)=>{
+  expect(request.capabilities).toBeUndefined();expect(request.legend.tools).not.toContain('describe_capabilities');
+  await expect(sources.tool({id:'disabled',tool:'describe_capabilities',arguments:{ids:['composition.table']}})).rejects.toThrow('Unavailable');
+  return JSON.stringify(dcpResponse(request.exchange));
+ });expect(c.notice()).toBe('');
+ const enabled=await setup(true,true,true,true,false,false,true),d=enabled.c!;enabled.type!('Show an image');d.submit();
+ const revision=enabled.editor.repository.state.revision;
+ for(const kind of ['image','grid','markdown-fallback']){
+  await d.askMock(async request=>JSON.stringify({...dcpResponse(request.exchange),composition:[{id:'new:b1',kind}]}));
+  expect(d.notice()).toContain('Unsupported DCP Block');expect(enabled.editor.repository.state.revision).toBe(revision);
+ }
+});
 it('materialises DCP atomically with independent reply/discursive references and AI provenance',async()=>{
  const f=await setup(),c=f.c!,e=f.editor,n=f.text!();f.type!('Alpha beta gamma');c.submit();const primary=c.target(c.frontier()!.id),mount=e.mounts.get(n.key),cells=[...n.inlineContent];
  const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
@@ -684,4 +730,120 @@ it('repairs a typed alias collision once with stable source authority and all de
  expect(ids['new:r1']).toBeUndefined();expect(c.resolveReference(ids['new:r2']).text).toBe('Rain is forecast.');expect(ids['new:arg1'].kind).toBe('argument');expect(ids['new:rel1'].kind).toBe('argument-relation');
  expect((original.payload.standoffProperties as any[]).filter(p=>p.type==='dialectic/range-anchor')).toHaveLength(1);
  expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});
+
+
+it('qualifies native authoring Stage 1 with shared human operations, immutable annotations, history and persistence',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true),c=f.c!,e=f.editor;
+ f.type!('The worn cup preserves ordinary life.');const original=f.text!(),originalCells=[...original.inlineContent];c.submit();
+ const sourceText=()=>original.inlineContent.map(key=>c.session()!.projection.node(key)!.payload.text).join('');
+ const paragraph=(id:number,markup:string)=>({id:'new:b'+id,kind:'paragraph',markup,ranges:[]});
+ const native=nativeDocumentSession(e);(native as any).bind(c.resourceId(),{folder:'isolated',filename:'stage1.ink'},{nativeHash:'initial',markdownHash:null,generation:null});
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ let inspected:any;
+ await c.askMock(async(request,sources)=>{
+  expect(request.nativeAuthoring).toBe(1);expect(request.legend.blocks).toEqual(expect.arrayContaining(['heading','grid','youtube']));
+  expect(request.legend.types.find((t:any)=>t.type==='text/colour').attributes).toEqual(['value']);
+  const detail=await sources.tool({id:'cap',tool:'describe_capabilities',arguments:{ids:['composition.heading','media.youtube']}});
+  expect(detail.items.every((x:any)=>x.authorable)).toBe(true);expect(detail.items[1].capabilityState).toBe('authorable-with-prerequisites');
+  const inventory=await sources.tool({id:'inventory',tool:'list_text_blocks',arguments:{cursor:null,limit:10,contributionId:null,participantId:null,fromOrdinal:1}});
+  const source=await sources.tool({id:'read',tool:'read_source',arguments:{handle:inventory.items[0].handle}});inspected=source.inspection;
+  const value:any=dcpResponse(request.exchange);
+  value.composition=[{...paragraph(1,'Objects'),kind:'heading',level:2},{id:'new:b2',kind:'grid',rows:[[[paragraph(3,'<annotation type="text/colour" value="#336699">Wear</annotation>')],[{...paragraph(4,'<boundary id="new:pos1"/>Use<boundary id="new:pos2"/>'),ranges:[{id:'new:s1',type:'text/colour',from:'new:pos1',to:'new:pos2',ref:null,attributes:[{name:'value',value:'#336699'}]}]}]]]},{id:'new:b5',kind:'youtube',url:'Zsqep7_9_mw'}];
+  value.anchors=[{id:'new:r1',source:source.handle,revision:source.revision,selector:{exact:'worn cup',prefix:'',suffix:''}}];
+  value.interpretations=[{id:'new:m1',target:'new:r1',type:'text/colour',ref:null,attributes:[{name:'value',value:'#336699'}]}];
+  return JSON.stringify(value);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);expect(inspected.root.nativeId).toBe(original.payload.id);
+ const generated=c.resolve(c.target(c.frontier()!.id))!,nodes=generated.children.map(k=>c.session()!.projection.node(k)!);
+ expect(nodes.map(n=>n.viewType)).toEqual(['standoff-editor-block','grid-block','youtube-video-block']);
+ expect(nodes[0].payload.blockProperties).toEqual([headingProperty('standoff-editor-block',2)]);
+ const grid=nodes[1],row=c.session()!.projection.node(grid.children[0])!,cells=row.children.map(k=>c.session()!.projection.node(k)!);
+ expect(row.viewType).toBe('grid-row-block');expect(cells.map(n=>n.viewType)).toEqual(['grid-cell-block','grid-cell-block']);
+ const texts=cells.map(cell=>c.session()!.projection.node(cell.children[0])!);
+ for(const text of texts)expect((text.payload.standoffProperties as any[]).find(p=>p.type==='text/colour')).toMatchObject({value:'#336699',start:0,end:text.inlineContent.length-1});
+ expect(nodes[2].payload.metadata).toMatchObject({url:'Zsqep7_9_mw'});
+ expect(sourceText()).toBe('The worn cup preserves ordinary life.');expect(original.inlineContent).toEqual(originalCells);
+ expect((original.payload.standoffProperties as any[]).find(p=>p.type==='text/colour')).toMatchObject({start:4,end:11,value:'#336699',metadata:{dcp:{appliedTo:'existing-source',sourceAuthor:'human'}}});
+ expect(()=>e.commands.replaceInlineRange(original.key,0,1,'X')).toThrow(/protected/);
+ expect(native.isDirty(c.resourceId())).toBe(true);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ e.repository.undo();expect(c.committed()).toHaveLength(1);expect(original.payload.standoffProperties??[]).toHaveLength(0);expect(sourceText()).toBe('The worn cup preserves ordinary life.');
+ e.repository.redo();expect(c.committed()).toHaveLength(2);expect(sourceText()).toBe('The worn cup preserves ordinary life.');
+ const saved=captureNative(e.repository.readState(),c.resourceId()),loaded=decodeNative(nativeBytes(saved));
+ expect(JSON.stringify(loaded)).toContain('grid-cell-block');expect(JSON.stringify(loaded)).toContain('#336699');expect(JSON.stringify(loaded)).toContain('youtube-video-block');
+ // Real human menu paths, in the editable draft, use the same native preparations.
+ const draftText=f.text!(),menu=blockMenuItems(e,draftText.key),add=menu.find(i=>i.label==='Add Block')!.children!;
+ await add.find(i=>i.label==='Add Grid')!.children!.find(i=>i.label==='1 × 2')!.run!();
+ const draft=c.resolve(c.target(c.draft()!.id))!,humanGrid=draft.children.map(k=>c.session()!.projection.node(k)!).find(n=>n.viewType==='grid-block')!;
+ const shape=(n:any):any=>({type:n.viewType,children:n.children.map((k:string)=>shape(c.session()!.projection.node(k)!))});
+ expect(shape(humanGrid)).toEqual(shape(grid));
+ await add.find(i=>i.label==='YouTube video URL…')!.input!.submit('Zsqep7_9_mw');
+ const humanMedia=draft.children.map(k=>c.session()!.projection.node(k)!).find(n=>n.viewType==='youtube-video-block')!;expect(humanMedia.payload.metadata).toEqual(nodes[2].payload.metadata);
+ f.type!('Colour');e.rangeAnnotations.apply([e.textRanges.snapshot(draftText.key,0,6)],'text/colour','#336699');expect((draftText.payload.standoffProperties as any[]).find(p=>p.type==='text/colour').value).toBe('#336699');
+ const reads={...c.dcpDiagnostics},fetches=(fetch as any).mock.calls.length;snapshots.mockClear();build.mockClear();f.type!('Typing');
+ expect(c.dcpDiagnostics).toEqual(reads);expect((fetch as any).mock.calls.length).toBe(fetches);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});
+
+it('rejects Stage 1 invalid declarations and stale/foreign authority without partial source annotations',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true),c=f.c!,e=f.editor;f.type!('Original immutable text.');const original=f.text!();c.submit();
+ const revision=e.repository.state.revision;
+ const badNodes=[
+  {id:'new:b1',kind:'heading',level:7,markup:'Invalid',ranges:[]},
+  {id:'new:b1',kind:'grid',rows:[[[{id:'new:b2',kind:'paragraph',markup:'A',ranges:[]}]],[]]},
+  {id:'new:b1',kind:'youtube',url:'javascript:alert(1)'},
+  {id:'new:r1',kind:'heading',level:2,markup:'Wrong identity role',ranges:[]},
+  {id:'new:b1',kind:'paragraph',markup:'<annotation type="text/colour" value="url(https://example.com)">X</annotation>',ranges:[]},
+  {id:'new:b1',kind:'paragraph',markup:'<boundary id="new:pos1"/>X<boundary id="new:pos2"/>',ranges:[{id:'new:s1',type:'text/colour',from:'new:pos1',to:'new:pos2',ref:null,attributes:[{name:'value',value:'#123'},{name:'value',value:'#456'}]}]},
+  {id:'new:b1',kind:'paragraph',markup:'<annotation type="style/glow">X</annotation>',ranges:[]},
+ ];
+ for(const bad of badNodes){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[bad]}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ for(const invalid of ['stale','foreign','late-invalid']){
+  await c.askMock(async(req,sources)=>{
+   const inventory=await sources.tool({id:'i',tool:'list_text_blocks',arguments:{cursor:null,limit:10,contributionId:null,participantId:null,fromOrdinal:1}}),source=await sources.tool({id:'r',tool:'read_source',arguments:{handle:inventory.items[0].handle}});
+   const v:any=dcpResponse(req.exchange);v.anchors=[{id:'new:r1',source:invalid==='foreign'?'src:other:b1':source.handle,revision:invalid==='stale'?'expired':source.revision,selector:{exact:'immutable',prefix:'',suffix:''}}];
+   v.interpretations=[{id:'new:m1',target:'new:r1',type:'text/colour',ref:null,attributes:[{name:'value',value:invalid==='late-invalid'?'inherit':'#336699'}]}];return JSON.stringify(v);
+  });expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);expect(original.payload.standoffProperties??[]).toHaveLength(0);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ }
+ // Force failure during canonical insertion, after prepared source/definition writes.
+ const insert=e.commands.insert.bind(e.commands),fail=vi.spyOn(e.commands,'insert').mockImplementation((dto,position)=>{if((dto.metadata as any)?.dialectic?.state==='committed')throw Error('Injected admission failure');return insert(dto,position);});
+ await c.askMock(async(req,sources)=>{const p=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}}),r=await sources.tool({id:'r',tool:'read_source',arguments:{handle:p.children[0]}});const v:any=dcpResponse(req.exchange);v.anchors=[{id:'new:r1',source:r.handle,revision:r.revision,selector:{exact:'immutable',prefix:'',suffix:''}}];v.interpretations=[{id:'new:m1',target:'new:r1',type:'text/colour',ref:null,attributes:[{name:'value',value:'#336699'}]}];return JSON.stringify(v);});
+ fail.mockRestore();expect(c.notice()).toContain('Injected admission failure');expect(e.repository.state.revision).toBe(revision);expect(original.payload.standoffProperties??[]).toHaveLength(0);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+});
+
+it('inspects native compound structure, configuration and unfamiliar content with bounded current handles',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true),c=f.c!,e=f.editor;f.type!('Read these structures.');
+ const heading=prepareHeading({id:'inspection-heading',type:'standoff-editor-block',text:'Evidence',standoffProperties:[{id:'colour',type:'text/colour',start:0,end:7,value:'#336699'}]},2);
+ const grid=prepareGrid([[[heading],[{id:'unfamiliar',type:'future/example',metadata:{secret:'must not leak'},children:[{id:'nested',type:'standoff-editor-block',text:'Preserved child'}]}]]]);grid.id='inspection-grid';
+ const draft=c.resolve(c.target(c.draft()!.id))!;
+ e.commands.insert(grid,{kind:'at',parentKey:draft.key,index:draft.children.length});
+ e.commands.insert({id:'inspection-tabs',type:'tab-row-block',metadata:{orientation:'vertical',secret:'must not leak'},children:[{id:'panel',type:'tab-block',metadata:{name:'Sources'},children:[{id:'panel-text',type:'standoff-editor-block',text:'A panel'}]}]},{kind:'at',parentKey:draft.key,index:draft.children.length});
+ c.submit();
+ await c.askMock(async(req,sources)=>{
+  const source=await sources.tool({id:'inspect',tool:'read_source',arguments:{handle:req.primaryReply}});
+  const tree=source.inspection;expect(tree.lossless).toBe(false);expect(JSON.stringify(tree)).not.toContain('must not leak');expect(new TextEncoder().encode(JSON.stringify(tree)).length).toBeLessThanOrEqual(tree.limits.bytes);
+  const grid=tree.root.children.find((n:any)=>n.kind==='grid');expect(grid.nativeId).toBe('inspection-grid');expect(grid.children[0].kind).toBe('row');
+  const cells=grid.children[0].children;expect(cells.map((n:any)=>n.kind)).toEqual(['cell','cell']);
+  const text=cells[0].children[0];expect(text.properties).toContainEqual(expect.objectContaining({type:'block/font/size',value:'h2'}));expect(text.annotations).toContainEqual(expect.objectContaining({type:'text/colour',value:'#336699'}));
+  const unknown=cells[1].children[0];expect(unknown).toMatchObject({nativeId:'unfamiliar',nativeType:'future/example',kind:'native'});expect(unknown.omissions.length).toBeGreaterThan(0);expect(unknown.children[0].handle).toMatch(/^src:/);
+  const read=await sources.tool({id:'unknown',tool:'read_source',arguments:{handle:unknown.handle}});expect(read.inspection.root.children[0]).toMatchObject({nativeId:'nested',text:'Preserved child'});
+  const tabs=tree.root.children.find((n:any)=>n.kind==='tabs');expect(tabs.configuration.orientation).toBe('vertical');expect(tabs.children[0].configuration.name).toBe('Sources');expect(tabs.children[0].children[0].text).toBe('A panel');
+  return JSON.stringify(dcpResponse(req.exchange));
+ });expect(c.notice()).toBe('');
+});
+
+it('bounds Stage 1 inspection work and generated grid descendants without increasing exchange budgets',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true),c=f.c!,e=f.editor;f.type!('Inspect the collection.');const draft=c.resolve(c.target(c.draft()!.id))!;
+ e.commands.insert({id:'collection',type:'container-block',children:Array.from({length:40},(_,i)=>({id:'item-'+i,type:'standoff-editor-block',text:'Item '+i}))},{kind:'at',parentKey:draft.key,index:draft.children.length});c.submit();
+ await c.askMock(async(req,sources)=>{
+  const reads=vi.spyOn(sources,'source');
+  const result=await sources.tool({id:'inspect',tool:'read_source',arguments:{handle:req.primaryReply}});
+  expect(reads.mock.calls.length).toBeLessThanOrEqual(24);expect(result.inspection.omissions.join(' ')).toMatch(/limit/);
+  expect(new TextEncoder().encode(JSON.stringify(result.inspection)).length).toBeLessThanOrEqual(16000);reads.mockRestore();
+  for(let i=0;i<5;i++)await sources.tool({id:'cap-'+i,tool:'describe_capabilities',arguments:{ids:['inspection.native']}});
+  await expect(sources.tool({id:'seventh',tool:'describe_capabilities',arguments:{ids:['inspection.native']}})).rejects.toThrow('tool-call budget');
+  return JSON.stringify(dcpResponse(req.exchange));
+ });expect(c.notice()).toBe('');
+ const revision=e.repository.state.revision;
+ await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'grid',rows:Array.from({length:16},(_,r)=>Array.from({length:16},(_,col)=>[{id:'new:b'+(2+r*16+col),kind:'paragraph',markup:'x',ranges:[]}]))}]}));
+ expect(c.notice()).toContain('native Block budget');expect(e.repository.state.revision).toBe(revision);
 });

@@ -1,6 +1,7 @@
 import type {SemanticAuthoringDescriptor} from '../runtime/visual-effect-registry';
 import type { EffectDefinition } from "../runtime/effect-contributions";
 import type { JSX } from "solid-js";
+import {safeColor} from '../interchange/inline-values.mjs';
 
 export type StandoffAnnotation = Record<string, unknown> & {
   id?: string;
@@ -13,6 +14,8 @@ export type StandoffAnnotation = Record<string, unknown> & {
 
 type SvgStyle = { kind: "contribution"; definition: EffectDefinition } | { kind: "underline"; colour: string } | { kind: "rainbow" | "highlighter" | "rectangle" | "spiky" };
 export interface StandoffStyleSchema {
+  /** Curated authoring projection; independent of renderer availability. */
+  authoring?: {group:'core-formatting';purpose:string;parameters:Record<string,unknown>;prepare(attributes:Record<string,unknown>,targetType:string):{value:string}};
   semantic?:SemanticAuthoringDescriptor;
   cell?: JSX.CSSProperties;
   valueStyle?: "color" | "background-color";
@@ -27,7 +30,14 @@ export interface StandoffStyleSchema {
 /** Current TS style registrations; optional authoring descriptors. Reference values are IDs, not colours. */
 export const standoffStyleSchemas: Readonly<Record<string, StandoffStyleSchema>> = {
   "text/background-colour": { valueStyle: "background-color" },
-  "text/colour": { valueStyle: "color" },
+  "text/colour": { valueStyle: "color", authoring:{
+    group:'core-formatting',purpose:'Give a selected passage an explicit text colour.',
+    parameters:{value:{type:'string',minLength:1,maxLength:128,description:'Native safeColor: CSS colour name, hex, rgb(a) or hsl(a); no inherited/reset values.'}},
+    prepare(attributes,targetType){
+      if(targetType!=='standoff-editor-block'||Object.keys(attributes).length!==1||typeof attributes.value!=='string'||attributes.value.length>128||!safeColor(attributes.value))throw Error('Invalid native text colour or target');
+      return {value:attributes.value};
+    },
+  } },
   "cell/micro-document": { deferred: "embedded-document" },
   "animation/clock": { deferred: "animation-plugin" },
   "style/blur": { regionEffect: true },

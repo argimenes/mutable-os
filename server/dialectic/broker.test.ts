@@ -61,6 +61,15 @@ it.each(['json','budget'])('does not grant source tools during %s repair',async 
  const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai','invalid'))).mockResolvedValueOnce(sse(streamFixture('openai','',{id:'read',name:'read_source',arguments:{handle:'s'}})));
  const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});const id=(await(await f.call('/exchange',{request:req})).json()).id;await(await f.call('/exchange/'+id+'/turn',{round:0})).text();const result=await(await f.call('/exchange/'+id+'/turn',{round:1,repair:true,diagnostic:{code}})).text();expect(result).toContain('budget');expect(result).not.toContain('"type":"result"');expect(fetcher).toHaveBeenCalledTimes(2);
 });
+it('does not grant capability discovery during the existing source-only repair',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai','invalid source')))
+  .mockResolvedValueOnce(sse(streamFixture('openai','',{id:'catalogue',name:'describe_capabilities',arguments:{ids:['composition.table']}})));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});
+ const id=(await(await f.call('/exchange',{request:{...req,capabilities:{version:1},legend:{tools:['describe_capabilities']}}})).json()).id;
+ await(await f.call('/exchange/'+id+'/turn',{round:0})).text();
+ const result=await(await f.call('/exchange/'+id+'/turn',{round:1,repair:true,diagnostic:{code:'source-identity'}})).text();
+ expect(result).toContain('budget');expect(result).not.toContain('"type":"result"');expect(fetcher).toHaveBeenCalledTimes(2);
+});
 it('shares the six-call budget across initial work and source recovery',async()=>{
  const initial:any[]=streamFixture('openai','',{id:'old-0',name:'read_source',arguments:{handle:'old'}});
  const template=initial.at(-1).response.output[0];initial.at(-1).response.output=Array.from({length:6},(_,i)=>({...template,call_id:'old-'+i}));

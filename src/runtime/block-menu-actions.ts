@@ -10,6 +10,7 @@ import { backgroundImages, defaultBackgroundUrls, isBackgroundType, mediaUrl, yo
 import { stickyNoteDto } from "./sticky-notes";
 import { exportDocument } from './export-document';
 import { standoffCodeDto } from './standoff-code';
+import {prepareGrid,prepareYouTube} from '../block-tree/native-authoring';
 
 import type { BlockMenuItem } from "./block-menu-types";
 export type { BlockMenuItem } from "./block-menu-types";
@@ -65,7 +66,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
     const visit = (key: NodeKey) => { const current = editor.node(key); if (!current) return; [...current.children].forEach(visit); if (types.includes(current.viewType) && key !== root) unwrap(key); };
     visit(target.key);
   });
-  const grid = (rows: number, columns: number, emptyFirst = false) => dto("grid-block", Array.from({ length: rows }, (_, row) => dto("grid-row-block", Array.from({ length: columns }, (_, column) => dto("grid-cell-block", emptyFirst && !row && !column ? [] : [text()])))));
+  const grid = (rows: number, columns: number, emptyFirst = false) => prepareGrid(Array.from({length:rows},(_,row)=>Array.from({length:columns},(_,column)=>emptyFirst&&!row&&!column?[]:[text()])));
   const convert = (value: ExistingBlockDto, depth: number) => {
     editor.commands.structuralTransaction("Convert Block", () => {
     let target = editor.commands.insert(value, { kind: "before", anchorKey: key });
@@ -76,7 +77,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
   };
   const mediaInput = (label: string, type: string) => input(label, (url) => {
     if (type === "youtube-video-block" ? !youtubeId(url) : !mediaUrl(url)) throw new Error("Enter a valid media URL (YouTube videos also accept a video ID).");
-    add(dto(type, [], { url }));
+    add(type==='youtube-video-block'?prepareYouTube(url):dto(type, [], { url }));
   });
   const historyEntry = editor.features.blockHistory
     ? command("history.open", "History…")

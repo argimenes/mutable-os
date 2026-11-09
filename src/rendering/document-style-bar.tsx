@@ -1,4 +1,5 @@
 import { documentStylePorts } from '../runtime/document-style-ports';
+import {headingProperty} from '../block-tree/native-authoring';
 import {useGlossPresentation} from '../features/gloss/presentation-context';
 import { initialisCommand } from "../features/initialis/controller";
 import { ownSelectionToolbar } from "../input/selection-target";
@@ -168,6 +169,7 @@ export function DocumentStyleBar(props: { editor: ReactiveEditor; scopeKey?: Nod
   const blockStyle = (type: string, value: string) => {
     if (editor.crossText.range()) { editor.crossText.notice("Collapse the text selection before changing paragraph layout."); return; }
     capture(); const node = target(); if (!node) { setNotice("Focus a text Block first."); return; }
+    if(type==='block/font/size'&&/^h[1-6]$/.test(value))value=headingProperty(node.viewType,Number(value.slice(1))).value;
     const current = (node.payload.blockProperties as Record<string, unknown>[] | undefined) ?? [];
     const existing = current.find(p => p.type === type && !p.isDeleted);
     if (existing?.value === value) return;

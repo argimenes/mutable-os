@@ -97,7 +97,7 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    try{
     let emitted=0;const turn=await providerTurn(e.state,e.key,e.abort.signal,text=>{emit({type:'delta',text:text.slice(emitted)});emitted=text.length;},fetcher);
     if(e.abort.signal.aborted)throw Error('Exchange cancelled or timed out.');
-    e.calls+=turn.calls.length;if(e.calls>liveLimits.calls||e.repaired&&turn.calls.length&&(!e.recoverSources||turn.calls.some(c=>!sourceRecoveryTools.includes(c.tool))))throw Error('Provider tool budget exceeded.');
+    e.calls+=turn.calls.length;if(e.calls>liveLimits.calls||e.repaired&&turn.calls.length&&(!e.recoverSources||turn.calls.some(c=>!sourceRecoveryTools.some(tool=>tool===c.tool))))throw Error('Provider tool budget exceeded.');
     await testLog.write('provider.turn',turn);e.pending=turn.calls;e.final=!turn.calls.length;
     if(e.final&&e.manifest&&e.receipt)await continuity!.prepared(e.manifest,e.key,e.receipt.exchangeId,e.repaired);
     emit({type:'result',...turn});res.end();

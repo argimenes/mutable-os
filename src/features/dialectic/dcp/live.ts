@@ -50,7 +50,7 @@ export class DialecticProviderSession {
      if(buffer.trim()||!turn)throw Error('Broker stream interrupted; no contribution committed.');sources.check();
      const attempt:LiveProvenance['attempts'][number]={receipt:turn.receipt,toolCalls:turn.calls,toolResultIds:[]};details.attempts.push(attempt);round++;
      if(turn.calls.length){
-      calls+=turn.calls.length;if(calls>liveLimits.calls||repair&&(!recoverSources||turn.calls.some(c=>!sourceRecoveryTools.includes(c.tool))))throw Error('DCP tool budget exceeded.');const results=[];
+      calls+=turn.calls.length;if(calls>liveLimits.calls||repair&&(!recoverSources||turn.calls.some(c=>!sourceRecoveryTools.some(tool=>tool===c.tool))))throw Error('DCP tool budget exceeded.');const results=[];
       for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`,result=await sources.tool({...call,id:toolId});attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
       next={round,results};continue;
      }

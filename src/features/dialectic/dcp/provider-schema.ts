@@ -1,3 +1,5 @@
+import {headingOperation,gridOperation,youtubeOperation} from '../../../block-tree/native-authoring';
+import {compositionLimits} from './limits';
 import {generatedIdentityPattern,type GeneratedIdentityKind} from './identities';
 // Strict provider schema for the negotiated text-only DCP profile.
 // Native prepare() remains authoritative for capabilities, sizes, ownership and markup.
@@ -8,17 +10,30 @@ export const responseSchema = {"type":"object","properties":{"protocol":{"enum":
 const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group:'b',List:'b',Table:'b',Anchor:'r',Span:'s',LocalEntity:'e',Interpretation:'m',Argument:'arg',Gloss:'g',ArgumentRelation:'rel',EntityRelation:'rel'};
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
-/** Anthropic rejects recursive JSON schemas. Expand references by depth, not by
- * content, keeping the same native 12-level composition boundary. */
-export function schemaFor(provider:'openai'|'anthropic'):any {
- if(provider==='openai')return responseSchema;
- const schema:any=structuredClone(responseSchema),defs=schema.$defs;
- const node=defs.Node,templates={Group:defs.Group,List:defs.List,Table:defs.Table};
- for(let depth=0;depth<=12;depth++){
-  defs['Node'+depth]=depth===12?{$ref:'#/$defs/Paragraph'}:{anyOf:node.anyOf.map((r:any)=>({$ref:r.$ref==='#/$defs/Paragraph'?r.$ref:r.$ref+depth}))};
-  if(depth===12)continue;
+/** Transport projection of shared native operations. The baseline remains unchanged. */
+export function authoringSchema(nativeAuthoring=false):any {
+ if(!nativeAuthoring)return responseSchema;
+ const schema:any=structuredClone(responseSchema),d=schema.$defs;
+ d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
+ d.Grid=structuredClone(d.Table);d.Grid.properties.kind={type:'string',enum:['grid']};
+ d.Grid.properties.rows.maxItems=Math.min(compositionLimits.tableRows,gridOperation.constraints.maxRows);
+ d.Grid.properties.rows.items.maxItems=Math.min(compositionLimits.tableColumns,gridOperation.constraints.maxColumns);
+ d.Grid.properties.rows.items.items.maxItems=Math.min(compositionLimits.cellChildren,gridOperation.constraints.maxCellChildren);
+ d.YouTube={type:'object',properties:{id:d.Paragraph.properties.id,kind:{type:'string',enum:['youtube']},url:youtubeOperation.parameters.url},required:['id','kind','url'],additionalProperties:false};
+ d.Node.anyOf.push(...['Heading','Grid','YouTube'].map(name=>({$ref:'#/$defs/'+name})));
+ return schema;
+}
+/** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring));
+ if(provider==='openai')return nativeAuthoring?schema:responseSchema;
+ const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{})};
+ const leaf=node.anyOf.filter((r:any)=>!Object.hasOwn(templates,r.$ref.replace('#/$defs/','')));
+ for(let depth=0;depth<=compositionLimits.depth;depth++){
+  defs['Node'+depth]=depth===compositionLimits.depth?(nativeAuthoring?{anyOf:leaf}:{$ref:'#/$defs/Paragraph'}):{anyOf:node.anyOf.map((r:any)=>({$ref:Object.hasOwn(templates,r.$ref.replace('#/$defs/',''))?r.$ref+depth:r.$ref}))};
+  if(depth===compositionLimits.depth)continue;
   for(const [name,value]of Object.entries(templates))defs[name+depth]=JSON.parse(JSON.stringify(value).replaceAll('#/$defs/Node','#/$defs/Node'+(depth+1)));
  }
- for(const name of ['Node','Group','List','Table'])delete defs[name];
+ for(const name of ['Node',...Object.keys(templates)])delete defs[name];
  schema.properties.composition.items={$ref:'#/$defs/Node0'};return schema;
 }

@@ -1,4 +1,6 @@
+import {inspectNative} from './inspection';
 import {sourceScope,sourceIdentity} from './identities';
+import {capabilityCatalogue} from './capabilities';
 import {DcpInventory} from './inventory';
 import {waitForQuery} from '../../../application/facts-query-provider';
 import {ScopedEntities} from '../../../application/scoped-entities';
@@ -14,6 +16,7 @@ import type {Resolution} from '../references';
 function* edges(n:BlockNode){yield* n.children;for(const name in n.ownedRelations)yield n.ownedRelations[name];}
 export type SourceStatus='complete'|'truncated'|'missing'|'ambiguous'|'unavailable'|'unauthorized';
 export class DcpSources {
+ readonly capabilities:ReturnType<typeof capabilityCatalogue>|undefined;
  readonly handles=new Map<string,ReplyTarget>();
  private issued=new Map<string,string>();
  private readonly identityScope=sourceScope();
@@ -31,6 +34,7 @@ export class DcpSources {
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
  constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:(fromOrdinal?:number)=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[]){
   this.deadline=Date.now()+Math.min(120000,Math.max(1,deadlineMs));
+  if(editor.features.dcpCapabilityCatalogue)this.capabilities=capabilityCatalogue(editor);
   let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;
   this.entities=new ScopedEntities(editor,rootKey,owner);
   this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key))this.stale=true;});
@@ -95,7 +99,7 @@ export class DcpSources {
     if(ref)a.entityHandle=this.issue({kind:'entity',resourceId:this.owner,entity:ref});
    }
   }
-  const supported=['standoff-editor-block','container-block','table-block','table-row-block','table-cell-block','indented-list-block'].includes(n.viewType);
+  const supported=['standoff-editor-block','container-block','table-block','table-row-block','table-cell-block','indented-list-block',...(this.editor.features.dcpNativeAuthoringStage1?['grid-block','grid-row-block','grid-cell-block','tab-row-block','tab-block','document-tab-row-block','document-tab-block','surface-block','side-block','youtube-video-block']:[])].includes(n.viewType);
   return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,semanticReferences:semanticReferences.slice(0,32),omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
  }
  /** Prepared once on explicit Ask. Never subscribed to typing or whole-history enumeration. */
@@ -123,11 +127,13 @@ export class DcpSources {
  private record(call:any,result:any){const size=JSON.stringify(result).length;if((this.bytes+=size)>48000)throw Error('DCP retrieval result budget exceeded');this.trail.push({call,result});return result;}
  async tool(call:any){
   keys(call,['id','tool','arguments']);if(typeof call.id!=='string'||call.id.length>128||this.callIds.has(call.id))throw Error('Invalid/duplicate tool call');this.callIds.add(call.id);
-  keys(call.arguments,call.tool==='read_source'?['handle']:call.tool==='list_text_blocks'?['cursor','limit','contributionId','participantId','fromOrdinal']:['query','limit']);
+  keys(call.arguments,call.tool==='describe_capabilities'?['ids']:call.tool==='read_source'?['handle']:call.tool==='list_text_blocks'?['cursor','limit','contributionId','participantId','fromOrdinal']:['query','limit']);
   this.check();if(++this.calls>6)throw Error('DCP tool-call budget exceeded');
+  if(call.tool==='describe_capabilities'){if(!this.capabilities)throw Error('Unavailable DCP tool');return this.record(call,this.capabilities.describe(call.arguments));}
   if(call.tool==='list_text_blocks'){this.diagnostics.inventories++;return this.record(call,(this.inventory??=new DcpInventory(this)).list(call.arguments));}
   if(call.tool==='read_source'){
    this.diagnostics.reads++;const result=await this.source(call.arguments.handle);
+   if(this.editor.features.dcpNativeAuthoringStage1&&result.kind&&['block','contribution'].includes(result.kind)&&!['unauthorized','missing','ambiguous'].includes(result.status))result.inspection=await inspectNative(this,result);
    // Never resolve a historical handle implicitly. Offer a small, freshly issued
    // inventory in the same Document so a failed read can recover explicitly.
    if(result.status==='unauthorized'&&result.recovery){this.diagnostics.inventories++;const arguments_={...result.recovery.arguments,limit:5};result.recovery={...result.recovery,arguments:arguments_,inventory:(this.inventory??=new DcpInventory(this)).list(arguments_)};result.reason+=' A fresh bounded inventory is attached under recovery.inventory; select the intended native blockId and call read_source with that new handle.';}

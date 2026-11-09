@@ -117,6 +117,10 @@ export type FeatureFlags = Readonly<{
   dialectic: boolean;
   /** Validated structured mock exchanges; no live provider or Stage 4B authoring. */
   dialecticDcp: boolean;
+  /** Bounded discovery of admitted DCP authoring capabilities. */
+  dcpCapabilityCatalogue: boolean;
+  /** Native heading/grid/media/annotation projections and bounded inspection. */
+  dcpNativeAuthoringStage1: boolean;
   dialecticProviders: boolean;
   dialecticProviderContinuity: boolean;
   /** Temporary local wire/contribution diagnostics; disable after DCP qualification. */
@@ -236,6 +240,8 @@ export const featureFlags: FeatureFlags = Object.freeze({
   thesis: true,
   dialectic: true,
   dialecticDcp: true,
+  dcpCapabilityCatalogue: true,
+  dcpNativeAuthoringStage1: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
   dcpTestPhaseLogging: true,

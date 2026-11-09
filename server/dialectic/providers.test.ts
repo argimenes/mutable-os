@@ -5,6 +5,21 @@ import {schemaFor} from '../../src/features/dialectic/dcp/provider-schema';
 import {plainContribution,sse,streamFixture} from './fixtures';
 import {defaultProviderSettings,type Provider} from '../../src/features/dialectic/dcp/provider-contract';
 const request={exchange:'exchange',protocolKey:{text:'Use DCP; semantic markup is optional.'}};
+it.each(['openai','anthropic'] as Provider[])('%s advertises negotiated catalogue discovery and continues its results',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,capabilities:{version:1,items:[]},legend:{tools:['describe_capabilities']}});
+ const fetcher=vi.fn<typeof fetch>()
+  .mockResolvedValueOnce(sse(streamFixture(provider,'',{id:'catalogue',name:'describe_capabilities',arguments:{ids:['composition.table','semantic.gloss']}})))
+  .mockResolvedValueOnce(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ const signal=new AbortController().signal,turn=await providerTurn(state,'fixture',signal,()=>{},fetcher);
+ expect(turn.calls[0].tool).toBe('describe_capabilities');
+ continuation(state,turn.calls,[{status:'complete',items:[{id:'composition.table',authorable:true}]}]);
+ await providerTurn(state,'fixture',signal,()=>{},fetcher);
+ for(const [,init]of fetcher.mock.calls){const body=JSON.parse(String(init?.body)),tool=body.tools.find((t:any)=>t.name==='describe_capabilities');expect(tool).toBeDefined();expect(tool.parameters??tool.input_schema).toMatchObject({required:['ids'],additionalProperties:false,properties:{ids:{maxItems:4}}});}
+ expect(String(fetcher.mock.calls[1][1]?.body)).toContain('authorable');
+ const disabled=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,'',{id:'unadvertised',name:'describe_capabilities',arguments:{ids:['composition.table']}})));
+ await expect(providerTurn(conversation({...defaultProviderSettings,provider},request),'fixture',signal,()=>{},disabled)).rejects.toThrow('Unadvertised');
+ expect(JSON.parse(String(disabled.mock.calls[0][1]?.body)).tools.map((t:any)=>t.name)).not.toContain('describe_capabilities');
+});
 it.each(['openai','anthropic'] as Provider[])('%s sends strict schemas with every required field defined and every reference resolvable',async provider=>{
  const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
  await providerTurn(conversation({...defaultProviderSettings,provider},request),'fixture-only-key',new AbortController().signal,()=>{},fetcher);
@@ -100,4 +115,16 @@ it.each(['openai','anthropic'] as Provider[])('%s sends source-operation require
  expect(instructions).toContain('Keep source anchor aliases distinct from any aliases on reproduced composition text');
  expect(body.tools.map((tool:any)=>tool.name).sort()).toEqual(['list_text_blocks','read_source','search_symposium']);
  expect(body.max_output_tokens??body.max_tokens).toBe(defaultProviderSettings.maxOutputTokens);
+});
+
+it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 1 schema without changing the disabled contract',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,nativeAuthoring:1});
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),schema=provider==='openai'?body.text.format.schema:body.output_config.format.schema;
+ expect(schema.$defs.Heading.properties.level).toEqual({type:'integer',minimum:1,maximum:6});expect(schema.$defs.YouTube.properties.url.maxLength).toBe(4096);
+ expect(schemaFor(provider).$defs.Heading).toBeUndefined();
+ const refs=new Set<string>();const walk=(value:any)=>{if(!value||typeof value!=='object')return;if(value.$ref)refs.add(value.$ref.slice('#/$defs/'.length));Object.values(value).forEach(walk);};walk(schema);
+ for(const name of refs)expect(schema.$defs[name],name).toBeDefined();
+ if(provider==='anthropic'){expect(schema.$defs.Node).toBeUndefined();expect(schema.$defs.Grid0).toBeDefined();expect(schema.$defs.Node12.anyOf.map((r:any)=>r.$ref)).toEqual(expect.arrayContaining(['#/$defs/Paragraph','#/$defs/Heading','#/$defs/YouTube']));}
 });
