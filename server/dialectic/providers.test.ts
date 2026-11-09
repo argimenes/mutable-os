@@ -175,3 +175,14 @@ it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 2D widgets in
  const independent=schemaFor(provider,true,false,false,false,true);expect(independent.$defs.Timer).toBeDefined();expect(independent.$defs.TextStyle).toBeUndefined();
  const visited=new Set<string>();const walk=(v:any,path=new Set<string>())=>{if(!v||typeof v!=='object')return;if(v.$ref){const name=v.$ref.slice('#/$defs/'.length);expect(schema.$defs[name],name).toBeDefined();if(provider==='anthropic')expect(path.has(name),'recursive '+name).toBe(false);if(!visited.has(name)){visited.add(name);walk(schema.$defs[name],new Set([...path,name]));}return;}if(v.type==='object'){expect(v.additionalProperties).toBe(false);expect(v.required.slice().sort()).toEqual(Object.keys(v.properties).sort());}Object.entries(v).filter(([k])=>k!=='$defs').forEach(([,x])=>walk(x,path));};walk(schema);
 });
+
+
+it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 3A managed binding without native resource identifiers',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,nativeAuthoring:1,textAuthoring:1,layoutAuthoring:1,compoundAuthoring:1,widgetAuthoring:1,managedImageAuthoring:1});
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),schema=provider==='openai'?body.text.format.schema:body.output_config.format.schema;
+ expect(schema.$defs.Image.required).toEqual(['id','kind','source','revision','alt']);expect(schema.$defs.Image.additionalProperties).toBe(false);
+ expect(schemaFor(provider,true,true,true,true,true).$defs.Image).toBeUndefined();expect(schemaFor(provider,false,true,true,true,true,true).$defs.Image).toBeUndefined();
+ const independent=schemaFor(provider,true,false,false,false,false,true);expect(independent.$defs.Image).toBeDefined();expect(independent.$defs.Timer).toBeUndefined();
+ const visited=new Set<string>();const walk=(v:any,path=new Set<string>())=>{if(!v||typeof v!=='object')return;if(v.$ref){const name=v.$ref.slice('#/$defs/'.length);expect(schema.$defs[name],name).toBeDefined();if(provider==='anthropic')expect(path.has(name),'recursive '+name).toBe(false);if(!visited.has(name)){visited.add(name);walk(schema.$defs[name],new Set([...path,name]));}return;}if(v.type==='object'){expect(v.additionalProperties).toBe(false);expect(v.required.slice().sort()).toEqual(Object.keys(v.properties).sort());}Object.entries(v).filter(([k])=>k!=='$defs').forEach(([,x])=>walk(x,path));};walk(schema);
+});

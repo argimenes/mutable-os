@@ -1,7 +1,7 @@
 import {prepareMargin,marginText} from './compound-authoring';
 import { StructuralDraft } from "./structural-draft";
 import { isAutomaticListMetadata, type AutomaticListMetadata } from "./list-wrap-plan";
-import { diffRecordBatch } from "./record-batch";
+import { diffRecordBatch, recordOperations } from "./record-batch";
 import { conversionSource } from '../interchange/conversion';
 import { mapStandoffPropertiesForReplacement, pointAffinity } from '../interchange/ranges';
 import { planFragmentInsertion } from '../interchange/insertion';
@@ -468,7 +468,11 @@ export class TreeCommands {
       copiedDocument.payload.linkedAnnotations={...(copiedDocument.payload.linkedAnnotations as JsonObject??{}),...fragment.linkedAnnotations};
       fragment.linkedAnnotations={};
     }
-    const state = this.current();
+    // Newly prepared fragments without registry merges use the same local
+    // record operations as insert(dto). Keep broader clipboard cases on their
+    // existing path; canonical ownership/admission still checks the full batch.
+    const bounded = !!this.pending?.requireBounded && !replaceKey && !Object.keys(fragment.linkedAnnotations ?? {}).length;
+    const state = this.current(bounded);
     const target = this.resolveInsertion(destination, undefined, state);
     if (Object.keys(fragment.state.contents).some(key => state.contents[key]) || Object.keys(fragment.state.placements).some(key => state.placements[key])) throw new TreeCommandError("Clipboard keys collide with existing Blocks");
     const children = [...target.children];
@@ -499,7 +503,7 @@ export class TreeCommands {
       if (!removed.definitionOwnerKey) changes.contents[removed.key] = null;
     }
     for (const op of extra) if (op.kind === "put-content") changes.contents[op.record.key] = op.record;
-    this.publish(replaceKey ? "Convert source Block to Mutable Ink" : "Paste Blocks", [changes], {
+    this.publish(replaceKey ? "Convert source Block to Mutable Ink" : "Paste Blocks", bounded ? [...recordOperations([changes])] : [changes], {
       commandId: "tree.insertFragment", subjects: fragment.roots.map(key => this.subject(fragment.state, key)),
       ...(fragment.copyIdentities?.length ? { relation: { kind: "copy" as const, pairs: fragment.copyIdentities } } : {}), ...descriptor });
     return [...fragment.roots];

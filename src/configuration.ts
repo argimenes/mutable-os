@@ -128,6 +128,8 @@ export type FeatureFlags = Readonly<{
   /** Native Surface/tab/page/margin projections, within a contribution. Requires Stage 1. */
   dcpNativeAuthoringStage2Compounds: boolean;
   dcpNativeAuthoringStage2Widgets: boolean;
+  /** Existing managed images through current same-Document DCP source authority. */
+  dcpNativeAuthoringStage3ManagedImages: boolean;
   dialecticProviders: boolean;
   dialecticProviderContinuity: boolean;
   /** Temporary local wire/contribution diagnostics; disable after DCP qualification. */
@@ -253,6 +255,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dcpNativeAuthoringStage2Layouts: true,
   dcpNativeAuthoringStage2Compounds: true,
   dcpNativeAuthoringStage2Widgets: true,
+  dcpNativeAuthoringStage3ManagedImages: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
   dcpTestPhaseLogging: true,

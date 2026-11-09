@@ -1,6 +1,6 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, cp, readdir, symlink, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, cp, readdir, symlink, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';import os from 'node:os';import {createHash} from 'node:crypto';import sharp from 'sharp';import express from 'express';
 import { ManagedAssetStore } from './managed-assets.mjs';
 import { validateImportedImage } from './asset-image-validation.mjs';
@@ -76,4 +76,16 @@ test('generic original store admits a 50 MiB PDF without broadening image admiss
  const {store}=await fixture(),lease=await store.begin(),bytes=Buffer.alloc(50*1024*1024,32);bytes.write('%PDF-1.7');
  const m=await store.stage(lease,bytes,{mediaType:'application/pdf'});await store.publish(lease);await store.finish(lease);const loaded=await store.get(m.assetId,'cavern');assert.equal(loaded.bytes.length,bytes.length);assert.equal(createHash('sha256').update(loaded.bytes).digest('hex'),m.assetId.slice(7));
  const imageLease=await store.begin();await assert.rejects(store.stage(imageLease,Buffer.alloc(10*1024*1024+1),{mediaType:'image/png'}),/limit/);await store.abort(imageLease);
+});
+
+
+test('existing binding verification rejects missing and corrupted originals without reacquisition',async()=>{
+ const {root,store}=await fixture(),bytes=await png(),lease=await store.begin(),asset=await store.stage(lease,bytes,await validateImportedImage(bytes));
+ await store.publish(lease);await store.finish(lease);
+ assert.equal((await store.get(asset.assetId,'cavern')).manifest.assetId,asset.assetId);
+ const digest=asset.assetId.slice(7),original=path.join(root,'.mutable/assets/objects',digest.slice(0,2),digest,'original');
+ const damaged=Buffer.from(bytes);damaged[damaged.length-1]^=1;await writeFile(original,damaged);
+ await assert.rejects(store.get(asset.assetId,'cavern'),/integrity|mismatch|corrupt/i);
+ await rm(original);await assert.rejects(store.get(asset.assetId,'cavern'));
+ await assert.rejects(store.get('sha256:'+'f'.repeat(64),'cavern'));
 });

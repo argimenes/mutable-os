@@ -1,3 +1,5 @@
+import {managedAsset} from '../../../interchange/managed-asset';
+import {managedImagesEnabled} from './managed-images';
 import type {DcpSources} from './sources';
 import type {BlockNode} from '../../../block-tree/types';
 import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
@@ -64,6 +66,7 @@ export async function inspectNative(sources:DcpSources,initial:any){
   }
   if(properties.length>limits.properties||marks.length>limits.properties)entry.omissions.push('Property count limit');
   if(node.viewType==='youtube-video-block')entry.resource={kind:'external-reference',...fields(meta,['url']),requiresAcquisition:false};
+  else if(node.viewType==='image-block'&&sources.editor.features.dcpNativeAuthoringStage3ManagedImages)entry.resource={kind:managedAsset(node.payload.asset)?'managed-image':'unmanaged-image',alt:scalar(meta?.alt)??'',binding:managedImagesEnabled(sources.editor)&&!!managedAsset(node.payload.asset)?'requires-active-session-verification':'unavailable',operation:'media.image',requiresAcquisition:false,perception:false};
   else if(/image|video|resource|pdf|iiif|citation|article|player/.test(node.viewType))entry.resource={kind:'native-resource',details:'Requires native resource binding adapter; no trusted capture exported'};
   if(meta)entry.omissions.push('Only selected persistent configuration is projected; internal and unsupported metadata omitted');
   if(entry.kind==='native')entry.omissions.push('Unmapped native kind; original identity and structure retained');

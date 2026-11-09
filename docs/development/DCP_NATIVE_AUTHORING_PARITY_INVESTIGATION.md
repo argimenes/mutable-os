@@ -4,6 +4,14 @@
 
 ## Decision
 
+### Stage 3A implementation update — 9 November 2026
+
+Stage 3 planning is accepted. Existing managed images can now be bound through current same-Document source authority, shared native image preparation and bounded canonical fragment admission. See [Stage 3A qualification](DCP_NATIVE_AUTHORING_STAGE3A_QUALIFICATION.md) for the new `image` construct, resource/authority limits, diagnostic evidence and deterministic qualification. This does not imply external-reference, acquisition or cloning parity. Stage 3B has not begun; the historical inventory below remains the baseline.
+
+### Stage 2 acceptance and Stage 3 planning — 9 November 2026
+
+Stage 2A–2D is accepted and complete as planned. [Stage 3 plan](DCP_NATIVE_AUTHORING_STAGE3_PLAN.md) investigates native resource binding, external references, retained captures, copying and acquisition in small reviewable increments. It preserves purpose-driven projections and shared native services; the original generic-operation proposal below remains superseded. No Stage 3 implementation has begun. The live exercise partially succeeded (native structures and source anchor; requested source highlight absent), and 56 deterministic resource/clipboard/persistence tests passed. Remaining canonical-audit gaps are carried forward.
+
 ### Stage 2D implementation update — 9 November 2026
 
 Stage 2C is accepted. Shared native preparations now expose sticky notes, timers, the supported coffee-cup 3D object and the existing Canvas demonstration preview. Submitted timer operations and 3D viewing use local state in their native views; authored configuration stays protected. See [Stage 2D qualification](DCP_NATIVE_AUTHORING_STAGE2D_QUALIFICATION.md) for operation coverage, tests and remaining host-context/canonical-audit gaps. Stage 3 has not begun. The original inventory remains the audit baseline.

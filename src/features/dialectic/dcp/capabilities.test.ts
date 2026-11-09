@@ -5,6 +5,16 @@ import {compositionLimits,capabilityLimits} from './limits';
 import {registerDcpTypes} from './markup';
 import {VisualEffectRegistry} from '../../../runtime/visual-effect-registry';
 import {featureFlags} from '../../../configuration';
+it('advertises bounded Stage 3A binding independently of resource possession, with no acquisition route',()=>{
+ const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage3ManagedImages:true,managedAssetClipboard:true});
+ const catalogue=capabilityCatalogue(editor),detail=catalogue.describe({ids:['media.image']});
+ expect(detail.status).toBe('complete');expect(detail.items[0]).toMatchObject({authorable:true,availability:{resources:'existing-managed-resource',resourceReadiness:'input-required'}});
+ expect((detail.parameters.$defs.Image as any).required).toEqual(['id','kind','source','revision','alt']);
+ expect(JSON.stringify(detail)).not.toContain('assetId');expect(JSON.stringify(detail)).not.toContain('cavernId');
+ for(const item of catalogue.summary.items)expect(new TextEncoder().encode(JSON.stringify(catalogue.describe({ids:[item.id]}))).length).toBeLessThanOrEqual(capabilityLimits.bytes);
+ editor.features.managedAssetClipboard=false;expect(capabilityCatalogue(editor).describe({ids:['media.image']}).items[0].authorable).toBe(false);
+ editor.features.managedAssetClipboard=true;editor.features.dcpNativeAuthoringStage3ManagedImages=false;expect(capabilityCatalogue(editor).describe({ids:['media.image']}).items[0].authorable).toBe(false);
+});
 
 function fixture(semantics=true,missing=''){
  const visualEffects=new VisualEffectRegistry();registerDcpTypes(visualEffects,semantics);

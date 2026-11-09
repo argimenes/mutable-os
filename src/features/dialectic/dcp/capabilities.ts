@@ -1,3 +1,4 @@
+import {imageBindingLimits} from './managed-images';
 import {compoundOperations} from '../../../block-tree/compound-authoring';
 import {listOperation,layoutOperation} from '../../../block-tree/layout-authoring';
 import {withTextStyleDefaults,withCompoundDefaults} from './authoring';
@@ -10,11 +11,11 @@ import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
 import {capabilityLimits,compositionLimits} from './limits';
 import {classifications,legend} from './markup';
 
-type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source'|'ListConfiguration'|'TableConfiguration'|'Surface'|'Tabs'|'Pages'|'StickyNote'|'Timer'|'Object3D'|'CanvasPreview';
+type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source'|'ListConfiguration'|'TableConfiguration'|'Surface'|'Tabs'|'Pages'|'StickyNote'|'Timer'|'Object3D'|'CanvasPreview'|'Image';
 interface Adapter {
- id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'|'taskLists'|'reversibleBlocks'|'timer'|'threeDObjects'; annotationRenderer?:string; presentationOnly?:boolean;
+ id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'|'taskLists'|'reversibleBlocks'|'timer'|'threeDObjects'|'managedAssetClipboard'; annotationRenderer?:string; presentationOnly?:boolean;
  constraints?:Record<string,unknown>; guidance:string; example?:unknown;
- resources?:'asset-acquisition-unavailable'|'validated-external-reference';
+ resources?:'asset-acquisition-unavailable'|'validated-external-reference'|'existing-managed-resource';
  nativeOperation?:string;nativeEffects?:readonly string[];parameters?:Record<string,unknown>;prerequisites?:readonly string[];
 }
 const text=['standoff-editor-block'];
@@ -49,6 +50,7 @@ export const capabilityInstructions='CAPABILITY DISCOVERY: capabilities is the c
  * repository subscription, typing hook or provider-model capability inference. */
 export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'features'|'visualEffects'>){
  const stage1=editor.features.dcpNativeAuthoringStage1===true;
+ const managedImageAuthoring=stage1&&editor.features.dcpNativeAuthoringStage3ManagedImages===true;
  const widgetAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Widgets===true;
  const compoundAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Compounds===true;
  const layoutAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Layouts===true;
@@ -79,6 +81,10 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   projected.push({id:'configuration.margins',name:'Marginal content',purpose:compoundOperations.margins.purpose,schema:'Paragraph',read:'native-owned-relations',nativeTypes:['left-margin-block','right-margin-block',...text],nativeEffects:compoundOperations.margins.nativeEffects,nativeOperation:'attachMargins / prepareMargin / marginText',guidance:'Paragraph/heading margins:null or {left:[nodes],right:[nodes]}. Uses named owned relations, not children. No nested marginal relations or pages in margins. Existing source content is not edited.'});
   for(const a of projected)if(a.example)a.example=withCompoundDefaults(a.example);
  }
+ if(managedImageAuthoring){
+  const image=projected.find(a=>a.id==='media.image')!;
+  Object.assign(image,{schema:'Image',feature:'managedAssetClipboard',read:'bounded-native-inspection',resources:'existing-managed-resource',nativeOperation:'ManagedAssets.verifiedImage / managedImageBlock',prerequisites:['Current read image Block handle and revision in this Document','Managed PNG/JPEG original in the active Cavern session'],constraints:imageBindingLimits,guidance:'Bind an existing managed image with {id,kind:image,source,revision,alt}. Discover source children and read the image Block. Host verifies integrity/session; no image perception, resource IDs, URLs, acquisition or cloning. Resource readiness is checked at admission, not assumed from inspection.'});
+ }
  if(widgetAuthoring)projected.push(
   {id:'composition.sticky-note',name:'Sticky note',purpose:'Compose a native yellow paper note with owned content and optional dimensions.',nativeTypes:['sticky-note-block',...text],schema:'StickyNote',nativeOperation:'prepareStickyNote / noteDimensions',read:'bounded-native-inspection',guidance:'Inline note, not a floating workspace window. size:null uses 280×280; explicit size minimum 200×160. Fixed yellow paper/scroll appearance. Submitted content and resizing protected; scrolling remains local.'},
   {id:'widget.timer',name:'Timer',purpose:'Provide a native countdown with an authored duration and local submitted controls.',nativeTypes:['timer-block'],schema:'Timer',nativeOperation:'timerBlockDto / timerDuration / timerDimensions',feature:'timer',read:'bounded-native-inspection',guidance:'Initial idle state, 1–86400 whole seconds. Native floating presentation; no host-window authority or geometry-derived placement. Submitted Start/Pause/Reset remain local to the mounted occurrence and reset on remount; duration, size and deletion protected.'},
@@ -92,7 +98,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   const registered=a.id!=='source.classification'||classifications.some(type=>semanticTypes.some(t=>t.type===type));
   const authorable=constructor&&renderer&&enabled&&registered;
   return {...a,...(stage1?{reading:{available:!['not-a-source','unavailable'].includes(a.read),mode:'bounded-native-inspection'},capabilityState:a.inspectionOnly?'readable':authorable?(a.prerequisites?'authorable-with-prerequisites':'authorable'):!enabled?'disabled':'unsupported-through-dcp',context:'Committed Document sources / new contribution; no retroactive text editing'}:{}),status:a.inspectionOnly?'readable':authorable?'authorable':a.presentationOnly?'presentation-only':'unavailable',authorable,
-   availability:{representation:true,renderer:a.presentationOnly?'host-controlled':renderer,constructor,providerAdapter:constructor,resources:a.resources??'none-required',enabled,semanticRegistration:registered,...(stage1&&a.resources==='validated-external-reference'?{resourceReadiness:'input-required'}:{})},
+   availability:{representation:true,renderer:a.presentationOnly?'host-controlled':renderer,constructor,providerAdapter:constructor,resources:a.resources??'none-required',enabled,semanticRegistration:registered,...(stage1&&['validated-external-reference','existing-managed-resource'].includes(a.resources??'')?{resourceReadiness:'input-required'}:{})},
    ...(!authorable&&!a.inspectionOnly?{reason:a.presentationOnly?'Host presentation, not an authored Document object':!constructor?'No admitted DCP authoring path':!enabled?'Required DCP profile/feature disabled':!renderer?'Required native renderer unavailable':'Required semantic registration unavailable'}:{}),
    ...(a.schema?{schemaRef:'#/$defs/'+a.schema}:{}),
    ...(a.id==='composition.paragraph'?{annotationLegend:'request.legend.types'}:{}),
@@ -100,12 +106,12 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   };
  });
  const summary={version:1,detailTool:'describe_capabilities',items:items.map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
- const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring).$defs as Record<string,unknown>;
+ const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring).$defs as Record<string,unknown>;
  function parameters(names:Definition[]){
   const defs:Record<string,unknown>={},externalDefinitions:Record<string,unknown>={};
   const add=(name:string)=>{
-   if((compoundAuthoring||widgetAuthoring)&&name==='Node'){
-    externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>(a.id.startsWith('composition.')||a.id.startsWith('widget.'))&&a.schema&&a.id!=='composition.tasks').map(a=>a.id)};return;
+   if((compoundAuthoring||widgetAuthoring||managedImageAuthoring)&&name==='Node'){
+    externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>(a.id.startsWith('composition.')||a.id.startsWith('widget.')||a.id==='media.image')&&a.schema&&a.id!=='composition.tasks').map(a=>a.id)};return;
    }
    if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);
   };

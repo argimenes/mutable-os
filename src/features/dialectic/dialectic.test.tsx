@@ -1,3 +1,4 @@
+import {managedImageBlock} from '../../interchange/resource-url';
 import {timerBlockDto} from '../timer/model';
 import {objectDto} from '../three-d-object/model';
 import {prepareStickyNote} from '../../block-tree/note-authoring';
@@ -33,10 +34,10 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true,compoundAuthoring=false,compoundFeatures=true,widgetAuthoring=false,widgetFeatures=true){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true,compoundAuthoring=false,compoundFeatures=true,widgetAuthoring=false,widgetFeatures=true,managedImageAuthoring=false){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
  if(widgetAuthoring){vi.stubGlobal('ResizeObserver',class{observe(){}disconnect(){}});vi.stubGlobal('IntersectionObserver',class{observe(){}disconnect(){}});vi.stubGlobal('matchMedia',()=>({matches:false,addEventListener(){},removeEventListener(){}}));}
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage2Widgets:widgetAuthoring,timer:widgetFeatures,threeDObjects:widgetFeatures,dcpNativeAuthoringStage2Compounds:compoundAuthoring,reversibleBlocks:compoundFeatures,verticalTabs:compoundFeatures,taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage3ManagedImages:managedImageAuthoring,dcpNativeAuthoringStage2Widgets:widgetAuthoring,timer:widgetFeatures,threeDObjects:widgetFeatures,dcpNativeAuthoringStage2Compounds:compoundAuthoring,reversibleBlocks:compoundFeatures,verticalTabs:compoundFeatures,taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -1174,6 +1175,79 @@ it('retains prior native authoring families inside Stage 2C compounds',async()=>
 });
 
 const widgetFixture=(native=true,widgets=true,features=true)=>setup(true,true,true,true,true,false,true,native,true,true,true,true,true,true,widgets,features);
+const imageReference={kind:'managed' as const,cavernId:'image-cavern',assetId:'sha256:'+'a'.repeat(64)};
+const imageManifest={...imageReference,mediaType:'image/png',byteLength:100,width:3,height:2};
+async function imageFixture(enabled=true,sourceAsset:unknown=imageReference){
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true,true,true,true,false,true,enabled),c=f.c!,e=f.editor;
+ e.setAssetContext(()=>({cavernId:imageReference.cavernId,session:'image-session'}));
+ // Runtime URL rendering is independently qualified by managed-assets.test.
+ vi.spyOn(e.assets,'bind').mockImplementation(()=>()=>{});
+ const verify=vi.mocked(fetch);verify.mockImplementation(async()=>new Response(JSON.stringify({Success:true,Data:imageManifest})));
+ f.type!('Image source with green patina');
+ const prepared=managedImageBlock(imageManifest,'Original image').native;Object.values(prepared.state.contents)[0].payload.asset=sourceAsset;
+ e.commands.insertFragment(prepared,{kind:'at',parentKey:c.resolve(c.target(c.draft()!.id))!.key,index:1});c.submit();
+ const sourceId=c.frontier()!.id;
+ const read=async(sources:any)=>{
+  const parent=await sources.tool({id:'image-parent',tool:'read_source',arguments:{handle:sources.issue(c.target(sourceId))}});
+  return sources.tool({id:'image-source',tool:'read_source',arguments:{handle:parent.children[1]}});
+ };
+ verify.mockClear();return {...f,read,verify,sourceId};
+}
+const imageNode=(source:any,id='new:b1')=>({id,kind:'image',source:source.handle,revision:source.revision,alt:'Green patina'});
+it('qualifies Stage 3A nested managed binding, native equivalence, immutable sources, history, persistence and bounded typing',async()=>{
+ const f=await imageFixture(),c=f.c!,e=f.editor,snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ const native=nativeDocumentSession(e);(native as any).bind(c.resourceId(),{folder:'isolated',filename:'stage3a.ink'},{nativeHash:'initial',markdownHash:null,generation:null});snapshot.mockClear();build.mockClear();
+ await c.askMock(async(req,sources)=>{
+  expect(req.managedImageAuthoring).toBe(1);expect(req.legend.blocks).toContain('image');expect(req.protocolKey.text).not.toContain(' or assets.');expect(req.legend.deferred).toContain('asset-acquisition');
+  const source=await f.read(sources);expect(source.status).toBe('complete');expect(source.inspection.root.resource).toMatchObject({kind:'managed-image',binding:'requires-active-session-verification',perception:false});
+  const wire=JSON.stringify(source);expect(wire).not.toContain(imageReference.assetId);expect(wire).not.toContain(imageReference.cavernId);
+  return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b10',kind:'tabs',orientation:'horizontal',tabs:[{label:'Evidence',content:[imageNode(source)]}]},{id:'new:b11',kind:'paragraph',markup:'Commentary',ranges:[],margins:{left:[imageNode(source,'new:b2')],right:[]}}]});
+ });expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const state=e.repository.readState(),images=Object.values(state.contents).filter(n=>n.viewType==='image-block');expect(images).toHaveLength(3);
+ const original=images.find(n=>(n.payload.metadata as any).alt==='Original image')!,copies=images.filter(n=>n!==original);
+ const human=managedImageBlock(imageManifest,'Green patina').native;const expected=Object.values(human.state.contents)[0];
+ for(const copy of copies){expect({...copy.payload,id:undefined}).toEqual({...expected.payload,id:undefined});expect(copy.payload.id).not.toBe(original.payload.id);expect(resourceIdentity.resourceOwner(state,copy.key)?.key).toBe(c.root()!.contentKey);}
+ expect(f.verify).toHaveBeenCalledTimes(1);expect(f.verify.mock.calls[0][0]).toBe('/api/assets/verify');expect(native.isDirty(c.resourceId())).toBe(true);expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const generated=c.resolve(c.target(c.frontier()!.id))!,paragraph=c.session()!.projection.node(generated.children[1])!;expect(paragraph.ownedRelations.leftMargin).toBeDefined();
+ expect(()=>e.commands.setPayloadField(c.session()!.projection.node(c.session()!.projection.node(generated.children[0])!.children[0])!.children[0],'asset',null)).toThrow(/protected/);
+ e.repository.undo();expect(c.committed()).toHaveLength(1);expect(Object.values(e.repository.readState().contents).filter(n=>n.viewType==='image-block')).toHaveLength(1);e.repository.redo();expect(c.committed()).toHaveLength(2);
+ const saved=captureNative(e.repository.readState(),c.resourceId()),loaded=new ReactiveEditor({id:'image-bank',type:'workspace-object-bank-block',children:[]});cleanup.push(()=>loaded.dispose());const bank=loaded.repository.readState();admitNative(loaded.repository,nativeBytes(saved),bank.placements[bank.rootPlacementKey].contentKey);expect(nativeText(captureNative(loaded.repository.readState(),c.resourceId()))).toBe(nativeText(saved));
+ const reads={...c.dcpDiagnostics},requests=f.verify.mock.calls.length;snapshot.mockClear();build.mockClear();f.type!('Typing remains local');expect(c.dcpDiagnostics).toEqual(reads);expect(f.verify).toHaveBeenCalledTimes(requests);expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});
+it('rejects Stage 3A forged authority, extra metadata, resource and descendant bounds before verification',async()=>{
+ const f=await imageFixture(),c=f.c!,e=f.editor,revision=e.repository.state.revision;
+ for(const variant of ['forged','stale-revision','foreign','asset-id','alt','bindings','descendants']){
+  await c.askMock(async(req,sources)=>{const source=await f.read(sources),node:any=imageNode(source);let composition:any[]=[node];
+   if(variant==='forged')node.source='src:invented:b1';if(variant==='stale-revision')node.revision='old';
+   if(variant==='foreign')node.source=sources.issue({kind:'block',resourceId:'foreign-document',blockId:'other'});
+   if(variant==='asset-id')node.assetId=imageReference.assetId;if(variant==='alt')node.alt='x'.repeat(1025);
+   if(variant==='bindings')composition=Array.from({length:9},(_,i)=>imageNode(source,'new:b'+i));
+   if(variant==='descendants')composition=[node,...Array.from({length:4},(_,i)=>({id:'new:b'+(i+10),kind:'group',children:Array.from({length:64},(_,j)=>({id:'new:b'+(100+i*64+j),kind:'paragraph',markup:'x',ranges:[]}))}))];
+   return JSON.stringify({...dcpResponse(req.exchange),composition});
+  });expect(c.notice(),variant).not.toBe('');expect(e.repository.state.revision,variant).toBe(revision);
+ }expect(f.verify).not.toHaveBeenCalled();
+});
+it('rejects Stage 3A expired exchange handles, failed verification and session changes without admission',async()=>{
+ const f=await imageFixture(),c=f.c!,e=f.editor;let expired:any;
+ await c.askMock(async(req,sources)=>{expired=imageNode(await f.read(sources));return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toBe('');
+ const revision=e.repository.state.revision;
+ await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[expired]}));expect(c.notice()).toMatch(/current image source/);expect(e.repository.state.revision).toBe(revision);
+ for(const error of ['Missing original','Corrupt original']){
+  f.verify.mockImplementation(async()=>new Response(JSON.stringify({Success:false,Error:error}),{status:400}));
+  await c.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await f.read(sources))]}));expect(c.notice()).toContain(error);expect(e.repository.state.revision).toBe(revision);
+ }
+ f.verify.mockImplementation(async()=>({ok:true,json:async()=>{e.setAssetContext(()=>({cavernId:imageReference.cavernId,session:'changed'}));return {Success:true,Data:imageManifest};}} as Response));
+ await c.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await f.read(sources))]}));expect(c.notice()).toMatch(/session/);expect(e.repository.state.revision).toBe(revision);
+});
+it('rolls back Stage 3A mixed fragments and source annotations together after insertion fails',async()=>{
+ const f=await imageFixture(),c=f.c!,e=f.editor,revision=e.repository.state.revision,before=nativeText(captureNative(e.repository.readState(),c.resourceId()));
+ const insert=e.commands.insertFragment.bind(e.commands);vi.spyOn(e.commands,'insertFragment').mockImplementation((...args)=>{insert(...args);throw Error('Injected fragment admission failure');});
+ await c.askMock(async(req,sources)=>{const image=await f.read(sources),parent=await sources.source(sources.issue(c.target(f.sourceId))),text=await sources.source(parent.children[0]);return JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(image)],anchors:[{id:'new:r1',source:text.handle,revision:text.revision,selector:{exact:'green patina',prefix:'',suffix:''}}],interpretations:[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}]});});
+ expect(c.notice()).toContain('Injected fragment admission failure');expect(c.committed()).toHaveLength(1);expect(e.repository.state.revision).toBe(revision);expect(nativeText(captureNative(e.repository.readState(),c.resourceId()))).toBe(before);
+});
+it('keeps Stage 3A disabled mode',async()=>{
+ const off=await imageFixture(false);await off.c!.askMock(async(req,sources)=>{expect(req.managedImageAuthoring).toBeUndefined();return JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await off.read(sources))]});});expect(off.c!.notice()).toContain('Unsupported DCP Block');expect(off.verify).not.toHaveBeenCalled();
+});
 it('qualifies Stage 2D native widgets, ownership, protected operations, inspection and persistence',async()=>{
  const f=await widgetFixture(),c=f.c!,e=f.editor;f.type!('Native notes and widgets');c.submit();
  const p={id:'new:b2',kind:'paragraph',markup:'Note with emphasis',ranges:[],textStyle:null,margins:null};
@@ -1219,4 +1293,18 @@ it('gates Stage 2D widgets and bounds generated note descendants',async()=>{
  }
  const f=await widgetFixture(),c=f.c!,e=f.editor;f.type!('Bounds');c.submit();const revision=e.repository.state.revision;
  await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:Array.from({length:4},(_,i)=>({id:'new:b'+(i*65+1),kind:'sticky-note',size:null,content:Array.from({length:64},(_,j)=>({id:'new:b'+(i*65+j+2),kind:'timer',durationSeconds:1,size:null}))}))}));expect(c.notice()).toContain('native Block budget');expect(e.repository.state.revision).toBe(revision);
+});
+
+
+it('rejects Stage 3A nonmanaged and foreign originals, changed sources and late session changes',async()=>{
+ for(const asset of [null,{...imageReference,assetId:'forged'},{...imageReference,cavernId:'foreign'}]){
+  const f=await imageFixture(true,asset),c=f.c!,revision=f.editor.repository.state.revision;
+  await c.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await f.read(sources))]}));expect(c.notice()).not.toBe('');expect(f.editor.repository.state.revision).toBe(revision);expect(f.verify).not.toHaveBeenCalled();
+ }
+ const stale=await imageFixture(),c=stale.c!,e=stale.editor;
+ stale.verify.mockImplementation(async()=>{e.repository.undo();return new Response(JSON.stringify({Success:true,Data:imageManifest}));});
+ await c.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await stale.read(sources))]}));expect(c.notice()).toMatch(/changed/);expect(c.committed()).toHaveLength(0);
+ const late=await imageFixture(),d=late.c!,editor=late.editor,revision=editor.repository.state.revision,transaction=editor.commands.boundedStructuralTransaction.bind(editor.commands);
+ vi.spyOn(editor.commands,'boundedStructuralTransaction').mockImplementation((label,operation)=>{editor.setAssetContext(()=>({cavernId:imageReference.cavernId,session:'late-switch'}));return transaction(label,operation);});
+ await d.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await late.read(sources))]}));expect(d.notice()).toMatch(/session/);expect(editor.repository.state.revision).toBe(revision);
 });
