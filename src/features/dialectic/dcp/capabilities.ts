@@ -1,5 +1,6 @@
+import {compoundOperations} from '../../../block-tree/compound-authoring';
 import {listOperation,layoutOperation} from '../../../block-tree/layout-authoring';
-import {withTextStyleDefaults} from './authoring';
+import {withTextStyleDefaults,withCompoundDefaults} from './authoring';
 import {codeOperation} from '../../../block-tree/literal-authoring';
 import {sourceOperation} from '../../../interchange/source-block';
 import type {ReactiveEditor} from '../../../reactive-editor/editor';
@@ -9,9 +10,9 @@ import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
 import {capabilityLimits,compositionLimits} from './limits';
 import {classifications,legend} from './markup';
 
-type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source'|'ListConfiguration'|'TableConfiguration';
+type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source'|'ListConfiguration'|'TableConfiguration'|'Surface'|'Tabs'|'Pages';
 interface Adapter {
- id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'|'taskLists'; annotationRenderer?:string; presentationOnly?:boolean;
+ id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'|'taskLists'|'reversibleBlocks'; annotationRenderer?:string; presentationOnly?:boolean;
  constraints?:Record<string,unknown>; guidance:string; example?:unknown;
  resources?:'asset-acquisition-unavailable'|'validated-external-reference';
  nativeOperation?:string;nativeEffects?:readonly string[];parameters?:Record<string,unknown>;prerequisites?:readonly string[];
@@ -48,6 +49,7 @@ export const capabilityInstructions='CAPABILITY DISCOVERY: capabilities is the c
  * repository subscription, typing hook or provider-model capability inference. */
 export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'features'|'visualEffects'>){
  const stage1=editor.features.dcpNativeAuthoringStage1===true;
+ const compoundAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Compounds===true;
  const layoutAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Layouts===true;
  const textAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Text===true;
  const semanticTypes=legend(editor.visualEffects,stage1,textAuthoring);
@@ -71,6 +73,11 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   projected.push({id:'composition.tasks',name:'Task lists',purpose:'Author checkable items with protected initial completion state.',read:'native-task-state',nativeTypes:['indented-list-block','container-block',...text],schema:'List',feature:'taskLists',nativeOperation:'prepareList / taskChecked',nativeEffects:['checked'],guidance:'style:task defaults to unchecked; configuration.items specifies initial checked values. Also supported in ordered/bullet lists. Draft controls remain interactive; submitted authored state is protected.'});
   for(const a of projected)if(a.example)a.example=layoutExample(textAuthoring?withTextStyleDefaults(a.example):a.example);
  }
+ if(compoundAuthoring){
+  for(const [kind,schema] of [['surface','Surface'],['tabs','Tabs'],['pages','Pages']] as const){const operation=compoundOperations[kind];projected.push({id:'composition.'+kind,name:schema,purpose:operation.purpose,schema,read:'bounded-native-inspection',nativeTypes:[...operation.nativeEffects],nativeEffects:operation.nativeEffects,nativeOperation:kind==='surface'?'prepareSurface / surfaceSide':'prepareTabs / tabPanel / preparePage',...(kind==='surface'?{feature:'reversibleBlocks' as const}:{constraints:{verticalOrientation:{feature:'verticalTabs',enabled:editor.features.verticalTabs===true},...(kind==='pages'?{placement:'top-level-contribution'}:{})}}),guidance:kind==='surface'?'Front/back content; host-owned Sides. Flipping is transient navigation, not a content edit.':'Labels and orientation are authored; visible-panel navigation is transient. Vertical orientation requires native verticalTabs. Pages require top-level contribution placement; no host authority.'});}
+  projected.push({id:'configuration.margins',name:'Marginal content',purpose:compoundOperations.margins.purpose,schema:'Paragraph',read:'native-owned-relations',nativeTypes:['left-margin-block','right-margin-block',...text],nativeEffects:compoundOperations.margins.nativeEffects,nativeOperation:'attachMargins / prepareMargin / marginText',guidance:'Paragraph/heading margins:null or {left:[nodes],right:[nodes]}. Uses named owned relations, not children. No nested marginal relations or pages in margins. Existing source content is not edited.'});
+  for(const a of projected)if(a.example)a.example=withCompoundDefaults(a.example);
+ }
  const items=projected.map(a=>{
   const renderer=a.nativeTypes.every(type=>!!editor.registry.resolve(type)?.view)&&(!a.annotationRenderer||!!editor.visualEffects.type(a.annotationRenderer)?.renderers.length);
   const enabled=editor.features.dialecticDcp&&(!a.semantic||editor.features.scopedSemantics)&&(!a.feature||editor.features[a.feature]);
@@ -86,12 +93,17 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   };
  });
  const summary={version:1,detailTool:'describe_capabilities',items:items.map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
- const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring).$defs as Record<string,unknown>;
+ const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring).$defs as Record<string,unknown>;
  function parameters(names:Definition[]){
-  const defs:Record<string,unknown>={};
-  const add=(name:string)=>{if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);};
+  const defs:Record<string,unknown>={},externalDefinitions:Record<string,unknown>={};
+  const add=(name:string)=>{
+   if(compoundAuthoring&&name==='Node'){
+    externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>a.id.startsWith('composition.')&&a.schema&&a.id!=='composition.tasks').map(a=>a.id)};return;
+   }
+   if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);
+  };
   const walk=(value:any)=>{if(!value||typeof value!=='object')return;if(value.$ref)add(value.$ref.replace('#/$defs/',''));for(const child of Object.values(value))walk(child);};
-  names.forEach(add);return {$defs:defs};
+  names.forEach(add);return {$defs:defs,...(Object.keys(externalDefinitions).length?{externalDefinitions}:{})};
  }
  function describe(args:Record<string,unknown>){
   const ids=args?.ids;

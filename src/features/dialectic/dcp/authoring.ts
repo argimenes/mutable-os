@@ -44,3 +44,10 @@ export function withTextStyleDefaults(value:any):any {
  if(!value||typeof value!=='object')return value;
  return {...Object.fromEntries(Object.entries(value).map(([key,item])=>[key,withTextStyleDefaults(item)])),...(['paragraph','heading'].includes(value.kind)&&!Object.hasOwn(value,'textStyle')?{textStyle:null}:{})};
 }
+
+/** Add newly negotiated optional fields to illustrative composition examples. */
+export function withCompoundDefaults(value:any):any {
+ if(Array.isArray(value))return value.map(withCompoundDefaults);
+ if(!value||typeof value!=='object')return value;
+ return {...Object.fromEntries(Object.entries(value).map(([k,v])=>[k,withCompoundDefaults(v)])),...(['paragraph','heading'].includes(value.kind)&&!Object.hasOwn(value,'margins')?{margins:null}:{})};
+}

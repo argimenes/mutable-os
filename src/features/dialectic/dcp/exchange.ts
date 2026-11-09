@@ -1,3 +1,4 @@
+import {prepareSurface,prepareTabs,attachMargins} from '../../../block-tree/compound-authoring';
 import {prepareList,prepareLayout} from '../../../block-tree/layout-authoring';
 import {standoffCodeDto,validateLiteralText} from '../../../block-tree/literal-authoring';
 import {sourceBlockDto} from '../../../interchange/source-block';
@@ -5,7 +6,7 @@ import {prepareHeading,prepareGrid,prepareYouTube,prepareTextAppearance} from '.
 import {compositionLimits as limits} from './limits';
 import {capabilityInstructions} from './capabilities';
 import {validateGeneratedIdentity,type GeneratedIdentityKind} from './identities';
-import {nativeAuthoringInstructions,authoringExamples,withTextStyleDefaults} from './authoring';
+import {nativeAuthoringInstructions,authoringExamples,withTextStyleDefaults,withCompoundDefaults} from './authoring';
 import {DcpValidationError,validationDiagnostic} from './diagnostics';
 import {responseIntents} from './provider-contract';
 import {ENTITY_REFERENCE} from '../../../feature-api/scoped-entities';
@@ -37,11 +38,12 @@ export const mockTransport:DcpTransport=async(request,sources,chunk,signal)=>{
  }
  const output=JSON.stringify(response);for(let i=0;i<output.length;i+=160){if(signal.aborted)throw Error('DCP cancelled');chunk(output.slice(0,i+160));await new Promise(r=>setTimeout(r,8));}return output;
 };
-export function request(exchange:string,primaryReply:string,selectedContext:string[],context:any[],registry:VisualEffectRegistry,semantics=false,capabilities?:DcpSources['capabilities'],nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false){layoutAuthoring=nativeAuthoring&&layoutAuthoring;textAuthoring=nativeAuthoring&&textAuthoring;return {...(layoutAuthoring?{layoutAuthoring:1}:{}),...(nativeAuthoring?{nativeAuthoring:1}:{}),...(textAuthoring?{textAuthoring:1}:{}),...(capabilities?{capabilities:capabilities.summary}:{}),protocol:'dcp/1.0',exchange,protocolKey:semantics?{...protocolKey,version:'4b-1',text:protocolKey.text.replace('Stage 4A cannot author arguments, relationships, Entities, Glosses or assets.','Stage 4B admits owned arguments, directed argument and Entity relations, scoped Entities and independent explicit Glosses. No global mutations or assets. from performs relation toward to; depends-on points from dependent to prerequisite.')}:protocolKey,profile:semantics?'4b-1':'4a-1',cadence:'dialogic',primaryReply,selectedContext,context,authoring:{version:1,instructions:nativeAuthoringInstructions+(nativeAuthoring?'\n'+stage1Instructions:'')+(textAuthoring?'\n'+stage2TextInstructions:'')+(layoutAuthoring?'\n'+stage2LayoutInstructions:'')+(capabilities?'\n'+capabilityInstructions:''),examples:textAuthoring?withTextStyleDefaults(semantics?authoringExamples:authoringExamples.slice(0,1)):semantics?authoringExamples:authoringExamples.slice(0,1)},legend:{types:legend(registry,nativeAuthoring,textAuthoring),blocks:['paragraph','group','list','table',...(nativeAuthoring?['heading','grid','youtube']:[]),...(textAuthoring?['code','source']:[])],tools:['read_source','search_symposium','list_text_blocks',...(capabilities?['describe_capabilities']:[])],unknownSemantics:'inert',deferred:semantics?['assets','promotion']:['arguments','relations','entities','glosses','assets']},budgets:{calls:6,sourceCells:12000,searchBlocks:512,searchCharacters:100000,responseBytes:limits.responseBytes,nodes:limits.nodes,depth:limits.depth}};}
+export function request(exchange:string,primaryReply:string,selectedContext:string[],context:any[],registry:VisualEffectRegistry,semantics=false,capabilities?:DcpSources['capabilities'],nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false){compoundAuthoring=nativeAuthoring&&compoundAuthoring;layoutAuthoring=nativeAuthoring&&layoutAuthoring;textAuthoring=nativeAuthoring&&textAuthoring;return {...(compoundAuthoring?{compoundAuthoring:1}:{}),...(layoutAuthoring?{layoutAuthoring:1}:{}),...(nativeAuthoring?{nativeAuthoring:1}:{}),...(textAuthoring?{textAuthoring:1}:{}),...(capabilities?{capabilities:capabilities.summary}:{}),protocol:'dcp/1.0',exchange,protocolKey:semantics?{...protocolKey,version:'4b-1',text:protocolKey.text.replace('Stage 4A cannot author arguments, relationships, Entities, Glosses or assets.','Stage 4B admits owned arguments, directed argument and Entity relations, scoped Entities and independent explicit Glosses. No global mutations or assets. from performs relation toward to; depends-on points from dependent to prerequisite.')}:protocolKey,profile:semantics?'4b-1':'4a-1',cadence:'dialogic',primaryReply,selectedContext,context,authoring:{version:1,instructions:nativeAuthoringInstructions+(nativeAuthoring?'\n'+stage1Instructions:'')+(textAuthoring?'\n'+stage2TextInstructions:'')+(layoutAuthoring?'\n'+stage2LayoutInstructions:'')+(compoundAuthoring?'\n'+stage2CompoundInstructions:'')+(capabilities?'\n'+capabilityInstructions:''),examples:(compoundAuthoring?withCompoundDefaults:(value:any)=>value)(textAuthoring?withTextStyleDefaults(semantics?authoringExamples:authoringExamples.slice(0,1)):semantics?authoringExamples:authoringExamples.slice(0,1))},legend:{types:legend(registry,nativeAuthoring,textAuthoring),blocks:['paragraph','group','list','table',...(nativeAuthoring?['heading','grid','youtube']:[]),...(textAuthoring?['code','source']:[]),...(compoundAuthoring?['surface','tabs','pages']:[])],tools:['read_source','search_symposium','list_text_blocks',...(capabilities?['describe_capabilities']:[])],unknownSemantics:'inert',deferred:semantics?['assets','promotion']:['arguments','relations','entities','glosses','assets']},budgets:{calls:6,sourceCells:12000,searchBlocks:512,searchCharacters:100000,responseBytes:limits.responseBytes,nodes:limits.nodes,depth:limits.depth}};}
 export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock'){
  const nativeAuthoring=sources.editor?.features.dcpNativeAuthoringStage1===true;
  const textAuthoring=nativeAuthoring&&sources.editor?.features.dcpNativeAuthoringStage2Text===true;
  const layoutAuthoring=nativeAuthoring&&sources.editor?.features.dcpNativeAuthoringStage2Layouts===true;
+ const compoundAuthoring=nativeAuthoring&&sources.editor?.features.dcpNativeAuthoringStage2Compounds===true;
  let path='$';try{
  if(typeof raw!=='string'||raw.length>limits.responseBytes||new TextEncoder().encode(raw).length>limits.responseBytes)throw Error('DCP response size exceeded');
  const response=JSON.parse(raw);keys(response,['protocol','kind','exchange','intent','replyTargets','composition','anchors','entities','interpretations','arguments','glosses','relations','suggestions','promotionRecommendations']);
@@ -59,15 +61,36 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
   aliases.set(alias,{kind:'range',resourceId,anchorId:id});ranges.set(alias,range);
   return {id:crypto.randomUUID(),type:RANGE_ANCHOR,annotationId:id,start:range.start,end:range.end-1};
  };
- const build=(node:any,depth=0):ExistingBlockDto=>{
+ const build=(node:any,depth=0,inMargin=false):ExistingBlockDto=>{
   if(depth>limits.depth)throw Error('DCP composition depth exceeded');
   if(!node||typeof node!=='object')throw Error('Invalid composition node');claim(node.id,'b');
   if(node.kind==='paragraph'||nativeAuthoring&&node.kind==='heading'){
-   keys(node,['id','kind','markup','ranges',...(node.kind==='heading'?['level']:[]),...(textAuthoring&&Object.hasOwn(node,'textStyle')?['textStyle']:[])]);const parsed=markup(node.markup,list(node.ranges,128),registry,provenance,claim,semantics?semantic.mark:undefined,nativeAuthoring,textAuthoring);characters+=[...parsed.text].length;if(characters>limits.outputCells)throw Error('DCP output Cell budget');
+   keys(node,['id','kind','markup','ranges',...(node.kind==='heading'?['level']:[]),...(textAuthoring&&Object.hasOwn(node,'textStyle')?['textStyle']:[]),...(compoundAuthoring&&Object.hasOwn(node,'margins')?['margins']:[])]);const parsed=markup(node.markup,list(node.ranges,128),registry,provenance,claim,semantics?semantic.mark:undefined,nativeAuthoring,textAuthoring);characters+=[...parsed.text].length;if(characters>limits.outputCells)throw Error('DCP output Cell budget');
    const block=dto('standoff-editor-block',{text:parsed.text,standoffProperties:parsed.marks}),properties=block.standoffProperties as any[];
    for(const [alias,span]of parsed.anchors)properties.push(anchor(alias,{...span,blockId:String(block.id),text:[...parsed.text].slice(span.start,span.end).join(''),sourceAuthor:actor}));
    const text=node.kind==='heading'?prepareHeading(block,node.level):block;
-   return textAuthoring?prepareTextAppearance(text,node.textStyle,node.kind==='heading'):text;
+   const styled=textAuthoring?prepareTextAppearance(text,node.textStyle,node.kind==='heading'):text;
+   if(compoundAuthoring&&node.margins!=null){
+    if(inMargin)throw Error('Nested marginal relations are not supported');keys(node.margins,['left','right']);
+    const margins=['left','right'].map(side=>list(node.margins[side],limits.groupChildren).map(n=>build(n,depth+1,true)));
+    nodes+=margins.filter(content=>content.length).length;if(nodes>limits.nodes)throw Error('DCP native Block budget exceeded');
+    return attachMargins(styled,margins[0],margins[1]);
+   }
+   return styled;
+  }
+  if(compoundAuthoring&&node.kind==='surface'){
+   keys(node,['id','kind','front','back']);if(!sources.editor.features.reversibleBlocks)throw Error('Native reversible Surfaces disabled');
+   const front=list(node.front,limits.groupChildren),back=list(node.back,limits.groupChildren);if(!front.length||!back.length)throw Error('Surface faces need content');
+   nodes+=4+(front.length>1?1:0);if(nodes>limits.nodes)throw Error('DCP native Block budget exceeded');
+   return prepareSurface(front.map(n=>build(n,depth+1,inMargin)),back.map(n=>build(n,depth+1,inMargin)));
+  }
+  if(compoundAuthoring&&['tabs','pages'].includes(node.kind)){
+   const pages=node.kind==='pages',field=pages?'pages':'tabs';keys(node,['id','kind','orientation',field]);
+   if(pages&&depth!==0)throw Error('Page collections require contribution-level placement');
+   if(node.orientation==='vertical'&&!sources.editor.features.verticalTabs)throw Error('Native vertical tabs disabled');
+   const panels=list(node[field],16);if(!panels.length)throw Error('Empty tabs/pages');
+   nodes+=1+panels.length*(pages?2:1);if(nodes>limits.nodes)throw Error('DCP native Block budget exceeded');
+   return prepareTabs(panels.map(panel=>{keys(panel,['label','content']);const content=list(panel.content,limits.groupChildren);if(!content.length)throw Error('Empty panel content');return {label:panel.label,content:content.map(n=>build(n,depth+1,inMargin))};}),node.orientation,pages);
   }
   if(textAuthoring&&['code','source'].includes(node.kind)){
    const code=node.kind==='code';keys(node,['id','kind','text',code?'language':'format']);validateLiteralText(node.text);
@@ -80,7 +103,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
   if(node.kind==='table'||nativeAuthoring&&node.kind==='grid'){
    keys(node,['id','kind','rows',...(layoutAuthoring&&node.kind==='table'&&Object.hasOwn(node,'configuration')?['configuration']:[])]);
    const rows=list(node.rows,limits.tableRows);if(!rows.length)throw Error('Empty layout');
-   const content=rows.map(row=>{const cells=list(row,limits.tableColumns);if(!cells.length)throw Error('Empty layout row');return cells.map((cell:any)=>{const children=list(cell,limits.cellChildren);if(!children.length)throw Error('Empty cell');return children.map(n=>build(n,depth+1));});});
+   const content=rows.map(row=>{const cells=list(row,limits.tableColumns);if(!cells.length)throw Error('Empty layout row');return cells.map((cell:any)=>{const children=list(cell,limits.cellChildren);if(!children.length)throw Error('Empty cell');return children.map(n=>build(n,depth+1,inMargin));});});
    nodes+=1+content.length+content.reduce((n,row)=>n+row.length,0);if(nodes>limits.nodes)throw Error('DCP native Block budget exceeded');
    return node.kind==='grid'&&!layoutAuthoring?prepareGrid(content):prepareLayout(node.kind,content,node.configuration);
   }
@@ -88,13 +111,13 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
    keys(node,['id','kind','style','items',...(layoutAuthoring&&Object.hasOwn(node,'configuration')?['configuration']:[])]);
    if(!layoutAuthoring&&!['ordered','bullet'].includes(node.style))throw Error('Invalid list style');
    const items=list(node.items,limits.listItems);if(!items.length)throw Error('Empty list');
-   const content=items.map(item=>{const children=list(item,limits.itemChildren);if(!children.length)throw Error('Empty list item');return children.map(n=>build(n,depth+1));});
+   const content=items.map(item=>{const children=list(item,limits.itemChildren);if(!children.length)throw Error('Empty list item');return children.map(n=>build(n,depth+1,inMargin));});
    nodes+=1+items.length;if(nodes>limits.nodes)throw Error('DCP native Block budget exceeded');
    const result=prepareList(content,node.style,node.configuration);
    if(result.children?.some(n=>typeof n.checked==='boolean')&&!sources.editor?.features.taskLists)throw Error('Native task lists disabled');
    return result;
   }
-  if(node.kind==='group'){keys(node,['id','kind','children']);const children=list(node.children,limits.groupChildren);if(!children.length)throw Error('Empty group');return dto('container-block',{children:children.map(n=>build(n,depth+1))});}
+  if(node.kind==='group'){keys(node,['id','kind','children']);const children=list(node.children,limits.groupChildren);if(!children.length)throw Error('Empty group');return dto('container-block',{children:children.map(n=>build(n,depth+1,inMargin))});}
   throw Error('Unsupported DCP Block capability');
  };
  const composition=list(response.composition,limits.roots);if(!composition.length)throw Error('Empty contribution');const children=composition.map((n,i)=>{path='$.composition['+i+']';return build(n);});
@@ -152,3 +175,8 @@ The new core formatting types in legend.types share the existing inline/range/in
 export const stage2LayoutInstructions=`NATIVE LISTS AND LAYOUTS — STAGE 2B
 Keep list.items and table/grid.rows as arrays of child content arrays; the host creates owned item/row/cell shells. Lists add style:'task' for unchecked-by-default tasks. List configuration is null or {start:null|safeInteger,reversed:boolean,items:null|[{value:null|safeInteger,checked:null|boolean}]}; item settings must match items exactly. Ordered lists may override start/value and reverse numbering; bullet/task lists cannot. Reversed default start is item count. checked:null leaves an ordinary item non-task and a task-style item unchecked; explicit booleans set authored task state, also on ordered lists. Initial collapse configuration is unavailable: nested lists start expanded. Submitted checked state is immutable; no operational event system is available.
 Tables add configuration:null or {headers:[[boolean]]}, exactly matching rows/cells. Header semantics do not invent content formatting: style text explicitly when wanted. Tables remain rectangular; grids can retain unequal row lengths after native-style merging. Nest lists/layouts through ordinary content. Header spans, column widths and arbitrary metadata are unavailable; do not approximate them. Existing-source anchors and canonical contribution admission remain unchanged.`;
+
+export const stage2CompoundInstructions=`NATIVE COMPOUNDS — STAGE 2C
+surface {id,kind:'surface',front:[nodes],back:[nodes]} authors both faces; each needs content. Native builders create Sides and structural containers. tabs {id,kind:'tabs',orientation:'horizontal'|'vertical',tabs:[{label,content:[nodes]}]} creates labelled panels. pages uses the same orientation/panel form with kind:'pages',pages:[{label,content:[nodes]}], and supplies native PageBlocks inside page tabs. Labels are nonempty single-line strings up to 256 characters; at most 16 panels. Panels require content. Empty text may use a paragraph with markup:''.
+Page collections are allowed only as top-level composition entries, not inside pages, margins, groups or other compounds. These are contribution content, never new Documents, application sessions, host tabs or workspace windows. Do not supply destinations, native relation names, active flags or raw metadata. Tab switching and Surface flipping use native transient presentation state; labels, orientation, faces and content remain authored and protected.
+Paragraphs/headings accept margins:null or {left:[nodes],right:[nodes]}; empty arrays omit that margin. Native builders attach named owned relations and standard marginal text styling unless explicitly styled. Nested marginal relations and pages within margins are unavailable. All descendants, including generated shells and margin owners, count against existing budgets. Native inspection preserves handles and named relations with explicit omissions; it is not a clone format.`;

@@ -1,3 +1,4 @@
+import {compoundParameters} from '../../../block-tree/compound-authoring';
 import {listConfiguration,tableConfiguration} from '../../../block-tree/layout-authoring';
 import {codeOperation} from '../../../block-tree/literal-authoring';
 import {sourceOperation} from '../../../interchange/source-block';
@@ -14,7 +15,7 @@ const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
-export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false):any {
+export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false):any {
  if(!nativeAuthoring)return responseSchema;
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
@@ -40,14 +41,28 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layout
   d.List.properties.configuration=nullable('ListConfiguration');d.List.required.push('configuration');
   d.Table.properties.configuration=nullable('TableConfiguration');d.Table.required.push('configuration');
  }
+ if(compoundAuthoring){
+  const content={type:'array',minItems:1,maxItems:64,items:{$ref:'#/$defs/Node'}};
+  const object=(properties:Record<string,unknown>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
+  const node=(kind:string,properties:Record<string,unknown>)=>object({id:d.Paragraph.properties.id,kind:{type:'string',enum:[kind]},...properties});
+  const panels={type:'array',minItems:1,maxItems:16,items:object({label:compoundParameters.label,content})};
+  d.Surface=node('surface',{front:content,back:content});
+  d.Tabs=node('tabs',{orientation:compoundParameters.orientation,tabs:panels});
+  d.Pages=node('pages',{orientation:compoundParameters.orientation,pages:panels});
+  const marginContent={...content,minItems:0};
+  for(const name of ['Paragraph','Heading']){d[name].properties.margins={anyOf:[object({left:marginContent,right:marginContent}),{type:'null'}]};d[name].required.push('margins');}
+  d.Node.anyOf.push(...['Surface','Tabs','Pages'].map(name=>({$ref:'#/$defs/'+name})));
+ }
  return schema;
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false):any {
- const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring));
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring));
  if(provider==='openai')return nativeAuthoring?schema:responseSchema;
- const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{})};
+ const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{}),...(nativeAuthoring&&compoundAuthoring?{Paragraph:defs.Paragraph,Heading:defs.Heading,Surface:defs.Surface,Tabs:defs.Tabs,Pages:defs.Pages}:{})};
+ if(nativeAuthoring&&compoundAuthoring)for(const name of ['Paragraph','Heading']){defs[name+'Leaf']=structuredClone(defs[name]);defs[name+'Leaf'].properties.margins={type:'null'};}
  const leaf=node.anyOf.filter((r:any)=>!Object.hasOwn(templates,r.$ref.replace('#/$defs/','')));
+ if(nativeAuthoring&&compoundAuthoring)leaf.push({$ref:'#/$defs/ParagraphLeaf'},{$ref:'#/$defs/HeadingLeaf'});
  for(let depth=0;depth<=compositionLimits.depth;depth++){
   defs['Node'+depth]=depth===compositionLimits.depth?(nativeAuthoring?{anyOf:leaf}:{$ref:'#/$defs/Paragraph'}):{anyOf:node.anyOf.map((r:any)=>({$ref:Object.hasOwn(templates,r.$ref.replace('#/$defs/',''))?r.$ref+depth:r.$ref}))};
   if(depth===compositionLimits.depth)continue;

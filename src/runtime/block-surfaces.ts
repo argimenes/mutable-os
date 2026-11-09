@@ -1,3 +1,4 @@
+import {surfaceSide,surfaceShell} from '../block-tree/compound-authoring';
 import { createStore } from 'solid-js/store';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import type { BlockNode } from '../block-tree/types';
@@ -90,7 +91,7 @@ export class BlockSurfaces {
   }
   private back(surface:string, resource?:BlockNode) {
     const c=this.editor.commands;
-    return c.insert({type:'side-block',metadata:{surfaceRole:'back'},children:[{type:'container-block',metadata:{structuralContainer:true},children:[...(resource?[resourceInformation(resource.payload),...resourceNotes(resource.payload,resource.viewType)]:[]),{type:'standoff-editor-block',text:''}]}]}, {kind:'at',parentKey:surface,index:1});
+    return c.insert(surfaceSide('back',[...(resource?[resourceInformation(resource.payload),...resourceNotes(resource.payload,resource.viewType)]:[]),{type:'standoff-editor-block',text:''}]), {kind:'at',parentKey:surface,index:1});
   }
   run(id:string,key:string, invocation?:{nodeKey:string;start:number;end:number;version:number}) {
     if(!this.editor.features.reversibleBlocks)return;
@@ -131,7 +132,7 @@ export class BlockSurfaces {
           const direct=this.parent(n), existing=n.viewType==='surface-block'?n:direct?.viewType==='side-block'&&this.parent(direct)?.children[0]===direct.key?this.parent(direct):undefined;
           const use=id==='surface.flip'?surface:existing;
           if(use){result=use.placementKey;if(!use.children[1])this.back(result);}
-          else {this.ordinary(n);result=c.insert({type:'surface-block',metadata:{reversible:true},children:[]},{kind:'before',anchorKey:n.placementKey});const front=c.insert({type:'side-block',metadata:{surfaceRole:'front'},children:[]},{kind:'at',parentKey:result,index:0});c.move(n.placementKey,{kind:'at',parentKey:front,index:0});this.back(result,resourceTypes.has(n.viewType)?n:undefined);}
+          else {this.ordinary(n);result=c.insert(surfaceShell(),{kind:'before',anchorKey:n.placementKey});const front=c.insert(surfaceSide('front',[]),{kind:'at',parentKey:result,index:0});c.move(n.placementKey,{kind:'at',parentKey:front,index:0});this.back(result,resourceTypes.has(n.viewType)?n:undefined);}
           flipAfter=id==='surface.flip';
         } else if(id==='surface.unwrap'||id==='surface.delete') {
           if(!surface?.children[1])throw Error('There is no reverse.');

@@ -154,3 +154,14 @@ it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 2B layouts wi
  expect(schemaFor(provider,true,true).$defs.ListConfiguration).toBeUndefined();expect(schemaFor(provider,false,true,true).$defs.ListConfiguration).toBeUndefined();
  const visited=new Set<string>();const walk=(v:any,path=new Set<string>())=>{if(!v||typeof v!=='object')return;if(v.$ref){const name=v.$ref.slice('#/$defs/'.length);expect(schema.$defs[name],name).toBeDefined();if(provider==='anthropic')expect(path.has(name),'recursive '+name).toBe(false);if(!visited.has(name)){visited.add(name);walk(schema.$defs[name],new Set([...path,name]));}return;}if(v.type==='object'){expect(v.additionalProperties).toBe(false);expect(v.required.slice().sort()).toEqual(Object.keys(v.properties).sort());}Object.entries(v).filter(([k])=>k!=='$defs').forEach(([,x])=>walk(x,path));};walk(schema);
 });
+
+it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 2C recursive margins and compound schemas without leaking host authority',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,nativeAuthoring:1,textAuthoring:1,layoutAuthoring:1,compoundAuthoring:1});
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),schema=provider==='openai'?body.text.format.schema:body.output_config.format.schema;
+ const suffix=provider==='openai'?'':'0';expect(schema.$defs['Surface'+suffix].required).toEqual(['id','kind','front','back']);expect(schema.$defs['Pages'+suffix].required).toEqual(['id','kind','orientation','pages']);expect(schema.$defs['Paragraph'+suffix].required).toContain('margins');
+ expect(schema.$defs['Tabs'+suffix].properties.tabs.items.properties).not.toHaveProperty('documentId');expect(schemaFor(provider,true,true,true).$defs.Surface).toBeUndefined();expect(schemaFor(provider,false,true,true,true).$defs.Surface).toBeUndefined();
+ const checked=new Set<string>();const walk=(v:any,path=new Set<string>())=>{if(!v||typeof v!=='object')return;if(v.$ref){const name=v.$ref.slice('#/$defs/'.length);expect(schema.$defs[name],name).toBeDefined();if(provider==='anthropic')expect(path.has(name),'recursive '+name).toBe(false);if(!checked.has(name)){checked.add(name);walk(schema.$defs[name],new Set([...path,name]));}return;}if(v.type==='object'){expect(v.additionalProperties).toBe(false);expect(v.required.slice().sort()).toEqual(Object.keys(v.properties).sort());}Object.entries(v).filter(([key])=>key!=='$defs').forEach(([,child])=>walk(child,path));};walk(schema);
+ if(provider==='anthropic'){expect(schema.$defs.ParagraphLeaf.properties.margins).toEqual({type:'null'});expect(schema.$defs.Node12.anyOf.map((r:any)=>r.$ref)).not.toContain('#/$defs/Pages12');}
+});

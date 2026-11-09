@@ -4,6 +4,10 @@
 
 ## Decision
 
+### Stage 2C implementation update — 9 November 2026
+
+Stage 2B is accepted. Shared compound preparations now cover new Surfaces/Sides, labelled tabs/orientation, document-tab PageBlocks and left/right named marginal relations. See [Stage 2C qualification](DCP_NATIVE_AUTHORING_STAGE2C_QUALIFICATION.md) for native equivalence, immutable-safe navigation, bounded discovery, source authority and persistence evidence. Existing-book fixed-size page insertion remains an explicit context-dependent parity gap; no host or retroactive-edit authority was added. The original inventory below remains the audit baseline. Stage 2D and Stage 3 have not begun.
+
 ### Stage 2B implementation update — 9 November 2026
 
 Stage 2A is accepted. Shared list/task and layout preparations now cover numbering, initial checked state, native table headers and unequal-row grid composition. See [Stage 2B qualification](DCP_NATIVE_AUTHORING_STAGE2B_QUALIFICATION.md) for tested operation coverage, immutable controls and explicit width/span/collapse limitations. The original inventory remains the baseline; later composition families and resource stages have not begun.

@@ -97,3 +97,13 @@ it('keeps Stage 2B layout/task details bounded and separates native task prerequ
  editor.features.taskLists=false;expect(capabilityCatalogue(editor).describe({ids:['composition.tasks']}).items[0].authorable).toBe(false);
  editor.features.dcpNativeAuthoringStage2Layouts=false;expect(capabilityCatalogue(editor).describe({ids:['composition.tasks']}).items[0].status).toBe('unknown');
 });
+
+it('keeps Stage 2C discovery bounded and advertises only enabled native compound routes',()=>{
+ expect(featureFlags.dcpNativeAuthoringStage2Compounds).toBe(true);
+ const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage2Text:true,dcpNativeAuthoringStage2Layouts:true,dcpNativeAuthoringStage2Compounds:true,taskLists:true,reversibleBlocks:true,verticalTabs:true,documentInterchange:true,standoffCodeHighlighting:true});
+ const catalogue=capabilityCatalogue(editor);
+ for(const {id} of catalogue.summary.items){const detail=catalogue.describe({ids:[id]});expect(detail.status,id).toBe('complete');const walk=(v:any)=>{if(!v||typeof v!=='object')return;if(v.$ref){const name=v.$ref.slice('#/$defs/'.length);expect(detail.parameters.$defs[name]||(detail.parameters as any).externalDefinitions?.[name],name).toBeDefined();}Object.values(v).forEach(walk);};walk(detail.parameters.$defs);expect(new TextEncoder().encode(JSON.stringify(detail)).length,id).toBeLessThanOrEqual(capabilityLimits.bytes);}
+ for(const id of ['composition.surface','composition.tabs','composition.pages','configuration.margins'])expect(catalogue.describe({ids:[id]}).items[0].authorable,id).toBe(true);
+ editor.features.reversibleBlocks=false;expect(capabilityCatalogue(editor).describe({ids:['composition.surface']}).items[0].authorable).toBe(false);
+ editor.features.dcpNativeAuthoringStage2Compounds=false;expect(capabilityCatalogue(editor).describe({ids:['composition.pages']}).items[0].status).toBe('unknown');
+});

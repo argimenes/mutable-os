@@ -30,9 +30,9 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true,compoundAuthoring=false,compoundFeatures=true){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage2Compounds:compoundAuthoring,reversibleBlocks:compoundFeatures,verticalTabs:compoundFeatures,taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -1057,4 +1057,114 @@ it('preserves Stage 2B feature gates and counts all owned item and layout descen
   const composition=kind==='list'?[{id:'new:b1',kind:'list',style:'task',items:Array.from({length:64},(_,i)=>[p(2+i*3),p(3+i*3),p(4+i*3)])}]:[{id:'new:b1',kind,rows:Array.from({length:16},(_,r)=>Array.from({length:16},(_,col)=>[p(2+r*16+col)]))}];
   await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition}));expect(c.notice()).toContain('native Block budget');expect(e.repository.state.revision).toBe(revision);
  }
+});
+
+it('qualifies Stage 2C compound ownership, read-only navigation, discovery, annotations and native reload',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true,true,true),c=f.c!,e=f.editor;
+ f.type!('Compose native compound content.');c.submit();
+ const p=(id:number,markup:string)=>({id:'new:b'+id,kind:'paragraph',markup,ranges:[],textStyle:null,margins:null});
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ const native=nativeDocumentSession(e);(native as any).bind(c.resourceId(),{folder:'isolated',filename:'stage2c.ink'},{nativeHash:'initial',markdownHash:null,generation:null});
+ await c.askMock(async req=>{
+  expect(req.compoundAuthoring).toBe(1);expect(req.authoring.examples[0].response.composition[0].margins).toBeNull();
+  return JSON.stringify({...dcpResponse(req.exchange),composition:[
+   {id:'new:b1',kind:'surface',front:[p(2,'Front A'),p(3,'Front B')],back:[p(4,'Reverse note')]},
+   {id:'new:b5',kind:'tabs',orientation:'vertical',tabs:[{label:'Evidence',content:[p(6,'First panel')]},{label:'Discussion',content:[p(7,'Second panel')]}]},
+   {id:'new:b8',kind:'pages',orientation:'horizontal',pages:[{label:'Opening',content:[{...p(9,'Main page text'),margins:{left:[p(10,'Left note')],right:[p(11,'Right note')]}}]},{label:'Closing',content:[p(12,'Last page')]}]}
+  ]});
+ });expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const node=(key:string)=>c.session()!.projection.node(key)!,generated=c.resolve(c.target(c.frontier()!.id))!,[surface,tabs,pages]=generated.children.map(node);
+ expect(surface.children.map(k=>node(k).viewType)).toEqual(['side-block','side-block']);expect(surface.children.map(k=>(node(k).payload.metadata as any).surfaceRole)).toEqual(['front','back']);
+ expect(node(node(surface.children[0]).children[0]).payload.metadata).toMatchObject({structuralContainer:true});
+ expect(tabs.payload.metadata).toMatchObject({orientation:'vertical'});expect(tabs.children.map(k=>(node(k).payload.metadata as any).name)).toEqual(['Evidence','Discussion']);
+ const page=node(node(pages.children[0]).children[0]),main=node(page.children[0]);expect(page.viewType).toBe('page-block');expect(main.children).toHaveLength(0);
+ expect(Object.keys(main.ownedRelations).sort()).toEqual(['leftMargin','rightMargin']);
+ const left=node(main.ownedRelations.leftMargin),right=node(main.ownedRelations.rightMargin),leftText=node(left.children[0]);
+ expect(left.viewType).toBe('left-margin-block');expect(right.viewType).toBe('right-margin-block');expect(leftText.payload.blockProperties).toEqual([{type:'block/alignment',value:'left'},{type:'block/font/size/three-quarters'}]);
+ const state=e.repository.readState();for(const n of [page,main,left,right,leftText]){expect(state.placements[n.placementKey].kind).toBe('owned');expect(resourceIdentity.resourceOwner(state,n.contentKey)?.key).toBe(c.root()!.contentKey);}
+ expect(()=>e.commands.replaceInlineRange(leftText.key,0,1,'X')).toThrow(/protected/);expect(()=>e.commands.setPayloadField(tabs.key,'metadata',{orientation:'horizontal'})).toThrow(/protected/);
+ expect(()=>e.commands.setPayloadField(tabs.children[0],'metadata',{name:'Changed',active:true})).toThrow(/protected/);
+ const persisted=nativeText(captureNative(e.repository.readState(),c.resourceId())),revision=e.repository.state.revision;
+ snapshots.mockClear();build.mockClear();
+ const tabButtons=[...f.host.querySelectorAll<HTMLButtonElement>('[role=tab]')];tabButtons.find(b=>b.textContent==='Discussion')!.click();await tick();expect(f.host.textContent).toContain('Second panel');
+ tabButtons.find(b=>b.textContent==='Closing')!.click();await tick();expect(f.host.textContent).toContain('Last page');
+ const flip=f.host.querySelector<HTMLButtonElement>('.surface-fold')!;flip.click();await tick();expect(flip.getAttribute('aria-label')).toBe('Return to front side');flip.click();await tick();
+ expect(e.repository.state.revision).toBe(revision);expect(nativeText(captureNative(e.repository.readState(),c.resourceId()))).toBe(persisted);
+ expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(native.isDirty(c.resourceId())).toBe(true);
+ e.repository.undo();expect(c.committed()).toHaveLength(1);e.repository.redo();expect(c.committed()).toHaveLength(2);
+ const saved=captureNative(e.repository.readState(),c.resourceId()),loaded=new ReactiveEditor({id:'compound-bank',type:'workspace-object-bank-block',children:[]});cleanup.push(()=>loaded.dispose());
+ const bank=loaded.repository.readState();admitNative(loaded.repository,nativeBytes(saved),bank.placements[bank.rootPlacementKey].contentKey);expect(nativeText(captureNative(loaded.repository.readState(),c.resourceId()))).toBe(nativeText(saved));
+ await c.askMock(async(req,sources)=>{
+  const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}});
+  const s=await sources.tool({id:'s',tool:'read_source',arguments:{handle:parent.children[0]}});expect(s.inspection.root.children.map((n:any)=>n.configuration.surfaceRole)).toEqual(['front','back']);expect(s.inspection.root.navigation.persistent).toBe(false);
+  const t=await sources.tool({id:'t',tool:'read_source',arguments:{handle:parent.children[1]}});expect(t.inspection.root.configuration.orientation).toBe('vertical');expect(t.inspection.root.children.map((n:any)=>n.configuration.name)).toEqual(['Evidence','Discussion']);
+  const pagesRead=await sources.tool({id:'pages',tool:'read_source',arguments:{handle:parent.children[2]}});expect(pagesRead.inspection.root.kind).toBe('pages');const pageRead=pagesRead.inspection.root.children[0].children[0];expect(pageRead.kind).toBe('page');
+  const relations=pageRead.children[0].ownedRelations;expect(relations.map((r:any)=>r.name).sort()).toEqual(['leftMargin','rightMargin']);
+  const leftRead=await sources.tool({id:'m',tool:'read_source',arguments:{handle:relations.find((r:any)=>r.name==='leftMargin').content.children[0].handle}});expect(leftRead.text).toBe('Left note');expect(leftRead.target.blockId).toBe(leftText.payload.id);
+  const inventory=await sources.tool({id:'i',tool:'list_text_blocks',arguments:{...inventoryArgs,limit:20}});expect(inventory.items.map((i:any)=>i.preview).join(' ')).toContain('Reverse note');expect(inventory.items.map((i:any)=>i.preview).join(' ')).toContain('Left note');
+  const response:any=dcpResponse(req.exchange);response.anchors=[{id:'new:r1',source:leftRead.handle,revision:leftRead.revision,selector:{exact:'Left note',prefix:'',suffix:''}}];response.interpretations=[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}];return JSON.stringify(response);
+ });expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(3);expect((node(leftText.key).payload.standoffProperties as any[]).some(p=>p.type==='style/highlight')).toBe(true);
+ // Human operations consume the same builders; preserve native shape and margins.
+ const draftText=f.text!();f.type!('Human draft');e.surfaces.run('surface.create',draftText.key);await tick();
+ const humanSurface=e.surfaces.nearest(draftText.key)!;expect(humanSurface.children.map(k=>(node(k).payload.metadata as any).surfaceRole)).toEqual(['front','back']);
+ const humanLeft=e.commands.ensureMargin(draftText.key,'left');expect(e.node(humanLeft)?.payload.blockProperties??node(e.nodeForPlacementInView(humanLeft,draftText.viewId)!.key).payload.blockProperties).toEqual(leftText.payload.blockProperties);
+ const reads={...c.dcpDiagnostics},requests=(fetch as any).mock.calls.length;snapshots.mockClear();build.mockClear();e.commands.replaceInlineRange(draftText.key,0,0,'Typing');expect(c.dcpDiagnostics).toEqual(reads);expect((fetch as any).mock.calls.length).toBe(requests);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});
+
+it('rejects invalid Stage 2C nesting, host destinations, states and source authority without partial writes',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true,true,true),c=f.c!,e=f.editor;f.type!('Immutable original');const original=f.text!();c.submit();
+ const p={id:'new:b2',kind:'paragraph',markup:'x',ranges:[]},pages={id:'new:b3',kind:'pages',orientation:'horizontal',pages:[{label:'Page',content:[{...p,id:'new:b4'}]}]},surface={id:'new:b1',kind:'surface',front:[p],back:[{...p,id:'new:b5'}]};
+ const bad=[{...surface,active:1},{...surface,front:[]},{...surface,back:[],destination:'workspace'},
+  {id:'new:b1',kind:'tabs',orientation:'diagonal',tabs:[{label:'Name',content:[p]}]},
+  ...['','\n','x'.repeat(257)].map(label=>({id:'new:b1',kind:'tabs',orientation:'horizontal',tabs:[{label,content:[p]}]})),
+  {id:'new:b1',kind:'tabs',orientation:'horizontal',tabs:[{label:'Host',content:[p],documentId:'foreign'}]},
+  {id:'new:b1',kind:'group',children:[pages]}, {...p,margins:{left:[pages],right:[]}},
+  {...p,margins:{left:[{...p,id:'new:b5',margins:{left:[{...p,id:'new:b6'}],right:[]}}],right:[]}},
+  ...['document','side','tab','page','left-margin','window'].map(kind=>({id:'new:b1',kind,children:[p]})),
+ ];
+ const revision=e.repository.state.revision;
+ for(const node of bad){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[node]}));expect(c.notice(),JSON.stringify(node)).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ for(const mode of ['stale','foreign','insert']){
+  const insert=e.commands.insert.bind(e.commands),fail=mode==='insert'?vi.spyOn(e.commands,'insert').mockImplementation((dto,pos)=>{if((dto.metadata as any)?.dialectic?.state==='committed')throw Error('Compound admission failure');return insert(dto,pos);}):undefined;
+  await c.askMock(async(req,sources)=>{
+   const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}}),source=await sources.tool({id:'s',tool:'read_source',arguments:{handle:parent.children[0]}});const v:any=dcpResponse(req.exchange);v.composition=[surface];v.anchors=[{id:'new:r1',source:mode==='foreign'?'src:foreign:b1':source.handle,revision:mode==='stale'?'stale':source.revision,selector:{exact:'original',prefix:'',suffix:''}}];v.interpretations=[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}];return JSON.stringify(v);
+  });fail?.mockRestore();expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);expect(original.payload.standoffProperties??[]).toHaveLength(0);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ }
+});
+
+it('gates Stage 2C features and counts compound shells and owned relations against existing budgets',async()=>{
+ const p=(id:number)=>({id:'new:b'+id,kind:'paragraph',markup:'x',ranges:[]});
+ for(const [native,compound,features] of [[true,false,true],[false,true,true],[true,true,false]]){
+  const f=await setup(true,true,true,true,true,false,true,native,true,true,true,true,compound,features),c=f.c!,e=f.editor;f.type!('Features');c.submit();const revision=e.repository.state.revision;
+  for(const node of [{id:'new:b1',kind:'surface',front:[p(2)],back:[p(3)]},{id:'new:b1',kind:'tabs',orientation:'vertical',tabs:[{label:'Tab',content:[p(2)]}]}]){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[node]}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+  if(!native||!compound){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{...p(1),margins:{left:[p(2)],right:[]}}]}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ }
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true,true,true),c=f.c!,e=f.editor;f.type!('Bounds');c.submit();const revision=e.repository.state.revision;
+ const cases=[Array.from({length:43},(_,i)=>({id:'new:b'+(1+i*3),kind:'surface',front:[p(2+i*3)],back:[p(3+i*3)]})),Array.from({length:52},(_,i)=>({...p(1+i*3),margins:{left:[p(2+i*3)],right:[p(3+i*3)]}})),Array.from({length:8},(_,i)=>({id:'new:b'+(1+i*17),kind:'pages',orientation:'horizontal',pages:Array.from({length:16},(_,j)=>({label:'Page '+j,content:[p(2+i*17+j)]}))}))];
+ for(const composition of cases){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition}));expect(c.notice()).toContain('native Block budget');expect(e.repository.state.revision).toBe(revision);}
+});
+
+it('negotiates Stage 2C independently of text/layout authoring and native vertical/reversible features',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,false,true,false,true,true,false),c=f.c!;f.type!('Independent compound mode');c.submit();
+ await c.askMock(async req=>{
+  expect(req.compoundAuthoring).toBe(1);expect(req.textAuthoring).toBeUndefined();expect(req.layoutAuthoring).toBeUndefined();
+  const p=(id:number)=>({id:'new:b'+id,kind:'paragraph',markup:'Content',ranges:[],margins:null});
+  return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'tabs',orientation:'horizontal',tabs:[{label:'Tab',content:[p(2)]}]},{id:'new:b3',kind:'pages',orientation:'horizontal',pages:[{label:'Page',content:[{...p(4),margins:{left:[p(5)],right:[]}}]}]}]});
+ });expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+});
+
+it('retains prior native authoring families inside Stage 2C compounds',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true,true,true),c=f.c!;f.type!('Compose mixed native content');c.submit();
+ await c.askMock(async req=>{
+  let id=0;const next=()=> 'new:b'+(++id),p=()=>({id:next(),kind:'paragraph',markup:'Text',ranges:[],textStyle:null,margins:null});
+  return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:next(),kind:'tabs',orientation:'horizontal',tabs:[{label:'Native content',content:[
+   {...p(),kind:'heading',level:2}, {id:next(),kind:'group',children:[p()]},
+   {id:next(),kind:'list',style:'task',items:[[p()]],configuration:{start:null,reversed:false,items:[{value:null,checked:true}]}},
+   {id:next(),kind:'table',rows:[[[p()]]],configuration:{headers:[[true]]}}, {id:next(),kind:'grid',rows:[[[p()]]]},
+   {id:next(),kind:'code',language:'javascript',text:'const n = 1;'}, {id:next(),kind:'source',format:'markdown',text:'# Preserved source'},
+   {id:next(),kind:'youtube',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+  ]}]}]});
+ });expect(c.notice()).toBe('');
+ const projection=c.session()!.projection,root=c.resolve(c.target(c.frontier()!.id))!,tabs=projection.node(root.children[0])!,panel=projection.node(tabs.children[0])!;
+ expect(panel.children.map(k=>projection.node(k)!.viewType)).toEqual(['standoff-editor-block','container-block','indented-list-block','table-block','grid-block','standoff-code-block','mutable/markdown-source-block','youtube-video-block']);
 });

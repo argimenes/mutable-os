@@ -1,3 +1,4 @@
+import {prepareMargin,marginText} from './compound-authoring';
 import { StructuralDraft } from "./structural-draft";
 import { isAutomaticListMetadata, type AutomaticListMetadata } from "./list-wrap-plan";
 import { diffRecordBatch } from "./record-batch";
@@ -789,12 +790,7 @@ export class TreeCommands {
     const owner = state.contents[state.placements[this.placementKey(ownerKey, state)].contentKey];
     if (owner.inlineKind !== "standoff") throw new TreeCommandError("Margins require a Standoff source block");
     const name = side === "left" ? "leftMargin" : "rightMargin";
-    const text: ExistingBlockDto = {
-      id: globalThis.crypto.randomUUID(), type: "standoff-editor-block", text: "", children: [],
-      standoffProperties: [], blockProperties: [
-        { type: "block/alignment", value: side }, { type: "block/font/size/three-quarters" },
-      ],
-    };
+    const text=marginText(side);
     const existing = owner.ownedRelations[name];
     if (existing) {
       const margin = state.contents[state.placements[existing].contentKey];
@@ -803,14 +799,7 @@ export class TreeCommands {
       if (firstText) return firstText;
       return this.insert(text, { kind: "at", parentKey: existing, index: margin.children.length });
     }
-    const placement = this.setRelation(ownerKey, name, {
-      id: globalThis.crypto.randomUUID(), type: `${side}-margin-block`,
-      blockProperties: [
-        { type: `block/marginalia/${side}` },
-        ...(side === "right" ? [{ type: "block/alignment", value: "right" }] : []),
-      ],
-      children: [text],
-    });
+    const placement = this.setRelation(ownerKey, name, prepareMargin(side,[text]));
     const next = this.current();
     return next.contents[next.placements[placement].contentKey].children[0];
   }

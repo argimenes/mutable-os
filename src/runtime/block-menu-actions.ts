@@ -1,3 +1,4 @@
+import {prepareTabs,tabPanel} from '../block-tree/compound-authoring';
 import {listShell} from '../block-tree/layout-authoring';
 import { tabOrientationMenu } from './tab-orientation';
 import { tabOrientation } from '../block-tree/tab-orientation';
@@ -146,7 +147,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
       if (!ancestor("grid-block")) items.push({ label: "Convert to grid (1 × 2)", run: () => convert(grid(1, 2, true), 2) });
       if (!ancestor("tab-row-block")) items.push({ label: "Convert to tab", run: () => {
         if (node.viewType === "standoff-editor-block") createTextTab(editor, key);
-        else convert(dto("tab-row-block", [dto("tab-block", [], { name: "Tab 1", active: true })]), 1);
+        else convert(prepareTabs([{label:'Tab 1',content:[]}]), 1);
       } });
       if (!ancestor("indented-list-block")) items.push({ label: "Convert to list", run: () => convert(listShell(), 0) });
       items.push(unavailable("Convert to pocket", "This action is a no-op in the original source; existing pocket controls are available."));
@@ -165,7 +166,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
       if (!canConvertDocumentToPage()) return;
       editor.commands.transaction("Convert Document to Page", () => {
         const children = editor.commands.childrenOf(document.key);
-        const row = editor.commands.insert(dto("document-tab-row-block", [dto("document-tab-block", [dto("page-block")], { name: "Page 1", active: true })]), { kind: "at", parentKey: document.key, index: 0 });
+        const row = editor.commands.insert(prepareTabs([{label:'Page 1',content:[]}],undefined,true), { kind: "at", parentKey: document.key, index: 0 });
         const tab = editor.commands.childrenOf(row)[0];
         const page = editor.commands.childrenOf(tab)[0];
         children.forEach((child, index) => editor.commands.move(child, { kind: "at", parentKey: page, index }));
@@ -186,8 +187,9 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
           const length = editor.commands.childrenOf(owner).length;
           // PageView reserves the left/right gutters around its main-text children.
           // A bare TextBlock under the tab bypasses that layout and page scrolling.
-          const content = label === "Pages" ? dto("page-block", [text()]) : text();
-          placement = editor.commands.insert(dto(tabType, [content], { name: `${label === "Pages" ? "Page" : "Tab"} ${length + 1}`, text: `Sticky tag ${length + 1}`, active: true }), { kind: "at", parentKey: owner, index: length });
+          const panel = label === "Tags" ? dto(tabType,[text()],{name:`Tab ${length+1}`,text:`Sticky tag ${length+1}`,active:true}) : tabPanel(`${label === "Pages" ? "Page" : "Tab"} ${length + 1}`,[text()],label === "Pages");
+          panel.metadata={...panel.metadata as Record<string,unknown>,text:`Sticky tag ${length+1}`};
+          placement = editor.commands.insert(panel, { kind: "at", parentKey: owner, index: length });
         });
         focus(find(placement).key);
       };
