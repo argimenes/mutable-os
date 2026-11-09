@@ -22,7 +22,7 @@ export function ResourceInformationView(props:BlockViewProps) {
  // Resolve the explicit source once per information occurrence, including an
  // eventual unwrap. Do not build an inventory on document edits.
  onMount(()=>{const node=projection.state.nodes[props.nodeKey],ref=(node?.payload.blockProperties as any[]??[]).find(p=>p.type==='codex/block-reference'&&!p.isDeleted)?.value;
-  if(ref&&!passive)untrack(()=>setResourceKey(Object.values(editor.repository.readState().contents).find(c=>c.payload.id===ref)?.key));
+  if(ref&&!passive)untrack(()=>{const nativeResource=resource();setResourceKey(nativeResource&&nativeResource.payload.id===ref?nativeResource.contentKey:Object.values(editor.repository.readState().contents).find(c=>c.payload.id===ref)?.key);});
   const release=editor.mounts.register(props.nodeKey,{root,focusElement:root,inputPolicy:passive?'opaque-widget':'container',focus:()=>root.focus()});onCleanup(release);});
  createEffect(()=>{const owner=surface();if(!owner)return;editor.surfaces.setInformationTarget(owner.key,root);onCleanup(()=>{if(editor.surfaces.informationTarget(owner.key)===root)editor.surfaces.setInformationTarget(owner.key,undefined);});});
  return <div ref={root} tabindex="-1" class="resource-reverse-information" data-runtime-key={props.nodeKey} data-client-id={props.nodeKey}>

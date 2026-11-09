@@ -18,7 +18,7 @@ const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
-export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false):any {
+export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false):any {
  if(!nativeAuthoring)return responseSchema;
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
@@ -75,11 +75,15 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layout
    d[name]={type:'object',properties,required:Object.keys(properties),additionalProperties:false};d.Node.anyOf.push({$ref:'#/$defs/'+name});
   }
  }
+ if(retainedPdfAuthoring){
+  d.RetainedPdf={type:'object',properties:{id:d.Paragraph.properties.id,kind:{type:'string',enum:['retained-pdf']},source:{type:'string'},revision:{type:'string'}},required:['id','kind','source','revision'],additionalProperties:false};
+  d.Node.anyOf.push({$ref:'#/$defs/RetainedPdf'});
+ }
  return schema;
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false):any {
- const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring));
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring));
  if(provider==='openai')return nativeAuthoring?schema:responseSchema;
  const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={...(nativeAuthoring&&widgetAuthoring?{StickyNote:defs.StickyNote}:{}),Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{}),...(nativeAuthoring&&compoundAuthoring?{Paragraph:defs.Paragraph,Heading:defs.Heading,Surface:defs.Surface,Tabs:defs.Tabs,Pages:defs.Pages}:{})};
  if(nativeAuthoring&&compoundAuthoring)for(const name of ['Paragraph','Heading']){defs[name+'Leaf']=structuredClone(defs[name]);defs[name+'Leaf'].properties.margins={type:'null'};}

@@ -4,6 +4,10 @@
 
 ## Decision
 
+### Stage 3C.1 implementation update — 9 November 2026
+
+Stage 3B is accepted. Retained PDF binding now resolves a current committed native PDF source, verifies its canonical capture and original through native services, and admits a native resource Surface atomically. See [Stage 3C qualification](DCP_NATIVE_AUTHORING_STAGE3C_QUALIFICATION.md) for the exact `retained-pdf` construct, viewer guards, limits and remaining IIIF/web/academic/structured prerequisites. Those families are investigated, not yet advertised. Stage 3D has not begun.
+
 ### Stage 3B implementation update — 9 November 2026
 
 Stage 3A is accepted. Stage 3B now supports external-image URLs, native YouTube/Vimeo references and sandboxed website embeds without existing native source authority. Ordinary PDF/IIIF/web hyperlinks remain available; specialised retained viewers await their capture operations. See [Stage 3B qualification](DCP_NATIVE_AUTHORING_STAGE3B_QUALIFICATION.md) for the three new constructs, preserved native policy differences, browser-network limitations and tests. Stage 3C has not begun. Existing-source authority remains necessary for managed binding and future native copying, not for introducing a new external URL.

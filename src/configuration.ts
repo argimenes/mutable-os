@@ -132,6 +132,8 @@ export type FeatureFlags = Readonly<{
   dcpNativeAuthoringStage3ManagedImages: boolean;
   /** Ordinary external image/video/embed composition; no acquisition. */
   dcpNativeAuthoringStage3ExternalMedia: boolean;
+  /** Current-source binding to a verified retained native PDF capture. */
+  dcpNativeAuthoringStage3RetainedPdf: boolean;
   dialecticProviders: boolean;
   dialecticProviderContinuity: boolean;
   /** Temporary local wire/contribution diagnostics; disable after DCP qualification. */
@@ -259,6 +261,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dcpNativeAuthoringStage2Widgets: true,
   dcpNativeAuthoringStage3ManagedImages: true,
   dcpNativeAuthoringStage3ExternalMedia: true,
+  dcpNativeAuthoringStage3RetainedPdf: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
   dcpTestPhaseLogging: true,

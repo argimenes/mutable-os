@@ -1,3 +1,4 @@
+import {retainedPdfsEnabled} from './retained-pdfs';
 import {passiveVideo} from '../../../interchange/uri';
 import {managedAsset} from '../../../interchange/managed-asset';
 import {managedImagesEnabled} from './managed-images';
@@ -67,7 +68,8 @@ export async function inspectNative(sources:DcpSources,initial:any){
   }
   if(properties.length>limits.properties||marks.length>limits.properties)entry.omissions.push('Property count limit');
   const external=sources.editor.features.dcpNativeAuthoringStage3ExternalMedia;
-  if(external&&node.viewType==='image-block'&&!managedAsset(node.payload.asset))entry.resource={kind:'external-reference',mode:'image-embed',...fields(meta,['url','alt']),availability:'unknown',retained:false,requiresAcquisition:false,perception:false};
+  if(node.viewType==='mutable/pdf-document-block'&&sources.editor.features.dcpNativeAuthoringStage3RetainedPdf)entry.resource={kind:'retained-capture',family:'pdf',label:scalar((node.payload.pdf as any)?.inspection?.label),pages:scalar((node.payload.pdf as any)?.inspection?.pages),binding:retainedPdfsEnabled(sources.editor)&&!node.payload.archive?'requires-active-session-and-original-verification':'unavailable',operation:'media.retained-pdf',availability:'unverified',textExtraction:false,state:'Viewing is local; submitted capture/configuration and annotation/extraction operations are protected'};
+  else if(external&&node.viewType==='image-block'&&!managedAsset(node.payload.asset))entry.resource={kind:'external-reference',mode:'image-embed',...fields(meta,['url','alt']),availability:'unknown',retained:false,requiresAcquisition:false,perception:false};
   else if(external&&['mutable/video-block','youtube-player-block','vimeo-player-block'].includes(node.viewType)){
    const video=passiveVideo(node.payload.video);entry.resource={kind:'embedded-media',provider:video?.provider??null,url:video?.canonicalUrl??null,availability:'unknown',retained:false,descriptor:video?'valid':'unsupported',state:'Playback is local to the mounted occurrence; authored URL remains protected'};
   }

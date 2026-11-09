@@ -1,6 +1,6 @@
 # DCP native authoring — Stage 3 plan for review
 
-Status update, 9 November 2026: the plan is accepted and [Stage 3A is implemented and qualified](DCP_NATIVE_AUTHORING_STAGE3A_QUALIFICATION.md). The planning evidence below is retained as historical context. Stage 3B is now implemented under the revised conversational-media brief; see [Stage 3B qualification](DCP_NATIVE_AUTHORING_STAGE3B_QUALIFICATION.md). Stage 3C has not begun.
+Status update, 9 November 2026: the plan is accepted and [Stage 3A is implemented and qualified](DCP_NATIVE_AUTHORING_STAGE3A_QUALIFICATION.md). The planning evidence below is retained as historical context. Stage 3B is now implemented under the revised conversational-media brief; see [Stage 3B qualification](DCP_NATIVE_AUTHORING_STAGE3B_QUALIFICATION.md). [Stage 3C.1 retained PDF binding is qualified](DCP_NATIVE_AUTHORING_STAGE3C_QUALIFICATION.md); other retained families remain separate investigated subincrements.
 
 9 November 2026. Stage 2A–2D is accepted and complete as planned. This is investigation and planning only; no Stage 3 runtime, schema, catalogue or feature-default changes have been implemented. The accepted concise DCP projections and shared native operations remain the architecture; the original investigation's generic-operation proposal is not revived.
 
@@ -59,4 +59,4 @@ These establish a reuse baseline, not qualification of unimplemented DCP resourc
 
 The completed Stage 2 plan does not imply universal parity. Carry forward horizontal rules, legacy plain-code Blocks, standalone checkboxes, existing-container sticky tabs, legacy book-dependent pages, workspace Canvas counters, Phosphor host sessions and other canonical-audit context gaps. Keep host-only operations out of ordinary contributions. Native cloning must not become a means to smuggle unsupported host authority or silently drop dependencies.
 
-Review requested: the 3A → 3B → 3C → 3D → 3E sequence, the host-private fragment boundary, same-Document initial authority and separate acquisition side effects. Stages 3A/3B are implemented under their accepted briefs; Stage 3C waits for review. Generation, Markdown fallback, notices, task-expectation enforcement and general retroactive editing remain deferred.
+Review requested: the 3A → 3B → 3C → 3D → 3E sequence, the host-private fragment boundary, same-Document initial authority and separate acquisition side effects. Stages 3A/3B are accepted. Stage 3C.1 PDF binding is implemented; the remaining retained-family subincrements are identified in its qualification report. Stage 3D has not begun. Generation, Markdown fallback, notices, task-expectation enforcement and general retroactive editing remain deferred.

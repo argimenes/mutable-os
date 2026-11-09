@@ -143,3 +143,13 @@ it('qualifies Stage 2D purpose, schema and native prerequisites within unchanged
  editor.features.threeDObjects=false;expect(capabilityCatalogue(editor).describe({ids:['widget.object3d']}).items[0].authorable).toBe(false);
  editor.features.dcpNativeAuthoringStage2Widgets=false;expect(capabilityCatalogue(editor).describe({ids:['composition.sticky-note']}).items[0].status).toBe('unknown');
 });
+
+it('qualifies bounded retained PDF discovery without exposing capture authority',()=>{
+ expect(featureFlags.dcpNativeAuthoringStage3RetainedPdf).toBe(true);
+ const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage3RetainedPdf:true,crossResourceLoaders:true,reversibleBlocks:true});
+ const catalogue=capabilityCatalogue(editor),detail=catalogue.describe({ids:['media.retained-pdf']});expect(detail.status).toBe('complete');expect(detail.items[0]).toMatchObject({authorable:true,availability:{resources:'retained-capture',resourceReadiness:'input-required'}});
+ expect((detail.parameters.$defs.RetainedPdf as any).required).toEqual(['id','kind','source','revision']);for(const word of ['snapshotId','assetId','cavernId','resourceId'])expect(JSON.stringify(detail.parameters)).not.toContain(word);
+ for(const item of catalogue.summary.items)expect(new TextEncoder().encode(JSON.stringify(catalogue.describe({ids:[item.id]}))).length).toBeLessThanOrEqual(capabilityLimits.bytes);
+ const missing=fixture(true,'resource-information-block').editor;Object.assign(missing.features,editor.features);expect(capabilityCatalogue(missing).describe({ids:['media.retained-pdf']}).items[0].authorable).toBe(false);
+ editor.features.crossResourceLoaders=false;expect(capabilityCatalogue(editor).describe({ids:['media.retained-pdf']}).items[0].authorable).toBe(false);editor.features.dcpNativeAuthoringStage3RetainedPdf=false;expect(capabilityCatalogue(editor).summary.items.some(i=>i.id==='media.retained-pdf')).toBe(false);
+});
