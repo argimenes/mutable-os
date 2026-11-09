@@ -1,3 +1,4 @@
+import type {GeneratedIdentityKind} from './identities';
 import {ENTITY_REFERENCE} from '../../../feature-api/scoped-entities';
 import {standoffStyleSchemas,standoffStyleSchema} from '../../../rendering/standoff-styles';
 import {SaxesParser} from 'saxes';
@@ -22,7 +23,7 @@ export function annotation(type:string,attrs:Record<string,string>,registry:Visu
 }
 /** XML structural validation + exact decoded text. CR is encoded only in text
  * tokens before SAX parsing; literal line breaks in attributes are forbidden. */
-export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,provenance:Provenance,claim:(id:string)=>void,reference?:(type:string,handle:string)=>ReturnType<typeof annotation>){
+export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,provenance:Provenance,claim:(id:string,kind:GeneratedIdentityKind)=>void,reference?:(type:string,handle:string)=>ReturnType<typeof annotation>){
  if(typeof source!=='string'||source.length>32768||/<!|<\?/.test(source)||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source))throw Error('Invalid or oversized annotation markup');
  // This restricted grammar admits no angle brackets in attributes. XML entities
  // remain available; text CR survives XML's normal line-ending normalization.
@@ -38,17 +39,17 @@ export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,
   const attrs=tag.attributes as Record<string,string>;
   if(tag.name==='dcp-root'&&!stack.length){stack.push({tag:tag.name,start:0});return;}
   if(tag.name==='boundary'){
-   if(!tag.isSelfClosing||Object.keys(attrs).some(k=>k!=='id')||!attrs.id)throw Error('Invalid range boundary');claim(attrs.id);boundaries.set(attrs.id,cells);stack.push({tag:tag.name,start:cells});return;
+   if(!tag.isSelfClosing||Object.keys(attrs).some(k=>k!=='id')||!attrs.id)throw Error('Invalid range boundary');claim(attrs.id,'pos');boundaries.set(attrs.id,cells);stack.push({tag:tag.name,start:cells});return;
   }
   if(tag.name!=='annotation'||!attrs.type)throw Error('Unsupported markup element');
-  const {type,id,...rest}=attrs;if(id)claim(id);
+  const {type,id,...rest}=attrs;if(id)claim(id,'s');
   const spec=rest.ref!==undefined&&reference?(Object.keys(rest).length===1?reference(type,rest.ref):(()=>{throw Error('Unsupported reference attributes');})()):annotation(type,rest,registry,provenance);
   stack.push({tag:tag.name,start:cells,id,spec});
  });
  parser.on('closetag',()=>{const entry=stack.pop()!;if(!entry.spec)return;if(cells===entry.start)throw Error('Empty annotation');marks.push({id:crypto.randomUUID(),...entry.spec,start:entry.start,end:cells-1});if(entry.id)anchors.set(entry.id,{start:entry.start,end:cells});});
  parser.write('<dcp-root>'+encoded+'</dcp-root>').close();
  for(const r of ranges){
-  keys(r,['id','type','from','to','ref','attributes']);claim(r.id);
+  keys(r,['id','type','from','to','ref','attributes']);claim(r.id,'s');
   if(r.ref!==null&&!reference||!Array.isArray(r.attributes)||r.attributes.length)throw Error('Range attributes/references unavailable in 4A');
   const start=boundaries.get(r.from),end=boundaries.get(r.to);if(start===undefined||end===undefined||end<=start)throw Error('Missing/reversed/empty range boundary');
   marks.push({id:crypto.randomUUID(),...(r.ref!==null&&reference?reference(r.type,r.ref):annotation(r.type,{},registry,provenance)),start,end:end-1});anchors.set(r.id,{start,end});

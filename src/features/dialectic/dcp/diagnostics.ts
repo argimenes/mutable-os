@@ -3,7 +3,7 @@ const reasons = {
  json:'Return a complete JSON object matching the response schema.',
  fields:'Include exactly the required fields of this object.',
  'source-identity':'Obtain a fresh current-exchange source handle using bounded discovery, then read_source for its current revision. Historical handles and revisions cannot author content.',
- identity:'Use unique response-local IDs and issued handles of the required kind.',
+ identity:'Use unique response-local IDs of the declared role: new:b for composition, new:r for source anchors, new:s for generated passages. Existing src: handles are host-issued. Styling reproduced quotations needs no id. When renaming an ID, update every dependent reference; never give a source anchor and reproduced text the same declaration ID.',
  source:'Use a complete current TextBlock source and its revision; quote exact text with unambiguous prefix/suffix.',
  markup:'Use only annotation and self-closing boundary tags, valid XML escapes and nonempty spans. Check boundary IDs.',
  capability:'Use only negotiated types and operations; check the endpoint kinds and allowed attributes.',

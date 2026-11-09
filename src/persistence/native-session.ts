@@ -9,6 +9,7 @@ import { admitMarkdown, type LinkTarget } from './markdown';
 import { enrollPair, type PairGeneration, type PairResult, type ResourcePair } from './resource-pair';
 import { markNativeBinding, ownNativeSession } from './native-bindings';
 import { recognizeCompatibleDocument } from './compatible-document';
+import { browserSaveDiagnostics, diagnosticError } from './browser-save-diagnostics';
 type Baseline = { nativeHash: string | null; markdownHash: string | null; generation: string | null; locationRevision?: string };
 export type NativeOverwrite = {resourceId:string; nativeHash:string};
 type Binding = { location: DocumentLocation; baseline: Baseline; pair: ResourcePair; pending?: PairGeneration; overwrite?:NativeOverwrite; message: string; comparedHash?: string; busy: boolean; relocation?: string; relocationWork?: Promise<unknown>; members: Set<string> };
@@ -18,13 +19,21 @@ export function nativeDocumentSession(editor: ReactiveEditor) {
   let service = sessions.get(editor); if (!service) sessions.set(editor, service = new NativeDocumentSession(editor)); return service;
 }
 async function request(action: string, body?: unknown, signal?: AbortSignal) {
-  const response = await fetch(`/api/native/${action}`, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal } : { signal });
+  const tracked = ['save', 'recover', 'save-recognized', 'recover-recognized'].includes(action);
+  const input = body as any, started = performance.now();
+  const diagnostic = tracked ? { action, requestId: crypto.randomUUID(), resourceId: input?.generation?.resourceId ?? input?.resourceId ?? input?.source?.resourceId, generation: typeof input?.generation === 'string' ? input.generation : input?.generation?.generation, filename: input?.location?.filename ?? input?.source?.location?.filename } : undefined;
+  if (diagnostic) browserSaveDiagnostics.record('native.request', diagnostic);
+  let response: Response;
+  try { response = await fetch(`/api/native/${action}`, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal } : { signal }); }
+  catch (error) { if (diagnostic) { const failure = diagnosticError(error); browserSaveDiagnostics.record(failure === 'network-request-failed' ? 'native.network-failure' : 'native.request-failed', { ...diagnostic, error: failure, elapsedMs: performance.now() - started }); } throw error; }
   let json: any;
   try { json = await response.json(); }
   catch (error) {
+    if (diagnostic) browserSaveDiagnostics.record('native.invalid-response', { ...diagnostic, status: response.status, elapsedMs: performance.now() - started });
     if (signal?.aborted) throw error;
     throw Object.assign(new Error('Native store returned an invalid response'), {status:response.status});
   }
+  if (diagnostic) browserSaveDiagnostics.record('native.response', { ...diagnostic, status: response.status, accepted: response.ok && json?.Success === true, phase: json?.Data?.result?.phase ?? json?.Data?.phase, preflight: json?.PublicationStarted === false, elapsedMs: performance.now() - started });
   if (!response.ok || !json?.Success) throw Object.assign(new Error(json?.Error ?? 'Native store request failed'), {status:response.status,preflight:json?.PublicationStarted===false}); return json.Data;
 }
 const sameLocation = (a: DocumentLocation, b: DocumentLocation) => a.folder === b.folder && a.filename === b.filename;

@@ -10,6 +10,7 @@ import { captureNative, nativeText } from './native-resource';
 import { createNativeDocumentStoreRouter } from '../../server/native-document-store.mjs';
 import { normalizeDefinitionOwnership } from '../block-tree/definition-ownership';
 import * as markdown from './markdown';
+import { browserSaveDiagnostics } from './browser-save-diagnostics';
 const cleanup:Array<()=>any>=[];afterEach(async()=>{for(const dispose of cleanup.splice(0).reverse())await dispose();vi.unstubAllGlobals();vi.restoreAllMocks();});
 async function host(readOnly=false) {
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'native-client-'));cleanup.push(()=>fs.rm(root,{recursive:true,force:true}));
@@ -76,10 +77,12 @@ it.each(['letter.ink','letter.phosphor','letter.mutable.json'])('saves only Muta
  await fs.copyFile(path.join(f.root,'rich.mutable.json'),path.join(f.root,filename));
  const id=await service.open(location),before=await fs.readFile(path.join(f.root,filename),'utf8');
  expect(service.isDirty(id)).toBe(false);
+ const diagnostics=vi.spyOn(browserSaveDiagnostics,'record').mockImplementation(()=>{});
  const projection=vi.spyOn(markdown,'exportMarkdown'),snapshot=vi.spyOn(editor.repository,'snapshot');
  const c=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='standoff-editor-block')!;
  const p=Object.values(editor.repository.readState().placements).find(p=>p.contentKey===c.key)!;
  for(let i=0;i<3;i++){editor.commands.replaceInlineRange(p.key,0,0,'Unsaved ');expect(service.isDirty(id)).toBe(true);await Promise.resolve();}
+ expect(diagnostics).not.toHaveBeenCalled();
  expect(snapshot).not.toHaveBeenCalled();snapshot.mockRestore();
  expect(await fs.readFile(path.join(f.root,filename),'utf8')).toBe(before);
  expect(await service.save(id,{folder:'.',filename:'Unwanted.mutable.json'})).toMatchObject({phase:'saved',dirty:false});
@@ -88,6 +91,30 @@ it.each(['letter.ink','letter.phosphor','letter.mutable.json'])('saves only Muta
  expect((await fs.readdir(f.root)).filter(name=>name.endsWith('.md'))).toEqual(['import.md']);
  expect(await fs.stat(path.join(f.root,'Unwanted.mutable.json')).catch(()=>null)).toBeNull();
  expect(projection).not.toHaveBeenCalled();
+});
+
+it('records a failed Save and exact-generation recovery without logging document contents',async()=>{
+ const f=await host(),{editor,service}=f.make(),location={folder:'.',filename:'rich.mutable.json'},id=await service.open(location);
+ const diagnostics=vi.spyOn(browserSaveDiagnostics,'record').mockImplementation(()=>{});
+ const c=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='standoff-editor-block')!;
+ const p=Object.values(editor.repository.readState().placements).find(p=>p.contentKey===c.key)!;
+ editor.commands.replaceInlineRange(p.key,0,0,'PRIVATE DOCUMENT TEXT');
+ const actual=globalThis.fetch;
+ vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+ expect(await service.save(id)).toMatchObject({phase:'failed',dirty:true});
+ const attempted=diagnostics.mock.calls.find(([event])=>event==='native.request')![1]!;
+ expect(attempted).toMatchObject({action:'save',resourceId:id,filename:location.filename});
+ expect(diagnostics.mock.calls.find(([event])=>event==='native.network-failure')![1]).toMatchObject({generation:attempted.generation,error:'network-request-failed'});
+ editor.commands.replaceInlineRange(p.key,0,0,'NEWER UNSAVED TEXT');
+ vi.stubGlobal('fetch',actual);
+ expect(await service.recover(id,location)).toMatchObject({phase:'saved',dirty:true});
+ const requests=diagnostics.mock.calls.filter(([event])=>event==='native.request').map(([,fields])=>fields!);
+ expect(requests[1].generation).toBe(requests[0].generation);
+ expect(requests[1].requestId).not.toBe(requests[0].requestId);
+ expect(diagnostics.mock.calls.find(([event])=>event==='native.response')![1]).toMatchObject({status:200,phase:'saved'});
+ expect(JSON.stringify(diagnostics.mock.calls)).not.toMatch(/PRIVATE DOCUMENT TEXT|NEWER UNSAVED TEXT|nativeHash/);
+ const saved=await fs.readFile(path.join(f.root,location.filename),'utf8');
+ expect(saved).toContain('PRIVATE DOCUMENT TEXT');expect(saved).not.toContain('NEWER UNSAVED TEXT');
 });
 
 it('keeps newer edits dirty when an earlier explicit save completes',async()=>{

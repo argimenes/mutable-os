@@ -586,3 +586,102 @@ it('resends text as new native identities, preserving the original and an unfini
  expect(c.draft()!.id).toBe(draftId);expect(c.references()!.text(draftText.contentKey)).toBe('Keep this unfinished draft.');expect(e.mounts.get(source.key)).toBe(mount);expect(c.references()!.text(source.contentKey)).toBe('Repeat this request.');expect(snapshots).not.toHaveBeenCalled();
  e.repository.undo();expect(c.committed()).toHaveLength(2);e.repository.undo();expect(c.committed()).toHaveLength(1);expect(c.draft()!.id).toBe(draftId);
 });
+
+it('retrieves an unselected AI-authored passage and anchors three quoted commentaries without replacing the source',async()=>{
+ const f=await setup(true,true,true,true,true),c=f.c!,e=f.editor;
+ const original='Historical objects acquire different meanings because each generation meets them with fresh concerns, memories, and moral questions. A coin, a uniform, or a ruin is never only what it once was; it is also what later people need it to signify. But meaning is not endlessly free: the object’s material traces resist whatever story we would like to tell. So the real question is not whether objects change, but how interpretation stays accountable to evidence while still remaining alive to the present.';
+ const quotes=['each generation meets them with fresh concerns, memories, and moral questions','A coin, a uniform, or a ruin is never only what it once was','the object’s material traces resist whatever story we would like to tell'];
+ const comments=['Generational concerns change which questions are asked of the evidence.','Later uses add meanings without erasing the object’s earlier history.','Material evidence constrains interpretations even when present concerns motivate them.'];
+ const sourceId=String(f.text!().payload.id),participant={id:c.resourceId()+':ai',kind:'ai',name:'AI participant'};
+ f.type!(original);
+ const draft=c.resolve(c.target(c.draft()!.id))!;
+ e.commands.setPayloadField(draft.key,'metadata',{dialectic:{...JSON.parse(JSON.stringify(draft.payload.metadata)).dialectic,author:'ai',participant}});c.submit();
+ f.type!('Return to the passage you wrote about historical objects. Choose three short quotations and present an annotated commentary with native source anchors.');c.submit();
+ const source=c.resolve(c.target(sourceId,'block'))!,cells=[...source.inlineContent],mount=e.mounts.get(source.key),snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(req,sources)=>{
+  expect(req.structuralContext.sources.some((s:any)=>s.target.blockId===sourceId)).toBe(false);
+  const inventory=await sources.tool({id:'discover',tool:'list_text_blocks',arguments:{...inventoryArgs,participantId:participant.id,fromOrdinal:1}});
+  expect(inventory.items).toHaveLength(1);expect(inventory.items[0]).toMatchObject({blockId:sourceId,readRequired:true,contribution:{author:'ai',ordinal:1,participant}});
+  const read=await sources.tool({id:'read',tool:'read_source',arguments:{handle:inventory.items[0].handle}});
+  expect(read).toMatchObject({status:'complete',sourceAuthor:'ai',text:original});
+  expect(read.handle).toMatch(/^src:[A-Za-z0-9_-]{22}:b[1-9][0-9]*$/);
+  const repeated=await sources.tool({id:'rediscover',tool:'list_text_blocks',arguments:{...inventoryArgs,participantId:participant.id,fromOrdinal:1}});
+  expect(repeated.items[0].handle).toBe(read.handle);expect(repeated.items[0].contribution.handle).toBe(inventory.items[0].contribution.handle);
+  const search=await sources.tool({id:'search',tool:'search_symposium',arguments:{query:'Historical objects acquire',limit:5}});
+  expect(search.items[0].handle).toBe(read.handle);expect(search.items[0].revision).toBe(read.revision);
+  const v:any=dcpResponse(req.exchange);v.anchors=quotes.map((exact,i)=>({id:'new:r'+(i+1),source:read.handle,revision:read.revision,selector:{exact,prefix:'',suffix:''}}));
+  v.replyTargets=v.anchors.map((a:any)=>a.id);v.glosses=comments.map((text,i)=>({id:'new:g'+(i+1),target:'new:r'+(i+1),type:'commentary',text}));
+  v.composition=quotes.flatMap((quote,i)=>[{id:'new:b'+(i*2+1),kind:'paragraph',markup:'“'+quote+'”',ranges:[]},{id:'new:b'+(i*2+2),kind:'paragraph',markup:comments[i],ranges:[]}]);return JSON.stringify(v);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(3);expect(source.inlineContent).toEqual(cells);expect(e.mounts.get(source.key)).toBe(mount);
+ const marks=source.payload.standoffProperties as any[],anchors=marks.filter(p=>p.type==='dialectic/range-anchor');expect(anchors).toHaveLength(3);
+ expect(anchors.map(a=>Array.from(original).slice(a.start,a.end+1).join(''))).toEqual(quotes);
+ expect(c.frontier()!.data.discursiveReferences?.map(r=>r.kind)).toEqual(['range','range','range']);
+ for(const mark of marks.filter(p=>p.type==='mutable/gloss'))expect(mark.metadata.dcp).toMatchObject({sourceAuthor:'ai',appliedTo:'existing-source'});
+ expect(marks.filter(p=>p.type==='mutable/gloss')).toHaveLength(3);
+ expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ e.repository.undo();expect(source.payload.standoffProperties??[]).toHaveLength(0);e.repository.redo();expect((source.payload.standoffProperties as any[]).filter(p=>p.type==='dialectic/range-anchor')).toHaveLength(3);
+});
+
+it('keeps typed handles stable within an exchange and rejects stale, unknown, wrong-kind and native-GUID authority',async()=>{
+ const f=await setup(true,true,true,true,true),c=f.c!,e=f.editor;f.type!('Rain is forecast.');c.submit();
+ const {prepare}=await import('./dcp/exchange');let historical:any;
+ for(let exchange=0;exchange<2;exchange++)await c.askMock(async(req,sources)=>{
+  const page=await sources.tool({id:'inventory',tool:'list_text_blocks',arguments:{...inventoryArgs,fromOrdinal:1}}),item=page.items[0];
+  const source=await sources.tool({id:'read',tool:'read_source',arguments:{handle:item.handle}});
+  expect(sources.issue(source.target)).toBe(item.handle);expect(item.contribution.handle).toMatch(/^src:[A-Za-z0-9_-]{22}:c[1-9][0-9]*$/);
+  expect(source.target.blockId).toBe(item.blockId);expect(source.owner).toBe(c.resourceId());
+  if(historical){expect(source.handle).not.toBe(historical.handle);expect(source.revision).not.toBe(historical.revision);expect(await sources.source(historical.handle)).toMatchObject({status:'unauthorized'});}
+  const valid:any=dcpResponse(req.exchange);valid.composition=[{id:'new:b1',kind:'paragraph',markup:'A source quotation.',ranges:[]}];valid.anchors=[{id:'new:r1',source:source.handle,revision:source.revision,selector:{exact:'Rain',prefix:'',suffix:''}}];valid.replyTargets=['new:r1'];
+  const revision=e.repository.state.revision;
+  for(const handle of ['new:b1','new:r1',item.blockId,source.handle.replace(/b[0-9]+$/,'b99999'),item.contribution.handle,...historical?[historical.handle]:[]]){
+   const bad=structuredClone(valid);bad.anchors[0].source=handle;await expect(prepare(JSON.stringify(bad),req.exchange,c.resourceId(),e.visualEffects,sources,true)).rejects.toThrow();
+  }
+  for(const mutate of [
+   (v:any)=>v.anchors[0].revision=historical?.revision??'unissued-revision',
+   (v:any)=>v.anchors[0].selector.exact='Not the source',
+   (v:any)=>v.replyTargets=['new:b1'],
+   (v:any)=>v.replyTargets=['new:r999'],
+   (v:any)=>v.arguments=[{id:'new:arg1',anchor:source.handle}],
+   (v:any)=>v.relations=[{id:'new:rel1',kind:'argument',type:'supports',from:'new:r1',to:'new:r1'}],
+   (v:any)=>v.entities=[{id:'new:b1',name:'Rain',typename:'Concept',description:'',aliases:[]}]
+  ]){const bad=structuredClone(valid);mutate(bad);await expect(prepare(JSON.stringify(bad),req.exchange,c.resourceId(),e.visualEffects,sources,true)).rejects.toThrow();}
+  expect(()=>sources.issue({...source.target,resourceId:'foreign-document'})).toThrow('Outside Symposium');
+  expect(e.repository.state.revision).toBe(revision);historical=source;return JSON.stringify(valid);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(3);
+});
+
+it('repairs a typed alias collision once with stable source authority and all dependent references updated',async()=>{
+ const f=await setup(true,true,true,true,true),c=f.c!,e=f.editor;f.type!('Rain is forecast.');const original=f.text!();c.submit();
+ let request:any,source:any,turns=0;
+ const receipt={provider:'openai',model:'fixture',startedUtc:'start',completedUtc:'end',usage:null,stop:'completed',cost:{status:'unknown'}};
+ vi.stubGlobal('fetch',vi.fn(async(url:any,init:any)=>{
+  const body=init?.body&&JSON.parse(init.body);
+  if(url.endsWith('/session'))return Response.json({token:'fixture-token'});
+  if(url.endsWith('/settings'))return Response.json({settings:body.settings,ready:true});
+  if(url.endsWith('/exchange')){request=body.request;return Response.json({id:'fixture-exchange',settings:c.providerSettings()});}
+  if(url.endsWith('/turn')){
+   turns++;let calls:any[]=[],text='';
+   if(body.round===0)calls=[{id:'discover',tool:'list_text_blocks',arguments:inventoryArgs}];
+   else if(body.round===1)calls=[{id:'read',tool:'read_source',arguments:{handle:body.results[0].result.items[0].handle}}];
+   else {
+    if(body.round===2)source=body.results[0].result;
+    else {expect(body.round).toBe(3);expect(body.repair).toBe(true);expect(body.diagnostic).toMatchObject({code:'identity',path:'$.composition[0]'});expect(c.committed()).toHaveLength(1);}
+    const anchor=body.round===2?'new:r1':'new:r2',v:any=dcpResponse(request.exchange);
+    v.composition=[{id:body.round===2?'new:r1':'new:b1',kind:'paragraph',markup:'<annotation type="dialectic/suggestion" id="new:s1">Plan indoors.</annotation>',ranges:[]}];
+    v.anchors=[{id:anchor,source:source.handle,revision:source.revision,selector:{exact:'Rain is forecast.',prefix:'',suffix:''}}];v.replyTargets=[anchor];
+    v.interpretations=[{id:'new:m1',target:anchor,type:'dialectic/claim',ref:null,attributes:[]}];v.glosses=[{id:'new:g1',target:anchor,type:'commentary',text:'Weather informs the plan.'}];
+    v.arguments=[{id:'new:arg1',anchor},{id:'new:arg2',anchor:'new:s1'}];v.relations=[{id:'new:rel1',kind:'argument',type:'supports',from:'new:arg1',to:'new:arg2'}];text=JSON.stringify(v);
+   }
+   return new Response(JSON.stringify({type:'result',text,calls,receipt})+'\n');
+  }return Response.json({});
+ }));
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.configureProvider({provider:'openai',model:'fixture',maxOutputTokens:2048,repair:true,cadence:'conversational'},'fixture-key');await c.ask();
+ expect(c.notice()).toBe('');expect(turns).toBe(4);expect(c.committed()).toHaveLength(2);
+ const d=c.frontier()!.data.dcp!,ids=d.identityMap as any;expect(d.provider?.attempts.filter(a=>a.repair)).toHaveLength(1);expect(d.tools).toHaveLength(2);
+ expect(ids['new:r1']).toBeUndefined();expect(c.resolveReference(ids['new:r2']).text).toBe('Rain is forecast.');expect(ids['new:arg1'].kind).toBe('argument');expect(ids['new:rel1'].kind).toBe('argument-relation');
+ expect((original.payload.standoffProperties as any[]).filter(p=>p.type==='dialectic/range-anchor')).toHaveLength(1);
+ expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});

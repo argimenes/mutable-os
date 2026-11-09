@@ -1,3 +1,4 @@
+import {validateGeneratedIdentity,type GeneratedIdentityKind} from './identities';
 import {nativeAuthoringInstructions,authoringExamples} from './authoring';
 import {DcpValidationError,validationDiagnostic} from './diagnostics';
 import {responseIntents} from './provider-contract';
@@ -39,7 +40,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  for(const field of semantics?['promotionRecommendations']:['entities','arguments','glosses','relations','promotionRecommendations'])if(list(response[field],64).length)throw Error(semantics?`${field} authoring remains deferred beyond Stage 4B`:`${field} authoring is unavailable until Stage 4B`);
  if(list(response.suggestions,4).length)throw Error('Continuation suggestions are not enabled in Stage 4A');
  const provenance:Provenance={version:1,actor,exchangeId,protocol:'dcp/1.0',sourceResourceId:resourceId,appliedTo:'generated',sourceAuthor:actor,participantId:defaultParticipant(resourceId,'ai').id};
- const ids=new Set<string>();const claim=(id:string)=>{if(typeof id!=='string'||!/^[-a-zA-Z0-9_.:]{1,128}$/.test(id)||['__proto__','prototype','constructor'].includes(id)||ids.has(id)||sources.handles?.has(id))throw Error('Duplicate or invalid provisional ID');ids.add(id);};
+ const ids=new Set<string>();const claim=(id:string,kind:GeneratedIdentityKind)=>{validateGeneratedIdentity(id,kind);if(typeof id!=='string'||!/^[-a-zA-Z0-9_.:]{1,128}$/.test(id)||['__proto__','prototype','constructor'].includes(id)||ids.has(id)||sources.handles?.has(id))throw Error('Duplicate or invalid provisional ID');ids.add(id);};
  const definitions:Record<string,any>={},aliases=new Map<string,ReplyTarget>(),ranges=new Map<string,{key?:string;blockId:string;start:number;end:number;text:string;sourceAuthor:string}>(),annotations=new Map<string,any[]>();
  const semantic=semanticPreparation(sources,resourceId,definitions,aliases,claim,provenance);if(semantics){path='$.entities';semantic.entities(response.entities);}
  let nodes=0,characters=0;
@@ -51,7 +52,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  };
  const build=(node:any,depth=0):ExistingBlockDto=>{
   if(depth>12)throw Error('DCP composition depth exceeded');
-  if(!node||typeof node!=='object')throw Error('Invalid composition node');claim(node.id);
+  if(!node||typeof node!=='object')throw Error('Invalid composition node');claim(node.id,'b');
   if(node.kind==='paragraph'){
    keys(node,['id','kind','markup','ranges']);const parsed=markup(node.markup,list(node.ranges,128),registry,provenance,claim,semantics?semantic.mark:undefined);characters+=[...parsed.text].length;if(characters>24000)throw Error('DCP output Cell budget');
    const block=dto('standoff-editor-block',{text:parsed.text,standoffProperties:parsed.marks}),properties=block.standoffProperties as any[];
@@ -68,12 +69,12 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  };
  const composition=list(response.composition,64);if(!composition.length)throw Error('Empty contribution');const children=composition.map((n,i)=>{path='$.composition['+i+']';return build(n);});
  for(const [i,a] of list(response.anchors,32).entries()){path='$.anchors['+i+']';
-  keys(a,['id','source','revision','selector']);keys(a.selector,['exact','prefix','suffix']);claim(a.id);
+  keys(a,['id','source','revision','selector']);keys(a.selector,['exact','prefix','suffix']);claim(a.id,'r');
   const found=await sources.exact(a.source,a.revision,a.selector),range={key:found.node.key,blockId:String(found.node.payload.id),start:found.start,end:found.end,text:found.text,sourceAuthor:found.sourceAuthor};
   let properties=annotations.get(range.key);if(!properties)annotations.set(range.key,properties=[]);properties.push(anchor(a.id,range));
  }
  for(const [i,item] of list(response.interpretations,64).entries()){path='$.interpretations['+i+']';
-  keys(item,['id','target','type','ref','attributes']);claim(item.id);if(item.ref!==null&&!semantics||list(item.attributes,16).length)throw Error('Interpretation references/attributes unavailable in 4A');
+  keys(item,['id','target','type','ref','attributes']);claim(item.id,'m');if(item.ref!==null&&!semantics||list(item.attributes,16).length)throw Error('Interpretation references/attributes unavailable in 4A');
   const range=ranges.get(item.target);if(!range?.key)throw Error('Interpretation needs a proposed exact source anchor');
   const spec=item.ref!==null&&semantics?semantic.mark(item.type,item.ref):annotation(item.type,{},registry,provenance);if(spec.type!==ENTITY_REFERENCE&&spec.type!==INERT&&!classifications.includes(spec.type))throw Error('Only discursive classifications may be applied to existing sources in 4A');annotations.get(range.key)!.push({id:crypto.randomUUID(),...spec,start:range.start,end:range.end-1,metadata:{...spec.metadata,dcp:{...provenance,appliedTo:'existing-source',sourceAuthor:range.sourceAuthor}}});
  }

@@ -84,3 +84,20 @@ it.each(['gpt-5.4-mini','gpt-5.4-mini-2026-03-17','gpt-4.1','custom-model'])('co
  await providerTurn(state,'fixture-key',new AbortController().signal,()=>{},fetcher);
  const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(body.reasoning).toEqual(model.startsWith('gpt-5.4-mini')?{effort:'low'}:undefined);expect(body.max_output_tokens).toBe(defaultProviderSettings.maxOutputTokens);
 });
+
+it.each(['openai','anthropic'] as Provider[])('%s sends source-operation requirements on the initial turn, after conversational defaults',async provider=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ await providerTurn(conversation({...defaultProviderSettings,provider},request),'fixture-key',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),instructions=body.instructions??body.system;
+ expect(instructions.indexOf('REQUESTED SOURCE OPERATIONS')).toBeGreaterThan(instructions.indexOf('a short acknowledgement is valid'));
+ expect(instructions).toContain('Before declaring the passage unavailable, use list_text_blocks or search_symposium');
+ expect(instructions).toContain('read_source to obtain its current text and revision');
+ expect(instructions).toContain('Do not ask the participant for a source handle');
+ expect(instructions).toContain('participant and contribution chronology');
+ expect(instructions).toContain('including when you authored it yourself');
+ expect(instructions).toContain('Reproducing those quotations in composition is allowed');
+ expect(instructions).toContain('does not substitute for native source anchoring');
+ expect(instructions).toContain('Keep source anchor aliases distinct from any aliases on reproduced composition text');
+ expect(body.tools.map((tool:any)=>tool.name).sort()).toEqual(['list_text_blocks','read_source','search_symposium']);
+ expect(body.max_output_tokens??body.max_tokens).toBe(defaultProviderSettings.maxOutputTokens);
+});

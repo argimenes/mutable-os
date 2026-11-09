@@ -67,6 +67,8 @@ export type FeatureFlags = Readonly<{
   iiifResourceLoaders: boolean;
   /** Explicit global Cavern setup and startup lifecycle. */
   cavernStartup: boolean;
+  /** Bounded browser-local Save/connection evidence; no document content. */
+  browserSaveDiagnostics: boolean;
   /** Generic Desktop Window maximize/restore; normal geometry is retained. */
   windowMaximize: boolean;
   /** Composite Document application; transient tabs share canonical content. */
@@ -209,6 +211,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   deterministicAcademicResources: true,
   iiifResourceLoaders: true,
   cavernStartup: true,
+  browserSaveDiagnostics: true,
   windowMaximize: true,
   flint: true,
   flintCompactShell: true,

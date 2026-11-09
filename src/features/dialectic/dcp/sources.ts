@@ -1,3 +1,4 @@
+import {sourceScope,sourceIdentity} from './identities';
 import {DcpInventory} from './inventory';
 import {waitForQuery} from '../../../application/facts-query-provider';
 import {ScopedEntities} from '../../../application/scoped-entities';
@@ -15,6 +16,7 @@ export type SourceStatus='complete'|'truncated'|'missing'|'ambiguous'|'unavailab
 export class DcpSources {
  readonly handles=new Map<string,ReplyTarget>();
  private issued=new Map<string,string>();
+ private readonly identityScope=sourceScope();
  readonly fences=new Map<string,ContentRecord>();
  readonly revisions=new Map<string,string>();
  readonly diagnostics={visited:0,characters:0,reads:0,searches:0,inventories:0,inventoryVisited:0,inventoryPreviewCells:0};
@@ -35,7 +37,7 @@ export class DcpSources {
  }
  check(){if(this.signal.aborted)throw Error('DCP cancelled');if(Date.now()>this.deadline)throw Error('DCP deadline exceeded');if(this.stale)throw Error('Selected context changed; request a fresh DCP response.');for(const [h,text]of this.glossValues)if(this.resolve(this.target(h)).text!==text)throw Error('Selected context changed');for(const [key,record]of this.fences)if(this.editor.repository.readState().contents[key]!==record)throw Error('Selected context changed; request a fresh DCP response.');}
  fence(key:string){const c=this.editor.repository.readState().contents[key];if(!c)throw Error('Source unavailable');if(!this.fences.has(key))this.fences.set(key,c);this.check();}
- issue(target:ReplyTarget){if(target.resourceId!==this.owner)throw Error('Outside Symposium');const key=targetKey(target);let handle=this.issued.get(key);if(!handle){handle='source-'+crypto.randomUUID();this.issued.set(key,handle);this.handles.set(handle,target);}return handle;}
+ issue(target:ReplyTarget){if(target.resourceId!==this.owner)throw Error('Outside Symposium');const key=targetKey(target);let handle=this.issued.get(key);if(!handle){handle=sourceIdentity(this.identityScope,target.kind,this.issued.size+1);this.issued.set(key,handle);this.handles.set(handle,target);}return handle;}
  target(handle:string){const target=this.handles.get(handle);if(!target)throw Error('Unauthorized source handle');return target;}
  private committed(n:BlockNode){let cur:BlockNode|undefined=n;for(let depth=0;cur&&depth<128;depth++,cur=this.parent(cur.key)){const c=contribution((cur.payload.metadata as any)?.dialectic);if(c)return c.state==='committed';}return false;}
  definition(t:ReplyTarget){if(t.resourceId!==this.owner)throw Error('Definition belongs to another Document');this.fence(this.entities.root.contentKey);const id=t.anchorId??t.argumentId??t.definitionId??t.entity?.entityId;return id?this.entities.registry()[id]:undefined;}
