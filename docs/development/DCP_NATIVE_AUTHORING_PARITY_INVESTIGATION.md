@@ -1,5 +1,7 @@
 # Native editor / DCP authoring parity
 
+Current direction — 9 November 2026: Stage 3C.1 is accepted. Native editor infrastructure remains the shared architectural foundation; exhaustive DCP exposure is no longer the immediate objective. The current [agent-facing vocabulary](DCP_CURRENT_AUTHORING_VOCABULARY.md) and [curation recommendations](DCP_VOCABULARY_CURATION_RECOMMENDATIONS.md) guide the next review. Retained-family increments 3C.2–3C.5 are paused, with no 3C.2 implementation underway; cloning/acquisition 3D/3E are deferred. All qualified capabilities and defaults remain unchanged. The parity inventory below remains evidence, not a mandate to implement every registered type.
+
 9 November 2026. Investigation and bounded implementation proposal; no architecture implementation in this change. Surface-backed Markdown fallback is deferred.
 
 ## Decision

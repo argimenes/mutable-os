@@ -433,7 +433,12 @@ it('keeps the documentary vocabulary aligned with native registrations and the D
   expect(data.wire.initial).toEqual(baseline.wire.initial);
   expect(data.wire.tools).toEqual(baseline.wire.tools);
   expect(data.wire.catalogueDetails).toEqual(baseline.wire.catalogueDetails);
-  expect(data.wire.discoveryResults).toEqual(baseline.wire.discoveryResults);
+  // Stage A makes qualified native inspection independent of creation-stage
+  // flags. Retain the historical wire evidence and separately assert its new
+  // bounded, explicitly non-lossless reading projection.
+  const {inspection,...sourceWithoutInspection}=data.wire.discoveryResults.read_source;
+  expect(inspection).toMatchObject({version:1,lossless:false,root:{nativeId:'audit-text',nativeType:'standoff-editor-block'}});
+  expect({...data.wire.discoveryResults,read_source:sourceWithoutInspection}).toEqual(baseline.wire.discoveryResults);
   expect(data.nativeAppearanceFontSizes).toEqual(baseline.nativeAppearanceFontSizes);
   expect(data.initialisPreset).toEqual(baseline.initialisPreset);
   for(const p of data.standoffProperties){const previous=baseline.standoffProperties.find((v:any)=>v.id===p.id);expect(p.attributes.parameters).toEqual(previous.attributes.parameters);expect(p.toolbarDefaults).toEqual(previous.toolbarDefaults);expect(p.dcp).toEqual(previous.dcp);}

@@ -51,3 +51,31 @@ export function withCompoundDefaults(value:any):any {
  if(!value||typeof value!=='object')return value;
  return {...Object.fromEntries(Object.entries(value).map(([k,v])=>[k,withCompoundDefaults(v)])),...(['paragraph','heading'].includes(value.kind)&&!Object.hasOwn(value,'margins')?{margins:null}:{})};
 }
+
+/** Vocabulary-specific sections only. Discovery, identity, source authority and
+ * immutable-contribution rules retain the established text and precedence. */
+export function vocabularyInstructions(v:import('./vocabulary-contract').VocabularySnapshot){
+ const allows=(id:string)=>v.capabilities.includes(id);
+ let shared=nativeAuthoringInstructions.split('NATIVE COMPOSITION AND ANNOTATIONS')[0];
+ if(!allows('reference.reply'))shared=shared.replace(/replyTargets is an array[^\n]*\n/,'');
+ const source=nativeAuthoringInstructions.split('EXISTING PASSAGES\n')[1].split('SEMANTIC IDENTITIES')[0].split('interpretations:')[0];
+ return shared+'NATIVE COMPOSITION AND ANNOTATIONS\nUse the negotiated schema for enabled composition and configuration. Paragraph markup is restricted XML, not HTML or Markdown. Only types in legend.types have active authoring permission. Optional annotation IDs declare generated passages. For overlapping spans use boundary elements and ranges with typed response-local aliases. \n'+
+ (allows('source.anchor')?'EXISTING PASSAGES\n'+source:'')+
+ (allows('source.classification')?'Existing-source interpretations target a fresh exact source anchor and use only enabled legend types. Annotation is additive; it never rewrites source text.\n':'')+
+ (allows('composition.tasks')?'Submitted checked state is immutable; draft task controls remain interactive.\n':'')+
+ (['media.external-image','media.video','media.embed'].some(allows)?'Enabled external-media references can be introduced without a pre-existing source Block; browser loading is not retained acquisition.\n':'')+
+ (allows('semantic.gloss')?'Glosses attach independent explanatory text to an explicit passage handle or alias.\n':'')+
+ (allows('semantic.entity')?'New Entities are owned by this Document; there are no global mutations.\n':'')+
+ (v.standoff.includes('mutable/entity-reference')?'Entity ref is an issued or newly declared Entity handle, never a native GUID. Entity mentions may reference issued existing Entities without permission to create new Entities.\n':'')+
+ (allows('semantic.argument')?'An Argument gives an owned passage an independent identity; classification alone does not create one.\n':'')+
+ (allows('semantic.argument-relation')?'Argument relations use Argument endpoints, not Blocks or passage aliases. from acts toward to; depends-on points to the prerequisite. Existing issued endpoints do not require creation of new Arguments.\n':'')+
+ (allows('semantic.entity-relation')?'Entity relations require scoped Entity endpoints and at least one owned endpoint; existing endpoints do not require new Entity creation.\n':'')+
+ 'Disabled operations cannot be substituted through other markup or configuration. Unknown semantic retention is inert compatibility only. Return all schema fields, with empty disabled arrays; native validation and atomic admission remain authoritative.';
+}
+export function vocabularySourceInstructions(v:import('./vocabulary-contract').VocabularySnapshot){
+ // Retain source-recovery behaviour without a fixed bold/anchor example that
+ // could contradict an individually disabled authoring capability.
+ const before=sourceOperationInstructions.split(' Example wiring')[0];
+ if(v.capabilities.includes('source.anchor'))return before+' Never anchor the current instruction as a substitute. If an operation is disabled in this vocabulary, explain that limitation after identifying the requested source; do not claim it was authored.';
+ return sourceOperationInstructions.split('For requested quotation commentary:')[0]+'Source reading remains available. This vocabulary does not allow creating source anchors; explain that authoring limitation when requested, without treating it as a source-access failure.';
+}

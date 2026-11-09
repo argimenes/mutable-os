@@ -1,3 +1,4 @@
+import {requireStandoff,type VocabularySnapshot} from './vocabulary-contract';
 import type {GeneratedIdentityKind} from './identities';
 import {ENTITY_REFERENCE} from '../../../feature-api/scoped-entities';
 import {standoffStyleSchemas,standoffStyleSchema} from '../../../rendering/standoff-styles';
@@ -7,12 +8,14 @@ export const classifications=['claim','question','speculation','suggestion','obj
 export const INERT='dialectic/unknown-semantic';
 export interface Provenance {version:1;actor:'mock'|'ai';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string;participantId?:string}
 export interface Mark {id:string;type:string;start:number;end:number;value?:string;metadata:Record<string,any>}
+export const entityMentionSemantic={purpose:`Classify/style a passage: ${ENTITY_REFERENCE}`,attributes:['ref'],ai:'authorable' as const,rendering:'descriptive annotation',validation:'nonempty Cell range; no additional attributes'};
 export function registerDcpTypes(registry:VisualEffectRegistry,semantics=false){
- const stops= [...classifications,INERT,...(semantics?[ENTITY_REFERENCE]:[])].filter(t=>!registry.type(t)).map(type=>registry.registerType({type,renderers:[],semantic:{purpose:type===INERT?'Preserved inert semantic declaration':`Classify/style a passage: ${type}`,attributes:type===ENTITY_REFERENCE?['ref']:[],ai:type===INERT?'inert':'authorable',rendering:type.startsWith('style/')?'native text styling':'descriptive annotation',validation:'nonempty Cell range; no additional attributes'}}));
+ const stops= [...classifications,INERT,...(semantics?[ENTITY_REFERENCE]:[])].filter(t=>!registry.type(t)).map(type=>registry.registerType({type,renderers:[],semantic:type===ENTITY_REFERENCE?entityMentionSemantic:{purpose:type===INERT?'Preserved inert semantic declaration':`Classify/style a passage: ${type}`,attributes:type===ENTITY_REFERENCE?['ref']:[],ai:type===INERT?'inert':'authorable',rendering:type.startsWith('style/')?'native text styling':'descriptive annotation',validation:'nonempty Cell range; no additional attributes'}}));
  return ()=>stops.reverse().forEach(f=>f());
 }
 export function legend(registry:VisualEffectRegistry,nativeAuthoring=false,textAuthoring=false){return [...Object.entries(standoffStyleSchemas).filter(([type])=>!registry.type(type)).map(([type,schema])=>({type,semantic:schema.semantic})),...registry.definitions()].filter(t=>t.semantic?.ai==='authorable').map(t=>({type:t.type,...t.semantic})).concat(nativeAuthoring?Object.entries(standoffStyleSchemas).filter(([,s])=>s.authoring&&(!s.authoring.stage||textAuthoring)).map(([type,s])=>({type,purpose:s.authoring!.purpose,attributes:Object.keys(s.authoring!.parameters),ai:'authorable' as const,rendering:'native text styling',validation:'shared native property preparation'})):[]);}
-export function annotation(type:string,attrs:Record<string,string>,registry:VisualEffectRegistry,provenance:Provenance,nativeAuthoring=false,textAuthoring=false){
+export function annotation(type:string,attrs:Record<string,string>,registry:VisualEffectRegistry,provenance:Provenance,nativeAuthoring=false,textAuthoring=false,vocabulary?:VocabularySnapshot){
+ requireStandoff(vocabulary,type,!!registry.type(type)||!!standoffStyleSchemas[type]);
  if(type===ENTITY_REFERENCE)throw Error('Scoped Entity annotations require an admitted reference');
  if(Object.keys(attrs).length>16||Object.entries(attrs).some(([k,v])=>k.length>128||typeof v!=='string'||v.length>4096))throw Error('Annotation attribute budget exceeded');
  const descriptor=standoffStyleSchemas[type]?.authoring;
@@ -26,7 +29,7 @@ export function annotation(type:string,attrs:Record<string,string>,registry:Visu
 }
 /** XML structural validation + exact decoded text. CR is encoded only in text
  * tokens before SAX parsing; literal line breaks in attributes are forbidden. */
-export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,provenance:Provenance,claim:(id:string,kind:GeneratedIdentityKind)=>void,reference?:((type:string,handle:string)=>ReturnType<typeof annotation>),nativeAuthoring=false,textAuthoring=false){
+export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,provenance:Provenance,claim:(id:string,kind:GeneratedIdentityKind)=>void,reference?:((type:string,handle:string)=>ReturnType<typeof annotation>),nativeAuthoring=false,textAuthoring=false,vocabulary?:VocabularySnapshot){
  if(typeof source!=='string'||source.length>32768||/<!|<\?/.test(source)||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source))throw Error('Invalid or oversized annotation markup');
  // This restricted grammar admits no angle brackets in attributes. XML entities
  // remain available; text CR survives XML's normal line-ending normalization.
@@ -46,7 +49,7 @@ export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,
   }
   if(tag.name!=='annotation'||!attrs.type)throw Error('Unsupported markup element');
   const {type,id,...rest}=attrs;if(id)claim(id,'s');
-  const spec=rest.ref!==undefined&&reference?(Object.keys(rest).length===1?reference(type,rest.ref):(()=>{throw Error('Unsupported reference attributes');})()):annotation(type,rest,registry,provenance,nativeAuthoring,textAuthoring);
+  const spec=rest.ref!==undefined&&reference?(Object.keys(rest).length===1?reference(type,rest.ref):(()=>{throw Error('Unsupported reference attributes');})()):annotation(type,rest,registry,provenance,nativeAuthoring,textAuthoring,vocabulary);
   stack.push({tag:tag.name,start:cells,id,spec});
  });
  parser.on('closetag',()=>{const entry=stack.pop()!;if(!entry.spec)return;if(cells===entry.start)throw Error('Empty annotation');marks.push({id:crypto.randomUUID(),...entry.spec,start:entry.start,end:cells-1});if(entry.id)anchors.set(entry.id,{start:entry.start,end:cells});});
@@ -56,7 +59,7 @@ export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,
   if(r.ref!==null&&!reference||!nativeAuthoring&&(!Array.isArray(r.attributes)||r.attributes.length))throw Error('Range attributes/references unavailable in 4A');
   const attrs=attributeValues(r.attributes);if(r.ref!==null&&Object.keys(attrs).length)throw Error('Entity reference attributes unavailable');
   const start=boundaries.get(r.from),end=boundaries.get(r.to);if(start===undefined||end===undefined||end<=start)throw Error('Missing/reversed/empty range boundary');
-  marks.push({id:crypto.randomUUID(),...(r.ref!==null&&reference?reference(r.type,r.ref):annotation(r.type,attrs,registry,provenance,nativeAuthoring,textAuthoring)),start,end:end-1});anchors.set(r.id,{start,end});
+  marks.push({id:crypto.randomUUID(),...(r.ref!==null&&reference?reference(r.type,r.ref):annotation(r.type,attrs,registry,provenance,nativeAuthoring,textAuthoring,vocabulary)),start,end:end-1});anchors.set(r.id,{start,end});
  }
  return {text,marks,anchors};
 }

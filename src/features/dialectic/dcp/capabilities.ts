@@ -1,3 +1,4 @@
+import {permits,vocabularyExample,type VocabularySnapshot,type VocabularyDescriptor} from './vocabulary-contract';
 import {retainedPdfLimits,retainedPdfTypes} from './retained-pdfs';
 import {externalMediaLimits} from '../../../block-tree/media-authoring';
 import {imageBindingLimits} from './managed-images';
@@ -50,7 +51,7 @@ export const capabilityInstructions='CAPABILITY DISCOVERY: capabilities is the c
 
 /** One exchange snapshot: fixed adapter lookups only; no Document traversal,
  * repository subscription, typing hook or provider-model capability inference. */
-export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'features'|'visualEffects'>){
+export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'features'|'visualEffects'>,selection?:VocabularySnapshot){
  const stage1=editor.features.dcpNativeAuthoringStage1===true;
  const retainedPdfAuthoring=stage1&&editor.features.dcpNativeAuthoringStage3RetainedPdf===true;
  const externalMediaAuthoring=stage1&&editor.features.dcpNativeAuthoringStage3ExternalMedia===true;
@@ -59,7 +60,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
  const compoundAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Compounds===true;
  const layoutAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Layouts===true;
  const textAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Text===true;
- const semanticTypes=legend(editor.visualEffects,stage1,textAuthoring);
+ const semanticTypes=legend(editor.visualEffects,stage1,textAuthoring).filter(t=>!selection||selection.standoff.includes(t.type));
  const projected=adapters.map(a=>({...a})).map((a):Adapter=>!stage1?a:a.id==='composition.heading'?{...a,schema:'Heading',purpose:headingOperation.purpose,nativeOperation:'prepareHeading / headingProperty',nativeEffects:headingOperation.nativeEffects,guidance:'level 1–6 creates a native TextBlock with the heading Block property; same preparation as the style bar.',example:{...paragraph,kind:'heading',level:2}}:a.id==='composition.card-grid'?{...a,schema:'Grid',purpose:gridOperation.purpose,nativeOperation:'prepareGrid',nativeEffects:gridOperation.nativeEffects,constraints:gridOperation.constraints,guidance:'Use kind:grid with rectangular rows of nonempty cell content arrays. Native preparation supplies row/cell ownership; no spatial placement or merged cells in this creation projection.',example:{id:'new:b2',kind:'grid',rows:[[[paragraph]]]}}:a.id==='media.youtube'?{...a,schema:'YouTube',purpose:youtubeOperation.purpose,nativeOperation:'prepareYouTube / youtubeId',nativeEffects:youtubeOperation.nativeEffects,resources:'validated-external-reference',prerequisites:youtubeOperation.prerequisites,guidance:'Use a native-valid URL or video ID. No trusted capture, managed asset or generation is required. External playback availability is not guaranteed.',example:{id:'new:b1',kind:'youtube',url:'Zsqep7_9_mw'}}:a.id==='source.classification'?{...a,guidance:'Target a fresh exact source anchor. Stage 1 also admits formatting from the initial legend through this same interpretations shape; attributes use the native property descriptor. Existing text remains immutable.'}:a);
  if(stage1)projected.push({id:'formatting.colour',name:'Text colour',purpose:standoffStyleSchemas['text/colour'].authoring!.purpose,read:'native-property-value',nativeTypes:text,schema:'Span',nativeOperation:'standoffStyleSchemas[text/colour].authoring.prepare',nativeEffects:['text/colour','value'],parameters:standoffStyleSchemas['text/colour'].authoring!.parameters,guidance:'Core formatting. Inline value and explicit ranges/interpretations attributes use the same native colour validation. Other unadvertised decorative/experimental styles remain non-authorable.',example:{markup:'<annotation type="text/colour" value="#336699">Evidence</annotation>'}});
  if(stage1)projected.push({id:'inspection.native',name:'Native inspection',purpose:'Understand existing compound content and its persistent properties using current source authority.',read:'bounded-native-inspection',nativeTypes:[],inspectionOnly:true,guidance:'Call read_source with an issued handle. Inspect the related child/owned-relation tree, native identities, properties and omissions. This is not lossless serialisation or a native clone operation.',example:{tool:'read_source',arguments:{handle:'CURRENT_SOURCE.handle'}}});
@@ -68,7 +69,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   Object.assign(code,{schema:'Code',read:'native-code-and-configuration',feature:'standoffCodeHighlighting',purpose:codeOperation.purpose,nativeOperation:'standoffCodeDto',nativeEffects:codeOperation.nativeEffects,guidance:'Literal text and language; native syntax for JS/TS/Markdown, other labels remain unhighlighted. Host supplies the owned TextBlock. No annotations/markup in code.text.',example:{id:'new:b1',kind:'code',language:'typescript',text:'const evidence = 1;'}});
   projected.push({id:'composition.source',name:'Source content',schema:'Source',feature:'documentInterchange',purpose:sourceOperation.purpose,read:'native-literal-source',nativeTypes:[...sourceOperation.nativeEffects],nativeOperation:'sourceBlockDto / sourcePayload',nativeEffects:sourceOperation.nativeEffects,guidance:'Exact literal Markdown/HTML; isolated native preview. Not a composition fallback, resource import, or permission to execute HTML.',example:{id:'new:b1',kind:'source',format:'markdown',text:'# Retained source'}});
   projected.push({id:'configuration.text',name:'Text appearance',schema:'TextStyle',purpose:textAppearanceOperation.purpose,read:'native-block-properties',nativeTypes:text,nativeOperation:'prepareTextAppearance / textAppearanceProperty',nativeEffects:textAppearanceOperation.nativeEffects,guidance:'Paragraph/heading textStyle is null or an object with nullable alignment/indent/size. Heading size must be null: use level. No existing-content reconfiguration.',example:{alignment:'center',indent:1,size:null}});
-  const descriptors=Object.entries(standoffStyleSchemas).filter(([,s])=>s.authoring?.stage==='text');
+  const descriptors=Object.entries(standoffStyleSchemas).filter(([type,s])=>s.authoring?.stage==='text'&&(!selection||selection.standoff.includes(type)));
   projected.push({id:'formatting.core',name:'Core formatting and references',schema:'Span',purpose:'Mark revisions, notation, emphasis and links using stable native text properties.',read:'native-annotation-values',nativeTypes:text,nativeOperation:'standoffStyleSchemas[type].authoring.prepare',nativeEffects:descriptors.map(([type])=>type),parameters:Object.fromEntries(descriptors.map(([type,s])=>[type,s.authoring!.parameters])),guidance:'Inline markup, explicit ranges and existing-source interpretations share admission. Strikethrough/subscript/superscript/highlight take no attributes. Background colour and hyperlink require value. Decorative effects remain excluded.',example:{markup:'<annotation type="style/strikethrough">Earlier</annotation> <annotation type="reference/url" value="https://example.org/">source</annotation>'}});
   for(const a of projected){if(a.id==='composition.paragraph'||a.id==='composition.heading'){a.guidance+=' Stage 2A: include textStyle:null or explicit alignment/indent/size (heading size stays null).';}}
   for(const a of projected)if(a.example)a.example=withTextStyleDefaults(a.example);
@@ -105,27 +106,35 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   {id:'widget.object3d',name:'3D object',purpose:'Illustrate a native coffee cup with authored view, lighting and scene settings.',nativeTypes:['3d-object-block'],schema:'Object3D',nativeOperation:'objectDto / objectConfiguration',feature:'threeDObjects',read:'bounded-native-inspection',prerequisites:['WebGL 2 for graphics; saved native fallback remains readable'],guidance:'Only the existing coffee-cup scene; configuration:null uses native defaults. No acquisition or resource identifiers. Submitted orbit/presets/auto-rotation stay local; scene settings and size are protected.'},
   {id:'widget.canvas-preview',name:'Canvas demonstration preview',purpose:'Include the existing native demonstration of locally draggable sample boxes.',nativeTypes:['canvas-block'],schema:'CanvasPreview',nativeOperation:'canvasPreviewDto',read:'bounded-native-inspection',guidance:'Preview only. Sample box movement is local and not saved. No authored spatial cards, box configuration, workspace Canvas or host session.'}
  );
+ // Selection metadata extends these existing adapters; native schemas still own parameters.
+ projected.push({id:'reference.reply',name:'Discursive addressing',purpose:'Address existing contributions and passages without formal argument authoring.',read:'issued-source-handles',nativeTypes:[],guidance:'Contribution-level replyTargets; no reparenting or per-Block addressing.'});
+ if(layoutAuthoring)projected.push(
+  {id:'configuration.list-numbering',name:'List numbering',purpose:'Continue or reverse ordered numbering and specify individual item values.',read:'native-configuration',nativeTypes:['indented-list-block'],schema:'ListConfiguration',guidance:'Only ordered lists; task state is a separate capability.'},
+  {id:'configuration.table-headers',name:'Table headers',purpose:'Identify native table header cells.',read:'native-configuration',nativeTypes:['table-block'],schema:'TableConfiguration',guidance:'Header matrix must match the authored table.'}
+ );
  const items=projected.map(a=>{
   const renderer=a.nativeTypes.every(type=>!!editor.registry.resolve(type)?.view)&&(!a.annotationRenderer||!!editor.visualEffects.type(a.annotationRenderer)?.renderers.length);
   const enabled=editor.features.dialecticDcp&&(!a.semantic||editor.features.scopedSemantics)&&(!a.feature||editor.features[a.feature]);
-  const constructor=!!a.schema;
-  const registered=a.id!=='source.classification'||classifications.some(type=>semanticTypes.some(t=>t.type===type));
-  const authorable=constructor&&renderer&&enabled&&registered;
+  const constructor=!!a.schema||a.id==='reference.reply';
+  const registered=a.id!=='source.classification'||(stage1?semanticTypes.length>0:semanticTypes.some(t=>classifications.includes(t.type)||t.type==='mutable/entity-reference'));
+  const selected=permits(selection,a.id)||(a.id==='formatting.colour'&&!!selection?.standoff.includes('text/colour'))||(a.id==='formatting.core'&&!!selection?.standoff.some(type=>standoffStyleSchemas[type]?.authoring?.stage==='text'));
+  const authorable=constructor&&renderer&&enabled&&registered&&selected;
   return {...a,...(stage1?{reading:{available:!['not-a-source','unavailable'].includes(a.read),mode:'bounded-native-inspection'},capabilityState:a.inspectionOnly?'readable':authorable?(a.prerequisites?'authorable-with-prerequisites':'authorable'):!enabled?'disabled':'unsupported-through-dcp',context:externalMediaAuthoring?'New contribution, including external URLs; issued authority for existing native sources; no retroactive text editing':'Committed Document sources / new contribution; no retroactive text editing'}:{}),status:a.inspectionOnly?'readable':authorable?'authorable':a.presentationOnly?'presentation-only':'unavailable',authorable,
    availability:{representation:true,renderer:a.presentationOnly?'host-controlled':renderer,constructor,providerAdapter:constructor,resources:a.resources??'none-required',enabled,semanticRegistration:registered,...(stage1&&['validated-external-reference','existing-managed-resource','retained-capture'].includes(a.resources??'')?{resourceReadiness:'input-required'}:{})},
-   ...(!authorable&&!a.inspectionOnly?{reason:a.presentationOnly?'Host presentation, not an authored Document object':!constructor?'No admitted DCP authoring path':!enabled?'Required DCP profile/feature disabled':!renderer?'Required native renderer unavailable':'Required semantic registration unavailable'}:{}),
+   ...(!authorable&&!a.inspectionOnly?{reason:selection&&!selected?'Disabled by the exchange vocabulary':a.presentationOnly?'Host presentation, not an authored Document object':!constructor?'No admitted DCP authoring path':!enabled?'Required DCP profile/feature disabled':!renderer?'Required native renderer unavailable':'Required semantic registration unavailable'}:{}),
    ...(a.schema?{schemaRef:'#/$defs/'+a.schema}:{}),
    ...(a.id==='composition.paragraph'?{annotationLegend:'request.legend.types'}:{}),
    ...(a.id==='source.classification'?{types:stage1?semanticTypes.map(t=>t.type):classifications.filter(type=>semanticTypes.some(t=>t.type===type))}:{}),
   };
  });
- const summary={version:1,detailTool:'describe_capabilities',items:items.map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
- const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring).$defs as Record<string,unknown>;
+ const selectionDetails=new Set(['reference.reply','configuration.list-numbering','configuration.table-headers']);
+ const summary={version:1,detailTool:'describe_capabilities',items:items.filter(a=>selection?a.authorable||a.inspectionOnly||a.presentationOnly:!selectionDetails.has(a.id)).map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
+ const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring,selection).$defs as Record<string,unknown>;
  function parameters(names:Definition[]){
   const defs:Record<string,unknown>={},externalDefinitions:Record<string,unknown>={};
   const add=(name:string)=>{
    if((compoundAuthoring||widgetAuthoring||managedImageAuthoring||externalMediaAuthoring||retainedPdfAuthoring)&&name==='Node'){
-    externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>(a.id.startsWith('composition.')||a.id.startsWith('widget.')||a.id.startsWith('media.'))&&a.schema&&a.id!=='composition.tasks').map(a=>a.id)};return;
+    externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>(a.id.startsWith('composition.')||a.id.startsWith('widget.')||a.id.startsWith('media.'))&&a.schema&&a.id!=='composition.tasks'&&permits(selection,a.id)).map(a=>a.id)};return;
    }
    if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);
   };
@@ -141,12 +150,17 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   for(const id of ids){
    const found=items.find(item=>item.id===id);
    const {schema,...detail}=found??{id,status:'unknown',authorable:false,reason:'Unknown capability ID',schema:undefined};
-   selected.push(detail);if(schema)names.push(schema);
-   if(new TextEncoder().encode(JSON.stringify(result(ids))).length>capabilityLimits.bytes){selected.pop();if(schema)names.pop();omitted.push(id);}
+   if(selection){if((detail as any).example)(detail as any).example=vocabularyExample((detail as any).example,selection);if(id==='composition.list')(detail as any).guidance='Native nested lists. Only styles and configuration values admitted by the projected schema are authorable; initial checked state is protected after submission.';if(id==='composition.table')(detail as any).guidance='Rectangular owned cells. Header configuration is available only when enabled in the projected schema; no spans or width settings.';}
+   selected.push(detail);if(schema&&(!selection||found?.authorable))names.push(schema);
+   if(new TextEncoder().encode(JSON.stringify(result(ids))).length>capabilityLimits.bytes){selected.pop();if(schema&&(!selection||found?.authorable))names.pop();omitted.push(id);}
   }
   return result(omitted);
  }
- return {summary,describe};
+ const rawDefinitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring).$defs;
+ const nodeNames=new Set(rawDefinitions.Node.anyOf.map((r:any)=>r.$ref.slice('#/$defs/'.length)));
+ const selectable:VocabularyDescriptor[]=items.filter(a=>a.schema&&!['Span'].includes(a.schema)&&a.id!=='composition.markdown-fallback'||a.id==='reference.reply').map(a=>({id:a.id,purpose:a.purpose,available:a.authorable,requires:a.id==='source.classification'?['source.anchor']:a.id==='composition.tasks'||a.id==='configuration.list-numbering'?['composition.list']:a.id==='configuration.table-headers'?['composition.table']:[],...(a.id==='source.classification'?{requiresAny:semanticTypes.filter(t=>stage1||classifications.includes(t.type)||t.type==='mutable/entity-reference').map(t=>'standoff:'+t.type)}:{}),...(a.schema?{schema:a.schema}:{}),...(a.schema&&nodeNames.has(a.schema)&&a.id!=='composition.tasks'&&a.id!=='configuration.margins'?{kind:rawDefinitions[a.schema].properties.kind.enum[0]}:{})}));
+ for(const mark of semanticTypes)selectable.push({id:'standoff:'+mark.type,purpose:mark.purpose??mark.type,available:editor.features.dialecticDcp===true&&(mark.type!=='mutable/entity-reference'||editor.features.scopedSemantics===true),requires:[],standoff:mark.type});
+ return {summary,describe,selectable};
 }
 
 function layoutExample(value:any):any {

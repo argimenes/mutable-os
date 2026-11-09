@@ -1,3 +1,5 @@
+import {projectVocabulary} from './vocabulary-schema';
+import type {VocabularySnapshot} from './vocabulary-contract';
 import {noteSize} from '../../../block-tree/note-authoring';
 import {timerParameters} from '../../timer/model';
 import {objectParameters} from '../../three-d-object/model';
@@ -18,8 +20,8 @@ const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
-export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false):any {
- if(!nativeAuthoring)return responseSchema;
+export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot):any {
+ if(!nativeAuthoring)return vocabulary?projectVocabulary(structuredClone(responseSchema),vocabulary):responseSchema;
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
  d.Grid=structuredClone(d.Table);d.Grid.properties.kind={type:'string',enum:['grid']};
@@ -79,16 +81,17 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layout
   d.RetainedPdf={type:'object',properties:{id:d.Paragraph.properties.id,kind:{type:'string',enum:['retained-pdf']},source:{type:'string'},revision:{type:'string'}},required:['id','kind','source','revision'],additionalProperties:false};
   d.Node.anyOf.push({$ref:'#/$defs/RetainedPdf'});
  }
- return schema;
+ return projectVocabulary(schema,vocabulary);
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false):any {
- const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring));
- if(provider==='openai')return nativeAuthoring?schema:responseSchema;
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring,vocabulary));
+ if(provider==='openai')return schema;
  const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={...(nativeAuthoring&&widgetAuthoring?{StickyNote:defs.StickyNote}:{}),Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{}),...(nativeAuthoring&&compoundAuthoring?{Paragraph:defs.Paragraph,Heading:defs.Heading,Surface:defs.Surface,Tabs:defs.Tabs,Pages:defs.Pages}:{})};
- if(nativeAuthoring&&compoundAuthoring)for(const name of ['Paragraph','Heading']){defs[name+'Leaf']=structuredClone(defs[name]);defs[name+'Leaf'].properties.margins={type:'null'};}
+ for(const name of Object.keys(templates))if(!templates[name])delete templates[name];
+ if(nativeAuthoring&&compoundAuthoring)for(const name of ['Paragraph','Heading'].filter(name=>defs[name])){defs[name+'Leaf']=structuredClone(defs[name]);defs[name+'Leaf'].properties.margins={type:'null'};}
  const leaf=node.anyOf.filter((r:any)=>!Object.hasOwn(templates,r.$ref.replace('#/$defs/','')));
- if(nativeAuthoring&&compoundAuthoring)leaf.push({$ref:'#/$defs/ParagraphLeaf'},{$ref:'#/$defs/HeadingLeaf'});
+ if(nativeAuthoring&&compoundAuthoring)for(const name of ['Paragraph','Heading'])if(defs[name+'Leaf'])leaf.push({$ref:'#/$defs/'+name+'Leaf'});
  for(let depth=0;depth<=compositionLimits.depth;depth++){
   defs['Node'+depth]=depth===compositionLimits.depth?(nativeAuthoring?{anyOf:leaf}:{$ref:'#/$defs/Paragraph'}):{anyOf:node.anyOf.map((r:any)=>({$ref:Object.hasOwn(templates,r.$ref.replace('#/$defs/',''))?r.$ref+depth:r.$ref}))};
   if(depth===compositionLimits.depth)continue;

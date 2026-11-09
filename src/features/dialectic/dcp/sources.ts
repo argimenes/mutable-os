@@ -1,5 +1,6 @@
-import {retainedPdfsEnabled} from './retained-pdfs';
-import {managedImagesEnabled} from './managed-images';
+import {unwrap} from 'solid-js/store';
+import {hasNativeSourceReader} from './reading';
+import {resolveVocabulary,type VocabularySelection,type VocabularySnapshot} from './vocabulary';
 import {inspectNative} from './inspection';
 import {sourceScope,sourceIdentity} from './identities';
 import {capabilityCatalogue} from './capabilities';
@@ -18,6 +19,7 @@ import type {Resolution} from '../references';
 function* edges(n:BlockNode){yield* n.children;for(const name in n.ownedRelations)yield n.ownedRelations[name];}
 export type SourceStatus='complete'|'truncated'|'missing'|'ambiguous'|'unavailable'|'unauthorized';
 export class DcpSources {
+ readonly vocabulary:VocabularySnapshot|undefined;
  readonly capabilities:ReturnType<typeof capabilityCatalogue>|undefined;
  readonly handles=new Map<string,ReplyTarget>();
  private issued=new Map<string,string>();
@@ -34,16 +36,17 @@ export class DcpSources {
  private entityRevisions=new Map<string,number>();
  readonly entities:ScopedEntities;
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
- constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:(fromOrdinal?:number)=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[]){
+ constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:(fromOrdinal?:number)=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[],selection?:VocabularySelection){
   this.deadline=Date.now()+Math.min(120000,Math.max(1,deadlineMs));
-  if(editor.features.dcpCapabilityCatalogue)this.capabilities=capabilityCatalogue(editor);
+  this.vocabulary=editor.features.dcpVocabularySelection?resolveVocabulary(editor,selection):undefined;
+  if(editor.features.dcpCapabilityCatalogue)this.capabilities=capabilityCatalogue(editor,this.vocabulary);
   let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;
   this.entities=new ScopedEntities(editor,rootKey,owner);
   this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key))this.stale=true;});
  }
  check(){if(this.signal.aborted)throw Error('DCP cancelled');if(Date.now()>this.deadline)throw Error('DCP deadline exceeded');if(this.stale)throw Error('Selected context changed; request a fresh DCP response.');for(const [h,text]of this.glossValues)if(this.resolve(this.target(h)).text!==text)throw Error('Selected context changed');for(const [key,record]of this.fences)if(this.editor.repository.readState().contents[key]!==record)throw Error('Selected context changed; request a fresh DCP response.');}
  fence(key:string){const c=this.editor.repository.readState().contents[key];if(!c)throw Error('Source unavailable');if(!this.fences.has(key))this.fences.set(key,c);this.check();}
- issue(target:ReplyTarget){if(target.resourceId!==this.owner)throw Error('Outside Symposium');const key=targetKey(target);let handle=this.issued.get(key);if(!handle){handle=sourceIdentity(this.identityScope,target.kind,this.issued.size+1);this.issued.set(key,handle);this.handles.set(handle,target);}return handle;}
+ issue(target:ReplyTarget){if(target.resourceId!==this.owner)throw Error('Outside Symposium');const key=targetKey(target);let handle=this.issued.get(key);if(!handle){handle=sourceIdentity(this.identityScope,target.kind,this.issued.size+1);this.issued.set(key,handle);this.handles.set(handle,structuredClone(unwrap(target)));}return handle;}
  target(handle:string){const target=this.handles.get(handle);if(!target)throw Error('Unauthorized source handle');return target;}
  committed(n:BlockNode){let cur:BlockNode|undefined=n;for(let depth=0;cur&&depth<128;depth++,cur=this.parent(cur.key)){const c=contribution((cur.payload.metadata as any)?.dialectic);if(c)return c.state==='committed';}return false;}
  definition(t:ReplyTarget){if(t.resourceId!==this.owner)throw Error('Definition belongs to another Document');this.fence(this.entities.root.contentKey);const id=t.anchorId??t.argumentId??t.definitionId??t.entity?.entityId;return id?this.entities.registry()[id]:undefined;}
@@ -76,7 +79,7 @@ export class DcpSources {
   const base={handle,target,owner:this.owner,revision,kind:target.kind,sourceAuthor,contribution:contributionInfo};
   if(target.kind==='gloss'||target.kind==='range')return {status:'complete',...base,text:found.text??'',historical:found.historical};
   if(!n)return {status:'missing',...base};
-  if(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage2Text&&['mutable/markdown-source-block','mutable/html-source-block'].includes(n.viewType)&&typeof n.payload.text==='string'&&n.payload.text.length>24000)return {status:'truncated',...base,nativeType:n.viewType,reason:'Literal source exceeds the bounded UTF-16 read budget',omissions:['text']};
+  if(['mutable/markdown-source-block','mutable/html-source-block'].includes(n.viewType)&&typeof n.payload.text==='string'&&n.payload.text.length>24000)return {status:'truncated',...base,nativeType:n.viewType,reason:'Literal source exceeds the bounded UTF-16 read budget',omissions:['text']};
   if(n.inlineContent.length>12000)return {status:'truncated',...base,reason:'Source Cell budget; select a smaller passage',omissions:['text']};
   const cached=await this.text(n);this.check();const objects=cached.runs.length>1,text=cached.runs.map(r=>r.text).join('\uFFFC');
   const children:string[]=[];let omitted=false;
@@ -88,10 +91,10 @@ export class DcpSources {
    const p=properties[i],a=annotations[i];if(p.isDeleted||p.externalDefinition||typeof p.annotationId!=='string')continue;
    if(p.type==='dialectic/range-anchor'){
     a.anchorHandle=this.issue({kind:'range',resourceId:this.owner,anchorId:p.annotationId});semanticReferences.push(a.anchorHandle);
-    if(this.editor.features.scopedSemantics){a.arguments=this.argumentsFor(p.annotationId).slice(0,16).map(argumentId=>this.issue({kind:'argument',resourceId:this.owner,argumentId}));semanticReferences.push(...a.arguments);}
+    a.arguments=this.argumentsFor(p.annotationId).slice(0,16).map(argumentId=>this.issue({kind:'argument',resourceId:this.owner,argumentId}));semanticReferences.push(...a.arguments);
    }else if(p.type==='mutable/gloss'){a.glossHandle=this.issue({kind:'gloss',resourceId:this.owner,definitionId:p.annotationId});semanticReferences.push(a.glossHandle);}
   }
-  if(this.editor.features.scopedSemantics){
+  {
    let vaultId:string|undefined,unavailable=false;
    for(let i=0;i<annotations.length;i++){const p=properties[i],a=annotations[i] as any;if(p.isDeleted)continue;
     let ref=p.type===ENTITY_REFERENCE&&entityReference(p.metadata?.entityReference)?p.metadata.entityReference:undefined;
@@ -102,7 +105,7 @@ export class DcpSources {
     if(ref)a.entityHandle=this.issue({kind:'entity',resourceId:this.owner,entity:ref});
    }
   }
-  const supported=[...(retainedPdfsEnabled(this.editor)?['mutable/pdf-document-block']:[]),...(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage3ExternalMedia?['image-block','mutable/video-block','youtube-player-block','vimeo-player-block','iframe-block']:[]),...(managedImagesEnabled(this.editor)?['image-block']:[]),...(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage2Widgets?['sticky-note-block','timer-block','3d-object-block','canvas-block']:[]),'standoff-editor-block','container-block','table-block','table-row-block','table-cell-block','indented-list-block',...(this.editor.features.dcpNativeAuthoringStage1?['grid-block','grid-row-block','grid-cell-block','tab-row-block','tab-block','document-tab-row-block','document-tab-block','surface-block','side-block','youtube-video-block']:[]),...(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage2Compounds?['page-block','left-margin-block','right-margin-block']:[]),...(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage2Layouts?['checkbox-block']:[]),...(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage2Text?['standoff-code-block','mutable/markdown-source-block','mutable/html-source-block']:[])].includes(n.viewType);
+  const supported=hasNativeSourceReader(n.viewType);
   return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,semanticReferences:semanticReferences.slice(0,32),omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
  }
  /** Prepared once on explicit Ask. Never subscribed to typing or whole-history enumeration. */
@@ -136,7 +139,7 @@ export class DcpSources {
   if(call.tool==='list_text_blocks'){this.diagnostics.inventories++;return this.record(call,(this.inventory??=new DcpInventory(this)).list(call.arguments));}
   if(call.tool==='read_source'){
    this.diagnostics.reads++;const result=await this.source(call.arguments.handle);
-   if(this.editor.features.dcpNativeAuthoringStage1&&result.kind&&['block','contribution'].includes(result.kind)&&!['unauthorized','missing','ambiguous'].includes(result.status))result.inspection=await inspectNative(this,result);
+   if(result.kind&&['block','contribution'].includes(result.kind)&&!['unauthorized','missing','ambiguous'].includes(result.status))result.inspection=await inspectNative(this,result);
    // Never resolve a historical handle implicitly. Offer a small, freshly issued
    // inventory in the same Document so a failed read can recover explicitly.
    if(result.status==='unauthorized'&&result.recovery){this.diagnostics.inventories++;const arguments_={...result.recovery.arguments,limit:5};result.recovery={...result.recovery,arguments:arguments_,inventory:(this.inventory??=new DcpInventory(this)).list(arguments_)};result.reason+=' A fresh bounded inventory is attached under recovery.inventory; select the intended native blockId and call read_source with that new handle.';}

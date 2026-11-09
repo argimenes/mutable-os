@@ -1,5 +1,7 @@
 # DCP native authoring — Stage 3 plan for review
 
+Current priority update — 9 November 2026: Stage 3C.1 is accepted. The revised [vocabulary review](DCP_CURRENT_AUTHORING_VOCABULARY.md) and [curation recommendations](DCP_VOCABULARY_CURATION_RECOMMENDATIONS.md) supersede automatic continuation of the sequence below. 3C.2–3C.5 are paused (3C.2 has not started); 3D and 3E are deferred pending practical-value review. Preserve all qualified functionality and defaults. The remaining sequence is historical architectural planning, not an active implementation queue.
+
 Status update, 9 November 2026: the plan is accepted and [Stage 3A is implemented and qualified](DCP_NATIVE_AUTHORING_STAGE3A_QUALIFICATION.md). The planning evidence below is retained as historical context. Stage 3B is now implemented under the revised conversational-media brief; see [Stage 3B qualification](DCP_NATIVE_AUTHORING_STAGE3B_QUALIFICATION.md). [Stage 3C.1 retained PDF binding is qualified](DCP_NATIVE_AUTHORING_STAGE3C_QUALIFICATION.md); other retained families remain separate investigated subincrements.
 
 9 November 2026. Stage 2A–2D is accepted and complete as planned. This is investigation and planning only; no Stage 3 runtime, schema, catalogue or feature-default changes have been implemented. The accepted concise DCP projections and shared native operations remain the architecture; the original investigation's generic-operation proposal is not revived.
