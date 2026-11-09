@@ -1,3 +1,6 @@
+import {noteSize} from '../../../block-tree/note-authoring';
+import {timerParameters} from '../../timer/model';
+import {objectParameters} from '../../three-d-object/model';
 import {compoundParameters} from '../../../block-tree/compound-authoring';
 import {listConfiguration,tableConfiguration} from '../../../block-tree/layout-authoring';
 import {codeOperation} from '../../../block-tree/literal-authoring';
@@ -15,7 +18,7 @@ const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
-export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false):any {
+export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false):any {
  if(!nativeAuthoring)return responseSchema;
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
@@ -53,13 +56,22 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layout
   for(const name of ['Paragraph','Heading']){d[name].properties.margins={anyOf:[object({left:marginContent,right:marginContent}),{type:'null'}]};d[name].required.push('margins');}
   d.Node.anyOf.push(...['Surface','Tabs','Pages'].map(name=>({$ref:'#/$defs/'+name})));
  }
+ if(widgetAuthoring){
+  const object=(properties:Record<string,unknown>)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
+  const node=(kind:string,properties:Record<string,unknown>)=>object({id:d.Paragraph.properties.id,kind:{type:'string',enum:[kind]},...properties});
+  d.StickyNote=node('sticky-note',{content:{type:'array',minItems:1,maxItems:64,items:{$ref:'#/$defs/Node'}},size:{anyOf:[noteSize,{type:'null'}]}});
+  d.Timer=node('timer',timerParameters);
+  d.Object3D=node('object3d',{configuration:{anyOf:[object(objectParameters),{type:'null'}]}});
+  d.CanvasPreview=node('canvas-preview',{});
+  d.Node.anyOf.push(...['StickyNote','Timer','Object3D','CanvasPreview'].map(name=>({$ref:'#/$defs/'+name})));
+ }
  return schema;
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false):any {
- const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring));
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring));
  if(provider==='openai')return nativeAuthoring?schema:responseSchema;
- const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{}),...(nativeAuthoring&&compoundAuthoring?{Paragraph:defs.Paragraph,Heading:defs.Heading,Surface:defs.Surface,Tabs:defs.Tabs,Pages:defs.Pages}:{})};
+ const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={...(nativeAuthoring&&widgetAuthoring?{StickyNote:defs.StickyNote}:{}),Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{}),...(nativeAuthoring&&compoundAuthoring?{Paragraph:defs.Paragraph,Heading:defs.Heading,Surface:defs.Surface,Tabs:defs.Tabs,Pages:defs.Pages}:{})};
  if(nativeAuthoring&&compoundAuthoring)for(const name of ['Paragraph','Heading']){defs[name+'Leaf']=structuredClone(defs[name]);defs[name+'Leaf'].properties.margins={type:'null'};}
  const leaf=node.anyOf.filter((r:any)=>!Object.hasOwn(templates,r.$ref.replace('#/$defs/','')));
  if(nativeAuthoring&&compoundAuthoring)leaf.push({$ref:'#/$defs/ParagraphLeaf'},{$ref:'#/$defs/HeadingLeaf'});

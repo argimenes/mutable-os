@@ -107,3 +107,16 @@ it('keeps Stage 2C discovery bounded and advertises only enabled native compound
  editor.features.reversibleBlocks=false;expect(capabilityCatalogue(editor).describe({ids:['composition.surface']}).items[0].authorable).toBe(false);
  editor.features.dcpNativeAuthoringStage2Compounds=false;expect(capabilityCatalogue(editor).describe({ids:['composition.pages']}).items[0].status).toBe('unknown');
 });
+
+it('qualifies Stage 2D purpose, schema and native prerequisites within unchanged discovery bounds',()=>{
+ expect(featureFlags.dcpNativeAuthoringStage2Widgets).toBe(true);
+ const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage2Text:true,dcpNativeAuthoringStage2Layouts:true,dcpNativeAuthoringStage2Compounds:true,dcpNativeAuthoringStage2Widgets:true,timer:true,threeDObjects:true,reversibleBlocks:true,verticalTabs:true,taskLists:true});
+ for(const compounds of [true,false]){
+  editor.features.dcpNativeAuthoringStage2Compounds=compounds;const catalogue=capabilityCatalogue(editor);
+  for(const {id} of catalogue.summary.items){const detail=catalogue.describe({ids:[id]});expect(detail.status,id).toBe('complete');expect(new TextEncoder().encode(JSON.stringify(detail)).length,id).toBeLessThanOrEqual(capabilityLimits.bytes);}
+  for(const id of ['composition.sticky-note','widget.timer','widget.object3d','widget.canvas-preview'])expect(catalogue.describe({ids:[id]}).items[0].authorable,id).toBe(true);
+ }
+ editor.features.timer=false;expect(capabilityCatalogue(editor).describe({ids:['widget.timer']}).items[0].authorable).toBe(false);
+ editor.features.threeDObjects=false;expect(capabilityCatalogue(editor).describe({ids:['widget.object3d']}).items[0].authorable).toBe(false);
+ editor.features.dcpNativeAuthoringStage2Widgets=false;expect(capabilityCatalogue(editor).describe({ids:['composition.sticky-note']}).items[0].status).toBe('unknown');
+});

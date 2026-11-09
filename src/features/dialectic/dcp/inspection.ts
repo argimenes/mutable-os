@@ -5,7 +5,7 @@ import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
 const limits={nodes:24,depth:4,properties:32,relations:12,bytes:16000,string:1024} as const;
 const scalar=(value:unknown)=>typeof value==='string'?value.slice(0,limits.string):typeof value==='number'&&Number.isFinite(value)||typeof value==='boolean'||value===null?value:undefined;
 const fields=(input:any,names:readonly string[])=>Object.fromEntries(names.filter(name=>input&&scalar(input[name])!==undefined).map(name=>[name,scalar(input[name])]));
-const logical=(type:string)=>({'standoff-editor-block':'text','grid-block':'grid','grid-row-block':'row','grid-cell-block':'cell','table-block':'table','table-row-block':'row','table-cell-block':'cell','tab-row-block':'tabs','document-tab-row-block':'pages','tab-block':'panel','document-tab-block':'page-tab','page-block':'page','left-margin-block':'margin','right-margin-block':'margin','surface-block':'surface','side-block':'side','indented-list-block':'list','checkbox-block':'task','youtube-video-block':'youtube','standoff-code-block':'code','mutable/markdown-source-block':'source','mutable/html-source-block':'source'}[type]??'native');
+const logical=(type:string)=>({'sticky-note-block':'sticky-note','timer-block':'timer','3d-object-block':'object3d','canvas-block':'canvas-preview','standoff-editor-block':'text','grid-block':'grid','grid-row-block':'row','grid-cell-block':'cell','table-block':'table','table-row-block':'row','table-cell-block':'cell','tab-row-block':'tabs','document-tab-row-block':'pages','tab-block':'panel','document-tab-block':'page-tab','page-block':'page','left-margin-block':'margin','right-margin-block':'margin','surface-block':'surface','side-block':'side','indented-list-block':'list','checkbox-block':'task','youtube-video-block':'youtube','standoff-code-block':'code','mutable/markdown-source-block':'source','mutable/html-source-block':'source'}[type]??'native');
 
 /** Explicit read only. A bounded projection, never DTO export or clone input. */
 export async function inspectNative(sources:DcpSources,initial:any){
@@ -32,6 +32,19 @@ export async function inspectNative(sources:DcpSources,initial:any){
   if(node.viewType==='side-block'){const parent=sources.parent(node.key);if(parent?.viewType==='surface-block'){const index=parent.children.indexOf(node.key);entry.configuration.surfaceRole=index===0?'front':index===1?'back':'additional';}}
   if(node.viewType==='left-margin-block'||node.viewType==='right-margin-block')entry.configuration.side=node.viewType==='left-margin-block'?'left':'right';
   if(['tab-row-block','document-tab-row-block'].includes(node.viewType)||node.viewType==='surface-block'&&sources.editor.features.reversibleBlocks)entry.navigation={scope:'occurrence',persistent:false};
+  if(node.viewType==='sticky-note-block'){
+   entry.configuration.note={...fields(meta,['fontStep']),size:fields(meta?.size,['width','height'])};
+   entry.stateSemantics={authored:'content and dimensions',presentation:'local scrolling',appearance:'fixed yellow paper; colour/material metadata does not select rendered variants'};
+  }
+  if(node.viewType==='timer-block'){
+   entry.configuration.timer=fields(node.payload.timer,['durationSeconds','mode']);
+   entry.stateSemantics={nativeFeatureEnabled:sources.editor.features.timer===true,authored:'duration and dimensions',operational:'Start/Pause/Reset are occurrence-local when protected; editable timers retain native persisted controls',resetOnUnmount:true};
+  }
+  if(node.viewType==='3d-object-block'){
+   const object=node.payload.object3D as any;entry.configuration.object3d={...fields(object,['version','scene','lighting','autoRotate']),view:fields(object?.view,['azimuth','elevation']),settings:fields(object?.settings,['steam','coffeeStain'])};
+   entry.stateSemantics={nativeFeatureEnabled:sources.editor.features.threeDObjects===true,authored:'scene, initial view, lighting, rotation, settings and dimensions',presentation:'protected orbit/presets/rotation are local to this occurrence',graphics:'WebGL 2 or native fallback'};
+  }
+  if(node.viewType==='canvas-block')entry.stateSemantics={authored:'native preview Block',presentation:'demonstration boxes are local and not persisted',limitation:'not an authored spatial canvas'};
   if(node.viewType==='standoff-code-block')entry.configuration.language=scalar(meta?.markdownCode?.language??'javascript');
   if(node.viewType==='mutable/markdown-source-block'||node.viewType==='mutable/html-source-block'){entry.configuration.sourceFormat=fields(node.payload.sourceFormat,['version','format','profile']);entry.literal=true;}
   for(const p of properties.slice(0,limits.properties)){

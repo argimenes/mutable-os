@@ -182,6 +182,9 @@ export class ReactiveEditor {
     const protectedInput=(event:Event)=>{
       const resolved=this.mounts.resolveEvent(event);if(!resolved||this.canEditText(resolved.nodeKey))return;
       if(event instanceof KeyboardEvent){
+        // Native button activation has the same authority as a pointer click.
+        // Widget guards and canonical admission still protect authored state.
+        if(event.target instanceof HTMLButtonElement&&!event.target.disabled&&['Enter',' '].includes(event.key))return;
         const command=event.metaKey||event.ctrlKey;
         if(command?!['x','v'].includes(event.key.toLowerCase()):!(['Backspace','Delete','Enter'].includes(event.key)||event.key.length===1&&!event.altKey))return;
       }

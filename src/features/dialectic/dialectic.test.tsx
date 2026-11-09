@@ -1,3 +1,6 @@
+import {timerBlockDto} from '../timer/model';
+import {objectDto} from '../three-d-object/model';
+import {prepareStickyNote} from '../../block-tree/note-authoring';
 import {ReactiveEditor} from '../../reactive-editor/editor';
 import {prepareList,prepareLayout} from '../../block-tree/layout-authoring';
 import {toggleTask} from '../../runtime/tasks';
@@ -30,9 +33,10 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true,compoundAuthoring=false,compoundFeatures=true){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true,compoundAuthoring=false,compoundFeatures=true,widgetAuthoring=false,widgetFeatures=true){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage2Compounds:compoundAuthoring,reversibleBlocks:compoundFeatures,verticalTabs:compoundFeatures,taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ if(widgetAuthoring){vi.stubGlobal('ResizeObserver',class{observe(){}disconnect(){}});vi.stubGlobal('IntersectionObserver',class{observe(){}disconnect(){}});vi.stubGlobal('matchMedia',()=>({matches:false,addEventListener(){},removeEventListener(){}}));}
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage2Widgets:widgetAuthoring,timer:widgetFeatures,threeDObjects:widgetFeatures,dcpNativeAuthoringStage2Compounds:compoundAuthoring,reversibleBlocks:compoundFeatures,verticalTabs:compoundFeatures,taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -1167,4 +1171,52 @@ it('retains prior native authoring families inside Stage 2C compounds',async()=>
  });expect(c.notice()).toBe('');
  const projection=c.session()!.projection,root=c.resolve(c.target(c.frontier()!.id))!,tabs=projection.node(root.children[0])!,panel=projection.node(tabs.children[0])!;
  expect(panel.children.map(k=>projection.node(k)!.viewType)).toEqual(['standoff-editor-block','container-block','indented-list-block','table-block','grid-block','standoff-code-block','mutable/markdown-source-block','youtube-video-block']);
+});
+
+const widgetFixture=(native=true,widgets=true,features=true)=>setup(true,true,true,true,true,false,true,native,true,true,true,true,true,true,widgets,features);
+it('qualifies Stage 2D native widgets, ownership, protected operations, inspection and persistence',async()=>{
+ const f=await widgetFixture(),c=f.c!,e=f.editor;f.type!('Native notes and widgets');c.submit();
+ const p={id:'new:b2',kind:'paragraph',markup:'Note with emphasis',ranges:[],textStyle:null,margins:null};
+ const config={scene:'coffee-cup',view:{azimuth:90,elevation:30},lighting:'warm',autoRotate:false,steam:false,coffeeStain:true,size:320};
+ await c.askMock(async req=>{expect(req.widgetAuthoring).toBe(1);expect(req.legend.blocks).toContain('timer');return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'sticky-note',content:[p],size:{width:300,height:240}},{id:'new:b3',kind:'timer',durationSeconds:45,size:null},{id:'new:b4',kind:'object3d',configuration:config},{id:'new:b5',kind:'canvas-preview'}]});});
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const node=(key:string)=>c.session()!.projection.node(key)!,root=c.resolve(c.target(c.frontier()!.id))!,[note,timer,object,canvas]=root.children.map(node);
+ expect(note.viewType).toBe('sticky-note-block');expect(note.payload.metadata).toEqual(prepareStickyNote([{type:'standoff-editor-block'}],{width:300,height:240}).metadata);expect(note.children).toHaveLength(1);
+ expect(timer.payload.timer).toEqual(timerBlockDto(undefined,45).timer);expect(timer.payload.blockProperties).toEqual(timerBlockDto().blockProperties);expect(object.payload.object3D).toEqual(objectDto(config).object3D);expect(object.payload.blockProperties).toEqual(objectDto(config).blockProperties);expect(canvas.viewType).toBe('canvas-block');
+ const state=e.repository.readState();for(const n of [note,node(note.children[0]),timer,object,canvas]){expect(state.placements[n.placementKey].kind).toBe('owned');expect(resourceIdentity.resourceOwner(state,n.contentKey)?.key).toBe(c.root()!.contentKey);}
+ expect(()=>e.commands.replaceInlineRange(note.children[0],0,1,'X')).toThrow(/protected/);for(const n of [note,timer,object])expect(()=>e.commands.setPayloadField(n.key,'metadata',{x:1})).toThrow(/protected/);
+ const timerRoot=document.querySelector<HTMLElement>(`.reactive-timer[data-client-id="${timer.key}"]`)!;expect(timerRoot.querySelector<HTMLInputElement>('input')!.disabled).toBe(true);expect(f.host.querySelector('.reactive-sticky-note__resize')).toBeNull();
+ const saved=captureNative(e.repository.readState(),c.resourceId()),revision=e.repository.state.revision,snapshot=vi.spyOn(e.repository,'snapshot');
+ const canvasRoot=f.host.querySelector<HTMLElement>('.reactive-canvas-preview')!;
+ canvasRoot.querySelector('button')!.dispatchEvent(new MouseEvent('pointerdown',{clientX:0,clientY:0,bubbles:true}));canvasRoot.dispatchEvent(new MouseEvent('pointermove',{clientX:30,clientY:20,bubbles:true}));canvasRoot.dispatchEvent(new MouseEvent('pointerup',{bubbles:true}));expect(canvasRoot.querySelector('button')!.style.left).toBe('175px');
+ const button=(label:string)=>[...timerRoot.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label)!;button('Start').click();button('Pause').click();button('Reset').click();expect(e.repository.state.revision).toBe(revision);expect(nativeText(captureNative(e.repository.readState(),c.resourceId()))).toBe(nativeText(saved));expect(snapshot).not.toHaveBeenCalled();
+ e.repository.undo();expect(c.committed()).toHaveLength(1);e.repository.redo();expect(c.committed()).toHaveLength(2);
+ const loaded=new ReactiveEditor({id:'widget-bank',type:'workspace-object-bank-block',children:[]});cleanup.push(()=>loaded.dispose());const bank=loaded.repository.readState();admitNative(loaded.repository,nativeBytes(saved),bank.placements[bank.rootPlacementKey].contentKey);expect(nativeText(captureNative(loaded.repository.readState(),c.resourceId()))).toBe(nativeText(saved));
+ await c.askMock(async(req,sources)=>{
+  const parent=await sources.tool({id:'parent',tool:'read_source',arguments:{handle:req.primaryReply}});
+  let noteHandle='';const expected=['sticky-note','timer','object3d','canvas-preview'];
+  for(let i=0;i<4;i++){const source=await sources.tool({id:'widget'+i,tool:'read_source',arguments:{handle:parent.children[i]}});expect(source.status).toBe('complete');expect(source.inspection.root.kind).toBe(expected[i]);if(i===0)noteHandle=source.children[0];expect(source.inspection.root.stateSemantics).toBeDefined();if(i===1){expect(source.inspection.root.configuration.timer.durationSeconds).toBe(45);expect(JSON.stringify(source.inspection)).not.toContain('runningUntil');}if(i===2)expect(source.inspection.root.configuration.object3d.settings).toEqual({steam:false,coffeeStain:true});}
+  const noteText=await sources.tool({id:'note-text',tool:'read_source',arguments:{handle:noteHandle}});expect(noteText.text).toBe('Note with emphasis');
+  const response:any=dcpResponse(req.exchange);response.anchors=[{id:'new:r1',source:noteText.handle,revision:noteText.revision,selector:{exact:'emphasis',prefix:'',suffix:''}}];response.interpretations=[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}];return JSON.stringify(response);
+ });expect(c.notice()).toBe('');
+ snapshot.mockClear();const builds=vi.spyOn(c.session()!.projection as any,'build'),reads={...c.dcpDiagnostics},requests=(fetch as any).mock.calls.length;f.type!('Typing');expect(c.dcpDiagnostics).toEqual(reads);expect((fetch as any).mock.calls.length).toBe(requests);expect(snapshot).not.toHaveBeenCalled();expect(builds).not.toHaveBeenCalled();
+});
+it('rejects Stage 2D invalid settings, destinations and source authority atomically',async()=>{
+ const f=await widgetFixture(),c=f.c!,e=f.editor;f.type!('Original source');c.submit();const revision=e.repository.state.revision;
+ const timer={id:'new:b1',kind:'timer',durationSeconds:60,size:null},object={id:'new:b1',kind:'object3d',configuration:null},note={id:'new:b1',kind:'sticky-note',size:null,content:[{id:'new:b2',kind:'paragraph',markup:'x',ranges:[]}]};
+ const config={scene:'coffee-cup',view:{azimuth:45,elevation:25},lighting:'neutral',autoRotate:false,steam:true,coffeeStain:false,size:280};
+ const bad=[...[-1,0,1.5,86401,'60'].map(durationSeconds=>({...timer,durationSeconds})),{...timer,size:{width:109,height:130}},{...timer,runningUntil:123},{...timer,destination:'workspace'}, {...object,configuration:{...config,scene:'mesh'}},{...object,configuration:{...config,assetId:'invented'}},{...object,configuration:{...config,view:{azimuth:12,elevation:90}}},{...object,configuration:{...config,size:641}},{...object,configuration:{...config,steam:'yes'}},{...note,content:[]},{...note,size:{width:100,height:100}},{...note,colour:'red'},{id:'new:b1',kind:'canvas-preview',boxes:[]},...['canvas-counter','phosphor','window'].map(kind=>({id:'new:b1',kind}))];
+ for(const node of bad){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[node]}));expect(c.notice(),JSON.stringify(node)).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ for(const mode of ['stale','foreign','insert']){
+  const insert=e.commands.insert.bind(e.commands),fail=mode==='insert'?vi.spyOn(e.commands,'insert').mockImplementation((dto,pos)=>{if((dto.metadata as any)?.dialectic?.state==='committed')throw Error('Widget admission failure');return insert(dto,pos);}):undefined;
+  await c.askMock(async(req,sources)=>{const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}}),source=await sources.tool({id:'s',tool:'read_source',arguments:{handle:parent.children[0]}});const value:any=dcpResponse(req.exchange);value.composition=[timer];value.anchors=[{id:'new:r1',source:mode==='foreign'?'src:foreign:b1':source.handle,revision:mode==='stale'?'expired':source.revision,selector:{exact:'Original',prefix:'',suffix:''}}];value.interpretations=[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}];return JSON.stringify(value);});fail?.mockRestore();expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ }
+});
+it('gates Stage 2D widgets and bounds generated note descendants',async()=>{
+ for(const [native,widgets,features] of [[true,false,true],[false,true,true],[true,true,false]]){
+  const f=await widgetFixture(native,widgets,features),c=f.c!,e=f.editor;f.type!('Features');c.submit();const revision=e.repository.state.revision;
+  for(const node of [{id:'new:b1',kind:'timer',durationSeconds:60,size:null},{id:'new:b1',kind:'object3d',configuration:null}]){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[node]}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ }
+ const f=await widgetFixture(),c=f.c!,e=f.editor;f.type!('Bounds');c.submit();const revision=e.repository.state.revision;
+ await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:Array.from({length:4},(_,i)=>({id:'new:b'+(i*65+1),kind:'sticky-note',size:null,content:Array.from({length:64},(_,j)=>({id:'new:b'+(i*65+j+2),kind:'timer',durationSeconds:1,size:null}))}))}));expect(c.notice()).toContain('native Block budget');expect(e.repository.state.revision).toBe(revision);
 });

@@ -1,3 +1,4 @@
+import {canvasPreviewDto} from '../block-tree/note-authoring';
 import {prepareTabs,tabPanel} from '../block-tree/compound-authoring';
 import {listShell} from '../block-tree/layout-authoring';
 import { tabOrientationMenu } from './tab-orientation';
@@ -139,7 +140,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
       ...editor.featureActions.list("add-block-menu").map(item => command(item.command, item.label)),
       { label: "Insert Sticky Note Here", run: () => add(stickyNoteDto()) },
       mediaInput("Image URL…", "image-block"), mediaInput("YouTube video URL…", "youtube-video-block"),
-      { label: "Canvas", run: () => add(dto("canvas-block")) },
+      { label: "Canvas", run: () => add(canvasPreviewDto()) },
       { label: "Add Grid", children: [1, 2].flatMap(rows => [1, 2, 3].map(columns => ({ label: `${rows} × ${columns}`, run: () => add(grid(rows, columns)) }))) },
     ] });
     items.push({ label: "File", children: [...files, unavailable("Duplicate document", "Independent document-window sessions are not yet migrated; use Save as to make a stored copy."), unavailable("Rename document", "The original action is unimplemented; Save as creates a named copy.")] });

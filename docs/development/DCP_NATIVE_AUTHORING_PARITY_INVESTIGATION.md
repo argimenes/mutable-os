@@ -4,6 +4,10 @@
 
 ## Decision
 
+### Stage 2D implementation update — 9 November 2026
+
+Stage 2C is accepted. Shared native preparations now expose sticky notes, timers, the supported coffee-cup 3D object and the existing Canvas demonstration preview. Submitted timer operations and 3D viewing use local state in their native views; authored configuration stays protected. See [Stage 2D qualification](DCP_NATIVE_AUTHORING_STAGE2D_QUALIFICATION.md) for operation coverage, tests and remaining host-context/canonical-audit gaps. Stage 3 has not begun. The original inventory remains the audit baseline.
+
 ### Stage 2C implementation update — 9 November 2026
 
 Stage 2B is accepted. Shared compound preparations now cover new Surfaces/Sides, labelled tabs/orientation, document-tab PageBlocks and left/right named marginal relations. See [Stage 2C qualification](DCP_NATIVE_AUTHORING_STAGE2C_QUALIFICATION.md) for native equivalence, immutable-safe navigation, bounded discovery, source authority and persistence evidence. Existing-book fixed-size page insertion remains an explicit context-dependent parity gap; no host or retroactive-edit authority was added. The original inventory below remains the audit baseline. Stage 2D and Stage 3 have not begun.

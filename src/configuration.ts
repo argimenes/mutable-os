@@ -127,6 +127,7 @@ export type FeatureFlags = Readonly<{
   dcpNativeAuthoringStage2Layouts: boolean;
   /** Native Surface/tab/page/margin projections, within a contribution. Requires Stage 1. */
   dcpNativeAuthoringStage2Compounds: boolean;
+  dcpNativeAuthoringStage2Widgets: boolean;
   dialecticProviders: boolean;
   dialecticProviderContinuity: boolean;
   /** Temporary local wire/contribution diagnostics; disable after DCP qualification. */
@@ -251,6 +252,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dcpNativeAuthoringStage2Text: true,
   dcpNativeAuthoringStage2Layouts: true,
   dcpNativeAuthoringStage2Compounds: true,
+  dcpNativeAuthoringStage2Widgets: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
   dcpTestPhaseLogging: true,

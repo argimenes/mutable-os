@@ -10,9 +10,9 @@ import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
 import {capabilityLimits,compositionLimits} from './limits';
 import {classifications,legend} from './markup';
 
-type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source'|'ListConfiguration'|'TableConfiguration'|'Surface'|'Tabs'|'Pages';
+type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source'|'ListConfiguration'|'TableConfiguration'|'Surface'|'Tabs'|'Pages'|'StickyNote'|'Timer'|'Object3D'|'CanvasPreview';
 interface Adapter {
- id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'|'taskLists'|'reversibleBlocks'; annotationRenderer?:string; presentationOnly?:boolean;
+ id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'|'taskLists'|'reversibleBlocks'|'timer'|'threeDObjects'; annotationRenderer?:string; presentationOnly?:boolean;
  constraints?:Record<string,unknown>; guidance:string; example?:unknown;
  resources?:'asset-acquisition-unavailable'|'validated-external-reference';
  nativeOperation?:string;nativeEffects?:readonly string[];parameters?:Record<string,unknown>;prerequisites?:readonly string[];
@@ -49,6 +49,7 @@ export const capabilityInstructions='CAPABILITY DISCOVERY: capabilities is the c
  * repository subscription, typing hook or provider-model capability inference. */
 export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'features'|'visualEffects'>){
  const stage1=editor.features.dcpNativeAuthoringStage1===true;
+ const widgetAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Widgets===true;
  const compoundAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Compounds===true;
  const layoutAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Layouts===true;
  const textAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Text===true;
@@ -78,6 +79,12 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   projected.push({id:'configuration.margins',name:'Marginal content',purpose:compoundOperations.margins.purpose,schema:'Paragraph',read:'native-owned-relations',nativeTypes:['left-margin-block','right-margin-block',...text],nativeEffects:compoundOperations.margins.nativeEffects,nativeOperation:'attachMargins / prepareMargin / marginText',guidance:'Paragraph/heading margins:null or {left:[nodes],right:[nodes]}. Uses named owned relations, not children. No nested marginal relations or pages in margins. Existing source content is not edited.'});
   for(const a of projected)if(a.example)a.example=withCompoundDefaults(a.example);
  }
+ if(widgetAuthoring)projected.push(
+  {id:'composition.sticky-note',name:'Sticky note',purpose:'Compose a native yellow paper note with owned content and optional dimensions.',nativeTypes:['sticky-note-block',...text],schema:'StickyNote',nativeOperation:'prepareStickyNote / noteDimensions',read:'bounded-native-inspection',guidance:'Inline note, not a floating workspace window. size:null uses 280×280; explicit size minimum 200×160. Fixed yellow paper/scroll appearance. Submitted content and resizing protected; scrolling remains local.'},
+  {id:'widget.timer',name:'Timer',purpose:'Provide a native countdown with an authored duration and local submitted controls.',nativeTypes:['timer-block'],schema:'Timer',nativeOperation:'timerBlockDto / timerDuration / timerDimensions',feature:'timer',read:'bounded-native-inspection',guidance:'Initial idle state, 1–86400 whole seconds. Native floating presentation; no host-window authority or geometry-derived placement. Submitted Start/Pause/Reset remain local to the mounted occurrence and reset on remount; duration, size and deletion protected.'},
+  {id:'widget.object3d',name:'3D object',purpose:'Illustrate a native coffee cup with authored view, lighting and scene settings.',nativeTypes:['3d-object-block'],schema:'Object3D',nativeOperation:'objectDto / objectConfiguration',feature:'threeDObjects',read:'bounded-native-inspection',prerequisites:['WebGL 2 for graphics; saved native fallback remains readable'],guidance:'Only the existing coffee-cup scene; configuration:null uses native defaults. No acquisition or resource identifiers. Submitted orbit/presets/auto-rotation stay local; scene settings and size are protected.'},
+  {id:'widget.canvas-preview',name:'Canvas demonstration preview',purpose:'Include the existing native demonstration of locally draggable sample boxes.',nativeTypes:['canvas-block'],schema:'CanvasPreview',nativeOperation:'canvasPreviewDto',read:'bounded-native-inspection',guidance:'Preview only. Sample box movement is local and not saved. No authored spatial cards, box configuration, workspace Canvas or host session.'}
+ );
  const items=projected.map(a=>{
   const renderer=a.nativeTypes.every(type=>!!editor.registry.resolve(type)?.view)&&(!a.annotationRenderer||!!editor.visualEffects.type(a.annotationRenderer)?.renderers.length);
   const enabled=editor.features.dialecticDcp&&(!a.semantic||editor.features.scopedSemantics)&&(!a.feature||editor.features[a.feature]);
@@ -93,12 +100,12 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   };
  });
  const summary={version:1,detailTool:'describe_capabilities',items:items.map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
- const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring).$defs as Record<string,unknown>;
+ const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring).$defs as Record<string,unknown>;
  function parameters(names:Definition[]){
   const defs:Record<string,unknown>={},externalDefinitions:Record<string,unknown>={};
   const add=(name:string)=>{
-   if(compoundAuthoring&&name==='Node'){
-    externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>a.id.startsWith('composition.')&&a.schema&&a.id!=='composition.tasks').map(a=>a.id)};return;
+   if((compoundAuthoring||widgetAuthoring)&&name==='Node'){
+    externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>(a.id.startsWith('composition.')||a.id.startsWith('widget.'))&&a.schema&&a.id!=='composition.tasks').map(a=>a.id)};return;
    }
    if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);
   };
