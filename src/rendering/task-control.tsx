@@ -8,11 +8,12 @@ export function StandaloneTaskDisclosure(props: { nodeKey: string }) {
   const lists = createMemo(() => listItemChildren(projection, props.nodeKey));
   const collapsed = () => !!(projection.state.nodes[props.nodeKey]?.payload.metadata as any)?.listCollapsed;
   return <Show when={projection.parentOf(props.nodeKey)?.viewType !== 'indented-list-block' && lists().length}>
-    <button disabled={passive} class="reactive-task-disclosure" data-native-context-menu type="button" aria-label={collapsed() ? 'Expand child list' : 'Collapse child list'}
+    <button disabled={passive || !editor.canEditText(props.nodeKey)} class="reactive-task-disclosure" data-native-context-menu type="button" aria-label={collapsed() ? 'Expand child list' : 'Collapse child list'}
       aria-expanded={!collapsed()} aria-controls={lists().map(k => `list-${k}`).join(' ')}
       onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
       onClick={e => {
         e.stopPropagation();
+        if(passive||!editor.canEditText(props.nodeKey))return;
         if (!collapsed()) {
           let focused = editor.node(editor.focus.state.focusedKey!);
           while (focused && focused.key !== props.nodeKey) {
@@ -32,10 +33,10 @@ export function StandaloneTaskDisclosure(props: { nodeKey: string }) {
 
 export function TaskControl(props: { nodeKey: string }) {
   const { editor, projection, passive } = useReactiveView();
-  return <input disabled={passive} class="reactive-task-checkbox" type="checkbox" data-native-context-menu
+  return <input disabled={passive || !editor.canEditText(props.nodeKey)} class="reactive-task-checkbox" type="checkbox" data-native-context-menu
     aria-label="Task completion" checked={taskState(projection.state.nodes[props.nodeKey]) === true}
     onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
     onClick={e => e.stopPropagation()}
     onKeyDown={e => e.stopPropagation()}
-    onChange={e => { e.stopPropagation(); toggleTask(editor, props.nodeKey); }} />;
+    onChange={e => { e.stopPropagation(); if(!passive)toggleTask(editor, props.nodeKey); e.currentTarget.checked=taskState(projection.state.nodes[props.nodeKey])===true; }} />;
 }

@@ -4,6 +4,10 @@
 
 ## Decision
 
+### Stage 2B implementation update — 9 November 2026
+
+Stage 2A is accepted. Shared list/task and layout preparations now cover numbering, initial checked state, native table headers and unequal-row grid composition. See [Stage 2B qualification](DCP_NATIVE_AUTHORING_STAGE2B_QUALIFICATION.md) for tested operation coverage, immutable controls and explicit width/span/collapse limitations. The original inventory remains the baseline; later composition families and resource stages have not begun.
+
 ### Stage 2A implementation update — 9 November 2026
 
 Stage 1 is accepted. The first Stage 2 increment extends the same shared preparations with text appearance, literal standoff code and Markdown/HTML source, plus curated formatting/references. See [the reviewable Stage 2 plan](DCP_NATIVE_AUTHORING_STAGE2_PLAN.md) and [Stage 2A qualification](DCP_NATIVE_AUTHORING_STAGE2A_QUALIFICATION.md) for operation-level coverage and explicit remaining gaps. The original inventory below remains the baseline; it is not a claim that all Stage 2 operations are now supported. No new Block registry or general authoring framework was required.

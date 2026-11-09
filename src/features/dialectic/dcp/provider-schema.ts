@@ -1,3 +1,4 @@
+import {listConfiguration,tableConfiguration} from '../../../block-tree/layout-authoring';
 import {codeOperation} from '../../../block-tree/literal-authoring';
 import {sourceOperation} from '../../../interchange/source-block';
 import {headingOperation,gridOperation,youtubeOperation,textAppearanceOperation} from '../../../block-tree/native-authoring';
@@ -13,7 +14,7 @@ const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
-export function authoringSchema(nativeAuthoring=false,textAuthoring=false):any {
+export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false):any {
  if(!nativeAuthoring)return responseSchema;
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
@@ -32,11 +33,18 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false):any {
   d.Node.anyOf.push({$ref:'#/$defs/Code'},{$ref:'#/$defs/Source'});
  }
 
+ if(layoutAuthoring){
+  const nullable=(ref:string)=>({anyOf:[{$ref:'#/$defs/'+ref},{type:'null'}]});
+  d.ListConfiguration=listConfiguration;d.TableConfiguration=tableConfiguration;
+  d.List.properties.style.enum.push('task');
+  d.List.properties.configuration=nullable('ListConfiguration');d.List.required.push('configuration');
+  d.Table.properties.configuration=nullable('TableConfiguration');d.Table.required.push('configuration');
+ }
  return schema;
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false):any {
- const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring));
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring));
  if(provider==='openai')return nativeAuthoring?schema:responseSchema;
  const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{})};
  const leaf=node.anyOf.filter((r:any)=>!Object.hasOwn(templates,r.$ref.replace('#/$defs/','')));

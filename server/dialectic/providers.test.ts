@@ -142,3 +142,15 @@ it.each(['openai','anthropic'] as Provider[])('%s negotiates strict Stage 2 lite
  for(const name of refs)expect(schema.$defs[name],name).toBeDefined();
  if(provider==='anthropic')expect(schema.$defs.Node12.anyOf).toEqual(expect.arrayContaining([{$ref:'#/$defs/Code'},{$ref:'#/$defs/Source'}]));
 });
+
+it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 2B layouts with bounded schemas and preserves Stage 2A',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,nativeAuthoring:1,textAuthoring:1,layoutAuthoring:1});
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),schema=provider==='openai'?body.text.format.schema:body.output_config.format.schema;
+ const list=schema.$defs[provider==='openai'?'List':'List0'],table=schema.$defs[provider==='openai'?'Table':'Table0'];
+ expect(list.properties.style.enum).toContain('task');expect(list.required).toContain('configuration');expect(table.required).toContain('configuration');expect(schema.$defs.Code).toBeDefined();expect(schema.$defs.TextStyle).toBeDefined();
+ expect(schemaFor(provider,true,false,true).$defs.ListConfiguration).toBeDefined();expect(schemaFor(provider,true,false,true).$defs.TextStyle).toBeUndefined();
+ expect(schemaFor(provider,true,true).$defs.ListConfiguration).toBeUndefined();expect(schemaFor(provider,false,true,true).$defs.ListConfiguration).toBeUndefined();
+ const visited=new Set<string>();const walk=(v:any,path=new Set<string>())=>{if(!v||typeof v!=='object')return;if(v.$ref){const name=v.$ref.slice('#/$defs/'.length);expect(schema.$defs[name],name).toBeDefined();if(provider==='anthropic')expect(path.has(name),'recursive '+name).toBe(false);if(!visited.has(name)){visited.add(name);walk(schema.$defs[name],new Set([...path,name]));}return;}if(v.type==='object'){expect(v.additionalProperties).toBe(false);expect(v.required.slice().sort()).toEqual(Object.keys(v.properties).sort());}Object.entries(v).filter(([k])=>k!=='$defs').forEach(([,x])=>walk(x,path));};walk(schema);
+});

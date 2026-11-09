@@ -87,3 +87,13 @@ it('qualifies Stage 2 text descriptors, bounded recursive details and independen
  expect(disabled.describe({ids:['composition.paragraph']}).items[0].example).not.toHaveProperty('textStyle');
  expect(disabled.summary.items.some(i=>i.id==='formatting.core')).toBe(false);
 });
+
+it('keeps Stage 2B layout/task details bounded and separates native task prerequisites',()=>{
+ expect(featureFlags.dcpNativeAuthoringStage2Layouts).toBe(true);
+ const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage2Text:true,dcpNativeAuthoringStage2Layouts:true,taskLists:true,documentInterchange:true,standoffCodeHighlighting:true});
+ const catalogue=capabilityCatalogue(editor);
+ for(const {id} of catalogue.summary.items){const detail=catalogue.describe({ids:[id]});expect(detail.status,id).toBe('complete');expect(new TextEncoder().encode(JSON.stringify(detail)).length,id).toBeLessThanOrEqual(capabilityLimits.bytes);}
+ for(const id of ['composition.list','composition.tasks','composition.table','composition.card-grid'])expect(catalogue.describe({ids:[id]}).items[0].authorable,id).toBe(true);
+ editor.features.taskLists=false;expect(capabilityCatalogue(editor).describe({ids:['composition.tasks']}).items[0].authorable).toBe(false);
+ editor.features.dcpNativeAuthoringStage2Layouts=false;expect(capabilityCatalogue(editor).describe({ids:['composition.tasks']}).items[0].status).toBe('unknown');
+});

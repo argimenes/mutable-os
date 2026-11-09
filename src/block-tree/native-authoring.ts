@@ -1,4 +1,5 @@
 import type {ExistingBlockDto} from './types';
+import {prepareLayout} from './layout-authoring';
 import {youtubeId} from '../interchange/youtube-reference';
 
 /** Native preparations shared by editor commands and transport projections.
@@ -43,8 +44,7 @@ export function prepareGrid(rows:ExistingBlockDto[][][]):ExistingBlockDto {
  if(!Array.isArray(rows)||!rows.length||rows.length>maxRows)throw Error('Invalid native grid rows');
  const width=Array.isArray(rows[0])?rows[0].length:0;
  if(!width||width>maxColumns||rows.some(row=>!Array.isArray(row)||row.length!==width||row.some(cell=>!Array.isArray(cell)||cell.length>maxCellChildren)))throw Error('Invalid native grid cells');
- const dto=(type:string,children:ExistingBlockDto[]):ExistingBlockDto=>({id:crypto.randomUUID(),type,metadata:{},children});
- return dto('grid-block',rows.map(row=>dto('grid-row-block',row.map(cell=>dto('grid-cell-block',cell)))));
+ return prepareLayout('grid',rows);
 }
 export const youtubeOperation={purpose:'Present an existing external YouTube video; no acquisition or generation.',parameters:{url:{type:'string',minLength:1,maxLength:4096}},nativeEffects:['youtube-video-block','metadata.url'],prerequisites:['A URL or video ID accepted by the native YouTube validator']} as const;
 export function prepareYouTube(url:string):ExistingBlockDto {

@@ -146,7 +146,7 @@ function ListItem(props: { nodeKey: NodeKey; marker: string }) {
   const task = () => (editor.features.taskLists || projection.state.nodes[props.nodeKey]?.viewType === "checkbox-block") && taskState(projection.state.nodes[props.nodeKey]) !== undefined;
   const collapsed = () => !!(projection.state.nodes[props.nodeKey]?.payload.metadata as any)?.listCollapsed;
   const toggle = () => {
-    if(passive)return;
+    if(passive||!editor.canEditText(props.nodeKey))return;
     const next = !collapsed();
     let focused = editor.focus.state.focusedKey && projection.state.nodes[editor.focus.state.focusedKey];
     let hidesFocus = false;
@@ -164,7 +164,7 @@ function ListItem(props: { nodeKey: NodeKey; marker: string }) {
   };
   return <div role="listitem" class="reactive-imported-list-item" classList={{ "reactive-task-list-item": task() }} data-list-item={props.nodeKey}>
     <Show when={children().length} fallback={<span class="reactive-imported-list-marker" contentEditable={false} aria-hidden="true">{task() ? "" : props.marker}</span>}>
-      <button disabled={passive} type="button" class="reactive-imported-list-marker reactive-list-toggle" classList={{ 'reactive-list-toggle--collapsed': collapsed() }}
+      <button disabled={passive||!editor.canEditText(props.nodeKey)} type="button" class="reactive-imported-list-marker reactive-list-toggle" classList={{ 'reactive-list-toggle--collapsed': collapsed() }}
         contentEditable={false} data-native-context-menu aria-expanded={!collapsed()} aria-controls={children().map(k => `list-${k}`).join(' ')}
         aria-label={collapsed() ? 'Expand child list' : 'Collapse child list'} title={collapsed() ? 'Expand child list' : 'Collapse child list'}
         onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }} onClick={e => { e.stopPropagation(); toggle(); }}

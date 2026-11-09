@@ -1,3 +1,6 @@
+import {ReactiveEditor} from '../../reactive-editor/editor';
+import {prepareList,prepareLayout} from '../../block-tree/layout-authoring';
+import {toggleTask} from '../../runtime/tasks';
 import {blockMenuItems} from '../../runtime/block-menu-actions';
 import {headingProperty,prepareGrid,prepareHeading} from '../../block-tree/native-authoring';
 import {registerStandaloneEntityService} from '../../application/entity-service';
@@ -21,15 +24,15 @@ import * as resourceIdentity from '../../block-tree/resource-identity';
 import {captureBlocks,cloneBlocks} from '../../block-tree/clipboard';
 import {serializeSelection} from '../../interchange/serializer';
 import {materializeFragment} from '../../interchange/materialize';
-import {captureNative,nativeBytes,decodeNative} from '../../persistence/native-resource';
+import {captureNative,nativeBytes,decodeNative,admitNative,nativeText} from '../../persistence/native-resource';
 import {createDialecticController} from './controller';
 import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -960,4 +963,98 @@ it('reports oversized Stage 2 literal reads explicitly without expanding retriev
   expect(source.status).toBe('truncated');expect(source.text).toBeUndefined();expect(source.reason).toContain('UTF-16');expect(source.inspection.root).toMatchObject({kind:'source',literal:true});
   return JSON.stringify(dcpResponse(req.exchange));
  });expect(c.notice()).toBe('');
+});
+
+it('qualifies Stage 2B native lists/tasks/layouts with protected state, inspection and persistence',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true),c=f.c!,e=f.editor;
+ f.type!('The original source remains unchanged.');const original=f.text!(),cells=[...original.inlineContent];c.submit();
+ const p=(id:number,text:string)=>({id:'new:b'+id,kind:'paragraph',markup:text,ranges:[],textStyle:null});
+ const native=nativeDocumentSession(e);(native as any).bind(c.resourceId(),{folder:'isolated',filename:'stage2b.ink'},{nativeHash:'initial',markdownHash:null,generation:null});
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(req,sources)=>{
+  expect(req.layoutAuthoring).toBe(1);expect(req.authoring.instructions).toContain('Submitted checked state is immutable');
+  const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}}),source=await sources.tool({id:'r',tool:'read_source',arguments:{handle:parent.children[0]}});
+  const v:any=dcpResponse(req.exchange);v.composition=[
+   {id:'new:b1',kind:'list',style:'ordered',configuration:{start:5,reversed:true,items:[{value:9,checked:true},{value:null,checked:false}]},items:[[p(2,'First'),{id:'new:b3',kind:'list',style:'bullet',configuration:null,items:[[p(4,'Nested')]]}],[p(5,'Second')]]},
+   {id:'new:b6',kind:'list',style:'task',configuration:null,items:[[p(7,'Open')],[p(8,'Also open')]]},
+   {id:'new:b9',kind:'table',configuration:{headers:[[true,false]]},rows:[[[p(10,'Heading')],[p(11,'Value')]]]},
+   {id:'new:b12',kind:'grid',rows:[[[p(13,'Merged A'),p(14,'Merged B')]],[[p(15,'C')],[p(16,'D')]]]}
+  ];v.anchors=[{id:'new:r1',source:source.handle,revision:source.revision,selector:{exact:'original source',prefix:'',suffix:''}}];v.interpretations=[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}];return JSON.stringify(v);
+ });expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const node=(key:string)=>c.session()!.projection.node(key)!,generated=c.resolve(c.target(c.frontier()!.id))!,[list,tasks,table,grid]=generated.children.map(node);
+ expect(list.payload.metadata).toMatchObject({htmlList:{ordered:true,start:5,reversed:true}});
+ const items=list.children.map(node);expect(items[0].payload).toMatchObject({checked:true,metadata:{htmlListItem:{value:9}}});expect(items[1].payload.checked).toBe(false);
+ expect(tasks.children.map(k=>node(k).payload.checked)).toEqual([false,false]);
+ const tableCells=node(table.children[0]).children.map(node);expect(tableCells[0].payload.metadata).toMatchObject({htmlTableCell:{header:true,colSpan:1,rowSpan:1}});expect(tableCells[1].payload.metadata).toMatchObject({htmlTableCell:{header:false}});
+ expect(grid.children.map(k=>node(k).children.length)).toEqual([1,2]);expect(node(node(grid.children[0]).children[0]).children).toHaveLength(2);
+ expect(original.inlineContent).toEqual(cells);expect((original.payload.standoffProperties as any[]).some(p=>p.type==='style/highlight')).toBe(true);
+ const checkboxes=[...f.host.querySelectorAll<HTMLInputElement>('.reactive-task-checkbox')];expect(checkboxes).toHaveLength(4);expect(checkboxes.every(b=>b.disabled)).toBe(true);
+ const revision=e.repository.state.revision;checkboxes[0].checked=false;checkboxes[0].dispatchEvent(new Event('change',{bubbles:true}));expect(checkboxes[0].checked).toBe(true);expect(toggleTask(e,items[0].key)).toBe(false);expect(e.repository.state.revision).toBe(revision);
+ expect(()=>e.commands.setPayloadField(items[0].key,'checked',false)).toThrow(/protected/);
+ expect(f.host.querySelector<HTMLButtonElement>('.reactive-list-toggle')!.disabled).toBe(true);
+ expect(native.isDirty(c.resourceId())).toBe(true);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ e.repository.undo();expect(c.committed()).toHaveLength(1);expect(original.payload.standoffProperties??[]).toHaveLength(0);e.repository.redo();expect(c.committed()).toHaveLength(2);
+ const saved=decodeNative(nativeBytes(captureNative(e.repository.readState(),c.resourceId())));expect(Object.values(saved.contents).find(n=>n.payload.id===items[0].payload.id)!.payload).toMatchObject({checked:true,metadata:{htmlListItem:{value:9}}});
+ expect(Object.values(saved.contents).find(n=>n.payload.id===grid.payload.id)!.children).toHaveLength(2);
+ const loaded=new ReactiveEditor({id:'reload-bank',type:'workspace-object-bank-block',children:[]});cleanup.push(()=>loaded.dispose());
+ const bank=loaded.repository.readState();admitNative(loaded.repository,nativeBytes(saved),bank.placements[bank.rootPlacementKey].contentKey);
+ const restored=captureNative(loaded.repository.readState(),c.resourceId());expect(nativeText(restored)).toBe(nativeText(saved));
+
+ await c.askMock(async(req,sources)=>{
+  const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}});
+  const read=await sources.tool({id:'l',tool:'read_source',arguments:{handle:parent.children[0]}});
+  expect(read.inspection.root.configuration.htmlList).toEqual({ordered:true,start:5,reversed:true});expect(read.inspection.root.children[0]).toMatchObject({kind:'list-item',nativeId:items[0].payload.id,configuration:{checked:true,htmlListItem:{value:9}}});
+  const t=await sources.tool({id:'t',tool:'read_source',arguments:{handle:parent.children[2]}});expect(t.inspection.root.children[0].children[0].configuration.htmlTableCell.header).toBe(true);
+  const g=await sources.tool({id:'g',tool:'read_source',arguments:{handle:parent.children[3]}});expect(g.inspection.root.children.map((r:any)=>r.children.length)).toEqual([1,2]);
+  return JSON.stringify(dcpResponse(req.exchange));
+ });expect(c.notice()).toBe('');
+ // Same native preparations in a human draft, then actual controls and submission.
+ const draft=c.resolve(c.target(c.draft()!.id))!,text=(s:string)=>({id:crypto.randomUUID(),type:'standoff-editor-block',text:s});
+ e.commands.insert(prepareList([[text('Draft task')]],'task'),{kind:'at',parentKey:draft.key,index:draft.children.length});
+ const draftTask=node(draft.children.at(-1)!),owner=node(draftTask.children[0]),check=[...f.host.querySelectorAll<HTMLInputElement>('.reactive-task-checkbox')].at(-1)!;
+ expect(check.disabled).toBe(false);check.checked=true;check.dispatchEvent(new Event('change',{bubbles:true}));expect(owner.payload.checked).toBe(true);
+ e.repository.undo();expect(owner.payload.checked).toBe(false);e.repository.redo();expect(owner.payload.checked).toBe(true);
+ const target=f.text!(),add=blockMenuItems(e,target.key).find(i=>i.label==='Add Block')!.children!;
+ await add.find(i=>i.label==='Add Grid')!.children!.find(i=>i.label==='2 × 2')!.run!();
+ const humanGrid=draft.children.map(node).find(n=>n.viewType==='grid-block')!,secondCell=node(node(humanGrid.children[0]).children[1]);
+ await blockMenuItems(e,secondCell.children[0]).find(i=>i.label==='Grids')!.children!.find(i=>i.label==='Merge cell left')!.run!();
+ const shape=(n:any):any=>({type:n.viewType,children:n.children.map((k:string)=>shape(node(k)))});expect(shape(humanGrid)).toEqual(shape(grid));
+ e.tables.run({kind:'create',targets:[target.key],columns:2});
+ const humanTable=draft.children.map(node).find(n=>n.viewType==='table-block')!;expect(node(humanTable.children[0]).children.map(k=>node(k).viewType)).toEqual(tableCells.map(n=>n.viewType));
+ const reads={...c.dcpDiagnostics},requests=(fetch as any).mock.calls.length;snapshots.mockClear();build.mockClear();e.commands.replaceInlineRange(target.key,0,0,'Local typing');
+ expect(c.dcpDiagnostics).toEqual(reads);expect((fetch as any).mock.calls.length).toBe(requests);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ c.submit();expect(check.disabled).toBe(true);e.repository.undo();expect(check.disabled).toBe(false);e.repository.redo();expect(check.disabled).toBe(true);
+});
+
+it('rejects malformed Stage 2B configuration, source authority and insertion failures atomically',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true),c=f.c!,e=f.editor;f.type!('An immutable original.');const source=f.text!();c.submit();
+ const revision=e.repository.state.revision,p={id:'new:b2',kind:'paragraph',markup:'x',ranges:[]},list={id:'new:b1',kind:'list',style:'ordered',items:[[p]]};
+ const configs=[{start:1.5,reversed:false,items:null},{start:1,reversed:'yes',items:null},{start:null,reversed:false,items:[]},{start:null,reversed:false,items:[{value:null,checked:1}]},{start:null,reversed:false,items:[{value:null,checked:null,collapsed:true}]},{start:null,reversed:false,items:null,width:10}];
+ const bad=[...configs.map(configuration=>({...list,configuration})),{...list,style:'bullet',configuration:{start:4,reversed:false,items:null}},
+  ...[{headers:[[true,true]]},{headers:[[1]]},{headers:null},{widths:[1]},{headers:[[true]],spans:[[2]]}].map(configuration=>({id:'new:b1',kind:'table',rows:[[[p]]],configuration})),
+  {id:'new:b1',kind:'grid',rows:[[[p]]],configuration:{width:10}},
+  {id:'new:b1',kind:'table',rows:[[[p]],[[{...p,id:'new:b3'}],[{...p,id:'new:b4'}]]]},
+ ];
+ for(const node of bad){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[node]}));expect(c.notice(),JSON.stringify(node)).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ for(const mode of ['stale','foreign','insert']){
+  const insert=e.commands.insert.bind(e.commands),fail=mode==='insert'?vi.spyOn(e.commands,'insert').mockImplementation((dto,pos)=>{if((dto.metadata as any)?.dialectic?.state==='committed')throw Error('Stage 2B insertion failure');return insert(dto,pos);}):undefined;
+  await c.askMock(async(req,sources)=>{
+   const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}}),read=await sources.tool({id:'r',tool:'read_source',arguments:{handle:parent.children[0]}});
+   const value:any=dcpResponse(req.exchange);value.composition=[{...list,style:'task'}];value.anchors=[{id:'new:r1',source:mode==='foreign'?'src:other:b1':read.handle,revision:mode==='stale'?'expired':read.revision,selector:{exact:'immutable',prefix:'',suffix:''}}];value.interpretations=[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}];return JSON.stringify(value);
+  });fail?.mockRestore();expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);expect(source.payload.standoffProperties??[]).toHaveLength(0);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ }
+});
+
+it('preserves Stage 2B feature gates and counts all owned item and layout descendants',async()=>{
+ const p=(id:number)=>({id:'new:b'+id,kind:'paragraph',markup:'x',ranges:[]});
+ for(const [stage1,layouts,tasks] of [[true,false,true],[false,true,true],[true,true,false]]){
+  const f=await setup(true,true,true,true,true,false,true,stage1,true,true,layouts,tasks),c=f.c!,e=f.editor;f.type!('Features');c.submit();const revision=e.repository.state.revision;
+  await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'list',style:'task',items:[[p(2)]]}]}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);
+  if(!layouts||!stage1){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'list',style:'ordered',configuration:{start:3,reversed:false,items:null},items:[[p(2)]]}]}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ }
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true),c=f.c!,e=f.editor;f.type!('Bounds');c.submit();const revision=e.repository.state.revision;
+ for(const kind of ['list','table','grid']){
+  const composition=kind==='list'?[{id:'new:b1',kind:'list',style:'task',items:Array.from({length:64},(_,i)=>[p(2+i*3),p(3+i*3),p(4+i*3)])}]:[{id:'new:b1',kind,rows:Array.from({length:16},(_,r)=>Array.from({length:16},(_,col)=>[p(2+r*16+col)]))}];
+  await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition}));expect(c.notice()).toContain('native Block budget');expect(e.repository.state.revision).toBe(revision);
+ }
 });

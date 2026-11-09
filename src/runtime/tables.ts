@@ -1,3 +1,4 @@
+import {prepareLayout} from '../block-tree/layout-authoring';
 import { holdStructuralMedia } from './structural-media';
 import { createStore } from 'solid-js/store';
 import { clone } from '../block-tree/clone';
@@ -210,9 +211,9 @@ export class TableOperations {
       const nodes = this.targets(request.targets); target = nodes[0]; moving = nodes; affectedBlocks = nodes.length;
       const count = request.columns;
       apply = () => {
-        const rows = Array.from({ length: Math.ceil(nodes.length / count) }, (_, r) => dto('table-row-block',
-          Array.from({ length: count }, (_, col) => dto('table-cell-block', r * count + col < nodes.length ? [] : [emptyText()]))));
-        const table = c.insert(dto('table-block', rows), { kind: 'before', anchorKey: target.placementKey });
+        const rows = Array.from({ length: Math.ceil(nodes.length / count) }, (_, r) =>
+          Array.from({ length: count }, (_, col) => r * count + col < nodes.length ? [] : [emptyText()]));
+        const table = c.insert(prepareLayout('table', rows), { kind: 'before', anchorKey: target.placementKey });
         const cells = c.childrenOf(table).flatMap(row => c.childrenOf(row));
         nodes.forEach((n, i) => c.move(n.placementKey, { kind: 'at', parentKey: cells[i], index: 0 }));
         return [target.placementKey];

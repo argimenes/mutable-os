@@ -1,3 +1,4 @@
+import {taskChecked} from '../block-tree/layout-authoring';
 import type { BlockNode, NodeKey } from '../block-tree/types';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import { changeTextList, exitEmptyListItem } from './text-lists';
@@ -23,13 +24,14 @@ export function taskOwner(editor: ReactiveEditor, key: NodeKey): BlockNode | und
 
 export function setTaskState(editor: ReactiveEditor, key: NodeKey, checked: boolean | undefined): void {
   const node = taskOwner(editor, key) ?? editor.node(key);
-  if (!node || !['standoff-editor-block', 'container-block', 'checkbox-block'].includes(node.viewType)) return;
+  if (!node || !['standoff-editor-block', 'container-block', 'checkbox-block'].includes(node.viewType)||!editor.canEditText(node.key)) return;
+  if(checked!==undefined)taskChecked(checked);
   editor.commands.setPayloadField(node.key, 'checked', checked, checked === undefined ? 'Remove task state' : 'Toggle task completion');
 }
 
 export function toggleTask(editor: ReactiveEditor, key: NodeKey): boolean {
   const owner = taskOwner(editor, key);
-  if (!owner) return false;
+  if (!owner || !editor.canEditText(owner.key)) return false;
   setTaskState(editor, owner.key, !taskState(owner));
   return true;
 }

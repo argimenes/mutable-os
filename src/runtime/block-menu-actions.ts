@@ -1,3 +1,4 @@
+import {listShell} from '../block-tree/layout-authoring';
 import { tabOrientationMenu } from './tab-orientation';
 import { tabOrientation } from '../block-tree/tab-orientation';
 import { tableMenuItems } from './table-menu';
@@ -147,7 +148,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
         if (node.viewType === "standoff-editor-block") createTextTab(editor, key);
         else convert(dto("tab-row-block", [dto("tab-block", [], { name: "Tab 1", active: true })]), 1);
       } });
-      if (!ancestor("indented-list-block")) items.push({ label: "Convert to list", run: () => convert(dto("indented-list-block"), 0) });
+      if (!ancestor("indented-list-block")) items.push({ label: "Convert to list", run: () => convert(listShell(), 0) });
       items.push(unavailable("Convert to pocket", "This action is a no-op in the original source; existing pocket controls are available."));
     }
     const containsPage = (key: NodeKey): boolean => {

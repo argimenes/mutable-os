@@ -39,7 +39,7 @@ export function listItemChildren(projection: BlockTreeProjection, key: NodeKey):
 
 export function setListItemCollapsed(editor: ReactiveEditor, key: NodeKey, collapsed: boolean) {
   const item = editor.node(key);
-  if (!item) return;
+  if (!item||!editor.canEditText(key)) return;
   editor.commands.setPayloadField(key, 'metadata', { ...JSON.parse(JSON.stringify(item.payload.metadata ?? {})), listCollapsed: collapsed }, collapsed ? 'Collapse list item' : 'Expand list item');
 }
 const listDto = (source?: BlockNode): ExistingBlockDto => ({

@@ -1,3 +1,4 @@
+import {listOperation,layoutOperation} from '../../../block-tree/layout-authoring';
 import {withTextStyleDefaults} from './authoring';
 import {codeOperation} from '../../../block-tree/literal-authoring';
 import {sourceOperation} from '../../../interchange/source-block';
@@ -8,9 +9,9 @@ import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
 import {capabilityLimits,compositionLimits} from './limits';
 import {classifications,legend} from './markup';
 
-type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source';
+type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source'|'ListConfiguration'|'TableConfiguration';
 interface Adapter {
- id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'; annotationRenderer?:string; presentationOnly?:boolean;
+ id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'|'taskLists'; annotationRenderer?:string; presentationOnly?:boolean;
  constraints?:Record<string,unknown>; guidance:string; example?:unknown;
  resources?:'asset-acquisition-unavailable'|'validated-external-reference';
  nativeOperation?:string;nativeEffects?:readonly string[];parameters?:Record<string,unknown>;prerequisites?:readonly string[];
@@ -47,6 +48,7 @@ export const capabilityInstructions='CAPABILITY DISCOVERY: capabilities is the c
  * repository subscription, typing hook or provider-model capability inference. */
 export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'features'|'visualEffects'>){
  const stage1=editor.features.dcpNativeAuthoringStage1===true;
+ const layoutAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Layouts===true;
  const textAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Text===true;
  const semanticTypes=legend(editor.visualEffects,stage1,textAuthoring);
  const projected=adapters.map(a=>({...a})).map((a):Adapter=>!stage1?a:a.id==='composition.heading'?{...a,schema:'Heading',purpose:headingOperation.purpose,nativeOperation:'prepareHeading / headingProperty',nativeEffects:headingOperation.nativeEffects,guidance:'level 1–6 creates a native TextBlock with the heading Block property; same preparation as the style bar.',example:{...paragraph,kind:'heading',level:2}}:a.id==='composition.card-grid'?{...a,schema:'Grid',purpose:gridOperation.purpose,nativeOperation:'prepareGrid',nativeEffects:gridOperation.nativeEffects,constraints:gridOperation.constraints,guidance:'Use kind:grid with rectangular rows of nonempty cell content arrays. Native preparation supplies row/cell ownership; no spatial placement or merged cells in this creation projection.',example:{id:'new:b2',kind:'grid',rows:[[[paragraph]]]}}:a.id==='media.youtube'?{...a,schema:'YouTube',purpose:youtubeOperation.purpose,nativeOperation:'prepareYouTube / youtubeId',nativeEffects:youtubeOperation.nativeEffects,resources:'validated-external-reference',prerequisites:youtubeOperation.prerequisites,guidance:'Use a native-valid URL or video ID. No trusted capture, managed asset or generation is required. External playback availability is not guaranteed.',example:{id:'new:b1',kind:'youtube',url:'Zsqep7_9_mw'}}:a.id==='source.classification'?{...a,guidance:'Target a fresh exact source anchor. Stage 1 also admits formatting from the initial legend through this same interpretations shape; attributes use the native property descriptor. Existing text remains immutable.'}:a);
@@ -61,6 +63,13 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   projected.push({id:'formatting.core',name:'Core formatting and references',schema:'Span',purpose:'Mark revisions, notation, emphasis and links using stable native text properties.',read:'native-annotation-values',nativeTypes:text,nativeOperation:'standoffStyleSchemas[type].authoring.prepare',nativeEffects:descriptors.map(([type])=>type),parameters:Object.fromEntries(descriptors.map(([type,s])=>[type,s.authoring!.parameters])),guidance:'Inline markup, explicit ranges and existing-source interpretations share admission. Strikethrough/subscript/superscript/highlight take no attributes. Background colour and hyperlink require value. Decorative effects remain excluded.',example:{markup:'<annotation type="style/strikethrough">Earlier</annotation> <annotation type="reference/url" value="https://example.org/">source</annotation>'}});
   for(const a of projected){if(a.id==='composition.paragraph'||a.id==='composition.heading'){a.guidance+=' Stage 2A: include textStyle:null or explicit alignment/indent/size (heading size stays null).';}}
   for(const a of projected)if(a.example)a.example=withTextStyleDefaults(a.example);
+ }
+ if(layoutAuthoring){
+  Object.assign(projected.find(a=>a.id==='composition.list')!,{purpose:listOperation.purpose,nativeOperation:'prepareList / listMetadata / listItemPayload',nativeEffects:listOperation.nativeEffects,guidance:'Nested ordered/bullet/task items; configuration controls start/reversed and per-item value/checked. Native taskLists feature required for checked state. Null configuration preserves defaults; submitted state is immutable. Initial collapse settings are unavailable.',example:{id:'new:b2',kind:'list',style:'ordered',configuration:{start:3,reversed:false,items:null},items:[[paragraph]]}});
+  Object.assign(projected.find(a=>a.id==='composition.table')!,{nativeOperation:'prepareLayout',nativeEffects:['table-block','table-row-block','table-cell-block','metadata.htmlTableCell'],guidance:'Rectangular owned cells; configuration:null or matching headers boolean matrix. No spans or rendered width settings. Child paragraphs may use textStyle.',example:{id:'new:b2',kind:'table',configuration:{headers:[[true]]},rows:[[[paragraph]]]}});
+  Object.assign(projected.find(a=>a.id==='composition.card-grid')!,{purpose:layoutOperation.purpose,nativeOperation:'prepareLayout / prepareGrid',constraints:{...layoutOperation.constraints,rectangular:false},guidance:'Owned row/cell content. Unequal row lengths retain native merge results; no spanning or width rendering. Existing rectangular forms remain valid.'});
+  projected.push({id:'composition.tasks',name:'Task lists',purpose:'Author checkable items with protected initial completion state.',read:'native-task-state',nativeTypes:['indented-list-block','container-block',...text],schema:'List',feature:'taskLists',nativeOperation:'prepareList / taskChecked',nativeEffects:['checked'],guidance:'style:task defaults to unchecked; configuration.items specifies initial checked values. Also supported in ordered/bullet lists. Draft controls remain interactive; submitted authored state is protected.'});
+  for(const a of projected)if(a.example)a.example=layoutExample(textAuthoring?withTextStyleDefaults(a.example):a.example);
  }
  const items=projected.map(a=>{
   const renderer=a.nativeTypes.every(type=>!!editor.registry.resolve(type)?.view)&&(!a.annotationRenderer||!!editor.visualEffects.type(a.annotationRenderer)?.renderers.length);
@@ -77,7 +86,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   };
  });
  const summary={version:1,detailTool:'describe_capabilities',items:items.map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
- const definitions=authoringSchema(stage1,textAuthoring).$defs as Record<string,unknown>;
+ const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring).$defs as Record<string,unknown>;
  function parameters(names:Definition[]){
   const defs:Record<string,unknown>={};
   const add=(name:string)=>{if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);};
@@ -99,4 +108,10 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   return result(omitted);
  }
  return {summary,describe};
+}
+
+function layoutExample(value:any):any {
+ if(Array.isArray(value))return value.map(layoutExample);
+ if(!value||typeof value!=='object')return value;
+ return {...Object.fromEntries(Object.entries(value).map(([key,item])=>[key,layoutExample(item)])),...(['list','table'].includes(value.kind)&&!Object.hasOwn(value,'configuration')?{configuration:null}:{})};
 }
