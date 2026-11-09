@@ -72,3 +72,18 @@ it('discovers every Stage 1 projection within the existing budget and distinguis
  expect(catalogue.summary.items.find(i=>i.id==='media.youtube')).toMatchObject({state:'authorable-with-prerequisites'});
  expect(catalogue.describe({ids:['composition.markdown-fallback']}).items[0].authorable).toBe(false);
 });
+
+it('qualifies Stage 2 text descriptors, bounded recursive details and independent feature snapshots',()=>{
+ expect(featureFlags.dcpNativeAuthoringStage2Text).toBe(true);
+ const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage2Text:true,documentInterchange:true,standoffCodeHighlighting:true});
+ const catalogue=capabilityCatalogue(editor);
+ for(const {id} of catalogue.summary.items){const detail=catalogue.describe({ids:[id]});expect(detail.status,id).toBe('complete');expect(detail.items,id).toHaveLength(1);expect(new TextEncoder().encode(JSON.stringify(detail)).length).toBeLessThanOrEqual(capabilityLimits.bytes);}
+ for(const id of ['composition.code','composition.source','configuration.text','formatting.core'])expect(catalogue.describe({ids:[id]}).items[0].authorable,id).toBe(true);
+ expect(catalogue.describe({ids:['composition.card-grid']}).items[0].example.rows[0][0][0].textStyle).toBeNull();
+ editor.features.documentInterchange=false;expect(capabilityCatalogue(editor).describe({ids:['composition.source']}).items[0].authorable).toBe(false);
+ editor.features.standoffCodeHighlighting=false;expect(capabilityCatalogue(editor).describe({ids:['composition.code']}).items[0].authorable).toBe(false);
+ editor.features.dcpNativeAuthoringStage2Text=false;
+ const disabled=capabilityCatalogue(editor);expect(disabled.describe({ids:['composition.code']}).items[0].authorable).toBe(false);
+ expect(disabled.describe({ids:['composition.paragraph']}).items[0].example).not.toHaveProperty('textStyle');
+ expect(disabled.summary.items.some(i=>i.id==='formatting.core')).toBe(false);
+});

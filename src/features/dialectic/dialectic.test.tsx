@@ -27,9 +27,9 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -846,4 +846,118 @@ it('bounds Stage 1 inspection work and generated grid descendants without increa
  const revision=e.repository.state.revision;
  await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'grid',rows:Array.from({length:16},(_,r)=>Array.from({length:16},(_,col)=>[{id:'new:b'+(2+r*16+col),kind:'paragraph',markup:'x',ranges:[]}]))}]}));
  expect(c.notice()).toContain('native Block budget');expect(e.repository.state.revision).toBe(revision);
+});
+
+it('qualifies Stage 2 text appearance, literal code/source and curated annotations through native admission',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true),c=f.c!,e=f.editor;
+ f.type!('The worn cup preserves ordinary life.');const original=f.text!(),originalCells=[...original.inlineContent];c.submit();
+ const literal='<tag a="&">😀</tag>\r\nnext\rfinal';
+ const native=nativeDocumentSession(e);(native as any).bind(c.resourceId(),{folder:'isolated',filename:'stage2a.ink'},{nativeHash:'initial',markdownHash:null,generation:null});
+ const snapshots=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ await c.askMock(async(req,sources)=>{
+  expect(req.textAuthoring).toBe(1);expect(req.authoring.examples[0].response.composition[0].textStyle).toBeNull();
+  expect(req.legend.types.map((t:any)=>t.type)).toEqual(expect.arrayContaining(['style/strikethrough','style/subscript','style/superscript','style/highlight','text/background-colour','reference/url']));
+  const inventory=await sources.tool({id:'i',tool:'list_text_blocks',arguments:inventoryArgs});
+  const source=await sources.tool({id:'r',tool:'read_source',arguments:{handle:inventory.items[0].handle}});
+  const value:any=dcpResponse(req.exchange);
+  value.composition=[
+   {id:'new:b1',kind:'heading',level:2,textStyle:{alignment:'center',indent:1,size:null},markup:'Literal evidence',ranges:[]},
+   {id:'new:b2',kind:'paragraph',textStyle:{alignment:'right',indent:2,size:'three-quarters'},markup:'<annotation type="style/strikethrough">old</annotation> <annotation type="style/subscript">2</annotation> <annotation type="style/superscript">3</annotation> <annotation type="style/highlight">key</annotation> <boundary id="new:pos1"/>link<boundary id="new:pos2"/>',ranges:[{id:'new:s1',type:'reference/url',from:'new:pos1',to:'new:pos2',ref:null,attributes:[{name:'value',value:'https://example.org/evidence'}]},{id:'new:s2',type:'text/background-colour',from:'new:pos1',to:'new:pos2',ref:null,attributes:[{name:'value',value:'#fff000'}]}]},
+   {id:'new:b3',kind:'code',language:'typescript',text:literal},
+   {id:'new:b4',kind:'source',format:'markdown',text:literal},
+   {id:'new:b5',kind:'source',format:'html',text:literal}
+  ];
+  value.anchors=[{id:'new:r1',source:source.handle,revision:source.revision,selector:{exact:'worn cup',prefix:'',suffix:''}}];
+  value.interpretations=[{id:'new:m1',target:'new:r1',type:'reference/url',ref:null,attributes:[{name:'value',value:'https://example.org/cup'}]}];
+  return JSON.stringify(value);
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const generated=c.resolve(c.target(c.frontier()!.id))!,nodes=generated.children.map(k=>c.session()!.projection.node(k)!);
+ expect(nodes.map(n=>n.viewType)).toEqual(['standoff-editor-block','standoff-editor-block','standoff-code-block','mutable/markdown-source-block','mutable/html-source-block']);
+ expect(nodes[0].payload.blockProperties).toEqual(expect.arrayContaining([{type:'block/font/size',value:'h2'},{type:'block/alignment',value:'center'},{type:'block/indent',value:'1'}]));
+ expect(nodes[1].payload.blockProperties).toEqual([{type:'block/alignment',value:'right'},{type:'block/indent',value:'2'},{type:'block/font/size',value:'three-quarters'}]);
+ const marks=nodes[1].payload.standoffProperties as any[];
+ for(const type of ['style/strikethrough','style/subscript','style/superscript','style/highlight','text/background-colour','reference/url'])expect(marks.find(p=>p.type===type),type).toBeTruthy();
+ expect(marks.find(p=>p.type==='reference/url')).toMatchObject({start:12,end:15,value:'https://example.org/evidence'});
+ const codeText=c.session()!.projection.node(nodes[2].children[0])!;
+ expect(codeText.inlineContent.map(k=>c.session()!.projection.node(k)!.payload.text).join('')).toBe(literal);
+ expect(nodes[2].payload.metadata).toMatchObject({markdownCode:{language:'typescript'}});
+ for(const n of nodes.slice(3)){expect(n.payload.text).toBe(literal);expect(n.payload.sourceFormat).toMatchObject({version:1});expect(e.canEditText(n.key)).toBe(false);expect(()=>e.commands.setPayloadField(n.key,'text','Changed')).toThrow(/protected/);}
+ expect(original.inlineContent).toEqual(originalCells);expect((original.payload.standoffProperties as any[]).find(p=>p.type==='reference/url')).toMatchObject({start:4,end:11,value:'https://example.org/cup'});
+ const select=f.host.querySelector<HTMLSelectElement>('.standoff-code select')!;expect(select).toBeTruthy();expect(select.disabled).toBe(true);
+ const revision=e.repository.state.revision;select.value='markdown';select.dispatchEvent(new Event('change',{bubbles:true}));expect(e.repository.state.revision).toBe(revision);
+ const convert=[...f.host.querySelectorAll<HTMLButtonElement>('button')].filter(b=>b.textContent==='Convert to Mutable Ink…');expect(convert).toHaveLength(2);expect(convert.every(b=>b.disabled)).toBe(true);
+ expect(native.isDirty(c.resourceId())).toBe(true);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ e.repository.undo();expect(c.committed()).toHaveLength(1);expect(original.payload.standoffProperties??[]).toHaveLength(0);
+ e.repository.redo();expect(c.committed()).toHaveLength(2);
+ const saved=captureNative(e.repository.readState(),c.resourceId()),loaded=decodeNative(nativeBytes(saved));
+ const savedSources=Object.values(loaded.contents).filter(n=>n.viewType.endsWith('-source-block'));expect(savedSources).toHaveLength(2);expect(savedSources.every(n=>n.payload.text===literal)).toBe(true);expect(JSON.stringify(loaded)).toContain('three-quarters');
+ await c.askMock(async(req,sources)=>{
+  const read=await sources.tool({id:'i',tool:'read_source',arguments:{handle:req.primaryReply}}),tree=read.inspection.root;
+  const code=tree.children.find((n:any)=>n.kind==='code');expect(code.configuration.language).toBe('typescript');expect(code.nativeId).toBe(nodes[2].payload.id);expect(code.children[0].text).toBe(literal);
+  const source=tree.children.find((n:any)=>n.nativeType==='mutable/html-source-block');expect(source).toMatchObject({kind:'source',literal:true,text:literal,configuration:{sourceFormat:{format:'html',version:1}}});
+  const exact=await sources.tool({id:'s',tool:'read_source',arguments:{handle:source.handle}});expect(exact.status).toBe('complete');expect(exact.text).toBe(literal);
+  return JSON.stringify(dcpResponse(req.exchange));
+ });expect(c.notice()).toBe('');
+ // Human menu factories create the same native ownership and configuration.
+ const add=blockMenuItems(e,f.text!().key).find(i=>i.label==='Add Block')!.children!;
+ await add.find(i=>i.label==='Standoff code')!.children!.find(i=>i.label==='TypeScript')!.run!();
+ await add.find(i=>i.label==='HTML source')!.run!();
+ const draft=c.resolve(c.target(c.draft()!.id))!,human=draft.children.map(k=>c.session()!.projection.node(k)!);
+ expect(human.find(n=>n.viewType==='standoff-code-block')!.payload.metadata).toEqual(nodes[2].payload.metadata);
+ expect(human.find(n=>n.viewType==='mutable/html-source-block')!.payload.sourceFormat).toEqual(nodes[4].payload.sourceFormat);
+ f.type!('Native link');e.rangeAnnotations.apply([e.textRanges.snapshot(f.text!().key,0,6)],'reference/url','https://example.org/cup');
+ expect((f.text!().payload.standoffProperties as any[]).find(p=>p.type==='reference/url').value).toBe('https://example.org/cup');
+ snapshots.mockClear();build.mockClear();const reads={...c.dcpDiagnostics},fetches=(fetch as any).mock.calls.length;f.type!('Typing');
+ expect(c.dcpDiagnostics).toEqual(reads);expect((fetch as any).mock.calls.length).toBe(fetches);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const humanCode=human.find(n=>n.viewType==='standoff-code-block')!,codeSelect=[...f.host.querySelectorAll<HTMLSelectElement>('.standoff-code select')].at(-1)!;
+ expect(e.canEditText(humanCode.key)).toBe(true);expect(codeSelect.disabled).toBe(false);
+ c.submit();expect(e.canEditText(humanCode.key)).toBe(false);expect(codeSelect.disabled).toBe(true);
+ e.repository.undo();expect(e.canEditText(humanCode.key)).toBe(true);expect(codeSelect.disabled).toBe(false);
+});
+
+it('rejects invalid Stage 2 text declarations atomically and retains the existing source and output budgets',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true),c=f.c!,e=f.editor;f.type!('Original immutable passage.');const original=f.text!();c.submit();
+ const revision=e.repository.state.revision,paragraph={id:'new:b1',kind:'paragraph',markup:'Text',ranges:[]};
+ const invalid=[
+  ...[{alignment:'diagonal',indent:null,size:null},{alignment:null,indent:-1,size:null},{alignment:null,indent:0.5,size:null},{alignment:null,indent:null,size:'giant'},{alignment:null,indent:null,size:null,metadata:{}},{}].map(textStyle=>({...paragraph,textStyle})),
+  {...paragraph,kind:'heading',level:2,textStyle:{alignment:null,indent:null,size:'normal'}},
+  {id:'new:b1',kind:'code',language:'\n',text:'x'}, {id:'new:b1',kind:'code',language:'plain',text:'\uD800'},
+  {id:'new:b1',kind:'source',format:'javascript',text:'x'}, {id:'new:b1',kind:'source',format:'html',text:'x',metadata:{}},
+  ...['javascript:alert(1)','https://','data:text/html,x'].map(value=>({...paragraph,markup:`<annotation type="reference/url" value="${value}">x</annotation>`})),
+  {...paragraph,markup:'<annotation type="style/highlight" value="red">x</annotation>'},
+  {...paragraph,markup:'<annotation type="text/background-colour" value="inherit">x</annotation>'},
+  {id:'new:b1',kind:'source',format:'markdown',text:'x'.repeat(24001)}
+ ];
+ for(const bad of invalid){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[bad]}));expect(c.notice(),JSON.stringify(bad).slice(0,160)).not.toBe('');expect(e.repository.state.revision).toBe(revision);}
+ for(const mode of ['stale','foreign','invalid-style','insertion']){
+  const insert=e.commands.insert.bind(e.commands),fail=mode==='insertion'?vi.spyOn(e.commands,'insert').mockImplementation((dto,pos)=>{if((dto.metadata as any)?.dialectic?.state==='committed')throw Error('Stage 2 injected admission failure');return insert(dto,pos);}):undefined;
+  await c.askMock(async(req,sources)=>{
+   const p=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}}),r=await sources.tool({id:'r',tool:'read_source',arguments:{handle:p.children[0]}});
+   const v:any=dcpResponse(req.exchange);v.composition=[{id:'new:b1',kind:'code',language:'plain',text:'unchanged'}];
+   v.anchors=[{id:'new:r1',source:mode==='foreign'?'src:other:b1':r.handle,revision:mode==='stale'?'expired':r.revision,selector:{exact:'immutable',prefix:'',suffix:''}}];
+   v.interpretations=[{id:'new:m1',target:'new:r1',type:'reference/url',ref:null,attributes:[{name:'value',value:mode==='invalid-style'?'javascript:alert(1)':'https://example.org/'}]}];return JSON.stringify(v);
+  });fail?.mockRestore();expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);expect(original.payload.standoffProperties??[]).toHaveLength(0);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
+ }
+});
+
+it('requires negotiated Stage 2 and native code/source features for authoring',async()=>{
+ for(const [native,text] of [[true,false],[false,true],[true,true]]){
+  const f=await setup(true,true,true,true,true,false,true,native,text,false),c=f.c!,e=f.editor;f.type!('Features');c.submit();
+  for(const node of [{id:'new:b1',kind:'code',language:'plain',text:'x'},{id:'new:b1',kind:'source',format:'markdown',text:'x'}]){
+   const revision=e.repository.state.revision;await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[node]}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);
+  }
+ }
+});
+
+
+it('reports oversized Stage 2 literal reads explicitly without expanding retrieval budgets',async()=>{
+ const f=await setup(true,true,true,true,true,false,true,true,true),c=f.c!;f.type!('Retain source');c.submit();
+ await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'source',format:'markdown',text:'😀'.repeat(12001)}]}));expect(c.notice()).toBe('');
+ await c.askMock(async(req,sources)=>{
+  const parent=await sources.tool({id:'p',tool:'read_source',arguments:{handle:req.primaryReply}});
+  const source=await sources.tool({id:'s',tool:'read_source',arguments:{handle:parent.children[0]}});
+  expect(source.status).toBe('truncated');expect(source.text).toBeUndefined();expect(source.reason).toContain('UTF-16');expect(source.inspection.root).toMatchObject({kind:'source',literal:true});
+  return JSON.stringify(dcpResponse(req.exchange));
+ });expect(c.notice()).toBe('');
 });

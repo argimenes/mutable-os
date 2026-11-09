@@ -121,6 +121,8 @@ export type FeatureFlags = Readonly<{
   dcpCapabilityCatalogue: boolean;
   /** Native heading/grid/media/annotation projections and bounded inspection. */
   dcpNativeAuthoringStage1: boolean;
+  /** Stage 2A text configuration, literal code/source and curated formatting. Requires Stage 1. */
+  dcpNativeAuthoringStage2Text: boolean;
   dialecticProviders: boolean;
   dialecticProviderContinuity: boolean;
   /** Temporary local wire/contribution diagnostics; disable after DCP qualification. */
@@ -242,6 +244,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialecticDcp: true,
   dcpCapabilityCatalogue: true,
   dcpNativeAuthoringStage1: true,
+  dcpNativeAuthoringStage2Text: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
   dcpTestPhaseLogging: true,

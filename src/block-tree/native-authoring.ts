@@ -12,6 +12,31 @@ export function prepareHeading(text:ExistingBlockDto,level:number):ExistingBlock
  const property=headingProperty(text.type!,level);
  return {...text,blockProperties:[...(Array.isArray(text.blockProperties)?text.blockProperties:[]).filter((p:any)=>p.type!=='block/font/size'),property]};
 }
+export const textAppearanceOperation={
+ purpose:'Configure the alignment, indentation and named size of native text.',
+ parameters:{alignment:{type:'string',enum:['left','center','right','justify']},indent:{type:'integer',minimum:0,maximum:Number.MAX_SAFE_INTEGER},size:{type:'string',enum:['normal','half','three-quarters']}},
+ nativeEffects:['block/alignment','block/indent','block/font/size'],
+} as const;
+export function textAppearanceProperty(targetType:string,type:string,value:unknown){
+ if(targetType!=='standoff-editor-block')throw Error('Text appearance requires a TextBlock');
+ if(type==='block/alignment'&&textAppearanceOperation.parameters.alignment.enum.includes(value as any))return {type,value:value as string};
+ if(type==='block/indent'&&typeof value==='number'&&Number.isSafeInteger(value)&&value>=0)return {type,value:String(value)};
+ if(type==='block/font/size'){
+  if(typeof value==='string'&&/^h[1-6]$/.test(value))return headingProperty(targetType,Number(value.slice(1)));
+  if(textAppearanceOperation.parameters.size.enum.includes(value as any))return {type,value:value as string};
+ }
+ throw Error('Invalid native text appearance');
+}
+export function prepareTextAppearance(block:ExistingBlockDto,input:unknown,heading=false):ExistingBlockDto {
+ if(input==null)return block;
+ if(typeof input!=='object'||Array.isArray(input))throw Error('Invalid textStyle');
+ const style=input as Record<string,unknown>,names=['alignment','indent','size'];
+ if(Object.keys(style).some(k=>!names.includes(k))||names.some(k=>!Object.hasOwn(style,k)))throw Error('Invalid textStyle fields');
+ if(heading&&style.size!==null)throw Error('Heading level determines text size');
+ const properties=(Array.isArray(block.blockProperties)?block.blockProperties:[]) as Record<string,unknown>[];
+ const added=names.filter(name=>style[name]!==null).map(name=>textAppearanceProperty(block.type!,name==='size'?'block/font/size':'block/'+name,style[name]));
+ return {...block,blockProperties:[...properties.filter(p=>!added.some(a=>a.type===p.type)),...added]};
+}
 export const gridOperation={purpose:'Arrange related content in a native grid.',constraints:{maxRows:64,maxColumns:16,maxCellChildren:32,rectangular:true},nativeEffects:['grid-block','grid-row-block','grid-cell-block']} as const;
 export function prepareGrid(rows:ExistingBlockDto[][][]):ExistingBlockDto {
  const {maxRows,maxColumns,maxCellChildren}=gridOperation.constraints;

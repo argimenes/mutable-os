@@ -4,6 +4,10 @@
 
 ## Decision
 
+### Stage 2A implementation update — 9 November 2026
+
+Stage 1 is accepted. The first Stage 2 increment extends the same shared preparations with text appearance, literal standoff code and Markdown/HTML source, plus curated formatting/references. See [the reviewable Stage 2 plan](DCP_NATIVE_AUTHORING_STAGE2_PLAN.md) and [Stage 2A qualification](DCP_NATIVE_AUTHORING_STAGE2A_QUALIFICATION.md) for operation-level coverage and explicit remaining gaps. The original inventory below remains the baseline; it is not a claim that all Stage 2 operations are now supported. No new Block registry or general authoring framework was required.
+
 ### Stage 1 architecture amendment — 9 November 2026
 
 This amendment supersedes the earlier proposal for a generic native-operation wire form. The native inventory remains the coverage reference; it is not DCP's authoring language. The three layers are the canonical native model, shared native preparation operations, and purpose-driven DCP reading/authoring projections. This fits the existing plan without a new registry or general authoring framework, so Stage 1 can proceed under the revised brief.

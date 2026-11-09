@@ -1,13 +1,16 @@
+import {withTextStyleDefaults} from './authoring';
+import {codeOperation} from '../../../block-tree/literal-authoring';
+import {sourceOperation} from '../../../interchange/source-block';
 import type {ReactiveEditor} from '../../../reactive-editor/editor';
 import {responseSchema,authoringSchema} from './provider-schema';
-import {headingOperation,gridOperation,youtubeOperation} from '../../../block-tree/native-authoring';
+import {headingOperation,gridOperation,youtubeOperation,textAppearanceOperation} from '../../../block-tree/native-authoring';
 import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
 import {capabilityLimits,compositionLimits} from './limits';
 import {classifications,legend} from './markup';
 
-type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube';
+type Definition = keyof typeof responseSchema.$defs|'Heading'|'Grid'|'YouTube'|'TextStyle'|'Code'|'Source';
 interface Adapter {
- id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean; annotationRenderer?:string; presentationOnly?:boolean;
+ id:string; name:string; purpose:string; read:string; nativeTypes:string[]; schema?:Definition; semantic?:boolean; inspectionOnly?:boolean;feature?:'documentInterchange'|'standoffCodeHighlighting'; annotationRenderer?:string; presentationOnly?:boolean;
  constraints?:Record<string,unknown>; guidance:string; example?:unknown;
  resources?:'asset-acquisition-unavailable'|'validated-external-reference';
  nativeOperation?:string;nativeEffects?:readonly string[];parameters?:Record<string,unknown>;prerequisites?:readonly string[];
@@ -44,13 +47,24 @@ export const capabilityInstructions='CAPABILITY DISCOVERY: capabilities is the c
  * repository subscription, typing hook or provider-model capability inference. */
 export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'features'|'visualEffects'>){
  const stage1=editor.features.dcpNativeAuthoringStage1===true;
- const semanticTypes=legend(editor.visualEffects,stage1);
- const projected=adapters.map((a):Adapter=>!stage1?a:a.id==='composition.heading'?{...a,schema:'Heading',purpose:headingOperation.purpose,nativeOperation:'prepareHeading / headingProperty',nativeEffects:headingOperation.nativeEffects,guidance:'level 1–6 creates a native TextBlock with the heading Block property; same preparation as the style bar.',example:{...paragraph,kind:'heading',level:2}}:a.id==='composition.card-grid'?{...a,schema:'Grid',purpose:gridOperation.purpose,nativeOperation:'prepareGrid',nativeEffects:gridOperation.nativeEffects,constraints:gridOperation.constraints,guidance:'Use kind:grid with rectangular rows of nonempty cell content arrays. Native preparation supplies row/cell ownership; no spatial placement or merged cells in this creation projection.',example:{id:'new:b2',kind:'grid',rows:[[[paragraph]]]}}:a.id==='media.youtube'?{...a,schema:'YouTube',purpose:youtubeOperation.purpose,nativeOperation:'prepareYouTube / youtubeId',nativeEffects:youtubeOperation.nativeEffects,resources:'validated-external-reference',prerequisites:youtubeOperation.prerequisites,guidance:'Use a native-valid URL or video ID. No trusted capture, managed asset or generation is required. External playback availability is not guaranteed.',example:{id:'new:b1',kind:'youtube',url:'Zsqep7_9_mw'}}:a.id==='source.classification'?{...a,guidance:'Target a fresh exact source anchor. Stage 1 also admits formatting from the initial legend through this same interpretations shape; attributes use the native property descriptor. Existing text remains immutable.'}:a);
+ const textAuthoring=stage1&&editor.features.dcpNativeAuthoringStage2Text===true;
+ const semanticTypes=legend(editor.visualEffects,stage1,textAuthoring);
+ const projected=adapters.map(a=>({...a})).map((a):Adapter=>!stage1?a:a.id==='composition.heading'?{...a,schema:'Heading',purpose:headingOperation.purpose,nativeOperation:'prepareHeading / headingProperty',nativeEffects:headingOperation.nativeEffects,guidance:'level 1–6 creates a native TextBlock with the heading Block property; same preparation as the style bar.',example:{...paragraph,kind:'heading',level:2}}:a.id==='composition.card-grid'?{...a,schema:'Grid',purpose:gridOperation.purpose,nativeOperation:'prepareGrid',nativeEffects:gridOperation.nativeEffects,constraints:gridOperation.constraints,guidance:'Use kind:grid with rectangular rows of nonempty cell content arrays. Native preparation supplies row/cell ownership; no spatial placement or merged cells in this creation projection.',example:{id:'new:b2',kind:'grid',rows:[[[paragraph]]]}}:a.id==='media.youtube'?{...a,schema:'YouTube',purpose:youtubeOperation.purpose,nativeOperation:'prepareYouTube / youtubeId',nativeEffects:youtubeOperation.nativeEffects,resources:'validated-external-reference',prerequisites:youtubeOperation.prerequisites,guidance:'Use a native-valid URL or video ID. No trusted capture, managed asset or generation is required. External playback availability is not guaranteed.',example:{id:'new:b1',kind:'youtube',url:'Zsqep7_9_mw'}}:a.id==='source.classification'?{...a,guidance:'Target a fresh exact source anchor. Stage 1 also admits formatting from the initial legend through this same interpretations shape; attributes use the native property descriptor. Existing text remains immutable.'}:a);
  if(stage1)projected.push({id:'formatting.colour',name:'Text colour',purpose:standoffStyleSchemas['text/colour'].authoring!.purpose,read:'native-property-value',nativeTypes:text,schema:'Span',nativeOperation:'standoffStyleSchemas[text/colour].authoring.prepare',nativeEffects:['text/colour','value'],parameters:standoffStyleSchemas['text/colour'].authoring!.parameters,guidance:'Core formatting. Inline value and explicit ranges/interpretations attributes use the same native colour validation. Other unadvertised decorative/experimental styles remain non-authorable.',example:{markup:'<annotation type="text/colour" value="#336699">Evidence</annotation>'}});
  if(stage1)projected.push({id:'inspection.native',name:'Native inspection',purpose:'Understand existing compound content and its persistent properties using current source authority.',read:'bounded-native-inspection',nativeTypes:[],inspectionOnly:true,guidance:'Call read_source with an issued handle. Inspect the related child/owned-relation tree, native identities, properties and omissions. This is not lossless serialisation or a native clone operation.',example:{tool:'read_source',arguments:{handle:'CURRENT_SOURCE.handle'}}});
+ if(textAuthoring){
+  const code=projected.find(a=>a.id==='composition.code')!;
+  Object.assign(code,{schema:'Code',read:'native-code-and-configuration',feature:'standoffCodeHighlighting',purpose:codeOperation.purpose,nativeOperation:'standoffCodeDto',nativeEffects:codeOperation.nativeEffects,guidance:'Literal text and language; native syntax for JS/TS/Markdown, other labels remain unhighlighted. Host supplies the owned TextBlock. No annotations/markup in code.text.',example:{id:'new:b1',kind:'code',language:'typescript',text:'const evidence = 1;'}});
+  projected.push({id:'composition.source',name:'Source content',schema:'Source',feature:'documentInterchange',purpose:sourceOperation.purpose,read:'native-literal-source',nativeTypes:[...sourceOperation.nativeEffects],nativeOperation:'sourceBlockDto / sourcePayload',nativeEffects:sourceOperation.nativeEffects,guidance:'Exact literal Markdown/HTML; isolated native preview. Not a composition fallback, resource import, or permission to execute HTML.',example:{id:'new:b1',kind:'source',format:'markdown',text:'# Retained source'}});
+  projected.push({id:'configuration.text',name:'Text appearance',schema:'TextStyle',purpose:textAppearanceOperation.purpose,read:'native-block-properties',nativeTypes:text,nativeOperation:'prepareTextAppearance / textAppearanceProperty',nativeEffects:textAppearanceOperation.nativeEffects,guidance:'Paragraph/heading textStyle is null or an object with nullable alignment/indent/size. Heading size must be null: use level. No existing-content reconfiguration.',example:{alignment:'center',indent:1,size:null}});
+  const descriptors=Object.entries(standoffStyleSchemas).filter(([,s])=>s.authoring?.stage==='text');
+  projected.push({id:'formatting.core',name:'Core formatting and references',schema:'Span',purpose:'Mark revisions, notation, emphasis and links using stable native text properties.',read:'native-annotation-values',nativeTypes:text,nativeOperation:'standoffStyleSchemas[type].authoring.prepare',nativeEffects:descriptors.map(([type])=>type),parameters:Object.fromEntries(descriptors.map(([type,s])=>[type,s.authoring!.parameters])),guidance:'Inline markup, explicit ranges and existing-source interpretations share admission. Strikethrough/subscript/superscript/highlight take no attributes. Background colour and hyperlink require value. Decorative effects remain excluded.',example:{markup:'<annotation type="style/strikethrough">Earlier</annotation> <annotation type="reference/url" value="https://example.org/">source</annotation>'}});
+  for(const a of projected){if(a.id==='composition.paragraph'||a.id==='composition.heading'){a.guidance+=' Stage 2A: include textStyle:null or explicit alignment/indent/size (heading size stays null).';}}
+  for(const a of projected)if(a.example)a.example=withTextStyleDefaults(a.example);
+ }
  const items=projected.map(a=>{
   const renderer=a.nativeTypes.every(type=>!!editor.registry.resolve(type)?.view)&&(!a.annotationRenderer||!!editor.visualEffects.type(a.annotationRenderer)?.renderers.length);
-  const enabled=editor.features.dialecticDcp&&(!a.semantic||editor.features.scopedSemantics);
+  const enabled=editor.features.dialecticDcp&&(!a.semantic||editor.features.scopedSemantics)&&(!a.feature||editor.features[a.feature]);
   const constructor=!!a.schema;
   const registered=a.id!=='source.classification'||classifications.some(type=>semanticTypes.some(t=>t.type===type));
   const authorable=constructor&&renderer&&enabled&&registered;
@@ -63,7 +77,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   };
  });
  const summary={version:1,detailTool:'describe_capabilities',items:items.map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
- const definitions=authoringSchema(stage1).$defs as Record<string,unknown>;
+ const definitions=authoringSchema(stage1,textAuthoring).$defs as Record<string,unknown>;
  function parameters(names:Definition[]){
   const defs:Record<string,unknown>={};
   const add=(name:string)=>{if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);};

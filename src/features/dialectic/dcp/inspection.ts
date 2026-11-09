@@ -5,7 +5,7 @@ import {standoffStyleSchemas} from '../../../rendering/standoff-styles';
 const limits={nodes:24,depth:4,properties:32,relations:12,bytes:16000,string:1024} as const;
 const scalar=(value:unknown)=>typeof value==='string'?value.slice(0,limits.string):typeof value==='number'&&Number.isFinite(value)||typeof value==='boolean'||value===null?value:undefined;
 const fields=(input:any,names:readonly string[])=>Object.fromEntries(names.filter(name=>input&&scalar(input[name])!==undefined).map(name=>[name,scalar(input[name])]));
-const logical=(type:string)=>({'standoff-editor-block':'text','grid-block':'grid','grid-row-block':'row','grid-cell-block':'cell','table-block':'table','table-row-block':'row','table-cell-block':'cell','tab-row-block':'tabs','document-tab-row-block':'tabs','tab-block':'panel','document-tab-block':'panel','surface-block':'surface','side-block':'side','indented-list-block':'list','youtube-video-block':'youtube'}[type]??'native');
+const logical=(type:string)=>({'standoff-editor-block':'text','grid-block':'grid','grid-row-block':'row','grid-cell-block':'cell','table-block':'table','table-row-block':'row','table-cell-block':'cell','tab-row-block':'tabs','document-tab-row-block':'tabs','tab-block':'panel','document-tab-block':'panel','surface-block':'surface','side-block':'side','indented-list-block':'list','youtube-video-block':'youtube','standoff-code-block':'code','mutable/markdown-source-block':'source','mutable/html-source-block':'source'}[type]??'native');
 
 /** Explicit read only. A bounded projection, never DTO export or clone input. */
 export async function inspectNative(sources:DcpSources,initial:any){
@@ -22,6 +22,8 @@ export async function inspectNative(sources:DcpSources,initial:any){
   if(typeof source.text==='string'&&source.text.length>limits.string)entry.omissions.push('Text truncated; read this TextBlock directly for exact source authority');
   for(const [name,allowed]of Object.entries({htmlList:['ordered','start','reversed'],htmlListItem:['value'],htmlTableCell:['header','rowSpan','colSpan'],markdownCode:['language']}))if(meta?.[name])entry.configuration[name]=fields(meta[name],allowed);
   if(typeof node.payload.checked==='boolean')entry.configuration.checked=node.payload.checked;
+  if(node.viewType==='standoff-code-block')entry.configuration.language=scalar(meta?.markdownCode?.language??'javascript');
+  if(node.viewType==='mutable/markdown-source-block'||node.viewType==='mutable/html-source-block'){entry.configuration.sourceFormat=fields(node.payload.sourceFormat,['version','format','profile']);entry.literal=true;}
   for(const p of properties.slice(0,limits.properties)){
    const item:any=fields(p,['id','type','isDeleted']);
    if(typeof p.type==='string'&&p.type.startsWith('block/')){item.value=scalar(p.value);item.metadata=fields(p.metadata,['width','height','min-width','position','x','y','top','right','bottom','left']);}

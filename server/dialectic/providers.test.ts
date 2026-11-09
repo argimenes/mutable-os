@@ -128,3 +128,17 @@ it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 1 schema with
  for(const name of refs)expect(schema.$defs[name],name).toBeDefined();
  if(provider==='anthropic'){expect(schema.$defs.Node).toBeUndefined();expect(schema.$defs.Grid0).toBeDefined();expect(schema.$defs.Node12.anyOf.map((r:any)=>r.$ref)).toEqual(expect.arrayContaining(['#/$defs/Paragraph','#/$defs/Heading','#/$defs/YouTube']));}
 });
+
+it.each(['openai','anthropic'] as Provider[])('%s negotiates strict Stage 2 literal nodes and nullable appearance without altering older profiles',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,nativeAuthoring:1,textAuthoring:1});
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body)),schema=provider==='openai'?body.text.format.schema:body.output_config.format.schema;
+ expect(schema.$defs.Code.required).toEqual(['id','kind','language','text']);expect(schema.$defs.Source.properties.format.enum).toEqual(['markdown','html']);
+ expect(schema.$defs.Paragraph.required).toContain('textStyle');expect(schema.$defs.Heading.required).toContain('textStyle');
+ expect(schema.$defs.TextStyle.required).toEqual(['alignment','indent','size']);expect(schema.$defs.Paragraph.properties.textStyle.anyOf).toContainEqual({type:'null'});
+ expect(schemaFor(provider,true).$defs.Code).toBeUndefined();expect(schemaFor(provider,false,true).$defs.TextStyle).toBeUndefined();
+ const refs=new Set<string>();const walk=(value:any)=>{if(!value||typeof value!=='object')return;if(value.$ref)refs.add(value.$ref.slice('#/$defs/'.length));if(value.type==='object'){expect(value.additionalProperties).toBe(false);expect(value.required.slice().sort()).toEqual(Object.keys(value.properties).sort());}Object.values(value).forEach(walk);};walk(schema);
+ for(const name of refs)expect(schema.$defs[name],name).toBeDefined();
+ if(provider==='anthropic')expect(schema.$defs.Node12.anyOf).toEqual(expect.arrayContaining([{$ref:'#/$defs/Code'},{$ref:'#/$defs/Source'}]));
+});

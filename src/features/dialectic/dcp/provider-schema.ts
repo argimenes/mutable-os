@@ -1,4 +1,6 @@
-import {headingOperation,gridOperation,youtubeOperation} from '../../../block-tree/native-authoring';
+import {codeOperation} from '../../../block-tree/literal-authoring';
+import {sourceOperation} from '../../../interchange/source-block';
+import {headingOperation,gridOperation,youtubeOperation,textAppearanceOperation} from '../../../block-tree/native-authoring';
 import {compositionLimits} from './limits';
 import {generatedIdentityPattern,type GeneratedIdentityKind} from './identities';
 // Strict provider schema for the negotiated text-only DCP profile.
@@ -11,7 +13,7 @@ const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
-export function authoringSchema(nativeAuthoring=false):any {
+export function authoringSchema(nativeAuthoring=false,textAuthoring=false):any {
  if(!nativeAuthoring)return responseSchema;
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
@@ -21,11 +23,20 @@ export function authoringSchema(nativeAuthoring=false):any {
  d.Grid.properties.rows.items.items.maxItems=Math.min(compositionLimits.cellChildren,gridOperation.constraints.maxCellChildren);
  d.YouTube={type:'object',properties:{id:d.Paragraph.properties.id,kind:{type:'string',enum:['youtube']},url:youtubeOperation.parameters.url},required:['id','kind','url'],additionalProperties:false};
  d.Node.anyOf.push(...['Heading','Grid','YouTube'].map(name=>({$ref:'#/$defs/'+name})));
+ if(textAuthoring){
+  const nullable=(schema:unknown)=>({anyOf:[schema,{type:'null'}]});
+  d.TextStyle={type:'object',properties:Object.fromEntries(Object.entries(textAppearanceOperation.parameters).map(([key,value])=>[key,nullable(value)])),required:Object.keys(textAppearanceOperation.parameters),additionalProperties:false};
+  for(const name of ['Paragraph','Heading']){d[name].properties.textStyle=nullable({$ref:'#/$defs/TextStyle'});d[name].required.push('textStyle');}
+  const node=(kind:string,parameters:Record<string,unknown>)=>({type:'object',properties:{id:d.Paragraph.properties.id,kind:{type:'string',enum:[kind]},...parameters},required:['id','kind',...Object.keys(parameters)],additionalProperties:false});
+  d.Code=node('code',codeOperation.parameters);d.Source=node('source',sourceOperation.parameters);
+  d.Node.anyOf.push({$ref:'#/$defs/Code'},{$ref:'#/$defs/Source'});
+ }
+
  return schema;
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false):any {
- const schema:any=structuredClone(authoringSchema(nativeAuthoring));
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring));
  if(provider==='openai')return nativeAuthoring?schema:responseSchema;
  const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{})};
  const leaf=node.anyOf.filter((r:any)=>!Object.hasOwn(templates,r.$ref.replace('#/$defs/','')));

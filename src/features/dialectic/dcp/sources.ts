@@ -74,6 +74,7 @@ export class DcpSources {
   const base={handle,target,owner:this.owner,revision,kind:target.kind,sourceAuthor,contribution:contributionInfo};
   if(target.kind==='gloss'||target.kind==='range')return {status:'complete',...base,text:found.text??'',historical:found.historical};
   if(!n)return {status:'missing',...base};
+  if(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage2Text&&['mutable/markdown-source-block','mutable/html-source-block'].includes(n.viewType)&&typeof n.payload.text==='string'&&n.payload.text.length>24000)return {status:'truncated',...base,nativeType:n.viewType,reason:'Literal source exceeds the bounded UTF-16 read budget',omissions:['text']};
   if(n.inlineContent.length>12000)return {status:'truncated',...base,reason:'Source Cell budget; select a smaller passage',omissions:['text']};
   const cached=await this.text(n);this.check();const objects=cached.runs.length>1,text=cached.runs.map(r=>r.text).join('\uFFFC');
   const children:string[]=[];let omitted=false;
@@ -99,7 +100,7 @@ export class DcpSources {
     if(ref)a.entityHandle=this.issue({kind:'entity',resourceId:this.owner,entity:ref});
    }
   }
-  const supported=['standoff-editor-block','container-block','table-block','table-row-block','table-cell-block','indented-list-block',...(this.editor.features.dcpNativeAuthoringStage1?['grid-block','grid-row-block','grid-cell-block','tab-row-block','tab-block','document-tab-row-block','document-tab-block','surface-block','side-block','youtube-video-block']:[])].includes(n.viewType);
+  const supported=['standoff-editor-block','container-block','table-block','table-row-block','table-cell-block','indented-list-block',...(this.editor.features.dcpNativeAuthoringStage1?['grid-block','grid-row-block','grid-cell-block','tab-row-block','tab-block','document-tab-row-block','document-tab-block','surface-block','side-block','youtube-video-block']:[]),...(this.editor.features.dcpNativeAuthoringStage1&&this.editor.features.dcpNativeAuthoringStage2Text?['standoff-code-block','mutable/markdown-source-block','mutable/html-source-block']:[])].includes(n.viewType);
   return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,semanticReferences:semanticReferences.slice(0,32),omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
  }
  /** Prepared once on explicit Ask. Never subscribed to typing or whole-history enumeration. */
