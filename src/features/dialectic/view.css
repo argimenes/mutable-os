@@ -54,3 +54,16 @@
 .textual-workspace .dialectic-contribution-menu details>button{background:var(--tw-menu);color:var(--tw-menu-ink)}
 .textual-workspace .dialectic-canvas [data-dialectic-draft="true"]{background:var(--tw-bg);margin-bottom:0}
 .textual-workspace .dialectic-canvas [data-dialectic-contribution]{padding-inline-end:4ch}
+
+/* Derived native activity; no persistent per-contribution inspector or layout probes. */
+.dialectic-contribution-activity{margin-top:12px;padding-top:8px;border-top:1px solid #e2e7df;font:12px/1.5 system-ui,sans-serif;color:#4c6d61}
+.dialectic-activity-controls,.dialectic-contribution-notices{display:flex;flex-wrap:wrap;gap:4px}
+.dialectic-app .dialectic-contribution-activity button{padding:2px 6px;background:transparent;border-color:transparent;font:inherit}
+.dialectic-app .dialectic-contribution-activity button:hover{background:#edf2ed;border-color:#c5d4c9}
+.dialectic-contribution-notices{color:#795319;margin-top:4px}
+.dialectic-activity-compact{display:none}
+.dialectic-activity-inspection{border-bottom:1px solid #b8c6bd;padding-bottom:12px;margin-bottom:12px;outline-offset:2px}
+.dialectic-activity-inspection h4{margin:0 0 8px}.dialectic-activity-item{margin:8px 0}.dialectic-activity-item button{max-width:100%;overflow-wrap:anywhere;text-align:left}.dialectic-activity-item small{display:block}.dialectic-activity-item blockquote{margin:4px 0 8px 8px;overflow-wrap:anywhere}
+.textual-workspace .dialectic-contribution-activity{font:inherit;line-height:var(--tw-line-height);margin-top:var(--tw-line-height);padding-top:0;color:var(--tw-ink);border-color:currentColor}
+.textual-workspace .dialectic-activity-controls,.textual-workspace .dialectic-contribution-notices{gap:0}.textual-workspace .dialectic-contribution-notices{color:var(--tw-focus);margin:0}
+.textual-workspace .dialectic-activity-full{display:none}.textual-workspace .dialectic-activity-compact{display:inline}.textual-workspace .dialectic-app .dialectic-contribution-activity button{padding:0 1ch;line-height:var(--tw-line-height)}

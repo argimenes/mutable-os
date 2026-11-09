@@ -115,6 +115,8 @@ export type FeatureFlags = Readonly<{
   thesis: boolean;
   /** Native Block conversations with explicit context and a deterministic mock assistant. */
   dialectic: boolean;
+  /** Native contribution effects and historical notices beside committed content. */
+  dialecticContributionActivity: boolean;
   /** Validated structured mock exchanges; no live provider or Stage 4B authoring. */
   dialecticDcp: boolean;
   /** Bounded discovery of admitted DCP authoring capabilities. */
@@ -254,6 +256,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   sqliteSemanticServices: true,
   thesis: true,
   dialectic: true,
+  dialecticContributionActivity: true,
   dialecticDcp: true,
   dcpCapabilityCatalogue: true,
   dcpVocabularySelection: true,

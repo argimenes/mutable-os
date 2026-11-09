@@ -187,6 +187,8 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
   if(node.kind==='group'){keys(node,['id','kind','children']);const children=list(node.children,limits.groupChildren);if(!children.length)throw Error('Empty group');return dto('container-block',{children:children.map(n=>build(n,depth+1,inMargin))});}
   throw Error('Unsupported DCP Block capability');
  };
+ // Host-prepared descendants include native named ownership (e.g. margins).
+ const ownedChildren=(n:ExistingBlockDto):ExistingBlockDto[]=>[...n.children??[],...Object.values(n.relation??{}).filter((v:any)=>v&&typeof v==='object'&&typeof v.type==='string') as ExistingBlockDto[]];
  const composition=list(response.composition,limits.roots);if(!composition.length)throw Error('Empty contribution');const children=composition.map((n,i)=>{path='$.composition['+i+']';return build(n);});
  if(response.anchors.length)requireCapability(vocabulary,'source.anchor');
  if(response.interpretations.length)requireCapability(vocabulary,'source.classification');
@@ -206,7 +208,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
   path='$.relations';await semantic.argumentsAndRelations(response.arguments,response.relations);
   for(const [i,input] of list(response.glosses,32).entries()){path='$.glosses['+i+']';
    const mark=semantic.gloss(input),range=ranges.get(input.target);
-   if(range){if(range.key){mark.metadata.dcp={...provenance,appliedTo:'existing-source',sourceAuthor:range.sourceAuthor};definitions[mark.annotationId].metadata.dcp=mark.metadata.dcp;}const properties=range.key?annotations.get(range.key)!:(()=>{const walk=(nodes:ExistingBlockDto[]):any=>{for(const n of nodes){if(n.id===range.blockId)return n.standoffProperties;const result=walk(n.children??[]);if(result)return result;}};return walk(children);})();properties.push({...mark,start:range.start,end:range.end-1});}
+   if(range){if(range.key){mark.metadata.dcp={...provenance,appliedTo:'existing-source',sourceAuthor:range.sourceAuthor};definitions[mark.annotationId].metadata.dcp=mark.metadata.dcp;}const properties=range.key?annotations.get(range.key)!:(()=>{const walk=(nodes:ExistingBlockDto[]):any=>{for(const n of nodes){if(n.id===range.blockId)return n.standoffProperties;const result=walk(ownedChildren(n));if(result)return result;}};return walk(children);})();properties.push({...mark,start:range.start,end:range.end-1});}
    else {const t=semantic.target(input.target);if(t.kind!=='range')throw Error('Gloss needs an explicit passage anchor');sources.definition(t);const resolved=sources.resolve(t);if(resolved.status!=='resolved'||!resolved.segments?.length)throw Error('Gloss passage unavailable');const source=await sources.source(input.target);mark.metadata.dcp={...provenance,appliedTo:'existing-source',sourceAuthor:source.sourceAuthor??'unknown'};definitions[mark.annotationId].metadata.dcp=mark.metadata.dcp;for(const s of resolved.segments){const p=annotations.get(s.node.key)??[];p.push({...mark,id:crypto.randomUUID(),start:s.start,end:s.end-1});annotations.set(s.node.key,p);}}
   }
  }
@@ -214,7 +216,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  path='$.replyTargets';const discursiveReferences=list(response.replyTargets,12).map(h=>aliases.get(h)??sources.target(h));
  const annotationRefs:{blockId:string;propertyId:string}[]=[];
  const collect=(blockId:string,properties:any[])=>{for(const p of properties)if(p.type!==RANGE_ANCHOR)annotationRefs.push({blockId,propertyId:p.id});};
- const visit=(nodes:ExistingBlockDto[])=>{for(const n of nodes){collect(String(n.id),n.standoffProperties as any[]??[]);visit(n.children??[]);}};visit(children);
+ const visit=(nodes:ExistingBlockDto[])=>{for(const n of nodes){collect(String(n.id),n.standoffProperties as any[]??[]);visit(ownedChildren(n));}};visit(children);
  for(const [key,properties]of annotations){const n=sources.node(key);if(n)collect(String(n.payload.id),properties);}
  path='$.composition';const pdfs=await preparePdfBindings(sources,pdfBindings);const images=await prepareImageBindings(sources,imageBindings);
  const preparedResources={leaves:new Map([...pdfs.leaves,...images.leaves,...externalLeaves]),check:()=>{pdfs.check();images.check();checkExternal();}};

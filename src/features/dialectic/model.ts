@@ -6,11 +6,15 @@ export interface Participant {id:string;kind:'human'|'ai';name:string}
 export const defaultParticipant=(owner:string,kind:'human'|'ai'):Participant=>({id:owner+':'+kind,kind,name:kind==='human'?'Local author':'Mock assistant'});
 export const participantLabel=(c:Contribution)=>c.participant?.name??(c.author==='human'?'You':'Mock assistant');
 export interface ConsumedContext {version:1;items:{target:ReplyTarget;text:string;origins:('reply-target'|'selected')[];revisions:{contentKey:string;revision:number}[]}[];limits:{characters:number;blocks:number};}
+export type ContributionNoticeCode='markdown-fallback'|'partial-conversion'|'unsupported-media'|'incomplete-operation'|'validation-repaired';
+/** Host-recorded history, never a model claim or a mutable activity count. */
+export interface ContributionNotice extends Omit<import('../../interchange/diagnostics').InterchangeDiagnostic,'code'> {code:ContributionNoticeCode;target?:ReplyTarget}
 export interface Contribution {
  version:1;kind:'contribution';state:'draft'|'committed';author:'human'|'mock'|'ai';participant?:Participant;
  ordinal?:number;createdUtc?:string;replies:ReplyTarget[];context?:ReplyTarget[];requestId?:string;
  discursiveReferences?:ReplyTarget[];dcp?:{version:1;profile:string;request:unknown;tools:unknown[];response:string;identityMap:unknown;annotationRefs?:{blockId:string;propertyId:string}[];intent:string;provider?:import('./dcp/provider-contract').LiveProvenance};
  replyExcerpts?:{target:ReplyTarget;text:string}[];consumedContext?:ConsumedContext;
+ notices?:ContributionNotice[];
 }
 export const conversationMetadata={version:1,kind:'conversation'} as const;
 export function contribution(value:unknown):Contribution|undefined {

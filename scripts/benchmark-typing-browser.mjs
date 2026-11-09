@@ -9,6 +9,7 @@
 // BENCHMARK_ACADEMIC=off|idle|pending qualifies DOI loader isolation (pending uses a controlled service response).
 // BENCHMARK_CODE=5|50|200|embedded adds a standoff CodeBlock to the real editor fixture.
 // BENCHMARK_DIALECTIC=1 adds linked range anchors and the incremental Dialectic index.
+// BENCHMARK_ACTIVITY=off disables its contribution-activity membership projection for comparison.
 // Requires Node 22+ (WebSocket).
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -73,7 +74,7 @@ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) =
      const {WorkspaceSession}=await import('/src/application/workspace-session.ts');
      const {WorkspacePresentationView}=await import('/src/application/workspace-presentation-view.tsx');
      const {materializeLocalWorkspace}=await import('/src/reactive-editor/workspace-manifest.ts');
-     const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[{id:'bench-window',type:'document-window-block',metadata:{size:{w:900,h:700}},children:[dto]}]}),{features:{spatialWorkspace:true,markdownInputTransformation:${JSON.stringify(process.env.BENCHMARK_MIT !== 'off')},standoffCodeHighlighting:codeEnabled}});
+     const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[{id:'bench-window',type:'document-window-block',metadata:{size:{w:900,h:700}},children:[dto]}]}),{features:{dialecticContributionActivity:${JSON.stringify(process.env.BENCHMARK_ACTIVITY !== 'off')},spatialWorkspace:true,markdownInputTransformation:${JSON.stringify(process.env.BENCHMARK_MIT !== 'off')},standoffCodeHighlighting:codeEnabled}});
      editor=session.editor;projection=session.projection;
      if(presentation==='spatial')session.selectPresentation('spatial');
      const stop=render(()=>createComponent(WorkspacePresentationView,{session}),host);
@@ -83,7 +84,7 @@ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) =
        if(!session.spatial.document.activate('block:bench-window'))throw new Error('Benchmark Document authorization failed');
      }
    } else {
-     editor = new ReactiveEditor(dto,{features:{markdownInputTransformation:${JSON.stringify(process.env.BENCHMARK_MIT !== 'off')},standoffCodeHighlighting:codeEnabled,structuredResources:structuredMode!=='off',crossResourceLoaders:pdfMode!=='off',iiifResourceLoaders:iiifMode!=='off',academicResourceLoaders:${JSON.stringify((process.env.BENCHMARK_ENCYCLOPEDIA??process.env.BENCHMARK_ACADEMIC) !== 'off')}}}); registerApplicationViews(editor);
+     editor = new ReactiveEditor(dto,{features:{dialecticContributionActivity:${JSON.stringify(process.env.BENCHMARK_ACTIVITY !== 'off')},markdownInputTransformation:${JSON.stringify(process.env.BENCHMARK_MIT !== 'off')},standoffCodeHighlighting:codeEnabled,structuredResources:structuredMode!=='off',crossResourceLoaders:pdfMode!=='off',iiifResourceLoaders:iiifMode!=='off',academicResourceLoaders:${JSON.stringify((process.env.BENCHMARK_ENCYCLOPEDIA??process.env.BENCHMARK_ACADEMIC) !== 'off')}}}); registerApplicationViews(editor);
      if(iiifMode||pdfMode)editor.clipboard.setContext(()=>({cavernId:'fixture',session:'fixture'}));
      projection = editor.createView('browser-performance');
      dispose = render(() => createComponent(ReactiveTreeView,{editor,projection}), host);

@@ -1,8 +1,9 @@
+import {ContributionActivityBar,ContributionActivityInspector} from './activity-view';
 import {render} from 'solid-js/web';
 import {ProviderSettingsView} from './provider-settings';
 import {participantLabel} from './model';
 import {SequenceNavigation,SequenceAuthor,SequenceReader} from './sequence-view';
-import {For,Show,createEffect,createMemo,createSignal,onCleanup,onMount,untrack,type JSX} from 'solid-js';
+import {For,Show,createEffect,createMemo,createSignal,createRoot,onCleanup,onMount,untrack,type JSX} from 'solid-js';
 import type {DocumentApplicationInstance} from '../../feature-api/document-application';
 import type {DocumentApplicationPort} from '../../application/document-application-ports';
 import {DocumentBrowser} from '../../demo/document-browser';
@@ -53,6 +54,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
    </main>
    <aside class="dialectic-inspector" inert={!!c.sequences.presenting()} aria-label="Conversation context">
     <div class="dialectic-eyebrow">INSPECTION</div>
+    <Show when={c.editor.features.dialecticContributionActivity}><ContributionActivityInspector c={c}/></Show>
     <h3>{selected()?c.label(selected()!):'Explore a contribution'}</h3>
     <Show when={row()}>{r=><p class="dialectic-muted">{r().data.createdUtc?new Date(r().data.createdUtc!).toLocaleString():'Draft'} · {c.editor.features.nativeTextProtection&&r().data.state==='committed'?'Original content protected · annotations welcome':'Content stays editable'}</p>}</Show>
     <button disabled={!selected()||['gloss','entity','argument-relation','entity-relation'].includes(selected()!.kind)} onClick={act(()=>{if(selected())c.setReply(selected());})}>Reply to this</button>
@@ -71,7 +73,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <Show when={row()?.data.replies.length}><details open><summary>Reply sources</summary><For each={row()?.data.replies}>{t=><div><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button><For each={row()?.data.replyExcerpts?.filter(x=>JSON.stringify(x.target)===JSON.stringify(t))}>{x=><><small>Text captured for this reply{c.resolveReference(t).text!==x.text?' · Source changed or unavailable':''}</small><blockquote>{x.text}</blockquote></>}</For></div>}</For></details></Show>
     <Show when={row()?.data.discursiveReferences?.length}><details open><summary>Discursive references</summary><p>Additional passages; the primary reply remains unchanged.</p><For each={row()?.data.discursiveReferences}>{t=><button onClick={act(()=>c.inspect(t))}>{c.label(t)}</button>}</For></details></Show>
     <Show when={selected()?.kind==='argument'}><For each={c.argumentRelations(selected()!.argumentId!)}>{d=>{const r=d.metadata.dialecticArgumentRelation;return <p><button onClick={()=>c.inspect({kind:'argument',...r.from})}>{c.label({kind:'argument',...r.from})}</button> → {r.relation} → <button onClick={()=>c.inspect({kind:'argument',...r.to})}>{c.label({kind:'argument',...r.to})}</button></p>;}}</For></Show>
-    <Show when={row()?.data.dcp}>{dcp=><details open class="dialectic-native-structures"><summary>Authored structures</summary>
+    <Show when={!c.editor.features.dialecticContributionActivity&&row()?.data.dcp}>{dcp=><details open class="dialectic-native-structures"><summary>Authored structures</summary>
      <p>{row()?.data.discursiveReferences?.length??0} discursive addresses · {dcp().annotationRefs?`${dcp().annotationRefs!.length} annotations`:'annotation details not listed for this earlier response'} · {(Object.values(dcp().identityMap??{}) as any[]).filter(t=>t.kind==='argument-relation'||t.kind==='entity-relation').length} relationships</p>
      <small>Addresses refer to sources without making them arguments. Select an annotation to inspect its current passage and authorship.</small>
      <For each={dcp().annotationRefs?.slice(0,128)}>{ref=>{const details=createMemo(()=>c.annotationDetails(ref));return <button class="dialectic-annotation-link" onClick={()=>c.inspectAnnotation(ref)}>{details()?.property.type??'Unavailable annotation'} · {details()?.text??ref.propertyId.slice(0,8)}</button>;}}</For>
@@ -102,7 +104,12 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
 }
 
 /** Label existing container mounts without replacing children or creating a renderer fork. */
+const decorationOwners=new WeakMap<DialecticController,{users:number;dispose:()=>void}>();
 function decorate(c:DialecticController){
+ let entry=decorationOwners.get(c);if(!entry){entry=createRoot(dispose=>{decorateMounts(c);return {users:0,dispose};});decorationOwners.set(c,entry);}entry.users++;
+ onCleanup(()=>{if(--entry!.users===0){entry!.dispose();decorationOwners.delete(c);}});
+}
+function decorateMounts(c:DialecticController){
  const documents=new Set<HTMLElement>();
  const decorated=new Map<HTMLElement,{dispose:()=>void;slot:HTMLElement;host:HTMLElement}>();
  const clear=(element:HTMLElement)=>{const d=decorated.get(element);if(!d)return;d.dispose();d.host.remove();delete element.dataset.dialecticContribution;delete element.dataset.dialecticDraft;delete d.slot.dataset.dialecticDraftSlot;decorated.delete(element);};
@@ -113,8 +120,8 @@ function decorate(c:DialecticController){
    const element=c.editor.mounts.get(r.key)?.root as HTMLElement|undefined;if(!element)continue;keep.add(element);const doc=element.closest<HTMLElement>('[data-block-type="document-block"]');if(doc){doc.dataset.dialecticDocument='true';documents.add(doc);}element.dataset.dialecticContribution=r.label;element.dataset.dialecticDraft=String(r.draft);
    const slot=element.closest<HTMLElement>('.block-selectable')??element;slot.dataset.dialecticDraftSlot=String(r.draft);
    if(!decorated.has(element)){
-    const host=document.createElement('div');host.className='dialectic-contribution-menu';host.contentEditable='false';host.setAttribute('data-cross-text-controls','');element.appendChild(host);
-    const dispose=render(()=>{let menu!:HTMLDetailsElement;return <details ref={menu} onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape'){menu.open=false;menu.querySelector('summary')?.focus();}}}><summary aria-label={`Contribution actions ${r.id}`} title="Contribution actions">☰</summary><button disabled={c.busy()||c.providerConfiguring()||c.resending()} onClick={e=>{e.stopPropagation();menu.open=false;void c.resend(r.id);}}>Resend this text</button></details>;},host);
+    const host=document.createElement('div');host.className='dialectic-contribution-tools';host.contentEditable='false';host.setAttribute('data-cross-text-controls','');element.appendChild(host);
+    const dispose=render(()=>{let menu!:HTMLDetailsElement;return <><div class="dialectic-contribution-menu"><details ref={menu} onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape'){menu.open=false;menu.querySelector('summary')?.focus();}}}><summary aria-label={`Contribution actions ${r.id}`} title="Contribution actions">☰</summary><button disabled={c.busy()||c.providerConfiguring()||c.resending()} onClick={e=>{e.stopPropagation();menu.open=false;void c.resend(r.id);}}>Resend this text</button></details></div><Show when={c.editor.features.dialecticContributionActivity}><ContributionActivityBar c={c} id={r.id}/></Show></>;},host);
     decorated.set(element,{dispose,slot,host});
    }
   }for(const element of decorated.keys())if(!keep.has(element))clear(element);});
@@ -141,6 +148,7 @@ export function DialecticDesktop(props:{application:DocumentApplicationInstance;
 }
 export function DialecticTextual(props:{controller:DialecticController;port:DocumentApplicationPort;active:()=>boolean}){
  const host=useTextualApplicationHost(),c=props.controller,editor=c.editor;
+ decorate(c);
  let slot!:HTMLDivElement,surface!:HTMLDivElement,viewport!:HTMLDivElement,root!:HTMLDivElement;
  const [mounted,setMounted]=createSignal(false);
  // Host rebinding changes the port, not the retained session identity. Match

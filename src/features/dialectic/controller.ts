@@ -1,4 +1,6 @@
 import {allQualifiedSelection,copyVocabularySelection,vocabularyDescriptors,type VocabularySelection} from './dcp/vocabulary';
+import {createContributionActivity,repairedNotice,type ActivityCategory,type ActivityItem,type ActivitySummary} from './activity';
+import {revealPositionMarker} from '../../runtime/reveal-match';
 import {retainedPdfsEnabled} from './dcp/retained-pdfs';
 import {managedImagesEnabled} from './dcp/managed-images';
 import {composePreparedLeaves} from '../../block-tree/prepared-leaves';
@@ -9,7 +11,7 @@ import {liveLimits,type ProviderSettings,type LiveProvenance} from './dcp/provid
 import {DcpSources} from './dcp/sources';
 import {request as dcpRequest,prepare as prepareDcp,mockTransport,receive,type DcpTransport} from './dcp/exchange';
 import {createSequenceController} from './sequence-controller';
-import {batch,createEffect,createMemo,createSignal,onCleanup,untrack,type Accessor} from 'solid-js';
+import {batch,createEffect,createMemo,createRoot,createSignal,onCleanup,untrack,type Accessor} from 'solid-js';
 import {unwrap} from 'solid-js/store';
 import type {ReactiveEditor} from '../../reactive-editor/editor';
 import type {DocumentApplicationPort} from '../../application/document-application-ports';
@@ -33,6 +35,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const configureProvider=async(settings:ProviderSettings,key?:string)=>{if(busy()||providerConfiguring())return;setProviderConfiguring(true);try{const ready=await providers.configure(settings,key);if(!alive)return;setProviderReady(ready);setProviderSettings({...providers.settings});setProviderNotice(ready?'Session provider ready.':'Enter a session key; no server environment key is configured.');if(ready)setProviderMode('live');}catch(e){if(alive){setProviderReady(providers.ready);setProviderNotice(String(e));}}finally{if(alive)setProviderConfiguring(false);}};
  const forgetProvider=async()=>{cancel();await providers.forget();setProviderReady(false);setProviderNotice('Session keys forgotten.');};
  const [inspection,setInspection]=createSignal<ReplyTarget>(),[reply,setReply]=createSignal<ReplyTarget>();
+ const [activityInspection,setActivityInspection]=createSignal<{id:string;category:ActivityCategory|'notices'}>();
  const [context,setContext]=createSignal<ReplyTarget[]>([]),[notice,setNotice]=createSignal(''),[busy,setBusy]=createSignal(false);
  const [trail,setTrail]=createSignal<ReplyTarget[]>([]),[cursor,setCursor]=createSignal(-1);
  const diagnostics={rowBuilds:0,contextNodes:0,submissions:0};
@@ -52,7 +55,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  createEffect(()=>{const id=resourceId();if(id===currentResource)return;untrack(()=>batch(()=>{
   if(currentResource)choices.set(currentResource,{inspection:inspection(),reply:reply(),context:context(),trail:trail(),cursor:cursor()});
   currentResource=id;generation++;requestAbort?.abort();clearPreview();setBusy(false);const saved=choices.get(id);
-  setInspection(saved?.inspection);setReply(saved?.reply);setContext(saved?.context??[]);setTrail(saved?.trail??[]);setCursor(saved?.cursor??-1);setNotice('');
+  setInspection(saved?.inspection);setActivityInspection(undefined);setReply(saved?.reply);setContext(saved?.context??[]);setTrail(saved?.trail??[]);setCursor(saved?.cursor??-1);setNotice('');
  }));});
  const rows=createMemo(()=>{
   const r=root();if(!r||!isConversation(metadata(r).dialectic))return [];
@@ -62,6 +65,12 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const committed=createMemo(()=>rows().filter(r=>r.data.state==='committed').sort((a,b)=>(a.data.ordinal??0)-(b.data.ordinal??0)));
  const frontier=()=>committed().at(-1),draft=()=>rows().find(r=>r.data.state==='draft');
  const references=createMemo(()=>{const s=session();if(!s)return;return untrack(()=>{const index=new DialecticReferences(editor,s.projection,s.rootKey);onCleanup(()=>index.dispose());return index;});});
+ const activityDiagnostics={candidates:0,resolutions:0};
+ const activities=new Map<string,{summary:Accessor<ActivitySummary>;dispose:()=>void}>();
+ const contributionActivity=(id:string)=>{
+  let entry=activities.get(id);if(!entry){entry=createRoot(dispose=>{const data=createMemo(()=>editor.features.dialecticContributionActivity?rows().find(r=>r.id===id)?.data:undefined);return {dispose,summary:createContributionActivity(data,references,activityDiagnostics)};});activities.set(id,entry);}return entry.summary;
+ };
+ createEffect(()=>{const ids=new Set(rows().map(r=>r.id));untrack(()=>{for(const [id,entry]of activities)if(!ids.has(id)){entry.dispose();activities.delete(id);}if(activityInspection()&&!ids.has(activityInspection()!.id))setActivityInspection(undefined);});});
  const pending=new Map<string,{range:TextRangeSnapshot;definition:RangeDefinition}>();
  const preferred=new Map<string,string>();
  const target=(id:string,kind:'contribution'|'block'='contribution'):ReplyTarget=>({kind,resourceId:resourceId(),blockId:id});
@@ -92,11 +101,13 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const preview=editor.decorations.createCollection('dialectic:'+crypto.randomUUID());
  createEffect(()=>{if(!alive)return;const t=inspection(),r=resolveReference(t),a=inspectedAnnotation();const ranges=a?[{node:a.node,start:a.property.start,end:a.property.end+1}]:(r.segments??[]);preview.replace(ranges.map((s,i)=>({id:String(i),range:editor.textRanges.snapshot(s.node.key,s.start,s.end),renderers:[{id:'range',name:'svg-highlight',params:{color:'#f3cf7c'}}]})));});
  const run=(action:()=>unknown)=>{try{setNotice('');return action();}catch(e){setNotice(String(e));}};
+ let revealGeneration=0;
  const reveal=(t:ReplyTarget,focus=false)=>{
+  const revealTicket=++revealGeneration;
   if(['entity','argument-relation','entity-relation'].includes(t.kind))return;
   if(t.kind==='gloss'){editor.gloss.openDefinition(root()!.key,t.definitionId);return;}
   const node=resolve(t);if(!node){setNotice('The target is missing, ambiguous, or belongs to another Document. Its reference has been retained.');return;}
-  const mount=editor.mounts.get(node.key);mount?.root.scrollIntoView?.({block:'center',behavior:'auto'});
+  const sourceSession=session();void revealPositionMarker(editor,{id:'dialectic-inspection',anchor:{kind:'block',nodeKey:node.key}},()=>alive&&session()===sourceSession&&revealTicket===revealGeneration);
   if(focus){
    const first=(n:BlockNode):BlockNode|undefined=>n.viewType==='standoff-editor-block'?n:n.children.map(k=>session()!.projection.node(k)).filter(Boolean).map(n=>first(n!)).find(Boolean);
    const text=first(node);if(text)editor.focus.request(text.key,{reason:'dialectic-compose',caret:'end'});
@@ -104,10 +115,12 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  };
  const inspect=(t:ReplyTarget,record=true)=>{
   t=structuredClone(unwrap(t));
-  setAnnotationInspection(undefined);setInspection(t);if(record)batch(()=>{const next=trail().slice(0,cursor()+1);if(targetKey(next.at(-1)??t)!==targetKey(t)||!next.length)next.push(t);setTrail(next);setCursor(next.length-1);});
+  setActivityInspection(undefined);setAnnotationInspection(undefined);setInspection(t);if(record)batch(()=>{const next=trail().slice(0,cursor()+1);if(targetKey(next.at(-1)??t)!==targetKey(t)||!next.length)next.push(t);setTrail(next);setCursor(next.length-1);});
   reveal(t);
  };
  const inspectAnnotation=(ref:{blockId:string;propertyId:string})=>run(()=>{inspect(target(ref.blockId,'block'));setAnnotationInspection({...ref,resourceId:resourceId()});if(!annotationDetails(ref))setNotice('This annotation is unavailable; its authored reference is retained.');});
+ const inspectActivity=(id:string,category:ActivityCategory|'notices')=>run(()=>{inspect(target(id));setActivityInspection({id,category});});
+ const inspectActivityItem=(item:ActivityItem)=>run(()=>{const selected=activityInspection();if(item.target)inspect(item.target);else if(item.annotation)inspectAnnotation(item.annotation);setActivityInspection(selected);});
  const navigate=(delta:number)=>{const i=cursor()+delta;if(i>=0&&i<trail().length){setCursor(i);inspect(trail()[i],false);}};
  const present=()=>{sequences.leave(false);const row=frontier()??draft();if(row)inspect(target(row.id));};
  const compose=()=>{sequences.leave(false);const d=draft();if(d)reveal(target(d.id),true);};
@@ -252,7 +265,8 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     properties.push({id:crypto.randomUUID(),type:RANGE_ANCHOR,annotationId:t.anchorId,start:p.range.start,end:p.range.end-1});
    }
    for(const item of captured.manifest)item.origins=[...(targetKey(item.target)===targetKey(to)?['reply-target' as const]:[]),...(selectedTargets.some(t=>targetKey(t)===targetKey(item.target))?['selected' as const]:[])];
-   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...participant,name:live?participant.name:'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,
+   const repaired=editor.features.dialecticContributionActivity?repairedNotice(live):undefined;
+   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...participant,name:live?participant.name:'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,...(repaired?{notices:[repaired]}:{}),
     replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
     dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,identityMap:result.aliases,annotationRefs:result.annotationRefs,intent:result.intent,...(live?{provider:live}:{})}};
    const started=performance.now();
@@ -321,9 +335,9 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   }catch(error){if(alive)setNotice(String(error));}finally{setResending(false);}
  };
  const submitAndAsk=async(transport?:DcpTransport)=>{if(providerConfiguring()||resending())return;const submitted=submit();if(submitted){if(transport)await askMock(transport,submitted as ReplyTarget);else await ask(submitted as ReplyTarget);}};
- return {vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
+ return {activityInspection,inspectActivity,inspectActivityItem,contributionActivity,activityDiagnostics,vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
   references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,aiParticipants,aiParticipant,setSelectedAi,historyDiagnostics:history.diagnostics,
-  dispose(){sequences.dispose();alive=false;cancel();providers.dispose();history.dispose();choices.clear();pending.clear();preview.dispose();},capture,
+  dispose(){sequences.dispose();alive=false;cancel();providers.dispose();history.dispose();choices.clear();pending.clear();preview.dispose();for(const entry of activities.values())entry.dispose();activities.clear();},capture,
  };
 }
 export type DialecticController=ReturnType<typeof createDialecticController>;
