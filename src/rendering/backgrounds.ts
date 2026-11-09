@@ -22,14 +22,7 @@ export const defaultBackgroundUrls: Partial<Record<BackgroundType, string>> = {
   "youtube-video-background-block": "https://www.youtube.com/watch?v=Zsqep7_9_mw",
 };
 
-export function mediaUrl(value: unknown): string | undefined {
-  if (typeof value !== "string" || !value.trim()) return undefined;
-  const text = value.trim();
-  try {
-    const url = new URL(text, "https://local.invalid/");
-    return ["http:", "https:", "blob:"].includes(url.protocol) ? text : undefined;
-  } catch { return undefined; }
-}
+export {mediaUrl} from '../interchange/media-url';
 
 export {youtubeId} from "../interchange/youtube-reference";
 

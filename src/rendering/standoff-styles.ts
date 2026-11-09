@@ -39,7 +39,7 @@ const hyperlinkFormatting:NonNullable<StandoffStyleSchema['authoring']>={
  group:'core-formatting',stage:'text',purpose:'Attach a validated external hyperlink to a passage.',parameters:{value:{type:'string',minLength:1,maxLength:4096,description:'Valid HTTP(S) or mailto URL; no control characters or executable scheme.'}},
  prepare(attributes,targetType){
   if(targetType!=='standoff-editor-block'||Object.keys(attributes).length!==1||typeof attributes.value!=='string'||attributes.value.length>4096||!safeUrl(attributes.value))throw Error('Invalid native hyperlink or target');
-  const url=new URL(attributes.value);if(!['http:','https:','mailto:'].includes(url.protocol))throw Error('Invalid hyperlink scheme');
+  const url=new URL(attributes.value);if(url.username||url.password||!['http:','https:','mailto:'].includes(url.protocol))throw Error('Invalid hyperlink scheme');
   return {value:attributes.value};
  },
 };

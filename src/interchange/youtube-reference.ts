@@ -5,7 +5,7 @@ export function youtubeId(value: unknown): string | undefined {
   if (/^[\w-]{11}$/.test(text)) return text;
   try {
     const url = new URL(text);
-    if (!["http:", "https:"].includes(url.protocol)) return undefined;
+    if (url.username || url.password || url.port || !["http:", "https:"].includes(url.protocol)) return undefined;
     const host = url.hostname.replace(/^www\./, "");
     let id: string | null | undefined;
     if (host === "youtu.be") id = url.pathname.split("/")[1];

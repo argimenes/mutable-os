@@ -1,3 +1,4 @@
+import {passiveVideo} from '../../../interchange/uri';
 import {managedAsset} from '../../../interchange/managed-asset';
 import {managedImagesEnabled} from './managed-images';
 import type {DcpSources} from './sources';
@@ -65,8 +66,15 @@ export async function inspectNative(sources:DcpSources,initial:any){
    entry.annotations.push(item);
   }
   if(properties.length>limits.properties||marks.length>limits.properties)entry.omissions.push('Property count limit');
-  if(node.viewType==='youtube-video-block')entry.resource={kind:'external-reference',...fields(meta,['url']),requiresAcquisition:false};
-  else if(node.viewType==='image-block'&&sources.editor.features.dcpNativeAuthoringStage3ManagedImages)entry.resource={kind:managedAsset(node.payload.asset)?'managed-image':'unmanaged-image',alt:scalar(meta?.alt)??'',binding:managedImagesEnabled(sources.editor)&&!!managedAsset(node.payload.asset)?'requires-active-session-verification':'unavailable',operation:'media.image',requiresAcquisition:false,perception:false};
+  const external=sources.editor.features.dcpNativeAuthoringStage3ExternalMedia;
+  if(external&&node.viewType==='image-block'&&!managedAsset(node.payload.asset))entry.resource={kind:'external-reference',mode:'image-embed',...fields(meta,['url','alt']),availability:'unknown',retained:false,requiresAcquisition:false,perception:false};
+  else if(external&&['mutable/video-block','youtube-player-block','vimeo-player-block'].includes(node.viewType)){
+   const video=passiveVideo(node.payload.video);entry.resource={kind:'embedded-media',provider:video?.provider??null,url:video?.canonicalUrl??null,availability:'unknown',retained:false,descriptor:video?'valid':'unsupported',state:'Playback is local to the mounted occurrence; authored URL remains protected'};
+  }
+  else if(external&&node.viewType==='iframe-block')entry.resource={kind:'embedded-media',mode:'website',...fields(meta,['url','title']),availability:'unknown',retained:false,policy:meta?.resourceEmbed===true?'sandboxed-native-resource':'legacy-iframe-not-an-authoring-route'};
+  else if(external&&['mutable/pdf-document-block','mutable/iiif-manifest-block','mutable/iiif-image-block','mutable/web-article-block','mutable/citation-block','mutable/web-resource-block','mutable/academic-resource-block'].includes(node.viewType))entry.resource={kind:'retained-capture',availability:'unknown',newUrlRequires:'Native acquisition/capture service; ordinary hyperlinks need no capture',details:'Trusted capture/resource identities are not exported'};
+  else if(node.viewType==='youtube-video-block')entry.resource={kind:'external-reference',...fields(meta,['url']),requiresAcquisition:false,...(external?{mode:'provider-embed',availability:'unknown',retained:false}:{})};
+  else if(node.viewType==='image-block'&&(sources.editor.features.dcpNativeAuthoringStage3ManagedImages||external))entry.resource={kind:managedAsset(node.payload.asset)?'managed-image':'unmanaged-image',alt:scalar(meta?.alt)??'',binding:managedImagesEnabled(sources.editor)&&!!managedAsset(node.payload.asset)?'requires-active-session-verification':'unavailable',operation:'media.image',requiresAcquisition:false,perception:false};
   else if(/image|video|resource|pdf|iiif|citation|article|player/.test(node.viewType))entry.resource={kind:'native-resource',details:'Requires native resource binding adapter; no trusted capture exported'};
   if(meta)entry.omissions.push('Only selected persistent configuration is projected; internal and unsupported metadata omitted');
   if(entry.kind==='native')entry.omissions.push('Unmapped native kind; original identity and structure retained');

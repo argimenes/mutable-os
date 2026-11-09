@@ -130,6 +130,8 @@ export type FeatureFlags = Readonly<{
   dcpNativeAuthoringStage2Widgets: boolean;
   /** Existing managed images through current same-Document DCP source authority. */
   dcpNativeAuthoringStage3ManagedImages: boolean;
+  /** Ordinary external image/video/embed composition; no acquisition. */
+  dcpNativeAuthoringStage3ExternalMedia: boolean;
   dialecticProviders: boolean;
   dialecticProviderContinuity: boolean;
   /** Temporary local wire/contribution diagnostics; disable after DCP qualification. */
@@ -256,6 +258,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dcpNativeAuthoringStage2Compounds: true,
   dcpNativeAuthoringStage2Widgets: true,
   dcpNativeAuthoringStage3ManagedImages: true,
+  dcpNativeAuthoringStage3ExternalMedia: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
   dcpTestPhaseLogging: true,

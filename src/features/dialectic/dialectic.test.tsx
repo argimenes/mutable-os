@@ -1,3 +1,4 @@
+import {prepareImage,prepareVideoReference,prepareWebsiteEmbed} from '../../block-tree/media-authoring';
 import {managedImageBlock} from '../../interchange/resource-url';
 import {timerBlockDto} from '../timer/model';
 import {objectDto} from '../three-d-object/model';
@@ -34,10 +35,10 @@ import {dialecticApplication} from './index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
-async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true,compoundAuthoring=false,compoundFeatures=true,widgetAuthoring=false,widgetFeatures=true,managedImageAuthoring=false){
+async function setup(enabled=true,registry=true,dcp=true,semantics=false,protection=false,logging=false,catalogue=true,nativeAuthoring=false,textAuthoring=false,literalFeatures=true,layoutAuthoring=false,tasks=true,compoundAuthoring=false,compoundFeatures=true,widgetAuthoring=false,widgetFeatures=true,managedImageAuthoring=false,externalMediaAuthoring=false,externalNativeFeatures=true){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Test has no vault'}),{headers:{'Content-Type':'application/json'}})));
  if(widgetAuthoring){vi.stubGlobal('ResizeObserver',class{observe(){}disconnect(){}});vi.stubGlobal('IntersectionObserver',class{observe(){}disconnect(){}});vi.stubGlobal('matchMedia',()=>({matches:false,addEventListener(){},removeEventListener(){}}));}
- const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{dcpNativeAuthoringStage3ManagedImages:managedImageAuthoring,dcpNativeAuthoringStage2Widgets:widgetAuthoring,timer:widgetFeatures,threeDObjects:widgetFeatures,dcpNativeAuthoringStage2Compounds:compoundAuthoring,reversibleBlocks:compoundFeatures,verticalTabs:compoundFeatures,taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({id:'workspace',type:'workspace-block',children:[]}),{features:{resourceUrlPaste:externalNativeFeatures,dcpNativeAuthoringStage3ExternalMedia:externalMediaAuthoring,dcpNativeAuthoringStage3ManagedImages:managedImageAuthoring,dcpNativeAuthoringStage2Widgets:widgetAuthoring,timer:widgetFeatures,threeDObjects:widgetFeatures,dcpNativeAuthoringStage2Compounds:compoundAuthoring,reversibleBlocks:compoundFeatures,verticalTabs:compoundFeatures,taskLists:tasks,dcpNativeAuthoringStage2Layouts:layoutAuthoring,documentInterchange:literalFeatures&&externalNativeFeatures,standoffCodeHighlighting:literalFeatures,dcpNativeAuthoringStage2Text:textAuthoring,dcpNativeAuthoringStage1:nativeAuthoring,dcpCapabilityCatalogue:catalogue,dcpTestPhaseLogging:logging,dialecticProviderContinuity:false,nativeTextProtection:protection,dialectic:enabled,dialecticDcp:dcp,scopedSemantics:semantics,applicationPresentations:registry,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});
  const editor=session.editor;cleanup.push(()=>session.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={session}/>,host));
  if(!enabled)return {session,editor,host};
@@ -1176,9 +1177,52 @@ it('retains prior native authoring families inside Stage 2C compounds',async()=>
 
 const widgetFixture=(native=true,widgets=true,features=true)=>setup(true,true,true,true,true,false,true,native,true,true,true,true,true,true,widgets,features);
 const imageReference={kind:'managed' as const,cavernId:'image-cavern',assetId:'sha256:'+'a'.repeat(64)};
+const externalFixture=(enabled=true,nativeFeatures=true)=>setup(true,true,true,true,true,false,true,true,true,true,true,true,true,true,false,true,true,enabled,nativeFeatures);
+it('qualifies Stage 3B external media without native source handles, nested ownership, inspection and persistence',async()=>{
+ const f=await externalFixture(),c=f.c!,e=f.editor;f.type!('Introduce external architecture examples');c.submit();vi.mocked(fetch).mockClear();
+ const snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');
+ const image=(id:string)=>({id,kind:'external-image',url:'https://images.example.org/building.jpg',alt:'Building facade'}),p=(id:string,markup:string)=>({id,kind:'paragraph',markup,ranges:[]});
+ await c.askMock(async(req,sources)=>{
+  expect(req.externalMediaAuthoring).toBe(1);expect(req.authoring.instructions).toContain('without a pre-existing source Block');expect(sources.trail).toHaveLength(0);
+  return JSON.stringify({...dcpResponse(req.exchange),composition:[
+   {id:'new:b1',kind:'grid',rows:[[[image('new:b2')]]] },
+   {id:'new:b3',kind:'tabs',orientation:'horizontal',tabs:[{label:'Film',content:[{id:'new:b4',kind:'video',url:'https://vimeo.com/76979871'}]}]},
+   {id:'new:b5',kind:'surface',front:[image('new:b6')],back:[{id:'new:b7',kind:'embed',url:'https://example.org/building'}]},
+   {...p('new:b8','See the <annotation type="reference/url" value="https://example.org/paper.pdf">PDF</annotation> and <annotation type="reference/url" value="https://example.org/iiif/manifest.json">IIIF collection</annotation>.'),margins:{left:[image('new:b9')],right:[]}},
+   {id:'new:b10',kind:'youtube',url:'M7lc1UVf-VE'}]});
+ });expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);expect(fetch).not.toHaveBeenCalled();expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const state=e.repository.readState(),media=Object.values(state.contents).filter(n=>['image-block','mutable/video-block','iframe-block'].includes(n.viewType));expect(media).toHaveLength(5);
+ const nativeImage=prepareImage('https://images.example.org/building.jpg','Building facade');
+ for(const n of media){expect(resourceIdentity.resourceOwner(state,n.key)?.key).toBe(c.root()!.contentKey);expect(n.payload.asset).toBeUndefined();expect(n.payload.capture).toBeUndefined();if(n.viewType==='image-block')expect({...n.payload,id:null}).toEqual({...nativeImage,id:null,children:undefined});}
+ const video=media.find(n=>n.viewType==='mutable/video-block')!,humanVideo=Object.values(prepareVideoReference('https://vimeo.com/76979871').state.contents)[0];expect({...video.payload,id:null}).toEqual({...humanVideo.payload,id:null});
+ const embed=media.find(n=>n.viewType==='iframe-block')!,humanEmbed=Object.values(prepareWebsiteEmbed('https://example.org/building').state.contents)[0];expect({...embed.payload,id:null}).toEqual({...humanEmbed.payload,id:null});
+ const root=c.resolve(c.target(c.frontier()!.id))!,node=(key:string)=>c.session()!.projection.node(key)!;expect(node(root.children[3]).ownedRelations.leftMargin).toBeDefined();expect((node(root.children[3]).payload.standoffProperties as any[]).filter(p=>p.type==='reference/url')).toHaveLength(2);
+ const frames=[...f.host.querySelectorAll<HTMLIFrameElement>('iframe')];expect(frames.find(frame=>frame.src.includes('player.vimeo.com'))?.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin allow-presentation');expect(frames.find(frame=>frame.src==='https://example.org/building')?.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-presentation');
+ expect(frames.find(frame=>frame.src==='https://example.org/building')?.getAttribute('referrerpolicy')).toBe('no-referrer');
+ const imageNode=Object.values(c.session()!.projection.state.nodes).find(n=>n.contentKey===media[0].key)!;expect(()=>e.commands.setPayloadField(imageNode.key,'metadata',{url:'https://example.org/changed'})).toThrow(/protected/);
+ const revision=e.repository.state.revision;f.host.querySelector<HTMLImageElement>('.reactive-image img')!.dispatchEvent(new Event('error'));expect(e.repository.state.revision).toBe(revision);
+ const saved=captureNative(state,c.resourceId());e.repository.undo();expect(c.committed()).toHaveLength(1);expect(f.host.querySelector('.mutable-video-block iframe')).toBeNull();e.repository.redo();expect(c.committed()).toHaveLength(2);
+ const loaded=new ReactiveEditor({id:'external-bank',type:'workspace-object-bank-block',children:[]});cleanup.push(()=>loaded.dispose());const bank=loaded.repository.readState();admitNative(loaded.repository,nativeBytes(saved),bank.placements[bank.rootPlacementKey].contentKey);expect(nativeText(captureNative(loaded.repository.readState(),c.resourceId()))).toBe(nativeText(saved));
+ await c.askMock(async(req,sources)=>{for(const record of [media[0],video,embed]){const read=await sources.tool({id:record.key,tool:'read_source',arguments:{handle:sources.issue({kind:'block',resourceId:c.resourceId(),blockId:String(record.payload.id)})}});expect(read.status).toBe('complete');expect(read.inspection.root.resource).toMatchObject({availability:'unknown',retained:false});}return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toBe('');
+ snapshot.mockClear();build.mockClear();const reads={...c.dcpDiagnostics};vi.mocked(fetch).mockClear();f.type!('Local typing');expect(c.dcpDiagnostics).toEqual(reads);expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled();
+});
+it('rejects Stage 3B unsafe URLs, raw embed settings, forged resources and media budgets atomically',async()=>{
+ const f=await externalFixture(),c=f.c!,e=f.editor;f.type!('External request');c.submit();const revision=e.repository.state.revision;vi.mocked(fetch).mockClear();
+ const image={id:'new:b1',kind:'external-image',url:'https://example.org/image.png',alt:'Image'};
+ for(const composition of [[{...image,url:'https://user:pass@example.org/image'}],[{...image,url:'http://127.0.0.1/image'}],[{...image,assetId:'forged'}],[{id:'new:b1',kind:'video',url:'https://example.org/video.mp4'}],[{id:'new:b1',kind:'embed',url:'https://example.org',sandbox:'allow-same-origin'}],[{...image,alt:'x'.repeat(1025)}],Array.from({length:9},(_,i)=>({...image,id:'new:b'+i}))]){
+  await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition}));expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);
+ }expect(fetch).not.toHaveBeenCalled();
+ const insert=e.commands.insertFragment.bind(e.commands);vi.spyOn(e.commands,'insertFragment').mockImplementation((...args)=>{insert(...args);throw Error('Injected external admission failure');});
+ await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[image,{id:'new:b2',kind:'video',url:'https://vimeo.com/76979871'}]}));expect(c.notice()).toContain('Injected external admission failure');expect(e.repository.state.revision).toBe(revision);expect(c.committed()).toHaveLength(1);
+});
+it('preserves Stage 3B disabled mode and native feature prerequisites',async()=>{
+ const off=await externalFixture(false);off.type!('Disabled');off.c!.submit();await off.c!.askMock(async req=>{expect(req.externalMediaAuthoring).toBeUndefined();return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'external-image',url:'https://example.org/a',alt:'Image'}]});});expect(off.c!.notice()).toContain('Unsupported DCP Block');
+ const f=await externalFixture(true,false),c=f.c!,e=f.editor;f.type!('Features');c.submit();const revision=e.repository.state.revision;
+ for(const [kind,url] of [['video','https://vimeo.com/76979871'],['embed','https://example.org/page']]){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind,url}]}));expect(c.notice()).toMatch(/prerequisite disabled/);expect(e.repository.state.revision).toBe(revision);}
+});
 const imageManifest={...imageReference,mediaType:'image/png',byteLength:100,width:3,height:2};
-async function imageFixture(enabled=true,sourceAsset:unknown=imageReference){
- const f=await setup(true,true,true,true,true,false,true,true,true,true,true,true,true,true,false,true,enabled),c=f.c!,e=f.editor;
+async function imageFixture(enabled=true,sourceAsset:unknown=imageReference,external=false){
+ const f=await setup(true,true,true,true,true,false,true,true,true,true,true,true,true,true,false,true,enabled,external),c=f.c!,e=f.editor;
  e.setAssetContext(()=>({cavernId:imageReference.cavernId,session:'image-session'}));
  // Runtime URL rendering is independently qualified by managed-assets.test.
  vi.spyOn(e.assets,'bind').mockImplementation(()=>()=>{});
@@ -1307,4 +1351,15 @@ it('rejects Stage 3A nonmanaged and foreign originals, changed sources and late 
  const late=await imageFixture(),d=late.c!,editor=late.editor,revision=editor.repository.state.revision,transaction=editor.commands.boundedStructuralTransaction.bind(editor.commands);
  vi.spyOn(editor.commands,'boundedStructuralTransaction').mockImplementation((label,operation)=>{editor.setAssetContext(()=>({cavernId:imageReference.cavernId,session:'late-switch'}));return transaction(label,operation);});
  await d.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await late.read(sources))]}));expect(d.notice()).toMatch(/session/);expect(editor.repository.state.revision).toBe(revision);
+});
+
+
+it('qualifies Stage 3B human Add Image equivalence and mixed managed/external fragment admission',async()=>{
+ const f=await imageFixture(true,imageReference,true),c=f.c!,e=f.editor;
+ await c.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[imageNode(await f.read(sources)),{id:'new:b2',kind:'video',url:'https://vimeo.com/76979871'},{id:'new:b3',kind:'external-image',url:'https://example.org/photo.jpg',alt:'Photo'}]}));expect(c.notice()).toBe('');expect(f.verify).toHaveBeenCalledTimes(1);expect(f.verify.mock.calls[0][0]).toBe('/api/assets/verify');
+ const external=Object.values(e.repository.readState().contents).find(n=>n.viewType==='image-block'&&(n.payload.metadata as any)?.alt==='Photo')!;
+ const menu=blockMenuItems(e,f.text!().key).find(i=>i.label==='Add Block')!.children!;
+ menu.find(i=>i.label==='Image URL…')!.input!.submit('https://example.org/photo.jpg');
+ const human=Object.values(e.repository.readState().contents).find(n=>n.viewType==='image-block'&&(n.payload.metadata as any)?.url==='https://example.org/photo.jpg'&&!(n.payload.metadata as any)?.alt)!;
+ expect(human.viewType).toBe(external.viewType);expect(human.children).toEqual(external.children);expect(human.payload.metadata).toMatchObject({url:(external.payload.metadata as any).url});expect(human.payload.asset).toBeUndefined();expect(human.payload.id).not.toBe(external.payload.id);
 });

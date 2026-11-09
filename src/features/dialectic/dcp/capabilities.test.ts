@@ -5,6 +5,19 @@ import {compositionLimits,capabilityLimits} from './limits';
 import {registerDcpTypes} from './markup';
 import {VisualEffectRegistry} from '../../../runtime/visual-effect-registry';
 import {featureFlags} from '../../../configuration';
+it('qualifies Stage 3B reference/embed discovery independently of managed resources and retained captures',()=>{
+ const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage2Text:true,dcpNativeAuthoringStage2Layouts:true,dcpNativeAuthoringStage2Compounds:true,dcpNativeAuthoringStage2Widgets:true,dcpNativeAuthoringStage3ExternalMedia:true,documentInterchange:true,resourceUrlPaste:true,reversibleBlocks:true,timer:true,threeDObjects:true});
+ const catalogue=capabilityCatalogue(editor);
+ for(const id of ['media.external-image','media.video','media.embed']){
+  const detail=catalogue.describe({ids:[id]});expect(detail.status).toBe('complete');expect(detail.items[0]).toMatchObject({authorable:true,availability:{resources:'validated-external-reference',resourceReadiness:'input-required'}});
+  expect(JSON.stringify(detail.parameters)).not.toContain('source');expect(JSON.stringify(detail.parameters)).not.toContain('assetId');
+ }
+ expect(catalogue.describe({ids:['media.image']}).items[0].authorable).toBe(false);expect(catalogue.describe({ids:['media.retained-viewers']}).items[0].authorable).toBe(false);
+ for(const item of catalogue.summary.items){const detail=catalogue.describe({ids:[item.id]});expect(detail.status,item.id).toBe('complete');expect(new TextEncoder().encode(JSON.stringify(detail)).length).toBeLessThanOrEqual(capabilityLimits.bytes);}
+ editor.features.documentInterchange=false;editor.features.resourceUrlPaste=false;
+ expect(capabilityCatalogue(editor).describe({ids:['media.video']}).items[0].authorable).toBe(false);expect(capabilityCatalogue(editor).describe({ids:['media.embed']}).items[0].authorable).toBe(false);
+ editor.features.dcpNativeAuthoringStage3ExternalMedia=false;expect(capabilityCatalogue(editor).summary.items.some(i=>i.id==='media.external-image')).toBe(false);
+});
 it('advertises bounded Stage 3A binding independently of resource possession, with no acquisition route',()=>{
  const {editor}=fixture();Object.assign(editor.features,{dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage3ManagedImages:true,managedAssetClipboard:true});
  const catalogue=capabilityCatalogue(editor),detail=catalogue.describe({ids:['media.image']});

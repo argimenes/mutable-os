@@ -231,7 +231,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
    const structuralContext=await sources.manifest([primary,...selected]);
    if(!alive||ticket!==generation||session()!==source)return;sources.check();
-   const request=dcpRequest(exchangeId,primary,selected,captured.items.map(item=>({handle:sources!.issue(item.target),plainTextExcerpt:item.text})),editor.visualEffects,editor.features.scopedSemantics,sources.capabilities,editor.features.dcpNativeAuthoringStage1,editor.features.dcpNativeAuthoringStage2Text,editor.features.dcpNativeAuthoringStage2Layouts,editor.features.dcpNativeAuthoringStage2Compounds,editor.features.dcpNativeAuthoringStage2Widgets,managedImagesEnabled(editor));
+   const request=dcpRequest(exchangeId,primary,selected,captured.items.map(item=>({handle:sources!.issue(item.target),plainTextExcerpt:item.text})),editor.visualEffects,editor.features.scopedSemantics,sources.capabilities,editor.features.dcpNativeAuthoringStage1,editor.features.dcpNativeAuthoringStage2Text,editor.features.dcpNativeAuthoringStage2Layouts,editor.features.dcpNativeAuthoringStage2Compounds,editor.features.dcpNativeAuthoringStage2Widgets,managedImagesEnabled(editor),editor.features.dcpNativeAuthoringStage3ExternalMedia);
    requestForInspection=request;Object.assign(request,{structuralContext,task:{action:'respond',focus:primary,participantRequest:structuralContext.sources[0]?.sourceAuthor==='human'?{handle:primary,text:captured.items[0].text}:null}});
    if(live){request.cadence=live.settings.cadence;request.protocolKey={...request.protocolKey,version:request.protocolKey.version+'-c1'};}
    let prepared:Awaited<ReturnType<typeof prepareDcp>>|undefined;
@@ -253,11 +253,11 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,identityMap:result.aliases,annotationRefs:result.annotationRefs,intent:result.intent,...(live?{provider:live}:{})}};
    const started=performance.now();
    editor.commands.boundedStructuralTransaction(live?'Add DCP AI response':'Add DCP mock response',()=>{
-    result.preparedImages.check();
+    result.preparedResources.check();
     if(Object.keys(result.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,unknown>,...result.definitions});
     for(const [key,added]of result.annotations){const n=source.projection.node(key);if(!n)throw Error('Anchor source unavailable');editor.commands.setPayloadField(key,'standoffProperties',[...structuredClone(unwrap(n.payload.standoffProperties??[])) as any[],...added]);}
     const dto={id,type:'container-block',metadata:{dialectic:JSON.parse(JSON.stringify(data))},children:result.children};
-    if(result.preparedImages.leaves.size)editor.commands.insertFragment(composePreparedLeaves(dto,result.preparedImages.leaves,compositionLimits.nodes+1),{kind:'before',anchorKey:d.key});
+    if(result.preparedResources.leaves.size)editor.commands.insertFragment(composePreparedLeaves(dto,result.preparedResources.leaves,compositionLimits.nodes+1),{kind:'before',anchorKey:d.key});
     else editor.commands.insert(dto,{kind:'before',anchorKey:d.key});
    });
    dcpDiagnostics.commitMs=performance.now()-started;dcpDiagnostics.exchanges++;dcpDiagnostics.reads+=sources.diagnostics.reads;dcpDiagnostics.searches+=sources.diagnostics.searches;dcpDiagnostics.visited+=sources.diagnostics.visited;

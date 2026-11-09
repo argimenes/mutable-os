@@ -1,3 +1,4 @@
+import {prepareImage} from '../block-tree/media-authoring';
 import {canvasPreviewDto} from '../block-tree/note-authoring';
 import {prepareTabs,tabPanel} from '../block-tree/compound-authoring';
 import {listShell} from '../block-tree/layout-authoring';
@@ -80,7 +81,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
   };
   const mediaInput = (label: string, type: string) => input(label, (url) => {
     if (type === "youtube-video-block" ? !youtubeId(url) : !mediaUrl(url)) throw new Error("Enter a valid media URL (YouTube videos also accept a video ID).");
-    add(type==='youtube-video-block'?prepareYouTube(url):dto(type, [], { url }));
+    add(type==='youtube-video-block'?prepareYouTube(url):prepareImage(url));
   });
   const historyEntry = editor.features.blockHistory
     ? command("history.open", "History…")
