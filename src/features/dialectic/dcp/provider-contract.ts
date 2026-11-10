@@ -4,7 +4,7 @@ import {capabilityLimits} from './limits';
 /** Credentials never enter native provenance. Provider IDs are diagnostic only. */
 export type Provider = 'openai' | 'anthropic';
 export interface ProviderSettings {provider:Provider;model:string;maxOutputTokens:number;repair:boolean;cadence:'conversational'|'extended'}
-export const defaultProviderSettings:ProviderSettings={provider:'openai',model:'gpt-5.4-mini',maxOutputTokens:2048,repair:true,cadence:'conversational'};
+export const defaultProviderSettings:ProviderSettings={provider:'openai',model:'gpt-5.4',maxOutputTokens:2048,repair:true,cadence:'conversational'};
 export const liveLimits={deadlineMs:120000,calls:6,rounds:8,bytes:262144,wireBytes:1048576};
 export const responseIntents=['reply','acknowledge','share','create','propose','challenge','qualify','clarify','compare','elaborate','synthesise','ask','answer','other'];
 export interface ProviderCall {id:string;tool:'read_source'|'search_symposium'|'list_text_blocks'|'describe_capabilities';arguments:Record<string,unknown>}
