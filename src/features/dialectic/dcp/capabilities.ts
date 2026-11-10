@@ -4,7 +4,7 @@ import {externalMediaLimits} from '../../../block-tree/media-authoring';
 import {imageBindingLimits} from './managed-images';
 import {compoundOperations} from '../../../block-tree/compound-authoring';
 import {listOperation,layoutOperation} from '../../../block-tree/layout-authoring';
-import {withTextStyleDefaults,withCompoundDefaults} from './authoring';
+import {withTextStyleDefaults,withCompoundDefaults,withLayoutDefaults,editorialExamples} from './authoring';
 import {codeOperation} from '../../../block-tree/literal-authoring';
 import {sourceOperation} from '../../../interchange/source-block';
 import type {ReactiveEditor} from '../../../reactive-editor/editor';
@@ -79,7 +79,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   Object.assign(projected.find(a=>a.id==='composition.table')!,{nativeOperation:'prepareLayout',nativeEffects:['table-block','table-row-block','table-cell-block','metadata.htmlTableCell'],guidance:'Rectangular owned cells; configuration:null or matching headers boolean matrix. No spans or rendered width settings. Child paragraphs may use textStyle.',example:{id:'new:b2',kind:'table',configuration:{headers:[[true]]},rows:[[[paragraph]]]}});
   Object.assign(projected.find(a=>a.id==='composition.card-grid')!,{purpose:layoutOperation.purpose,nativeOperation:'prepareLayout / prepareGrid',constraints:{...layoutOperation.constraints,rectangular:false},guidance:'Owned row/cell content. Unequal row lengths retain native merge results; no spanning or width rendering. Existing rectangular forms remain valid.'});
   projected.push({id:'composition.tasks',name:'Task lists',purpose:'Author checkable items with protected initial completion state.',read:'native-task-state',nativeTypes:['indented-list-block','container-block',...text],schema:'List',feature:'taskLists',nativeOperation:'prepareList / taskChecked',nativeEffects:['checked'],guidance:'style:task defaults to unchecked; configuration.items specifies initial checked values. Also supported in ordered/bullet lists. Draft controls remain interactive; submitted authored state is protected.'});
-  for(const a of projected)if(a.example)a.example=layoutExample(textAuthoring?withTextStyleDefaults(a.example):a.example);
+  for(const a of projected)if(a.example)a.example=withLayoutDefaults(textAuthoring?withTextStyleDefaults(a.example):a.example);
  }
  if(compoundAuthoring){
   for(const [kind,schema] of [['surface','Surface'],['tabs','Tabs'],['pages','Pages']] as const){const operation=compoundOperations[kind];projected.push({id:'composition.'+kind,name:schema,purpose:operation.purpose,schema,read:'bounded-native-inspection',nativeTypes:[...operation.nativeEffects],nativeEffects:operation.nativeEffects,nativeOperation:kind==='surface'?'prepareSurface / surfaceSide':'prepareTabs / tabPanel / preparePage',...(kind==='surface'?{feature:'reversibleBlocks' as const}:{constraints:{verticalOrientation:{feature:'verticalTabs',enabled:editor.features.verticalTabs===true},...(kind==='pages'?{placement:'top-level-contribution'}:{})}}),guidance:kind==='surface'?'Front/back content; host-owned Sides. Flipping is transient navigation, not a content edit.':'Labels and orientation are authored; visible-panel navigation is transient. Vertical orientation requires native verticalTabs. Pages require top-level contribution placement; no host authority.'});}
@@ -151,7 +151,13 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
    const found=items.find(item=>item.id===id);
    const {schema,...detail}=found??{id,status:'unknown',authorable:false,reason:'Unknown capability ID',schema:undefined};
    if(selection){if((detail as any).example)(detail as any).example=vocabularyExample((detail as any).example,selection);if(id==='composition.list')(detail as any).guidance='Native nested lists. Only styles and configuration values admitted by the projected schema are authorable; initial checked state is protected after submission.';if(id==='composition.table')(detail as any).guidance='Rectangular owned cells. Header configuration is available only when enabled in the projected schema; no spans or width settings.';}
+   const exampleName:Record<string,string>={'semantic.gloss':'gloss','source.anchor':'source-objection','source.classification':'source-objection','semantic.argument':'arguments','semantic.argument-relation':'arguments'};
+   if(ids.length===1&&found?.authorable&&(!found.semantic||editor.features.scopedSemantics)){
+    let example:any=editorialExamples.find(e=>e.name===exampleName[id]);
+    if(example){if(textAuthoring)example=withTextStyleDefaults(example);if(layoutAuthoring)example=withLayoutDefaults(example);if(compoundAuthoring)example=withCompoundDefaults(example);if(selection)example=vocabularyExample(example,selection);if(example)(detail as any).contributionExample=example;}
+   }
    selected.push(detail);if(schema&&(!selection||found?.authorable))names.push(schema);
+   if(new TextEncoder().encode(JSON.stringify(result(ids))).length>capabilityLimits.bytes)delete (detail as any).contributionExample;
    if(new TextEncoder().encode(JSON.stringify(result(ids))).length>capabilityLimits.bytes){selected.pop();if(schema&&(!selection||found?.authorable))names.pop();omitted.push(id);}
   }
   return result(omitted);
@@ -161,10 +167,4 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
  const selectable:VocabularyDescriptor[]=items.filter(a=>a.schema&&!['Span'].includes(a.schema)&&a.id!=='composition.markdown-fallback'||a.id==='reference.reply').map(a=>({id:a.id,purpose:a.purpose,available:a.authorable,requires:a.id==='source.classification'?['source.anchor']:a.id==='composition.tasks'||a.id==='configuration.list-numbering'?['composition.list']:a.id==='configuration.table-headers'?['composition.table']:[],...(a.id==='source.classification'?{requiresAny:semanticTypes.filter(t=>stage1||classifications.includes(t.type)||t.type==='mutable/entity-reference').map(t=>'standoff:'+t.type)}:{}),...(a.schema?{schema:a.schema}:{}),...(a.schema&&nodeNames.has(a.schema)&&a.id!=='composition.tasks'&&a.id!=='configuration.margins'?{kind:rawDefinitions[a.schema].properties.kind.enum[0]}:{})}));
  for(const mark of semanticTypes)selectable.push({id:'standoff:'+mark.type,purpose:mark.purpose??mark.type,available:editor.features.dialecticDcp===true&&(mark.type!=='mutable/entity-reference'||editor.features.scopedSemantics===true),requires:[],standoff:mark.type});
  return {summary,describe,selectable};
-}
-
-function layoutExample(value:any):any {
- if(Array.isArray(value))return value.map(layoutExample);
- if(!value||typeof value!=='object')return value;
- return {...Object.fromEntries(Object.entries(value).map(([key,item])=>[key,layoutExample(item)])),...(['list','table'].includes(value.kind)&&!Object.hasOwn(value,'configuration')?{configuration:null}:{})};
 }
