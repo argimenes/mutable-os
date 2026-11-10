@@ -52,6 +52,7 @@ export class NativeDocumentSession {
   private dirtyState = createStore<Record<string, boolean>>({});
   /** Per-resource flags: reading a tab indicator must never capture a Document. */
   isDirty(id: string) { return this.dirtyState[0][id] ?? true; }
+  hasPendingSave(id: string) { return !!(this.bindings.get(id)?.pending || this.compatibleSources.get(id)?.pending); }
   /** A failed first destination is not a saved binding. Pending generations keep their destination. */
   needsSaveDestination(id: string) {
     if (this.compatibleSources.has(id)) return false;
@@ -414,10 +415,15 @@ export class NativeDocumentSession {
     if(old&&sameLocation(old.location,location)||compatible&&sameLocation(compatible.location,location))throw Error('Choose a new Vault location for this copy.');
     // Retain the same canonical editing session and coordinator. Only the
     // destination changes, after an explicit location choice.
+    const previous=old&&{location:old.location,baseline:old.baseline,comparedHash:old.comparedHash};
     if(old){old.location={...location};old.baseline={nativeHash:null,markdownHash:null,generation:null};old.comparedHash=undefined;}
     if(compatible)this.compatibleSources.delete(id);
     this.markDirty(id,true);this.touchStorage();
-    return this.save(id,location,overwrite);
+    const result=await this.save(id,location,overwrite);
+    // A confirmed preflight rejection did not move the saved resource. Keep its
+    // original binding so later contribution saves cannot target the rejected name.
+    if(result?.phase==='failed'&&!result.generation&&old&&previous&&!old.pending){Object.assign(old,previous);this.touchStorage();this.touch();}
+    return result;
   }
   async recoverRecognized(vault:string,resourceId:string,generation:string){const result=await request('recover-recognized',{vault,resourceId,generation});if(result.phase!=='saved')throw Error(result.error??'Document recovery remains pending');this.notice='Recovery complete. Explicitly reopen the Document; live source baselines were not replaced.';this.touch();return result;}
   async verifySource(vault:string,id:string){const proof=this.knowledgeEvidence(id);if(proof.pending||!proof.location||!proof.byteHash)throw Error('Source unavailable or pending');return request('verify-source',{vault,source:{resourceId:id,location:proof.location,byteHash:proof.byteHash}});}

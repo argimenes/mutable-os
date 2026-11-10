@@ -24,7 +24,7 @@ export function createDocumentSave(editor:ReactiveEditor,options:{vault:()=>Prom
  const guard=()=>{if(disposed)throw Error('Document Save view closed');options.guard();};
  return {
   prompt:():SavePrompt|undefined=>collision()?{kind:'collision',...collision()!}:destination()?{kind:'destination',...destination()!}:undefined,
-  async save(id:string,requested?:VaultLocation,forceChoose=false):Promise<boolean>{
+  async save(id:string,requested?:VaultLocation,forceChoose=false,submission?:{defaultFilename:string}):Promise<boolean>{
    if(editor.completionInput?.beforeSave?.()===false)return false;
    if(saving)throw Error('A Document Save is already in progress');saving=true;
    try {
@@ -36,10 +36,11 @@ export function createDocumentSave(editor:ReactiveEditor,options:{vault:()=>Prom
     const resource=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='document-block'&&String((c.payload.metadata as any)?.documentId??c.payload.id)===id);
     if(!resource)throw Error('Document is no longer available');
     const meta=resource.payload.metadata as any;
-    const name=meta?.interchange?.suggestedFilename??meta?.title??source?.filename??'Document';
+    const name=submission?.defaultFilename??meta?.interchange?.suggestedFilename??meta?.title??source?.filename??'Document';
     const imported=!source&&!!meta?.interchange;
     let target=native.needsSaveDestination(id)?requested:source;
     if(outside||forceChoose||imported){
+     if(submission)throw Error('Choose Save as… to confirm this Document’s Vault destination, then retry the contribution save.');
      if(!vault)throw Error('Open a Vault before saving this Document.');
      const choice=await new Promise<VaultLocation|undefined>(resolve=>setDestination({root:vault.root,filename:availableNativeFilename(externalSource?.filename??name,[]),choose:location=>{setDestination(undefined);resolve(location);}}));
      if(!choice)return false;check();target=choice;
@@ -54,6 +55,7 @@ export function createDocumentSave(editor:ReactiveEditor,options:{vault:()=>Prom
       const occupied=await native.list(target.folder);check();
       const existing=occupied.find(n=>n.normalize('NFC').toLowerCase()===target!.filename.normalize('NFC').toLowerCase());
       if(!existing)break;target={...target,filename:existing};
+      if(submission){target={...target,filename:availableNativeFilename(existing,occupied)};continue;}
       let proof:NativeOverwrite|undefined,overwriteUnavailable:string|undefined;
       try{proof=await native.inspectOverwrite(target);}catch(e){overwriteUnavailable=(e as Error).message;}
       check();const choice=await new Promise<SaveCollisionChoice>(resolve=>setCollision({filename:existing,suggested:availableNativeFilename(existing,occupied),overwriteUnavailable,choose:choice=>{setCollision(undefined);resolve(choice);}}));
@@ -65,7 +67,13 @@ export function createDocumentSave(editor:ReactiveEditor,options:{vault:()=>Prom
     check();
     const latest=native.location(id);
     if(JSON.stringify(latest)!==JSON.stringify(source))throw Error('Another view changed this Document’s Save destination. Retry Save.');
-    const action=()=>copy?native.saveCopy(id,target!,overwrite):native.save(id,target,overwrite);
+    const action=async()=>{
+     if(submission&&native.hasPendingSave(id)){
+      await native.recover(id,target!);check();
+      if(native.hasPendingSave(id))throw Error(native.status(id));
+     }
+     return copy?native.saveCopy(id,target!,overwrite):native.save(id,target,overwrite);
+    };
     const result=vault?.run?await vault.run(action,first):await action();
     if(result?.phase!=='saved')throw Error(native.status(id));return true;
    }finally{saving=false;}

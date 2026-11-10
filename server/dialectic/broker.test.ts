@@ -78,3 +78,29 @@ it('shares the six-call budget across initial work and source recovery',async()=
  await(await f.call('/exchange/'+id+'/turn',{round:0})).text();await(await f.call('/exchange/'+id+'/turn',{round:1,results:Array.from({length:6},(_,i)=>({id:'old-'+i,result:{status:'complete'}}))})).text();
  const output=await(await f.call('/exchange/'+id+'/turn',{round:2,repair:true,diagnostic:{code:'source-identity'}})).text();expect(output).toContain('tool budget exceeded');expect(output).not.toContain('"type":"result"');expect(fetcher).toHaveBeenCalledTimes(3);
 });
+
+it('runs a title utility independently while a conversational exchange is active',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify({title:'Historical interpretations'})))).mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify(plainContribution('exchange')))));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});
+ const id=(await(await f.call('/exchange',{request:req})).json()).id;
+ const title=await f.call('/utility/title',{text:'How do interpretations change?'});expect(title.status).toBe(200);expect(await title.json()).toEqual({title:'Historical interpretations'});
+ const output=await(await f.call('/exchange/'+id+'/turn',{round:0})).text();expect(output).toContain('picnic');
+ const main=JSON.parse(String(fetcher.mock.calls[1][1]?.body));expect(JSON.stringify(main)).not.toContain('Historical interpretations');expect(main.text.format.name).toBe('mutable_dcp');
+ const utility=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(utility.store).toBe(false);expect(utility.tools).toEqual([]);expect(utility.conversation).toBeUndefined();
+});
+it('bounds utility input and rejects extra instructions and invalid output without changing exchange state',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture('openai',JSON.stringify({title:'bad\ntitle'}))));const f=await fixture(fetcher);
+ await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});
+ expect((await f.call('/utility/title',{text:'x'.repeat(4001)})).status).toBe(400);
+ expect((await f.call('/utility/title',{text:'Hello',instructions:'extra'})).status).toBe(400);expect(fetcher).not.toHaveBeenCalled();
+ const invalid=await f.call('/utility/title',{text:'Hello'});expect(invalid.status).toBe(502);expect(await invalid.text()).not.toContain('bad');expect(fetcher).toHaveBeenCalledTimes(1);
+ expect((await f.call('/exchange',{request:req})).status).toBe(200);
+});
+it('limits concurrent title requests and aborts utility work when credentials are forgotten',async()=>{
+ let started=false,aborted=false;
+ const fetcher=vi.fn<typeof fetch>((_url,init)=>new Promise<Response>((_resolve,reject)=>{started=true;init?.signal?.addEventListener('abort',()=>{aborted=true;reject(Error('secret'));});}));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});
+ const title=f.call('/utility/title',{text:'First'});await vi.waitFor(()=>expect(started).toBe(true));
+ expect((await f.call('/utility/title',{text:'Second'})).status).toBe(429);await f.call('/session',undefined,{},'DELETE');
+ expect((await title).status).toBe(502);expect(aborted).toBe(true);expect(fetcher).toHaveBeenCalledTimes(1);
+});

@@ -1,3 +1,4 @@
+import { activeViewChild } from '../runtime/presentation-eligibility';
 import { tabOrientation } from '../block-tree/tab-orientation';
 import './tab-orientation.css';
 import { TableControl, CellControls } from './table-controls';
@@ -232,9 +233,7 @@ export function TabRowView(props: BlockViewProps) {
   const { editor, projection, passive } = useReactiveView();
   const documents = useDocumentTabHost();
   const node = () => projection.state.nodes[props.nodeKey];
-  const initial = node()?.children.find((key) => Boolean(projection.state.nodes[key]?.payload.metadata && (projection.state.nodes[key].payload.metadata as any).active)) ?? node()?.children[0];
-  const [active, setActive] = createSignal<NodeKey | undefined>(initial);
-  createEffect(() => { const key = editor.viewChildren[props.nodeKey]; if (key && node()?.children.includes(key)) setActive(key); });
+  const active = () => node() && activeViewChild(editor, node()!);
   let previousFlags = "";
   let root!: HTMLDivElement;
   useContainerMount(props.nodeKey, () => root);
@@ -243,10 +242,11 @@ export function TabRowView(props: BlockViewProps) {
     // Reordering labels is not a change to authored active flags.
     const flags = JSON.stringify([...children].sort().map(key => [key, (projection.state.nodes[key]?.payload.metadata as any)?.active]));
     if (flags !== previousFlags) {
-      const revealed = !previousFlags ? untrack(() => editor.viewChildren[props.nodeKey]) : undefined;
+      if (previousFlags) {
+        const current = untrack(active), marked = children.find(key => (projection.state.nodes[key]?.payload.metadata as any)?.active);
+        editor.setViewChild(props.nodeKey, marked ?? (current && children.includes(current) ? current : node()?.viewType === 'sticky-tab-row-block' ? '' : children[0]));
+      }
       previousFlags = flags;
-      const marked = children.find(key => (projection.state.nodes[key]?.payload.metadata as any)?.active);
-      setActive((revealed && children.includes(revealed) ? revealed : undefined) ?? marked ?? (children.includes(untrack(active)!) ? untrack(active) : children[0]));
     }
   });
   return (
@@ -257,7 +257,7 @@ export function TabRowView(props: BlockViewProps) {
             const child = () => projection.state.nodes[key];
             const metadata = () => child()?.payload.metadata as Record<string, unknown> | undefined;
             const title = () => { const id = tabDocumentTarget(metadata()); return (id && documents?.title(id)) || metadata()?.name || metadata()?.text || `Tab ${index() + 1}`; };
-            return <button type="button" role="tab" data-context-target={key} aria-selected={active() === key} onClick={() => { editor.setViewChild(props.nodeKey, key); setActive(key); if (!passive && !tabDocumentTarget(metadata())) { const target = child()?.children[0] ?? key; editor.focus.request(target, { reason: "activate-tab" }); } }}>{String(title())}</button>;
+            return <button type="button" role="tab" data-context-target={key} aria-selected={active() === key} onClick={() => { editor.setViewChild(props.nodeKey, key); if (!passive && !tabDocumentTarget(metadata())) { const target = child()?.children[0] ?? key; editor.focus.request(target, { reason: "activate-tab" }); } }}>{String(title())}</button>;
           }}
         </For>
       </div>
@@ -269,8 +269,7 @@ export function TabRowView(props: BlockViewProps) {
 export function StickyTabRowView(props: BlockViewProps) {
   const { editor, projection, passive } = useReactiveView();
   const node = () => projection.state.nodes[props.nodeKey];
-  const [active, setActive] = createSignal<NodeKey>();
-  createEffect(() => { const key = editor.viewChildren[props.nodeKey]; if (key && node()?.children.includes(key)) setActive(key); });
+  const active = () => node() && activeViewChild(editor, node()!);
   let previousFlags = "";
   let root!: HTMLElement;
   useContainerMount(props.nodeKey, () => root);
@@ -279,10 +278,11 @@ export function StickyTabRowView(props: BlockViewProps) {
     // Reordering labels is not a change to authored active flags.
     const flags = JSON.stringify([...children].sort().map(key => [key, (projection.state.nodes[key]?.payload.metadata as any)?.active]));
     if (flags !== previousFlags) {
-      const revealed = !previousFlags ? untrack(() => editor.viewChildren[props.nodeKey]) : undefined;
+      if (previousFlags) {
+        const current = untrack(active), marked = children.find(key => (projection.state.nodes[key]?.payload.metadata as any)?.active);
+        editor.setViewChild(props.nodeKey, marked ?? (current && children.includes(current) ? current : node()?.viewType === 'sticky-tab-row-block' ? '' : children[0]));
+      }
       previousFlags = flags;
-      const marked = children.find(key => (projection.state.nodes[key]?.payload.metadata as any)?.active);
-      setActive((revealed && children.includes(revealed) ? revealed : undefined) ?? marked ?? (children.includes(untrack(active)!) ? untrack(active) : undefined));
     }
   });
   return (
@@ -303,8 +303,7 @@ export function StickyTabRowView(props: BlockViewProps) {
               }}
               onClick={() => {
                 const next = active() === key ? undefined : key;
-                editor.setViewChild(props.nodeKey, next);
-                setActive(next);
+                editor.setViewChild(props.nodeKey, next ?? "");
                 if (next && !passive) {
                   const target = child()?.children[0] ?? key;
                   queueMicrotask(() => editor.focus.request(target, { reason: "activate-sticky-tab", caret: "start" }));

@@ -67,3 +67,74 @@
 .textual-workspace .dialectic-contribution-activity{font:inherit;line-height:var(--tw-line-height);margin-top:var(--tw-line-height);padding-top:0;color:var(--tw-ink);border-color:currentColor}
 .textual-workspace .dialectic-activity-controls,.textual-workspace .dialectic-contribution-notices{gap:0}.textual-workspace .dialectic-contribution-notices{color:var(--tw-focus);margin:0}
 .textual-workspace .dialectic-activity-full{display:none}.textual-workspace .dialectic-activity-compact{display:inline}.textual-workspace .dialectic-app .dialectic-contribution-activity button{padding:0 1ch;line-height:var(--tw-line-height)}
+
+/* Conversation chrome: native composition and host ownership remain unchanged. */
+.dialectic-chat{background:#fff;color:#242424;--dialectic-accent:#171717;font:14px/1.55 system-ui,sans-serif}
+.dialectic-chat button{border-color:transparent;border-radius:9px;background:transparent}
+.dialectic-chat button:hover{background:#ececec}.dialectic-chat button:focus-visible{outline-color:#777}
+.dialectic-chat .dialectic-bar{background:#fafafa;border-color:#eee;padding:12px 20px;min-height:56px;box-sizing:border-box}
+.dialectic-chat .dialectic-bar strong{font:600 19px system-ui,sans-serif;letter-spacing:-.4px}
+.dialectic-chat .dialectic-subtitle{display:none}
+.dialectic-options{position:relative}.dialectic-options>summary{list-style:none;cursor:pointer;font-size:24px;line-height:1;padding:5px 12px;border-radius:8px}.dialectic-options>summary::-webkit-details-marker{display:none}.dialectic-options>summary:hover{background:#ececec}
+.dialectic-options>div{position:absolute;right:0;top:100%;z-index:30;min-width:160px;display:flex;flex-direction:column;padding:6px;background:white;color:#242424;border:1px solid #ddd;border-radius:12px;box-shadow:0 5px 22px #0002}.dialectic-options button{text-align:left}
+.dialectic-chat .dialectic-body{grid-template-columns:58px minmax(0,1fr)}
+.dialectic-chat .dialectic-body[data-sidebar-open=true]{grid-template-columns:228px minmax(0,1fr)}
+.dialectic-chat .dialectic-body[data-inspector-open=true]{grid-template-columns:58px minmax(0,1fr) 272px}
+.dialectic-chat .dialectic-body[data-sidebar-open=true][data-inspector-open=true]{grid-template-columns:228px minmax(0,1fr) 272px}
+.dialectic-chat .dialectic-sidebar{display:flex;flex-direction:column;overflow:hidden;padding:8px;background:#f7f7f7;border-color:#eaeaea;min-height:0}
+.dialectic-rail-actions{display:flex;flex-direction:column;gap:6px;padding-bottom:12px;border-bottom:1px solid #e5e5e5;flex-shrink:0}
+.dialectic-rail-actions button{display:flex;align-items:center;justify-content:center;min-height:38px;padding:8px}
+.dialectic-chat svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.dialectic-chat [data-sidebar-open=true] .dialectic-rail-actions{flex-direction:row;justify-content:space-between}
+.dialectic-contribution-list{min-height:0;overflow:auto;flex:1;overscroll-behavior:contain}
+.dialectic-chat .dialectic-entry{margin:5px 0;padding:9px 6px;align-items:center;justify-content:center;gap:9px;min-height:38px}
+.dialectic-chat [data-sidebar-open=true] .dialectic-entry{justify-content:flex-start;padding-inline:10px}
+.dialectic-chat .dialectic-number{font:500 12px/1.4 system-ui,sans-serif;color:#666;font-variant-numeric:tabular-nums}
+.dialectic-chat .dialectic-entry[aria-current=true]{background:#e9e9e9;border-color:transparent}
+.dialectic-chat .dialectic-eyebrow{color:#777;letter-spacing:0;font-size:12px;font-weight:500;margin-top:16px}
+.dialectic-chat .dialectic-sidebar-details{max-height:40%;overflow:auto;flex-shrink:0;border-top:1px solid #e5e5e5}
+.dialectic-chat .dialectic-history{margin:12px 0 8px}
+.dialectic-chat .dialectic-main{background:#fff}
+.dialectic-chat .dialectic-reading-header{border:0;padding:14px 24px;font-size:15px;font-weight:500}
+.dialectic-chat .dialectic-muted,.dialectic-chat .dialectic-footnote{color:#777}
+.dialectic-chat .dialectic-inspector{background:#fafafa;border-color:#eaeaea}.dialectic-inspector[hidden]{display:none}
+.dialectic-chat .dialectic-inspector h3{font:600 17px system-ui,sans-serif}
+.dialectic-chat .dialectic-canvas .reactive-document-occurrence__content{width:100%;max-width:900px;box-sizing:border-box;margin-inline:auto;padding:24px 42px 0}
+.dialectic-chat .dialectic-canvas [data-dialectic-contribution]{background:transparent;border:0;border-radius:18px;padding:16px 40px 16px 0;margin:0 0 28px}
+.dialectic-chat .dialectic-canvas [data-dialectic-contribution]::before{color:#777;font-size:11px;letter-spacing:.3px}
+.dialectic-chat .dialectic-canvas [data-dialectic-author=human][data-dialectic-draft=false]{background:#f4f4f4;padding:18px 44px 18px 22px;margin-left:12%}
+.dialectic-chat .dialectic-canvas .reactive-standoff-flow{line-height:1.75}
+.dialectic-chat .dialectic-canvas [data-dialectic-draft=true]{border:1px solid #e7e7e7;background:#fff;border-radius:24px;box-shadow:0 2px 12px #00000008;padding:16px 38px 16px 20px;margin-top:auto;margin-bottom:0;min-height:56px;box-sizing:border-box}
+.dialectic-chat .dialectic-compose-bar{width:100%;max-width:900px;box-sizing:border-box;margin-inline:auto;padding:8px 42px 18px;background:white;border:0}
+.dialectic-chat .dialectic-compose-bar small{color:#888;font-size:12px}
+.dialectic-chat .dialectic-send{border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:8px;flex-shrink:0;background:#171717;color:#fff}
+.dialectic-chat .dialectic-send:hover{background:#333}
+.dialectic-chat .dialectic-status{background:#fff;border-color:#f0f0f0;color:#888;padding:5px 18px;font-size:10px}
+.dialectic-chat .dialectic-contribution-activity{color:#666;border-color:#eee}
+.dialectic-chat .dialectic-contribution-activity button:hover{background:#f3f3f3;border-color:#ddd}
+.dialectic-composer-feedback:empty{display:none}
+.dialectic-paste-progress{display:flex;align-items:center;gap:8px;font:12px/1.5 system-ui,sans-serif;color:#777;padding-bottom:8px}
+.dialectic-spinner{width:12px;height:12px;border:2px solid #ddd;border-top-color:#555;border-radius:50%;animation:dialectic-spin .8s linear infinite}
+.dialectic-response-progress{font:600 25px/1 system-ui,sans-serif;color:#777;margin-bottom:10px;letter-spacing:4px}
+.dialectic-response-progress i{font-style:normal;animation:dialectic-dot 1.2s ease-in-out infinite}.dialectic-response-progress i:nth-child(2){animation-delay:.16s}.dialectic-response-progress i:nth-child(3){animation-delay:.32s}
+.dialectic-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+@keyframes dialectic-spin{to{transform:rotate(360deg)}}@keyframes dialectic-dot{0%,80%,100%{opacity:.3}40%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.dialectic-spinner,.dialectic-response-progress i{animation:none}}
+@media(max-width:800px){.dialectic-chat .dialectic-body[data-sidebar-open=true]{grid-template-columns:180px minmax(0,1fr)}.dialectic-chat .dialectic-body[data-inspector-open=true]{grid-template-columns:50px minmax(0,1fr) 220px}.dialectic-chat .dialectic-body[data-sidebar-open=true][data-inspector-open=true]{grid-template-columns:150px minmax(0,1fr) 220px}.dialectic-chat .dialectic-canvas .reactive-document-occurrence__content{padding:16px 20px 0}.dialectic-chat .dialectic-compose-bar{padding-inline:20px}.dialectic-chat .dialectic-reading-header .dialectic-muted{display:none}}
+.textual-workspace .dialectic-chat .dialectic-body{grid-template-columns:6ch minmax(0,1fr)}.textual-workspace .dialectic-chat .dialectic-body[data-sidebar-open=true]{grid-template-columns:22ch minmax(0,1fr)}.textual-workspace .dialectic-chat .dialectic-body[data-inspector-open=true]{grid-template-columns:6ch minmax(0,1fr) 28ch}.textual-workspace .dialectic-chat .dialectic-body[data-sidebar-open=true][data-inspector-open=true]{grid-template-columns:22ch minmax(0,1fr) 28ch}
+.textual-workspace .dialectic-chat .dialectic-sidebar,.textual-workspace .dialectic-chat .dialectic-main,.textual-workspace .dialectic-chat .dialectic-inspector{background:var(--tw-bg);color:var(--tw-ink)}
+.dialectic-chat[data-formatting=false] .document-style-bar{display:none}
+.dialectic-chat .dialectic-canvas>.reactive-tabs>.reactive-tabs__labels{background:#fff;border-color:#eee;font-size:12px}
+.dialectic-chat .dialectic-canvas>.reactive-tabs>.reactive-tabs__labels button{background:#fff;color:#777;border-color:#eee}
+.dialectic-chat .dialectic-canvas>.reactive-tabs>.reactive-tabs__labels [aria-selected=true]{background:#f3f3f3;color:#333;border-color:#ddd}
+/* The native draft stays mounted. Its feedback sits above the input border. */
+.dialectic-chat .dialectic-canvas [data-dialectic-draft=true]{background:transparent;border:0;box-shadow:none;isolation:isolate;--dialectic-feedback-space:0px}
+.dialectic-chat .dialectic-canvas [data-dialectic-draft=true]::after{content:"";position:absolute;inset:var(--dialectic-feedback-space) 0 0;z-index:-1;border:1px solid #e7e7e7;border-radius:24px;background:white;pointer-events:none}
+.dialectic-chat .dialectic-canvas [data-dialectic-draft=true]:has(.dialectic-response-progress){--dialectic-feedback-space:51px}
+.dialectic-chat .dialectic-canvas [data-dialectic-draft=true]:has(.dialectic-paste-progress){--dialectic-feedback-space:44px}
+.dialectic-chat .dialectic-canvas [data-dialectic-draft=true]:has(.dialectic-response-progress):has(.dialectic-paste-progress){--dialectic-feedback-space:95px}
+.dialectic-chat .dialectic-response-progress{margin-bottom:26px}
+.dialectic-chat .dialectic-paste-progress{padding:0;margin-bottom:26px;line-height:18px}
+.dialectic-chat [data-dialectic-draft=true] .reactive-standoff-flow:focus{outline:none}
+.dialectic-chat [data-dialectic-draft=true]:focus-within::after{border-color:#c8c8c8}
+.dialectic-chat [data-dialectic-draft=true] .dialectic-contribution-menu{inset-block-start:calc(var(--dialectic-feedback-space) + 10px)}

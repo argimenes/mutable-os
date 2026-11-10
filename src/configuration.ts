@@ -15,6 +15,12 @@
  * disabled unless a host or dedicated demo explicitly enables it.
  */
 export type FeatureFlags = Readonly<{
+  /** Dialectic submission saves, conversational chrome and progress feedback. */
+  dialecticConversationUpdates: boolean;
+  /** Isolated title utility; never a conversational contribution. */
+  dialecticAutomaticTitles: boolean;
+  /** Bounded native text flows. Opt-in pending browser qualification. */
+  virtualTextFlows: boolean;
   /** Lezer-derived, session-only syntax on standoff CodeBlocks. */
   standoffCodeHighlighting: boolean;
   markdownInputTransformation: boolean;
@@ -202,6 +208,9 @@ export type FeatureFlags = Readonly<{
 }>;
 
 export const featureFlags: FeatureFlags = Object.freeze({
+  dialecticConversationUpdates: true,
+  dialecticAutomaticTitles: true,
+  virtualTextFlows: true,
   standoffCodeHighlighting: true,
   markdownInputTransformation: true,
   verticalTabs: true,

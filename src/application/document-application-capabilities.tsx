@@ -491,6 +491,10 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
         async save(location?: VaultLocation) {
           guard();await documentSaver!.save(requireId(),location);
         },
+        async saveSubmitted(id:string,defaultFilename:string) {
+          guard();if(!resolve(id))throw Error('Submitted Document is no longer available');
+          return documentSaver!.save(id,undefined,false,{defaultFilename});
+        },
         async recover(location: {folder: string; filename: string}) { guard(); if(native.compatibleSource(activeId()??''))await native.recover(activeId(),location);else if (selectedVault()) await vault!.recoverNative(location); else await native.recover(activeId(), location); },
         compare() { guard(); return native.compare(requireId()); },
         async keepMutable() { guard(); await native.keepMutable(requireId()); },

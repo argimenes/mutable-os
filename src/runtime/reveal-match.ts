@@ -12,6 +12,8 @@ export async function revealMatch(editor: ReactiveEditor, match: SearchMatch, cu
   }
   await new Promise(resolve => setTimeout(resolve, 0));
   if (!current()) return false;
+  await editor.focus.ensureRendered(match.ranges[0].nodeKey, current);
+  if (!current()) return false;
   const range = match.ranges[0], mount = editor.mounts.get(range.nodeKey);
   if (!mount) return false;
   const point = range.coordinate === "cell" ? mount.inlineBoundary?.(range.start) : undefined;
@@ -28,6 +30,8 @@ export async function revealPositionMarker(editor: ReactiveEditor, marker: Docum
     if (node && ["tab-row-block", "document-tab-row-block", "sticky-tab-row-block", "surface-block"].includes(node.viewType)) editor.setViewChild(node.key, path[index + 1]);
   }
   await new Promise(resolve => setTimeout(resolve, 0));
+  if (!current()) return false;
+  await editor.focus.ensureRendered(markerNodeKey(marker), current);
   if (!current()) return false;
   const mount = editor.mounts.get(markerNodeKey(marker));
   if (!mount) return false;

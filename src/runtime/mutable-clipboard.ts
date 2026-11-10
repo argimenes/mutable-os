@@ -19,6 +19,7 @@ import type { Destination } from '../block-tree/types';
 import { resourceOwner, resourceSource } from '../block-tree/resource-identity';
 import { serializeSelection, plainFragment, type Slice } from '../interchange/serializer';
 import {assertCopyableDialectic} from '../features/dialectic/anchors';
+import {contribution, isConversation} from '../features/dialectic/model';
 import { materializeFragment } from '../interchange/materialize';
 import { inlineMergePredicate } from '../interchange/insertion';
 import { fragmentGroup, validateFragment, type InterchangeScope, type MutableFragment } from '../interchange/fragment';
@@ -45,6 +46,8 @@ export class MutableClipboard {
   private context = () => this.editor.readAssetContext();
   private alive = true;
   private pending = false;
+  private readonly pasteSignal = createSignal<{nodeKey:string;viewId:string}>();
+  readonly pasting = this.pasteSignal[0];
   private cancelPreparation?: () => void;
   private markdownIntent?: { until: number; target: Element; bookmark: Bookmark };
   private markdownReadEpoch = 0;
@@ -231,7 +234,7 @@ export class MutableClipboard {
         if (!this.valid(bookmark, undefined, cross)) throw Error('Destination changed; paste cancelled.');
         const notice = prepared.fragment ? this.insert(bookmark, prepared.fragment, false, prepared.natives) : undefined;
         this.notify(prepared.notice ?? notice ?? 'Pasted Markdown.');
-      });
+      }, bookmark);
     } catch (error) { this.error(error); }
   }
   handleText(event: ClipboardEvent, cross = false): boolean {
@@ -269,7 +272,7 @@ export class MutableClipboard {
           const imported = await this.prepareImport({ data, plain: false, scope: bookmark.scope, assets: [], blocks: [], selections: 1 }, files, bookmark);
           if (!this.valid(bookmark)) throw Error('Destination changed; paste cancelled.');
           const notice = imported.fragment ? this.insert(bookmark, imported.fragment, false, imported.natives) : undefined; this.notify(imported.notice ?? notice ?? 'Pasted Blocks.');
-        });
+        }, bookmark);
         else {
           if (!canWriteAsync()) throw Error('Use Command/Control-C or X with a selected Block in this browser.');
           this.write(bookmark, id === 'selection.cut');
@@ -279,13 +282,27 @@ export class MutableClipboard {
     return true;
   }
   private stop(event: Event) { if (event.cancelable) event.preventDefault(); event.stopImmediatePropagation(); }
+  /** Resolve the draft through occurrence ancestry only, once per paste. */
+  private plainTextDefault(b: Bookmark): boolean {
+    if(b.kind!=='text')return false;
+    const node=b.nodeKey?this.editor.node(b.nodeKey):this.editor.nodeForPlacementInView(b.slices[0]?.placementKey,b.viewId);
+    const projection=node&&this.editor.projections.get(node.viewId);
+    let draft=false;
+    for(let current=node;current;current=projection?.parentOf(current.key)){
+      const metadata=current.payload.metadata as any;
+      const authored=contribution(metadata?.dialectic);
+      if(authored)draft=authored.state==='draft'&&authored.author==='human';
+      if(current.viewType==='document-block')return draft&&isConversation(metadata?.dialectic);
+    }
+    return false;
+  }
   private consume(event: ClipboardEvent, b: Bookmark, cross = false) {
     this.stop(event);
     if (this.pending) throw Error('A clipboard operation is already in progress.');
     if (event.type === 'paste') {
-      const plain = !!b.nodeKey && markdownLiteralContext(this.editor, b.nodeKey, false);
       const intent = this.markdownIntent;
       const asMarkdown = !!intent && intent.until >= Date.now() && (intent.target === (this.editor.mounts.resolveEvent(event)?.handle.focusElement ?? event.target)) && this.valid(intent.bookmark, event, cross);
+      const plain = (!!b.nodeKey && markdownLiteralContext(this.editor, b.nodeKey, false)) || (!asMarkdown && this.plainTextDefault(b));
       this.clearIntent();
       const data = captureClipboard(event.clipboardData);
       const files = this.editor.features.managedAssetClipboard && !plain && !asMarkdown ? captureFiles(event.clipboardData) : [];
@@ -296,7 +313,7 @@ export class MutableClipboard {
           if (!this.valid(b, event, cross)) throw Error('Destination changed; paste cancelled.');
           const notice = prepared.fragment ? this.insert(b, prepared.fragment, false, prepared.natives) : undefined;
           this.notify(prepared.notice ?? notice ?? 'Pasted Mutable content.');
-        });
+        }, b);
         return;
       }
       const imported = importClipboard(data, plain, this.editor.features.externalHtmlClipboard, this.editor.features.markdownClipboard, asMarkdown);
@@ -335,7 +352,7 @@ export class MutableClipboard {
       const signal=this.importController!.signal;const check=()=>{signal.throwIfAborted();if(!this.valid(bookmark,event,cross))throw Error('Destination changed; PDF insertion cancelled. The original may have been retained.');};check();
       const api=new HttpApplicationServices(()=>{const c=this.context();if(!c?.cavernId||!c.session)throw Error('Open a Vault before importing a PDF');return {cavernId:c.cavernId,session:c.session};});
       const result=await api.call('pdf.import',{id:crypto.randomUUID(),source},signal);check();const prepared=pdfBlock(result.snapshot,source);this.insert(bookmark,prepared.fragment,false,[this.editor.features.reversibleBlocks ? resourceSurface(prepared.native) : prepared.native]);this.notify('Pasted retained PDF. Open its local viewer; save to retain this occurrence.');
-    });
+    }, bookmark);
   }
   private pasteIIIF(bookmark:Bookmark,source:string,event:Event,cross:boolean){
     if(bookmark.disjoint)throw Error('Paste an IIIF resource into one selection.');
@@ -343,7 +360,7 @@ export class MutableClipboard {
       const signal=this.importController!.signal;const check=()=>{signal.throwIfAborted();if(!this.valid(bookmark,event,cross))throw Error('Destination changed; IIIF insertion cancelled. Captured sources may have been retained.');};
       check();const api=new HttpApplicationServices(()=>{const c=this.context();if(!c?.cavernId||!c.session)throw Error('Open a Vault before importing IIIF');return {cavernId:c.cavernId,session:c.session};});
       const result=await api.call('iiif.import',{id:crypto.randomUUID(),source},signal);check();const prepared=iiifBlock(result.snapshot,source);this.insert(bookmark,prepared.fragment,false,[this.editor.features.reversibleBlocks ? resourceSurface(prepared.native) : prepared.native]);this.notify('Pasted IIIF source. Activate its viewer to load remote tiles. Save to retain this occurrence.');
-    });
+    }, bookmark);
   }
   private pasteWikipedia(bookmark:Bookmark,source:string,event:Event,cross:boolean){
     if(bookmark.disjoint)throw Error('Paste an article into one selection.');
@@ -351,7 +368,7 @@ export class MutableClipboard {
       const signal=this.importController!.signal;const check=()=>{signal.throwIfAborted();if(!this.valid(bookmark,event,cross))throw Error('Destination changed; article insertion cancelled. Captured knowledge may have been retained.');};
       check();const api=new HttpApplicationServices(()=>{const c=this.context();if(!c?.cavernId||!c.session)throw Error('Open a Vault before importing an article');return {cavernId:c.cavernId,session:c.session};});
       const result=await api.call('encyclopedia.import',{id:crypto.randomUUID(),source},signal);check();const prepared=webArticleBlock(result,source);check();this.insert(bookmark,prepared.fragment,false,[this.editor.features.reversibleBlocks ? resourceSurface(prepared.native) : prepared.native]);this.notify('Pasted captured article. Save the document to retain this occurrence.');
-    });
+    }, bookmark);
   }
   private pasteAcademic(bookmark:Bookmark,source:string,event:Event,cross:boolean){
     if(bookmark.disjoint)throw Error('Paste a citation into one selection.');
@@ -363,7 +380,7 @@ export class MutableClipboard {
       const result=await api.call('academic.import',{id,source},signal);check();
       const prepared=citationBlock(result.citation,source);check();this.insert(bookmark,prepared.fragment,false,[this.editor.features.reversibleBlocks ? resourceSurface(prepared.native) : prepared.native]);
       this.notify('Pasted citation. Save the document to retain this occurrence.');
-    });
+    }, bookmark);
   }
   private pasteResource(bookmark: Bookmark, resource: ResourceUrl, sourceUrl: string, event: Event, cross: boolean) {
     if (bookmark.disjoint) throw Error('Paste a resource Block into a single text selection.');
@@ -382,7 +399,7 @@ export class MutableClipboard {
       const prepared = resourceBlock(sourceUrl, image); check();
       this.insert(bookmark, prepared.fragment, false, [this.editor.features.reversibleBlocks ? resourceSurface(prepared.native) : prepared.native]);
       this.notify(`Pasted ${resource.video ? `${resource.video.provider === 'youtube' ? 'YouTube' : 'Vimeo'} player` : resource.kind === 'image' ? 'image' : 'web page'} Block.`);
-    });
+    }, bookmark);
   }
   private write(b: Bookmark, cut: boolean, event?: ClipboardEvent, cross = false) {
     const fragment = serializeSelection(this.editor.repository.readState(), b.slices, b.scope);
@@ -405,12 +422,13 @@ export class MutableClipboard {
       this.notify(cut ? 'Cut content. Undo or Recover cut copy restores access if the clipboard fails.' : 'Copied Mutable content.');
     }
   }
-  private asyncTask(task: () => Promise<void>) {
+  private asyncTask(task: () => Promise<void>, destination?: Bookmark) {
     this.pending = true;
+    if(destination?.nodeKey)this.pasteSignal[1]({nodeKey:destination.nodeKey,viewId:destination.viewId});
     this.importController = new AbortController(); this.assetInserted = false;
     void task().catch(e => { if (this.alive) this.error(e); }).finally(async () => {
       const lease = this.assetLease, inserted = this.assetInserted; this.assetLease = undefined;
-      this.pending = false; this.importController = undefined;
+      this.pending = false; this.importController = undefined; this.pasteSignal[1](undefined);
       if (lease) { try { await this.assets.action(lease, inserted ? 'finish' : 'abort'); } catch { /* Durable ledger retains publication and recovers staging on next Cavern open. */ } }
     });
   }
@@ -546,5 +564,5 @@ export class MutableClipboard {
     this.asyncTask(async () => { await writeAsyncClipboard(exportClipboard(fragment)); this.notify('Recovered the cut content to the clipboard.'); });
   }
   private error(error: unknown) { this.notify(error instanceof Error ? error.message : String(error)); }
-  dispose() { this.alive = false; this.projectionIntent=undefined; this.cancel(); this.clearIntent(); this.recoverySignal[1](undefined); this.dismiss(); }
+  dispose() { this.pasteSignal[1](undefined); this.alive = false; this.projectionIntent=undefined; this.cancel(); this.clearIntent(); this.recoverySignal[1](undefined); this.dismiss(); }
 }

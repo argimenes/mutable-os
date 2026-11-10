@@ -206,3 +206,17 @@ it.each(['openai','anthropic'] as Provider[])('%s negotiates Stage 3C retained P
  const independent=schemaFor(provider,true,false,false,false,false,false,false,true);expect(independent.$defs.RetainedPdf).toBeDefined();expect(independent.$defs.ExternalImage).toBeUndefined();
  const visited=new Set<string>();const walk=(v:any,path=new Set<string>())=>{if(!v||typeof v!=='object')return;if(v.$ref){const name=v.$ref.slice('#/$defs/'.length);expect(schema.$defs[name],name).toBeDefined();if(provider==='anthropic')expect(path.has(name),'recursive '+name).toBe(false);if(!visited.has(name)){visited.add(name);walk(schema.$defs[name],new Set([...path,name]));}return;}if(v.type==='object'){expect(v.additionalProperties).toBe(false);expect(v.required.slice().sort()).toEqual(Object.keys(v.properties).sort());}Object.entries(v).filter(([k])=>k!=='$defs').forEach(([,x])=>walk(x,path));};walk(schema);
 });
+
+it.each(['openai','anthropic'] as Provider[])('%s title utility has no tools, history link, or DCP schema',async provider=>{
+ const {titleConversation}=await import('./providers');
+ const state=titleConversation({...defaultProviderSettings,provider},'First contribution');
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,JSON.stringify({title:'Historical interpretations'}))));
+ const result=await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ expect(JSON.parse(result.text)).toEqual({title:'Historical interpretations'});
+ const wire=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(wire.tools).toEqual([]);expect(wire.conversation).toBeUndefined();expect(wire.previous_response_id).toBeUndefined();
+ expect(wire.max_output_tokens??wire.max_tokens).toBe(512);expect(JSON.stringify(wire)).not.toContain('mutable_dcp');expect(JSON.stringify(wire)).not.toContain('read_source');
+ if(provider==='openai')expect(wire.store).toBe(false);
+ expect((wire.input??wire.messages).filter((x:any)=>x.role==='user')).toHaveLength(1);
+ const bad=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,'',{id:'call',name:'read_source',arguments:{handle:'forged'}})));
+ await expect(providerTurn(titleConversation({...defaultProviderSettings,provider},'First'),'fixture',new AbortController().signal,()=>{},bad)).rejects.toThrow('Unadvertised');
+});

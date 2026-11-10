@@ -4,11 +4,12 @@ import express from 'express';
 import {OpenAIConversations,type CavernScope} from './conversations.js';
 import type {ContinuityManifest,ContinuityReceipt} from '../../src/features/dialectic/dcp/continuity-contract.js';
 import {randomBytes} from 'node:crypto';
-import {conversation,continuation,providerTurn,repair,type ProviderConversation} from './providers.js';
+import {conversation,continuation,providerTurn,repair,titleConversation,type ProviderConversation} from './providers.js';
+import {parseConversationTitle,titleLimits} from '../../src/features/dialectic/title-contract.js';
 import {liveLimits,providerSettings,type Provider,type ProviderCall,type ProviderSettings} from '../../src/features/dialectic/dcp/provider-contract.js';
 
 const loopback=(host:string)=>['localhost','127.0.0.1','[::1]','::1','::ffff:127.0.0.1'].includes(host);
-interface Session {diagnosticId:string;origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
+interface Session {utility?:AbortController;diagnosticId:string;origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
 interface Exchange {state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;recoverSources?:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
 /** Local-only credential broker. No credential persistence, SQL, CORS or remote deployment mode. Optional diagnostics redact credentials. */
 export function createDialecticBroker(options:{fetcher?:typeof fetch;environment?:Record<string,string|undefined>;currentCavern?:()=>CavernScope|undefined;continuity?:boolean;testLogging?:boolean;logRoot?:string}={}){
@@ -16,7 +17,7 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
  const testLog=new DcpTestLog(()=>options.logRoot??options.currentCavern?.()?.path??process.cwd(),options.testLogging===true),fetcher=testLog.fetch(options.fetcher??fetch);
  const continuity=options.currentCavern&&options.continuity!==false?new OpenAIConversations(options.currentCavern,fetcher):undefined;
  const release=(s:Session,id:string)=>{const e=s.exchanges.get(id);if(e){void testLog.write('exchange.closed',{exchangeId:e.state.exchangeId,final:e.final,repaired:e.repaired,acknowledged:e.acknowledged??false}).catch(()=>undefined);e.abort.abort();clearTimeout(e.timer);s.exchanges.delete(id);if(e.manifest&&e.receipt&&!e.acknowledged)void continuity?.abandon(e.manifest,e.key,e.receipt.exchangeId).catch(()=>undefined);}};
- const forget=(token:string,s:Session)=>{for(const id of s.exchanges.keys())release(s,id);s.keys={};sessions.delete(token);};
+ const forget=(token:string,s:Session)=>{s.utility?.abort();for(const id of s.exchanges.keys())release(s,id);s.keys={};sessions.delete(token);};
  const sweep=setInterval(()=>{const now=Date.now();for(const [token,s]of sessions)if(s.expires<now||s.created+8*3600000<now)forget(token,s);},60000);sweep.unref();
  router.use((req,res,next)=>{
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
@@ -46,12 +47,28 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    if(s.exchanges.size)throw Error('Cancel or finish the current exchange before changing settings.');
    const settings=providerSettings(req.body?.settings),key=req.body?.key;
    if(key!==undefined&&(typeof key!=='string'||key.length<8||key.length>4096||/[\s\x00-\x1f]/.test(key)))throw Error('Enter a valid API key.');
-   if(key)s.keys[settings.provider]=key;s.settings=settings;
+   s.utility?.abort();if(key)s.keys[settings.provider]=key;s.settings=settings;
    res.json({settings,ready:!!(s.keys[settings.provider]||environment[settings.provider==='openai'?'OPENAI_API_KEY':'ANTHROPIC_API_KEY'])});
   }catch(e){res.status(400).json({error:String((e as Error).message)});}
  });
  router.delete('/session',(req,res)=>{forget(String(req.headers['x-dialectic-session']),res.locals.session);res.json({ok:true});});
  const sessionKey=(s:Session)=>s.settings&&(s.keys[s.settings.provider]||environment[s.settings.provider==='openai'?'OPENAI_API_KEY':'ANTHROPIC_API_KEY']);
+ // Independent, tool-free host task. Never joins or acknowledges a DCP exchange.
+ router.post('/utility/title',async(req,res)=>{
+  const s:Session=res.locals.session,key=sessionKey(s),text=req.body?.text;
+  if(!s.settings||!key){res.status(400).json({error:'Configure a provider before generating a title.'});return;}
+  if(!req.body||Object.keys(req.body).length!==1||typeof text!=='string'||!text.trim()||text.length>titleLimits.input){res.status(400).json({error:'Invalid title source.'});return;}
+  if(s.utility){res.status(429).json({error:'A title request is already active.'});return;}
+  const abort=new AbortController();s.utility=abort;
+  const timer=setTimeout(()=>abort.abort(),titleLimits.deadlineMs);timer.unref();
+  const closed=()=>{if(!res.writableEnded)abort.abort();};res.on('close',closed);
+  try{
+   const turn=await providerTurn(titleConversation(s.settings,text),key,abort.signal,()=>{},fetcher);
+   abort.signal.throwIfAborted();
+   res.json({title:parseConversationTitle(JSON.parse(turn.text))});
+  }catch{if(!res.destroyed)res.status(502).json({error:'Automatic title generation failed. The conversation is unchanged.'});}
+  finally{clearTimeout(timer);res.off('close',closed);if(s.utility===abort)s.utility=undefined;}
+ });
  router.post('/continuity/prepare',async(req,res)=>{try{const s:Session=res.locals.session,key=sessionKey(s);if(!continuity||s.settings?.provider!=='openai'){res.json({supported:false});return;}if(!key)throw Error('Configure a provider first');res.json({supported:true,plan:await continuity.plan(req.body.manifest,key)});}catch(e){res.status(409).json({error:(e as Error).message});}});
  router.post('/exchange',async(req,res)=>{
   const s:Session=res.locals.session;

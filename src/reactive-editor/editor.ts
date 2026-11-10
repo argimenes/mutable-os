@@ -1,3 +1,4 @@
+import { presentationEligible } from '../runtime/presentation-eligibility';
 import { passiveFocus } from '../runtime/passive-presentation';
 import {NativeTextProtection} from '../block-tree/text-protection';
 import { MarkdownInput } from '../runtime/markdown-input';
@@ -432,77 +433,55 @@ export class ReactiveEditor {
   }
 
   adjacentSibling(nodeKey: NodeKey, direction: -1 | 1) {
-    for (const projection of this.projections.values()) {
-      if (!projection.state.nodes[nodeKey]) continue;
-      for (const parent of Object.values(projection.state.nodes)) {
-        const index = parent.children.indexOf(nodeKey);
-        if (index >= 0) return projection.state.nodes[parent.children[index + direction]];
-      }
-    }
-    return undefined;
+    const node = this.node(nodeKey), projection = node && this.projections.get(node.viewId);
+    const parent = projection?.parentOf(nodeKey);
+    const index = parent?.children.indexOf(nodeKey) ?? -1;
+    return index >= 0 ? projection!.state.nodes[parent!.children[index + direction]] : undefined;
   }
 
   adjacentEditable(nodeKey: NodeKey, direction: -1 | 1) {
-    for (const projection of this.projections.values()) {
-      const origin = projection.state.nodes[nodeKey];
-      if (!origin) continue;
-      const parent = new Map<NodeKey, NodeKey>();
-      for (const candidate of Object.values(projection.state.nodes)) {
-        candidate.children.forEach((child) => parent.set(child, candidate.key));
-        Object.values(candidate.ownedRelations).forEach((child) => parent.set(child, candidate.key));
-      }
-      let scope = origin;
-      let cursor: NodeKey | undefined = origin.key;
-      while (cursor) {
-        const candidate = projection.state.nodes[cursor];
-        if (candidate && ["document-block", "left-margin-block", "right-margin-block"].includes(candidate.viewType)) {
-          scope = candidate;
-          break;
-        }
-        cursor = parent.get(cursor);
-      }
-      const ordered: typeof origin[] = [];
-      const visit = (key: NodeKey) => {
-        const candidate = projection.state.nodes[key];
-        if (!candidate) return;
-        const registration = this.registry.resolve(candidate.viewType);
-        const mount = this.mounts.get(candidate.key);
-        const hidden = mount?.root.closest('[hidden], [aria-hidden="true"]');
-        if (
-          mount &&
-          !hidden &&
-          (registration?.capabilities.includes("inline-editor") ||
-            registration?.capabilities.includes("native-text"))
-        ) {
-          ordered.push(candidate);
-        }
-        candidate.children.forEach(visit);
-      };
-      visit(scope.key);
-      const index = ordered.findIndex((candidate) => candidate.key === nodeKey);
-      if (index >= 0) return ordered[index + direction];
+    const origin = this.node(nodeKey);
+    if (!origin) return;
+    const projection = this.projections.get(origin.viewId)!;
+    let scope = origin;
+    for (let current: typeof origin | undefined = origin; current; current = projection.parentOf(current.key)) {
+      if (["document-block", "left-margin-block", "right-margin-block"].includes(current.viewType)) { scope = current; break; }
     }
-    return undefined;
+    // Traverse only the adjacent structural branches, never inline Cell records.
+    const edge = (key: NodeKey): typeof origin | undefined => {
+      const node = projection.state.nodes[key];
+      if (!node || !presentationEligible(this, key)) return;
+      const capabilities = this.registry.resolve(node.viewType)?.capabilities;
+      const editable = capabilities?.includes('inline-editor') || capabilities?.includes('native-text');
+      if (direction === 1 && editable) return node;
+      const children = direction === 1 ? node.children : [...node.children].reverse();
+      for (const child of children) { const found = edge(child); if (found) return found; }
+      if (editable) return node;
+    };
+    if (direction === 1) for (const child of origin.children) { const found = edge(child); if (found) return found; }
+    for (let current = origin; current.key !== scope.key;) {
+      const parent = projection.parentOf(current.key); if (!parent) return;
+      const index = parent.children.indexOf(current.key);
+      // Named relations are independent navigation regions, not ordinary children.
+      if (index < 0) return;
+      for (let i = index + direction; i >= 0 && i < parent.children.length; i += direction) {
+        const found = edge(parent.children[i]); if (found) return found;
+      }
+      if (direction === -1 && parent.key !== scope.key) {
+        const caps = this.registry.resolve(parent.viewType)?.capabilities;
+        if (presentationEligible(this, parent.key) && (caps?.includes('inline-editor') || caps?.includes('native-text'))) return parent;
+      }
+      current = parent;
+    }
   }
 
   focusFallback(nodeKey: NodeKey): NodeKey | undefined {
-    for (const projection of this.projections.values()) {
-      const node = projection.state.nodes[nodeKey];
-      if (!node) continue;
-      for (const parent of Object.values(projection.state.nodes)) {
-        const index = parent.children.indexOf(nodeKey);
-        if (index >= 0) {
-          if (!this.concertina.state.owner) return parent.children[index + 1] ?? parent.children[index - 1] ?? parent.key;
-          const visible = (key: NodeKey) => {
-            const root = this.mounts.get(key)?.root;
-            return root && !root.closest('[hidden], [aria-hidden="true"]');
-          };
-          return [parent.children[index + 1], parent.children[index - 1], parent.key].find(key => key && visible(key));
-        }
-        if (Object.values(parent.ownedRelations).includes(nodeKey)) return parent.key;
-      }
-    }
-    return undefined;
+    const node = this.node(nodeKey), projection = node && this.projections.get(node.viewId);
+    const parent = projection?.parentOf(nodeKey);
+    if (!parent) return;
+    const index = parent.children.indexOf(nodeKey);
+    const candidates = index >= 0 ? [parent.children[index + 1], parent.children[index - 1], parent.key] : [parent.key];
+    return candidates.find(key => key && presentationEligible(this, key));
   }
 
   encodeDocument(): ExistingBlockDto {

@@ -1,6 +1,7 @@
 import { passiveLimitation } from '../runtime/passive-presentation';
 import { Dynamic } from "solid-js/web";
-import { For, Show, onCleanup, onMount, getOwner } from "solid-js";
+import { For, Show, onCleanup, onMount, getOwner, createMemo, mapArray } from "solid-js";
+import { eligibleTextFlow, plainTextItem, VirtualTextFlow } from './virtual-text-flow';
 import type { NodeKey } from "../block-tree/types";
 import { useReactiveView } from "../reactive-editor/context";
 import { UnknownBlockView } from "./unknown-block-view";
@@ -38,9 +39,14 @@ function BlockContents(props: { nodeKey: NodeKey }) {
 }
 
 export function ChildBlocks(props: { parentKey: NodeKey }) {
-  const { projection } = useReactiveView();
+  const context = useReactiveView(), { projection } = context;
   const children = () => projection.state.nodes[props.parentKey]?.children ?? [];
-  return <For each={children()}>{(key) => <BlockOutlet nodeKey={key} />}</For>;
+  const structural = createMemo(() => eligibleTextFlow(props.parentKey, children(), context));
+  const textItems = mapArray(() => structural() ? children() : [], key => createMemo(() => plainTextItem(key, context)));
+  const virtual = createMemo(() => structural() && textItems().every(eligible => eligible()));
+  return <Show when={virtual()} fallback={<For each={children()}>{(key) => <BlockOutlet nodeKey={key} />}</For>}>
+    <VirtualTextFlow parentKey={props.parentKey} keys={children()} />
+  </Show>;
 }
 
 export function RelationBlocks(props: { parentKey: NodeKey }) {

@@ -717,7 +717,6 @@ export function StandoffEditorView(props: BlockViewProps) {
     disposed = true;
     if(!projection.state.nodes[props.nodeKey])editor.decorations.removeOccurrence(props.nodeKey);
     document.removeEventListener("scroll",onCandidateScroll,true);
-    if (editor.crossText.segments[props.nodeKey]) queueMicrotask(() => editor.crossText.validate());
     characterHost?.dispose();
     caretSurface?.dispose();
     editor.measurements.releaseCaret(props.nodeKey);

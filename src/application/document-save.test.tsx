@@ -62,3 +62,30 @@ it('Save As uses the existing copy service, preserves the source and retains the
  expect(JSON.parse(await fs.readFile(path.join(f.root,'vault/Copy.ink'),'utf8')).resourceId).toBe(id);
  expect(document.querySelector('[contenteditable=true]')).toBe(dom);
 },15000);
+
+it('submission saves preserve native names, choose collision-free date names, and recover unknown outcomes',async()=>{
+ const f=await setup(),editor=f.session.editor;f.actions.newDocument();f.mount();
+ const record=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='document-block')!,id=String((record.payload.metadata as any)?.documentId??record.payload.id);
+ const key=f.session.projection.nodeForPlacement(Object.values(editor.repository.readState().placements).find(p=>p.contentKey===record.key)!.key)!.key;
+ editor.commands.setPayloadField(key,'metadata',{...(record.payload.metadata as any),title:'A generated conversation title'});
+ const name='Conversation on November 10, 2026.ink';await fs.writeFile(path.join(f.root,'vault',name),'occupied');
+ let save!:ReturnType<typeof createDocumentSave>['save'];
+ const Host=()=>{const s=createDocumentSave(editor,{guard:()=>{},vault:async()=>({root:'vault'})});save=s.save;return <s.Dialogs/>;};cleanup.push(render(()=><Host/>,document.body.appendChild(document.createElement('div'))));
+ expect(await save(id,undefined,false,{defaultFilename:name})).toBe(true);
+ expect(f.native.location(id)?.filename).toBe('Conversation on November 10, 2026 (2).ink');expect(await fs.readFile(path.join(f.root,'vault',name),'utf8')).toBe('occupied');
+ expect(document.body.textContent).not.toContain('Replace existing');
+ const originalLocation={...f.native.location(id)!};
+ const rejected=await f.native.saveCopy(id,{folder:'vault',filename:'Other same-folder name.ink'});
+ expect(rejected?.phase).toBe('failed');expect(f.native.location(id)).toEqual(originalLocation);
+ await fs.mkdir(path.join(f.root,'vault/renamed'));
+ const copy=save(id,undefined,true);await wait(()=>expect(document.body.textContent).toContain('Save in Vault'));
+ const folder=document.querySelector<HTMLInputElement>('[aria-label="Save Vault folder"]')!;folder.value='vault/renamed';folder.dispatchEvent(new Event('input',{bubbles:true}));
+ const field=document.querySelector<HTMLInputElement>('[aria-label="Save Vault filename"]')!;field.value='My chosen name.ink';field.dispatchEvent(new Event('input',{bubbles:true}));click('Save in Vault');await copy;
+ await save(id,undefined,false,{defaultFilename:'Conversation on November 11, 2026.ink'});expect(f.native.location(id)?.filename).toBe('My chosen name.ink');
+ const fetchBefore=globalThis.fetch;let failed=false;const generations:string[]=[];
+ vi.stubGlobal('fetch',(input:any,init:any)=>{if(String(input).endsWith('/api/native/save')){generations.push(JSON.parse(init.body).generation.generation);if(!failed){failed=true;return Promise.reject(new TypeError('Failed to fetch'));}}return fetchBefore(input,init);});
+ await expect(save(id,undefined,false,{defaultFilename:name})).rejects.toThrow('Failed to fetch');expect(f.native.hasPendingSave(id)).toBe(true);
+ expect(await save(id,undefined,false,{defaultFilename:name})).toBe(true);expect(f.native.hasPendingSave(id)).toBe(false);expect(generations[1]).toBe(generations[0]);
+ expect(f.native.location(id)?.filename).toBe('My chosen name.ink');expect(f.native.isDirty(id)).toBe(false);
+ expect((await fs.readdir(path.join(f.root,'vault'))).some(n=>n.endsWith('.md'))).toBe(false);
+},15000);
