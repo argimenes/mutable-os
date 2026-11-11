@@ -1,3 +1,4 @@
+import {checkEmptyFieldsVersion,emptySemanticFields} from './empty-fields';
 import {projectVocabulary} from './vocabulary-schema';
 import type {VocabularySnapshot} from './vocabulary-contract';
 import {noteSize} from '../../../block-tree/note-authoring';
@@ -84,8 +85,10 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layout
  return projectVocabulary(semanticTargetSchema(schema,semanticWorkspace),vocabulary);
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot,semanticWorkspace=false):any {
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot,semanticWorkspace=false,emptyFields?:1):any {
+ checkEmptyFieldsVersion(emptyFields);
  const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring,vocabulary,semanticWorkspace));
+ if(emptyFields===1){const omitted=emptySemanticFields(vocabulary);for(const field of omitted)delete schema.properties[field];schema.required=schema.required.filter((field:string)=>!omitted.includes(field));}
  if(provider==='openai')return schema;
  const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={...(nativeAuthoring&&widgetAuthoring?{StickyNote:defs.StickyNote}:{}),Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{}),...(nativeAuthoring&&compoundAuthoring?{Paragraph:defs.Paragraph,Heading:defs.Heading,Surface:defs.Surface,Tabs:defs.Tabs,Pages:defs.Pages}:{})};
  for(const name of Object.keys(templates))if(!templates[name])delete templates[name];

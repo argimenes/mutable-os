@@ -83,6 +83,12 @@ the second concerns
 /** Compact baseline; source/argument examples are available through bounded discovery. */
 export const initialAuthoringExamples=(semantics:boolean)=>editorialExamples.filter(e=>['rich-text','comparison','restraint',...(semantics?['gloss']:[])].includes(e.name));
 
+/** Syntax conveniences for the same negotiated native standoff types. */
+export function inlineAliasInstructions(types:readonly string[]){
+ const aliases=[['style/bold','<b>text</b>'],['style/italics','<i>text</i>'],['mutable/entity-reference','<e ref="ENTITY_HANDLE_OR_ALIAS">mention</e>']].filter(([type])=>types.includes(type));
+ return aliases.length?'\nINLINE ALIASES: '+aliases.map(([type,form])=>form+' = '+type).join('; ')+'. These use the same native validation as <annotation>; the general annotation form remains supported. Optional id retains a typed passage alias. Entity ref must be a current issued Entity handle or a declared new Entity alias; no extra attributes. Escaping, nesting and boundary/ranges for overlaps are unchanged.\n':'';
+}
+
 export const authoringExamples = [
  {purpose:'Address two contributions without making them arguments. Example handles are placeholders, never issued authority.',sources:[{handle:'EXAMPLE_A',kind:'contribution'},{handle:'EXAMPLE_B',kind:'contribution'}],response:envelope({replyTargets:['EXAMPLE_A','EXAMPLE_B'],composition:[{id:'new:b1',kind:'paragraph',markup:'Thanks to both of you. Saturday works for me.',ranges:[]}]})},
  {purpose:'Annotate an old passage and explicitly relate two arguments. Source is a complete TextBlock with text “Rain is forecast.”; preserve actual returned handle/revision/quote in real use.',sources:[{handle:'EXAMPLE_BLOCK',kind:'block',revision:'EXAMPLE_REVISION',nativeType:'standoff-editor-block',text:'Rain is forecast.'}],response:envelope({replyTargets:['new:r1'],composition:[{id:'new:b1',kind:'paragraph',markup:'<annotation type="dialectic/suggestion" id="new:s1">Let us meet indoors.</annotation>',ranges:[]}],anchors:[{id:'new:r1',source:'EXAMPLE_BLOCK',revision:'EXAMPLE_REVISION',selector:{exact:'Rain is forecast.',prefix:'',suffix:''}}],interpretations:[{id:'new:m1',target:'new:r1',type:'dialectic/claim',ref:null,attributes:[]}],arguments:[{id:'new:arg1',anchor:'new:r1'},{id:'new:arg2',anchor:'new:s1'}],relations:[{id:'new:rel1',kind:'argument',type:'supports',from:'new:arg1',to:'new:arg2'}]})},

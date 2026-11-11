@@ -1,6 +1,7 @@
+import {normalizeEmptySemanticFields} from './empty-fields';
 import {declarativeTarget,quoteCells} from './semantic-target';
 import {requireCapability,requireComposition,permits,vocabularyExample,type VocabularySnapshot} from './vocabulary-contract';
-import {vocabularyInstructions} from './authoring';
+import {vocabularyInstructions,inlineAliasInstructions} from './authoring';
 import {preparePdfBindings,retainedPdfsEnabled,type PdfBinding} from './retained-pdfs';
 import {prepareExternalImage,prepareVideoReference,prepareWebsiteEmbed,externalMediaLimits} from '../../../block-tree/media-authoring';
 import type {BlockFragment} from '../../../block-tree/clipboard';
@@ -54,7 +55,7 @@ function legacyRequest(exchange:string,primaryReply:string,selectedContext:strin
 export function request(...args:Parameters<typeof legacyRequest>|[...Parameters<typeof legacyRequest>,VocabularySnapshot|undefined]):ReturnType<typeof legacyRequest>&{vocabulary?:VocabularySnapshot}{
  const vocabulary=args.length>15?args[15] as VocabularySnapshot|undefined:undefined;
  const result=legacyRequest(...args.slice(0,15) as Parameters<typeof legacyRequest>);
- if(!vocabulary)return result;
+ if(!vocabulary){result.authoring.instructions+=inlineAliasInstructions(result.legend.types.map(t=>t.type));return result;}
  Object.assign(result,{vocabulary});
  result.protocolKey={...result.protocolKey,text:result.protocolKey.text.replace(/Stage 4B admits[^.]*\./,'Only semantic operations enabled by the exchange vocabulary may be authored.')};
  if(!permits(vocabulary,'semantic.argument-relation'))result.protocolKey.text=result.protocolKey.text.replace(' from performs relation toward to; depends-on points from dependent to prerequisite.','');
@@ -64,9 +65,10 @@ export function request(...args:Parameters<typeof legacyRequest>|[...Parameters<
  // The schema supplies complete formal shapes. Legacy examples can mention
  // disabled operations; avoid publishing inconsistent examples in a selection.
  result.authoring.examples=result.authoring.examples.map((e:any)=>vocabularyExample(e,vocabulary)).filter((e:any)=>e!==undefined);
+ result.authoring.instructions+=inlineAliasInstructions(vocabulary.standoff);
  return result;
 }
-export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id){
+export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id,emptyFields?:1){
  const vocabulary=sources.vocabulary;
  const nativeAuthoring=sources.editor?.features.dcpNativeAuthoringStage1===true;
  const textAuthoring=nativeAuthoring&&sources.editor?.features.dcpNativeAuthoringStage2Text===true;
@@ -78,7 +80,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  const externalMediaAuthoring=nativeAuthoring&&sources.editor?.features.dcpNativeAuthoringStage3ExternalMedia===true;
  let path='$';try{
  if(typeof raw!=='string'||raw.length>limits.responseBytes||new TextEncoder().encode(raw).length>limits.responseBytes)throw Error('DCP response size exceeded');
- const response=JSON.parse(raw);keys(response,['protocol','kind','exchange','intent','replyTargets','composition','anchors','entities','interpretations','arguments','glosses','relations','suggestions','promotionRecommendations']);
+ const response=normalizeEmptySemanticFields(JSON.parse(raw),vocabulary,emptyFields);keys(response,['protocol','kind','exchange','intent','replyTargets','composition','anchors','entities','interpretations','arguments','glosses','relations','suggestions','promotionRecommendations']);
  if(response.protocol!=='dcp/1.0'||response.kind!=='contribution'||response.exchange!==exchangeId||!responseIntents.includes(response.intent??'reply'))throw Error('Invalid DCP response envelope');
  for(const field of semantics?['promotionRecommendations']:['entities','arguments','glosses','relations','promotionRecommendations'])if(list(response[field],64).length)throw Error(semantics?`${field} authoring remains deferred beyond Stage 4B`:`${field} authoring is unavailable until Stage 4B`);
  if(list(response.suggestions,4).length)throw Error('Continuation suggestions are not enabled in Stage 4A');

@@ -6,6 +6,7 @@ import {SaxesParser} from 'saxes';
 import type {VisualEffectRegistry} from '../../../runtime/visual-effect-registry';
 export const classifications=['claim','question','speculation','suggestion','objection','qualification'].map(n=>'dialectic/'+n);
 export const INERT='dialectic/unknown-semantic';
+const inlineAliases:Record<string,string>={b:'style/bold',i:'style/italics',e:ENTITY_REFERENCE};
 export interface Provenance {version:1;actor:'mock'|'ai';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string;participantId?:string;createdUtc?:string;sourceRevision?:string}
 export interface Mark {id:string;type:string;start:number;end:number;value?:string;metadata:Record<string,any>}
 export const entityMentionSemantic={purpose:`Classify/style a passage: ${ENTITY_REFERENCE}`,attributes:['ref'],ai:'authorable' as const,rendering:'descriptive annotation',validation:'nonempty Cell range; no additional attributes'};
@@ -42,12 +43,18 @@ export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,
  parser.on('text',v=>{text+=v;cells+=[...v].length;});
  parser.on('opentag',tag=>{
   if(++count>512||stack.length>32)throw Error('Markup node/depth budget exceeded');
-  const attrs=tag.attributes as Record<string,string>;
+  let attrs=tag.attributes as Record<string,string>;
   if(tag.name==='dcp-root'&&!stack.length){stack.push({tag:tag.name,start:0});return;}
   if(tag.name==='boundary'){
    if(!tag.isSelfClosing||Object.keys(attrs).some(k=>k!=='id')||!attrs.id)throw Error('Invalid range boundary');claim(attrs.id,'pos');boundaries.set(attrs.id,cells);stack.push({tag:tag.name,start:cells});return;
   }
-  if(tag.name!=='annotation'||!attrs.type)throw Error('Unsupported markup element');
+  const alias=Object.hasOwn(inlineAliases,tag.name)?inlineAliases[tag.name]:undefined;
+  if(alias){
+   const allowed=alias===ENTITY_REFERENCE?['id','ref']:['id'];
+   if(Object.keys(attrs).some(key=>!allowed.includes(key)))throw Error('Unsupported alias attribute');
+   if(alias===ENTITY_REFERENCE&&!attrs.ref)throw Error('Entity alias requires an admitted reference');
+   attrs={...attrs,type:alias};
+  }else if(tag.name!=='annotation'||!attrs.type)throw Error('Unsupported markup element');
   const {type,id,...rest}=attrs;if(id)claim(id,'s');
   const spec=rest.ref!==undefined&&reference?(Object.keys(rest).length===1?reference(type,rest.ref):(()=>{throw Error('Unsupported reference attributes');})()):annotation(type,rest,registry,provenance,nativeAuthoring,textAuthoring,vocabulary);
   stack.push({tag:tag.name,start:cells,id,spec});

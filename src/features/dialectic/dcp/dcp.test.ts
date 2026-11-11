@@ -12,6 +12,17 @@ it('preserves exact decoded Unicode/whitespace and nested native Cell ranges',()
  expect(parsed.text).toBe('A😀é\r\n<&');expect(parsed.anchors.get('outer')).toEqual({start:1,end:4});expect(parsed.marks.map(p=>[p.type,p.start,p.end])).toEqual([['dialectic/claim',2,3],['style/bold',1,3]]);
  expect(parsed.marks[0].metadata.dcp).toEqual(provenance);
 });
+it('maps aliases through SAX to identical native marks, Cell ranges and passage aliases',()=>{
+ const old='A<annotation type="style/bold" id="outer">😀<annotation type="style/italics">é</annotation><annotation type="dialectic/claim">!</annotation></annotation>\r\n&lt;b&gt;&amp;';
+ const short='A<b id="outer">😀<i>é</i><annotation type="dialectic/claim">!</annotation></b>\r\n&lt;b&gt;&amp;';
+ const project=(text:string)=>{const p=markup(text,[],fixture(),provenance,claim());return {...p,marks:p.marks.map(({id,...mark})=>mark)}};
+ expect(project(short)).toEqual(project(old));
+ const crossed=markup('<b>A<boundary id="from"/>B</b>C<boundary id="to"/>',[{id:'range',type:'style/italics',from:'from',to:'to',ref:null,attributes:[]}],fixture(),provenance,claim());
+ expect(crossed.marks.map(m=>[m.type,m.start,m.end])).toEqual([['style/bold',0,1],['style/italics',1,2]]);
+});
+it.each(['<b type="style/italics">x</b>','<b ref="new:e1">x</b>','<i onclick="x">x</i>','<e>x</e>','<e ref="">x</e>','<e ref="new:e1" type="style/bold">x</e>','<b><i>x</b></i>','<b/>','<constructor>x</constructor>','<b id="same">x</b><i id="same">y</i>'])('rejects malformed alias markup %s',text=>{
+ expect(()=>markup(text,[],fixture(),provenance,claim())).toThrow();
+});
 it('represents crossing ranges through explicit boundaries',()=>{
  const parsed=markup('<boundary id="a"/>AB<boundary id="b"/>CD<boundary id="c"/>EF<boundary id="d"/>',[
  {id:'one',type:'style/bold',from:'a',to:'c',ref:null,attributes:[]},{id:'two',type:'style/italics',from:'b',to:'d',ref:null,attributes:[]}],fixture(),provenance,claim());

@@ -15,6 +15,7 @@ import {documentContextInventory} from '../../interchange/package/document-conte
 import {ScopedEntities} from '../../application/scoped-entities';
 import {LOCAL_ENTITY,LOCAL_ENTITY_RELATION,ENTITY_REFERENCE} from '../../feature-api/scoped-entities';
 import {ARGUMENT,ARGUMENT_RELATION} from './arguments';
+import {emptySemanticFields} from './dcp/empty-fields';
 // @vitest-environment jsdom
 import {afterEach,expect,it,vi} from 'vitest';
 import {createRoot} from 'solid-js';
@@ -269,6 +270,24 @@ it('omits catalogue when disabled and rejects unsupported media even with discov
   await d.askMock(async request=>JSON.stringify({...dcpResponse(request.exchange),composition:[{id:'new:b1',kind}]}));
   expect(d.notice()).toContain('Unsupported DCP Block');expect(enabled.editor.repository.state.revision).toBe(revision);
  }
+});
+it('admits negotiated empty-field omission with aliases and preserves raw diagnostics, Undo/Redo and native persistence',async()=>{
+ const f=await setup(),c=f.c!,e=f.editor;f.type!('Discuss the evidence');c.submit();
+ const snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build');let raw='';
+ await c.askMock(async request=>{
+  expect(request.authoring.emptySemanticFields).toBe(1);expect(request.protocolKey.text).toBeTruthy();expect(request.authoring.instructions).toContain('INLINE ALIASES');
+  const value:any=dcpResponse(request.exchange);value.composition=[{id:'new:b1',kind:'paragraph',markup:'<b>Evidence</b> needs <i>context</i>.',ranges:[]}];
+  for(const field of emptySemanticFields(request.vocabulary))delete value[field];raw=JSON.stringify(value);return raw;
+ });
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const data=c.frontier()!.data,root=c.resolve(c.target(c.frontier()!.id))!,text=c.session()!.projection.node(root.children[0])!;
+ expect((text.payload.standoffProperties as any[]).map(p=>[p.type,p.start,p.end])).toEqual([['style/bold',0,7],['style/italics',15,21]]);
+ expect(data.dcp!.response).toBe(raw);expect(JSON.parse(raw)).not.toHaveProperty('suggestions');expect(data.dcp!.request).toMatchObject({authoring:{emptySemanticFields:1,examples:expect.arrayContaining([expect.objectContaining({name:'rich-text'})])}});
+ e.repository.undo();expect(c.committed()).toHaveLength(1);e.repository.redo();expect(c.committed()).toHaveLength(2);expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const saved=decodeNative(nativeBytes(captureNative(e.repository.readState(),c.resourceId()))),serialized=JSON.stringify(saved);expect(serialized).toContain('style/bold');expect(serialized).toContain('emptySemanticFields');expect(serialized).toContain('INLINE ALIASES');
+ const revision=e.repository.state.revision;
+ await c.askMock(async request=>{const value:any=dcpResponse(request.exchange);value.composition[0].markup='<b>valid</b><e ref="src:foreign:e1">invalid</e>';for(const field of emptySemanticFields(request.vocabulary))delete value[field];return JSON.stringify(value)});
+ expect(c.notice()).not.toBe('');expect(e.repository.state.revision).toBe(revision);expect(c.committed()).toHaveLength(2);
 });
 it('materialises DCP atomically with independent reply/discursive references and AI provenance',async()=>{
  const f=await setup(),c=f.c!,e=f.editor,n=f.text!();f.type!('Alpha beta gamma');c.submit();const primary=c.target(c.frontier()!.id),mount=e.mounts.get(n.key),cells=[...n.inlineContent];

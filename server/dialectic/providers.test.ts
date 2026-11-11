@@ -5,6 +5,26 @@ import {schemaFor} from '../../src/features/dialectic/dcp/provider-schema';
 import {plainContribution,sse,streamFixture} from './fixtures';
 import {defaultProviderSettings,type Provider} from '../../src/features/dialectic/dcp/provider-contract';
 const request={exchange:'exchange',protocolKey:{text:'Use DCP; semantic markup is optional.'}};
+it.each(['openai','anthropic'] as Provider[])('%s removes only duplicate user guidance and preserves diagnostics, examples and authority',async provider=>{
+ const full={...request,protocolKey:{version:'fixture',text:request.protocolKey.text},authoring:{version:1,instructions:'Unique authoritative authoring instruction.',examples:[{response:plainContribution('exchange')}],emptySemanticFields:1},semanticWorkspace:{authority:'current-exchange',entities:[{handle:'src:current:e1'}]},structuralContext:{sources:[{handle:'src:current:b1',revision:'current-revision'}]}};
+ const before=structuredClone(full),state=conversation({...defaultProviderSettings,provider},full),fetcher=vi.fn<typeof fetch>().mockImplementation(async()=>sse(streamFixture(provider,JSON.stringify(plainContribution('exchange')))));
+ for(const phase of ['initial','continuation','repair']){
+  if(phase==='continuation')continuation(state,[],[]);if(phase==='repair')repair(state,{code:'invalid-shape'});
+  await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ }
+ expect(full).toEqual(before);
+ for(const [,init]of fetcher.mock.calls){
+  const body=JSON.parse(String(init?.body)),system=body.instructions??body.system,projected=JSON.parse((body.input??body.messages)[0].content);
+  expect(system.split(full.protocolKey.text)).toHaveLength(2);expect(system.split(full.authoring.instructions)).toHaveLength(2);
+  expect(projected.protocolKey).toEqual({version:'fixture'});expect(projected.authoring).toEqual({version:1,examples:full.authoring.examples,emptySemanticFields:1});
+  expect(projected.semanticWorkspace).toEqual(full.semanticWorkspace);expect(projected.structuralContext).toEqual(full.structuralContext);
+  const schema=body.text?.format.schema??body.output_config.format.schema;
+  expect(schema.properties.suggestions).toBeUndefined();expect(schema.properties.promotionRecommendations).toBeUndefined();expect(schema.required).toContain('entities');
+  expect(system).toContain('Empty semantic fields v1: omit suggestions, promotionRecommendations');
+  if(provider==='openai')expect(body.text.format.strict).toBe(true);
+ }
+ expect(()=>conversation(defaultProviderSettings,{...full,authoring:{...full.authoring,emptySemanticFields:2}})).toThrow('Unsupported empty semantic fields version');
+});
 it.each(['openai','anthropic'] as Provider[])('%s advertises negotiated catalogue discovery and continues its results',async provider=>{
  const state=conversation({...defaultProviderSettings,provider},{...request,capabilities:{version:1,items:[]},legend:{tools:['describe_capabilities']}});
  const fetcher=vi.fn<typeof fetch>()
