@@ -8,7 +8,7 @@ export type {VocabularySelection,VocabularySnapshot,VocabularyDescriptor,Vocabul
 // Preset membership references existing descriptor IDs; it defines no native types,
 // constructors or validation. User overrides remain independent of presets.
 const core=['composition.paragraph','composition.heading','composition.group','composition.list','composition.table','composition.code','source.anchor','source.classification','reference.reply',...['style/bold','style/italics','style/highlight','reference/url'].map(t=>'standoff:'+t)];
-const general=[...core,'composition.card-grid','composition.tabs','composition.surface','composition.tasks','configuration.margins','configuration.text','configuration.list-numbering','configuration.table-headers','composition.sticky-note','media.external-image','media.video','media.youtube','media.embed','semantic.gloss'];
+const general=[...core,'composition.card-grid','composition.tabs','composition.surface','composition.tasks','configuration.margins','configuration.text','configuration.list-numbering','configuration.table-headers','composition.sticky-note','media.external-image','media.video','media.youtube','media.embed','semantic.gloss','semantic.entity','standoff:mutable/entity-reference'];
 const research=[...general,'composition.pages','composition.source','semantic.entity','semantic.argument','semantic.argument-relation','semantic.entity-relation','media.image','media.retained-pdf','standoff:mutable/entity-reference'];
 export const allQualifiedSelection:Readonly<VocabularySelection>=Object.freeze({profile:'all-qualified'});
 export function copyVocabularySelection(input:VocabularySelection):Readonly<VocabularySelection>{

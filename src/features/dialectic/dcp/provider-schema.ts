@@ -20,8 +20,8 @@ const declarationKinds:Record<string,GeneratedIdentityKind>={Paragraph:'b',Group
 for(const [name,kind]of Object.entries(declarationKinds))Object.assign((responseSchema.$defs as any)[name].properties.id,{pattern:generatedIdentityPattern(kind),maxLength:128});
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
-export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot):any {
- if(!nativeAuthoring)return vocabulary?projectVocabulary(structuredClone(responseSchema),vocabulary):responseSchema;
+export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot,semanticWorkspace=false):any {
+ if(!nativeAuthoring)return projectVocabulary(semanticTargetSchema(structuredClone(responseSchema),semanticWorkspace),vocabulary);
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
  d.Grid=structuredClone(d.Table);d.Grid.properties.kind={type:'string',enum:['grid']};
@@ -81,11 +81,11 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layout
   d.RetainedPdf={type:'object',properties:{id:d.Paragraph.properties.id,kind:{type:'string',enum:['retained-pdf']},source:{type:'string'},revision:{type:'string'}},required:['id','kind','source','revision'],additionalProperties:false};
   d.Node.anyOf.push({$ref:'#/$defs/RetainedPdf'});
  }
- return projectVocabulary(schema,vocabulary);
+ return projectVocabulary(semanticTargetSchema(schema,semanticWorkspace),vocabulary);
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
-export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot):any {
- const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring,vocabulary));
+export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot,semanticWorkspace=false):any {
+ const schema:any=structuredClone(authoringSchema(nativeAuthoring,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring,vocabulary,semanticWorkspace));
  if(provider==='openai')return schema;
  const defs=schema.$defs,node=defs.Node,templates:Record<string,any>={...(nativeAuthoring&&widgetAuthoring?{StickyNote:defs.StickyNote}:{}),Group:defs.Group,List:defs.List,Table:defs.Table,...(nativeAuthoring?{Grid:defs.Grid}:{}),...(nativeAuthoring&&compoundAuthoring?{Paragraph:defs.Paragraph,Heading:defs.Heading,Surface:defs.Surface,Tabs:defs.Tabs,Pages:defs.Pages}:{})};
  for(const name of Object.keys(templates))if(!templates[name])delete templates[name];
@@ -99,4 +99,13 @@ export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,te
  }
  for(const name of ['Node',...Object.keys(templates)])delete defs[name];
  schema.properties.composition.items={$ref:'#/$defs/Node0'};return schema;
+}
+
+function semanticTargetSchema(schema:any,enabled:boolean){
+ if(!enabled)return schema;
+ const object=(properties:any)=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
+ const base={block:{type:'string'},revision:{anyOf:[{type:'string'},{type:'null'}]}};
+ schema.$defs.SemanticTarget={anyOf:[{type:'string'},object({...base,whole:{type:'boolean',enum:[true]}}),object({...base,quote:{type:'string',minLength:1,maxLength:8192},prefix:{type:'string',maxLength:2048},suffix:{type:'string',maxLength:2048}})]};
+ for(const [name,field]of [['Gloss','target'],['Interpretation','target'],['Argument','anchor']])schema.$defs[name].properties[field]={$ref:'#/$defs/SemanticTarget'};
+ return schema;
 }

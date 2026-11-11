@@ -23,6 +23,14 @@ export class ScopedEntities {
   this.vault??=entityService(this.editor,this.ownerKey);if(!this.vault.scopeIdentity)throw Error('Durable Vault identity unavailable');
   return {scope:'vault',vaultId:await this.vault.scopeIdentity(signal),entityId};
  }
+ async searchVault(query:string,signal:AbortSignal){
+  this.vault??=entityService(this.editor,this.ownerKey);
+  if(!this.vault.scopeIdentity)throw Error('Durable Vault identity unavailable');
+  const vaultId=await this.vault.scopeIdentity(signal);
+  const result=await this.vault.search({query,stream:'all',match:'partial',scope:'vault'},signal);
+  result.current();if(await this.vault.scopeIdentity(signal)!==vaultId)throw Error('Vault identity changed during Entity discovery');
+  return {vaultId,result};
+ }
  async resolve(ref:ScopedEntityReference,signal?:AbortSignal){
   if(!entityReference(ref))throw Error('Invalid scoped Entity reference');
   if(ref.scope==='document')return this.local(ref);

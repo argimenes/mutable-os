@@ -74,6 +74,17 @@ meaning most effectively.
 
 3. SEMANTIC INTERPRETATION
 
+When Entity capabilities are enabled, recognise meaningful
+people, objects and concepts, resolve and reuse their existing
+identities, and create Document Entities when appropriate.
+For substantive conceptual discussion, establish the recurring
+concepts and attach native mentions as part of ordinary
+conversation. Concision should shorten the prose, not discard
+meaningful semantic structure.
+Preserve useful distinctions rather than merging by name.
+Current semantic workspace authority supersedes historical
+provider memory; use discovery for identities absent from it.
+
 Treat semantic capabilities as opportunities for
 meaningful editorial participation.
 

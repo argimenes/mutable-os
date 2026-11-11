@@ -15,7 +15,7 @@ import type {ReactiveEditor} from '../../../reactive-editor/editor';
 import type {BlockNode,ContentRecord} from '../../../block-tree/types';
 import type {ReplyTarget} from '../model';
 import {targetKey,contribution} from '../model';
-import type {Resolution} from '../references';
+import type {DialecticReferences,Resolution} from '../references';
 function* edges(n:BlockNode){yield* n.children;for(const name in n.ownedRelations)yield n.ownedRelations[name];}
 export type SourceStatus='complete'|'truncated'|'missing'|'ambiguous'|'unavailable'|'unauthorized';
 export class DcpSources {
@@ -26,8 +26,9 @@ export class DcpSources {
  private readonly identityScope=sourceScope();
  readonly fences=new Map<string,ContentRecord>();
  readonly revisions=new Map<string,string>();
- readonly diagnostics={visited:0,characters:0,reads:0,searches:0,inventories:0,inventoryVisited:0,inventoryPreviewCells:0};
+ readonly diagnostics={visited:0,characters:0,reads:0,searches:0,inventories:0,inventoryVisited:0,inventoryPreviewCells:0,entitySearches:0,entityCandidates:0,workspaceBytes:0};
  private inventory?:DcpInventory;
+ private entityPages=new Map<string,{query:string;iterator:Iterator<ReplyTarget>}>();
  readonly trail:any[]=[];
  private callIds=new Set<string>();
  private glossValues=new Map<string,string>();
@@ -36,7 +37,7 @@ export class DcpSources {
  private entityRevisions=new Map<string,number>();
  readonly entities:ScopedEntities;
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
- constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:(fromOrdinal?:number)=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[],selection?:VocabularySelection){
+ constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:(fromOrdinal?:number)=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[],selection?:VocabularySelection,readonly references?:DialecticReferences){
   this.deadline=Date.now()+Math.min(120000,Math.max(1,deadlineMs));
   this.vocabulary=editor.features.dcpVocabularySelection?resolveVocabulary(editor,selection):undefined;
   if(editor.features.dcpCapabilityCatalogue)this.capabilities=capabilityCatalogue(editor,this.vocabulary);
@@ -109,8 +110,8 @@ export class DcpSources {
   return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,semanticReferences:semanticReferences.slice(0,32),omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
  }
  /** Prepared once on explicit Ask. Never subscribed to typing or whole-history enumeration. */
- async manifest(handles:string[]){
-  const limits={sources:64,characters:12000,bytes:64000,depth:12};
+ async manifest(handles:string[],byteBudget=64000){
+  const limits={sources:64,characters:12000,bytes:Math.max(0,Math.min(64000,byteBudget)),depth:12};
   const queue=handles.map(handle=>({handle,depth:0})),seen=new Set<string>(),items:any[]=[];
   let characters=0,bytes=0,truncated=false;
   while(queue.length&&items.length<limits.sources){
@@ -133,8 +134,9 @@ export class DcpSources {
  private record(call:any,result:any){const size=JSON.stringify(result).length;if((this.bytes+=size)>48000)throw Error('DCP retrieval result budget exceeded');this.trail.push({call,result});return result;}
  async tool(call:any){
   keys(call,['id','tool','arguments']);if(typeof call.id!=='string'||call.id.length>128||this.callIds.has(call.id))throw Error('Invalid/duplicate tool call');this.callIds.add(call.id);
-  keys(call.arguments,call.tool==='describe_capabilities'?['ids']:call.tool==='read_source'?['handle']:call.tool==='list_text_blocks'?['cursor','limit','contributionId','participantId','fromOrdinal']:['query','limit']);
+  keys(call.arguments,call.tool==='search_entities'?['query','scope','limit',...(Object.hasOwn(call.arguments,'cursor')?['cursor']:[])]:call.tool==='describe_capabilities'?['ids']:call.tool==='read_source'?['handle']:call.tool==='list_text_blocks'?['cursor','limit','contributionId','participantId','fromOrdinal']:['query','limit']);
   this.check();if(++this.calls>6)throw Error('DCP tool-call budget exceeded');
+  if(call.tool==='search_entities')return this.record(call,await this.searchEntities(call.arguments));
   if(call.tool==='describe_capabilities'){if(!this.capabilities)throw Error('Unavailable DCP tool');return this.record(call,this.capabilities.describe(call.arguments));}
   if(call.tool==='list_text_blocks'){this.diagnostics.inventories++;return this.record(call,(this.inventory??=new DcpInventory(this)).list(call.arguments));}
   if(call.tool==='read_source'){
@@ -163,6 +165,37 @@ export class DcpSources {
   }
   return this.record(call,{status:truncated?'truncated':'complete',items,coverage:{visited:Math.min(visited,512),characters},omissions:truncated?['Search result, traversal or character budget']:[]});
  }
+ async searchEntities(input:any){
+  if(!this.editor.features.dcpSemanticWorkspace||!this.editor.features.scopedSemantics||!this.references)throw Error('Entity discovery unavailable');
+  keys(input,['query','scope','limit',...(Object.hasOwn(input,'cursor')?['cursor']:[])]);const {query,scope,limit}=input;const cursor=input.cursor??null;
+  if(typeof query!=='string'||!query.trim()||query.length>256||!['document','vault'].includes(scope)||!Number.isInteger(limit)||limit<1||limit>12)throw Error('Invalid Entity discovery arguments');
+  if(cursor!==null&&(typeof cursor!=='string'||scope!=='document'))throw Error('Invalid Entity cursor');
+  this.diagnostics.entitySearches++;const items:any[]=[];let visited=0,partial=false,nextCursor:string|null=null;
+  if(scope==='document'){
+   this.fence(this.entities.root.contentKey);const needle=query.toLocaleLowerCase();
+   const page=cursor?this.entityPages.get(cursor):{query,iterator:this.references.semanticEntityCandidates()};
+   if(!page||page.query!==query)throw Error('Stale or mismatched Entity cursor');if(cursor)this.entityPages.delete(cursor);
+   let done=false;
+   while(visited<512&&items.length<limit){
+    this.check();const next=page.iterator.next();if(next.done){done=true;break;}visited++;const t=next.value,e=this.entities.local(t.entity!);if(!e)continue;
+    if(![e.name,...e.aliases.map((a:{name:string})=>a.name)].some(n=>n.toLocaleLowerCase().includes(needle)))continue;
+    items.push(await this.semanticEntity(t));
+   }
+   if(!done){partial=true;nextCursor=crypto.randomUUID();this.entityPages.set(nextCursor,page);}
+  }else{
+   const {vaultId,result}=await this.entityWork(signal=>this.entities.searchVault(query,signal));partial=!result.complete||result.candidates.length>limit;
+   for(const c of result.candidates.slice(0,limit)){visited++;const item=await this.semanticEntity({kind:'entity',resourceId:this.owner,entity:{scope:'vault',vaultId,entityId:c.id}});if(item)items.push(item);}
+  }
+  this.check();this.diagnostics.entityCandidates+=visited;
+  return {status:partial?'partial':'complete',scope,nextCursor,items:items.filter(Boolean),coverage:{visited,limit,complete:!partial},omissions:partial?[scope==='document'?'Bounded candidate coverage; continue nextCursor with the same query. Absence is not proof of nonexistence.':'Bounded Vault coverage; refine the query. Absence is not proof of nonexistence.']:[]};
+ }
+ /** Workspace and discovery share current native resolution and handle issuance. */
+ async semanticEntity(t:ReplyTarget){
+  if(t.kind!=='entity')throw Error('Expected scoped Entity');
+  if(t.entity.scope==='document')this.fence(this.entities.root.contentKey);
+  const e=await this.readEntity(t.entity);if(!e)return;
+  return {handle:this.issue(t),identity:structuredClone(unwrap(t.entity)),revision:e.revision,name:e.name,typename:e.typename??null,description:(e.description??'').slice(0,240),aliases:e.aliases.slice(0,8).map((a:{name:string})=>a.name),omissions:[...((e.description?.length??0)>240?['description']:[]),...(e.aliases.length>8?['aliases']:[])]};
+ }
  async exact(handle:string,revision:string,selector:{exact:string;prefix:string;suffix:string}){
   const source=await this.source(handle),target=this.target(handle),n=this.resolve(target).node;
   if(source.status!=='complete'||!n||n.viewType!=='standoff-editor-block'||source.hasInlineObjects||source.revision!==revision||target.kind!=='block')throw Error('Exact anchor source unavailable or stale');
@@ -173,5 +206,5 @@ export class DcpSources {
   const start=boundaries[matches[0]],end=boundaries[matches[0]+exact.length];if(start===undefined||end===undefined||start<0||end<0)throw Error('Selector splits a Cell');
   return {node:n,start,end,text:exact,sourceAuthor:source.sourceAuthor};
  }
- dispose(){this.inventory?.dispose();this.stop();this.entities.dispose();}
+ dispose(){this.entityPages.clear();this.inventory?.dispose();this.stop();this.entities.dispose();}
 }

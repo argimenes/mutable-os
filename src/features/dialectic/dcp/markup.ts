@@ -6,7 +6,7 @@ import {SaxesParser} from 'saxes';
 import type {VisualEffectRegistry} from '../../../runtime/visual-effect-registry';
 export const classifications=['claim','question','speculation','suggestion','objection','qualification'].map(n=>'dialectic/'+n);
 export const INERT='dialectic/unknown-semantic';
-export interface Provenance {version:1;actor:'mock'|'ai';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string;participantId?:string}
+export interface Provenance {version:1;actor:'mock'|'ai';exchangeId:string;protocol:'dcp/1.0';sourceResourceId:string;appliedTo?:'generated'|'existing-source';sourceAuthor?:string;participantId?:string;createdUtc?:string;sourceRevision?:string}
 export interface Mark {id:string;type:string;start:number;end:number;value?:string;metadata:Record<string,any>}
 export const entityMentionSemantic={purpose:`Classify/style a passage: ${ENTITY_REFERENCE}`,attributes:['ref'],ai:'authorable' as const,rendering:'descriptive annotation',validation:'nonempty Cell range; no additional attributes'};
 export function registerDcpTypes(registry:VisualEffectRegistry,semantics=false){

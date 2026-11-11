@@ -25,7 +25,7 @@ it.each(['openai','anthropic'] as const)('projects strict recursive %s schema an
  const e=editor();for(const profile of ['all-qualified','core','general','research'] as VocabularyProfile[]){const v=resolveVocabulary(e,{profile}),s=schema(v,provider);refs(s);const wire=JSON.stringify(s);for(const kind of ['timer','object3d','retained-pdf'])if(!v.kinds.includes(kind))expect(wire).not.toContain('"enum":["'+kind+'"]');}
  const v=resolveVocabulary(e,{profile:'general',disable:['composition.surface','composition.tasks','configuration.margins','configuration.text','configuration.table-headers']}),s=schema(v,provider);expect(JSON.stringify(s)).not.toContain('"enum":["surface"]');expect(JSON.stringify(s)).not.toContain('"bullet","ordered","task"');
  for(const [name,d]of Object.entries(s.$defs) as [string,any][])if(/^Paragraph/.test(name)){expect(d.properties.margins).toEqual({type:'null'});expect(d.properties.textStyle).toEqual({type:'null'});}
- expect(s.properties.entities.maxItems).toBe(0);expect(s.$defs.Span.properties.type.enum).not.toContain('mutable/entity-reference');
+ expect(s.properties.entities.maxItems).toBeUndefined();expect(s.$defs.Span.properties.type.enum).toContain('mutable/entity-reference');
  const core=schema(resolveVocabulary(e,{profile:'core'}),provider);expect(core.$defs.ListConfiguration.properties.start).toEqual({type:'null'});expect(core.$defs.ListConfiguration.properties.items.anyOf[0].items.properties.checked).toEqual({type:'null'});
 });
 it('does not couple mentions/relationships to endpoint creation, or PDF wrappers to general Surfaces',()=>{

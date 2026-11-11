@@ -7,7 +7,7 @@ import type {BlockNode,ContentRecord} from '../../block-tree/types';
 import {glossOwner} from '../../block-tree/gloss-plan';
 import {glossDefinition,GLOSS} from '../gloss/model';
 import {RANGE_ANCHOR,rangeDefinition} from './anchors';
-import {contribution,type ReplyTarget} from './model';
+import {contribution,targetKey,type ReplyTarget} from './model';
 export interface Segment {contentKey:string;id:string;start:number;end:number;node:BlockNode}
 export interface Resolution {status:'resolved'|'unanchored'|'missing'|'ambiguous'|'invalid'|'outside-document';reason?:string;node?:BlockNode;segments?:Segment[];text?:string;historical?:string;changed?:boolean;identityExists?:boolean;argumentId?:string}
 export interface ActivityProperty {id:string;type:string;annotationId?:string;active:boolean;exchangeId?:string;sourceResourceId?:string;appliedTo?:string;entity?:import('../../feature-api/scoped-entities').ScopedEntityReference}
@@ -19,6 +19,47 @@ export class DialecticReferences {
  readonly diagnostics={treeVisits:0,propertyReads:0,recordUpdates:0,definitionReads:0};
  private argumentAnchors=new Map<string,string>();private anchorArguments=new Map<string,Set<string>>();private edgeEndpoints=new Map<string,string[]>();private argumentEdges=new Map<string,Set<string>>();
  private entries=new Map<string,Entry>();private blocks=new Map<string,Set<string>>();private anchors=new Map<string,Set<string>>();
+ // Identity-only semantic selection indexes. Native records remain authoritative.
+ private semanticDefinitions=new Map<string,ReplyTarget>();
+ private semanticEntityIds=new Set<string>();
+ private semanticEdgeEndpoints=new Map<string,string[]>();private semanticEdges=new Map<string,Set<string>>();
+ private semanticByBlock=new Map<string,Map<string,ReplyTarget>>();
+ private semanticMentions=new Map<string,{target:ReplyTarget;blocks:Set<string>}>();
+ private central:string[]=[];
+ private semanticRecent=new Map<string,ReplyTarget>();
+ readonly semanticDiagnostics={membershipUpdates:0,candidates:0};
+ private rememberSemantic(t:ReplyTarget){const k=targetKey(t);this.semanticRecent.delete(k);this.semanticRecent.set(k,t);if(this.semanticRecent.size>64)this.semanticRecent.delete(this.semanticRecent.keys().next().value!);}
+ private committedSemanticContent(key:string){let n:BlockNode|undefined=this.node(key);for(let depth=0;n&&depth<128;depth++,n=this.projection.parentOf(n.key)){const c=contribution((n.payload.metadata as any)?.dialectic);if(c)return c.state==='committed';}return false;}
+ private indexMentions(key:string,items:Map<string,ReplyTarget>){
+  const old=this.semanticByBlock.get(key)??new Map<string,ReplyTarget>();
+  if(old.size===items.size&&[...items.keys()].every(id=>old.has(id)))return;
+  this.semanticDiagnostics.membershipUpdates++;
+  for(const id of new Set([...old.keys(),...items.keys()])){
+   let entry=this.semanticMentions.get(id);if(!entry&&items.has(id)){entry={target:items.get(id)!,blocks:new Set()};this.semanticMentions.set(id,entry);}
+   if(!entry)continue;
+   if(items.has(id)){entry.blocks.add(key);if(!old.has(id))this.rememberSemantic(entry.target);}else entry.blocks.delete(key);
+   this.central=this.central.filter(k=>k!==id);
+   if(!entry.blocks.size){this.semanticMentions.delete(id);this.semanticRecent.delete(id);}else if(entry.target.kind==='entity')this.central.push(id);
+   this.central.sort((a,b)=>(this.semanticMentions.get(b)?.blocks.size??0)-(this.semanticMentions.get(a)?.blocks.size??0));this.central.length=Math.min(16,this.central.length);
+  }
+  if(items.size)this.semanticByBlock.set(key,items);else this.semanticByBlock.delete(key);
+ }
+ /** Bounded tier selection, independent of conversation length and UI activity. */
+ semanticCandidates(focus:ReplyTarget[]=[]){
+  const out=new Map<string,ReplyTarget>(),add=(t:ReplyTarget)=>{if(out.size<48)out.set(targetKey(t),t);};
+  for(const t of focus.slice(0,12)){
+   if(!['block','contribution'].includes(t.kind)){add(t);const anchor=t.kind==='range'?t.anchorId:t.kind==='argument'?this.argumentAnchors.get(t.argumentId):undefined;if(anchor){let count=0;for(const key of this.anchors.get(anchor)??[]){if(count++===12)break;for(const v of this.semanticByBlock.get(key)?.values()??[])add(v);}for(const id of this.anchorArguments.get(anchor)??[])add({kind:'argument',resourceId:this.resourceId,argumentId:id});}}
+   else {const keys=this.blocks.get(t.blockId!);for(const key of keys??[])for(const v of this.semanticByBlock.get(key)?.values()??[])add(v);}
+  }
+  // Reserve central concepts before filling with recent objects. The bounded
+  // central list is changed only by genuine native reference membership edits.
+  for(const k of this.central.slice(0,6)){const e=this.semanticMentions.get(k);if(e)add(e.target);}
+  for(const t of [...this.semanticRecent.values()].reverse().slice(0,24))add(t);
+  for(const t of [...out.values()]){const ids=t.kind==='entity'?this.semanticEdges.get(targetKey(t)):t.kind==='argument'?this.argumentEdges.get(t.argumentId):undefined;let count=0;for(const id of ids??[]){if(count++===3)break;add({kind:t.kind==='entity'?'entity-relation':'argument-relation',resourceId:this.resourceId,definitionId:id});}}
+  this.semanticDiagnostics.candidates+=out.size;return {targets:[...out.values()],indexed:this.semanticDefinitions.size,partial:true};
+ }
+ *semanticEntityCandidates(){for(const id of this.semanticEntityIds)yield this.semanticDefinitions.get(id)!;}
+ semanticLocations(t:ReplyTarget){const keys=this.semanticMentions.get(targetKey(t))?.blocks,out:ReplyTarget[]=[];for(const k of keys??[]){out.push({kind:'block',resourceId:this.resourceId,blockId:String(this.entries.get(k)?.record.payload.id)});if(out.length===3)break;}return out;}
  private stamps=new Map<string,{get:Accessor<number>;bump:()=>void}>();private stop:()=>void;
  private evidence={locationOf:(k:string)=>this.editor.repository.locationOf(k),ownedKeys:(k:string)=>this.editor.repository.ownedPlacementKeys(k)};
  readonly owner:string;readonly resourceId:string;
@@ -38,12 +79,20 @@ export class DialecticReferences {
  private belongs(key:string){return !!this.projection.nodesForContent(key).length&&glossOwner(this.editor.repository.readState(),key,this.evidence)===this.owner;}
  private edgeMap(c:ContentRecord){const state=this.editor.repository.readState();return new Map([...c.children,...Object.values(c.ownedRelations)].flatMap(k=>{const p=state.placements[k];return p&&!p.externalReference?[[k,p.contentKey] as const]:[];}));}
  private visit(key:string){if(this.entries.has(key)||!this.belongs(key))return;this.diagnostics.treeVisits++;this.update(key);}
- private remove(key:string){const old=this.entries.get(key);if(!old)return;this.entries.delete(key);this.blocks.get(String(old.record.payload.id))?.delete(key);this.stamp('b:'+String(old.record.payload.id)).bump();this.stamp('activity:b:'+String(old.record.payload.id)).bump();for(const id of old.anchors){this.anchors.get(id)?.delete(key);this.stamp('a:'+id).bump();this.stamp('activity:a:'+id).bump();}for(const child of old.edges.values())if(!this.belongs(child))this.remove(child);}
+ private remove(key:string){const old=this.entries.get(key);if(!old)return;this.indexMentions(key,new Map());this.entries.delete(key);this.blocks.get(String(old.record.payload.id))?.delete(key);this.stamp('b:'+String(old.record.payload.id)).bump();this.stamp('activity:b:'+String(old.record.payload.id)).bump();for(const id of old.anchors){this.anchors.get(id)?.delete(key);this.stamp('a:'+id).bump();this.stamp('activity:a:'+id).bump();}for(const child of old.edges.values())if(!this.belongs(child))this.remove(child);}
  private update(key:string,definitionIds?:string[]){
   const old=this.entries.get(key),c=this.editor.repository.readState().contents[key];if(!c||!this.belongs(key)){this.remove(key);return;}
   this.diagnostics.recordUpdates++;
-  const edges=this.edgeMap(c),ids=new Set<string>(),activity=new Map<string,ActivityProperty>();
+  const edges=this.edgeMap(c),ids=new Set<string>(),activity=new Map<string,ActivityProperty>(),semantic=new Map<string,ReplyTarget>();let committed:boolean|undefined;
   if(c.inlineKind==='standoff'){this.diagnostics.propertyReads++;for(const p of (c.payload.standoffProperties??[]) as any[]){
+   if(this.editor.features.dcpSemanticWorkspace&&!p.isDeleted&&!p.externalDefinition){
+    const ref=p.metadata?.entityReference;
+    let t:ReplyTarget|undefined;
+    if(entityReference(ref))t={kind:'entity',resourceId:this.resourceId,entity:ref};
+    else if(p.type===GLOSS&&typeof p.annotationId==='string')t={kind:'gloss',resourceId:this.resourceId,definitionId:p.annotationId};
+    else if(p.type.startsWith('dialectic/')&&p.type!==RANGE_ANCHOR)t={kind:'block',resourceId:this.resourceId,blockId:String(c.payload.id)};
+    if(t&&(committed??=this.committedSemanticContent(key)))semantic.set(targetKey(t),t);
+   }
    if(p.type===RANGE_ANCHOR&&!p.isDeleted&&typeof p.annotationId==='string')ids.add(p.annotationId);
    // Reuse the affected-record property pass. Offsets are deliberately absent:
    // ordinary rebasing must not invalidate contribution activity or read text.
@@ -52,6 +101,7 @@ export class DialecticReferences {
     activity.set(p.id,{id:p.id,type:p.type,annotationId:p.annotationId,active:!p.isDeleted&&!p.externalDefinition&&Number.isInteger(p.start)&&Number.isInteger(p.end)&&p.start>=0&&p.end>=p.start&&p.end<c.inlineContent.length,exchangeId:d?.exchangeId,sourceResourceId:d?.sourceResourceId,appliedTo:d?.appliedTo,...(entityReference(ref)?{entity:{...ref}}:{})});
    }
   }}
+  if(this.editor.features.dcpSemanticWorkspace)this.indexMentions(key,semantic);
   for(const id of new Set([...old?.anchors??[],...ids])){let keys=this.anchors.get(id);if(!keys)this.anchors.set(id,keys=new Set());ids.has(id)?keys.add(key):keys.delete(key);this.stamp('a:'+id).bump();}
   const id=String(c.payload.id);if(old&&old.record.payload.id!==id)this.blocks.get(String(old.record.payload.id))?.delete(key);
   let keys=this.blocks.get(id);if(!keys)this.blocks.set(id,keys=new Set());keys.add(key);
@@ -61,8 +111,27 @@ export class DialecticReferences {
   if(key===this.owner){const before:any=old?.record.payload.linkedAnnotations??{},after:any=c.payload.linkedAnnotations??{};if(before!==after||definitionIds)for(const id of definitionIds??new Set([...Object.keys(before),...Object.keys(after)])){this.diagnostics.definitionReads++;if(definitionIds||JSON.stringify(before[id])!==JSON.stringify(after[id])){this.indexDefinition(id,after[id]);this.stamp('a:'+id).bump();this.stamp('activity:d:'+id).bump();}}}
   for(const [pk,child]of old?.edges??[])if(!edges.has(pk)&&!this.belongs(child))this.remove(child);
   for(const [pk,child]of edges)if(!old?.edges.has(pk))this.visit(child);
+  if(old&&this.editor.features.dcpSemanticWorkspace&&contribution((old.record.payload.metadata as any)?.dialectic)?.state!==contribution((c.payload.metadata as any)?.dialectic)?.state){
+   // Submission changes eligibility without necessarily changing descendant text.
+   // Refresh this affected contribution only, never other Documents or typing.
+   const pending=[...edges.values()],seen=new Set<string>();while(pending.length){const child=pending.pop()!;if(seen.has(child))continue;seen.add(child);this.update(child);pending.push(...this.entries.get(child)?.edges.values()??[]);}
+  }
  }
  private indexDefinition(id:string,d:any){
+  if(this.editor.features.dcpSemanticWorkspace){
+   for(const endpoint of this.semanticEdgeEndpoints.get(id)??[])this.semanticEdges.get(endpoint)?.delete(id);this.semanticEdgeEndpoints.delete(id);
+   if(localEntityRelation(d)&&!d.isDeleted){const r=d.metadata.scopedEntityRelation,endpoints=[r.from,r.to].map(entity=>targetKey({kind:'entity',resourceId:this.resourceId,entity}));this.semanticEdgeEndpoints.set(id,endpoints);for(const endpoint of endpoints){let ids=this.semanticEdges.get(endpoint);if(!ids)this.semanticEdges.set(endpoint,ids=new Set());ids.add(id);}}
+   this.semanticEntityIds.delete(id);const prior=this.semanticDefinitions.get(id);if(prior){this.semanticRecent.delete(targetKey(prior));this.semanticDefinitions.delete(id);}
+   let t:ReplyTarget|undefined;
+   if(d&&!d.isDeleted){
+    if(localEntity(d)&&!d.metadata.scopedEntity.entity.deletedUtc)t={kind:'entity',resourceId:this.resourceId,entity:{scope:'document',resourceId:this.resourceId,entityId:id}};
+    else if(argumentDefinition(d))t={kind:'argument',resourceId:this.resourceId,argumentId:id};
+    else if(argumentRelation(d))t={kind:'argument-relation',resourceId:this.resourceId,definitionId:id};
+    else if(localEntityRelation(d))t={kind:'entity-relation',resourceId:this.resourceId,definitionId:id};
+    else if(glossDefinition(d))t={kind:'gloss',resourceId:this.resourceId,definitionId:id};
+   }
+   if(t){this.semanticDefinitions.set(id,t);if(t.kind==='entity')this.semanticEntityIds.add(id);this.rememberSemantic(t);}
+  }
   const old=this.argumentAnchors.get(id);if(old){this.anchorArguments.get(old)?.delete(id);this.stamp('a:'+old).bump();}this.argumentAnchors.delete(id);
   for(const endpoint of this.edgeEndpoints.get(id)??[]){this.argumentEdges.get(endpoint)?.delete(id);this.stamp('edges:'+endpoint).bump();}this.edgeEndpoints.delete(id);
   if(d?.isDeleted)return;
@@ -140,5 +209,5 @@ export class DialecticReferences {
   return {status:'resolved',node};
  }
  overlapping(segments:Segment[]){const definitions:any=this.editor.repository.readState().contents[this.owner]?.payload.linkedAnnotations??{},ids=new Set<string>();for(const s of segments)for(const p of (this.editor.repository.readState().contents[s.contentKey]?.payload.standoffProperties??[]) as any[])if(p.type===GLOSS&&!p.isDeleted&&p.start<s.end&&p.end>=s.start&&glossDefinition(definitions[p.annotationId])&&!definitions[p.annotationId].isDeleted)ids.add(p.annotationId);return [...ids].map(id=>({id,value:String(definitions[id].value)}));}
- dispose(){this.stop();this.entries.clear();this.blocks.clear();this.anchors.clear();this.stamps.clear();this.argumentAnchors.clear();this.anchorArguments.clear();this.edgeEndpoints.clear();this.argumentEdges.clear();}
+ dispose(){this.stop();this.semanticDefinitions.clear();this.semanticEntityIds.clear();this.semanticEdges.clear();this.semanticEdgeEndpoints.clear();this.semanticByBlock.clear();this.semanticMentions.clear();this.semanticRecent.clear();this.central=[];this.entries.clear();this.blocks.clear();this.anchors.clear();this.stamps.clear();this.argumentAnchors.clear();this.anchorArguments.clear();this.edgeEndpoints.clear();this.argumentEdges.clear();}
 }

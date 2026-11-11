@@ -112,6 +112,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
   {id:'configuration.list-numbering',name:'List numbering',purpose:'Continue or reverse ordered numbering and specify individual item values.',read:'native-configuration',nativeTypes:['indented-list-block'],schema:'ListConfiguration',guidance:'Only ordered lists; task state is a separate capability.'},
   {id:'configuration.table-headers',name:'Table headers',purpose:'Identify native table header cells.',read:'native-configuration',nativeTypes:['table-block'],schema:'TableConfiguration',guidance:'Header matrix must match the authored table.'}
  );
+ if(editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics)for(const a of projected)if(['semantic.gloss','semantic.argument','source.classification'].includes(a.id))a.guidance+=' Also accepts declarative whole TextBlock or exact quote targets through SemanticTarget; source Blocks require current complete read authority.';
  const items=projected.map(a=>{
   const renderer=a.nativeTypes.every(type=>!!editor.registry.resolve(type)?.view)&&(!a.annotationRenderer||!!editor.visualEffects.type(a.annotationRenderer)?.renderers.length);
   const enabled=editor.features.dialecticDcp&&(!a.semantic||editor.features.scopedSemantics)&&(!a.feature||editor.features[a.feature]);
@@ -129,7 +130,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
  });
  const selectionDetails=new Set(['reference.reply','configuration.list-numbering','configuration.table-headers']);
  const summary={version:1,detailTool:'describe_capabilities',items:items.filter(a=>selection?a.authorable||a.inspectionOnly||a.presentationOnly:!selectionDetails.has(a.id)).map(({id,name,purpose,status,reason,...detail})=>({id,name,purpose,status,...(stage1?{state:detail.capabilityState}:{}),...(reason?{reason}:{})}))};
- const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring,selection).$defs as Record<string,unknown>;
+ const definitions=authoringSchema(stage1,textAuthoring,layoutAuthoring,compoundAuthoring,widgetAuthoring,managedImageAuthoring,externalMediaAuthoring,retainedPdfAuthoring,selection,editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics).$defs as Record<string,unknown>;
  function parameters(names:Definition[]){
   const defs:Record<string,unknown>={},externalDefinitions:Record<string,unknown>={};
   const add=(name:string)=>{

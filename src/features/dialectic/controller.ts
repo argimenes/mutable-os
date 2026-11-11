@@ -1,3 +1,4 @@
+import {semanticWorkspace,enableSemanticWorkspace} from './dcp/workspace';
 import {allQualifiedSelection,copyVocabularySelection,vocabularyDescriptors,type VocabularySelection} from './dcp/vocabulary';
 import {createSubmissionSave} from './submission-save';
 import {createConversationTitle} from './conversation-title';
@@ -268,16 +269,18 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    for(const t of targets)if(!['gloss','entity','argument-relation','entity-relation'].includes(t.kind))requireCommittedTarget(t);
    const captured=capture(targets),source=session()!,exchangeId=crypto.randomUUID();
    ticket=++generation;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setDcpPreview('Preparing structured exchange…');
-   sources=new DcpSources(editor,resourceId(),function*(fromOrdinal=1){const rows=committed();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((rows[mid].data.ordinal??0)<fromOrdinal)lo=mid+1;else hi=mid;}for(let i=lo;i<rows.length;i++)yield source.projection.node(rows[i].key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),live?liveLimits.deadlineMs:30000,id=>references()!.argumentsFor(id),vocabularySelection());
+   sources=new DcpSources(editor,resourceId(),function*(fromOrdinal=1){const rows=committed();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((rows[mid].data.ordinal??0)<fromOrdinal)lo=mid+1;else hi=mid;}for(let i=lo;i<rows.length;i++)yield source.projection.node(rows[i].key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),live?liveLimits.deadlineMs:30000,id=>references()!.argumentsFor(id),vocabularySelection(),references());
    for(const key of captured.revisions.keys())sources.fence(key);
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
-   const structuralContext=await sources.manifest([primary,...selected]);
+   const structuralContext=await sources.manifest([primary,...selected],editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics?64000-8192:64000);
    if(!alive||ticket!==generation||session()!==source)return;sources.check();
    const request=dcpRequest(exchangeId,primary,selected,captured.items.map(item=>({handle:sources!.issue(item.target),plainTextExcerpt:item.text})),editor.visualEffects,editor.features.scopedSemantics,sources.capabilities,editor.features.dcpNativeAuthoringStage1,editor.features.dcpNativeAuthoringStage2Text,editor.features.dcpNativeAuthoringStage2Layouts,editor.features.dcpNativeAuthoringStage2Compounds,editor.features.dcpNativeAuthoringStage2Widgets,managedImagesEnabled(editor),editor.features.dcpNativeAuthoringStage3ExternalMedia,retainedPdfsEnabled(editor),sources.vocabulary);
    requestForInspection=request;Object.assign(request,{structuralContext,task:{action:'respond',focus:primary,participantRequest:structuralContext.sources[0]?.sourceAuthor==='human'?{handle:primary,text:captured.items[0].text}:null}});
+   if(editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics){enableSemanticWorkspace(request);Object.assign(request,{semanticWorkspace:await semanticWorkspace(sources,participant.id,structuralContext.sources.map((s:any)=>s.target).filter(Boolean))});}
+   if(!alive||ticket!==generation||session()!==source)return;sources.check();
    if(live){request.cadence=live.settings.cadence;request.protocolKey={...request.protocolKey,version:request.protocolKey.version+'-c1'};}
    let prepared:Awaited<ReturnType<typeof prepareDcp>>|undefined;
-   const validate=async(raw:string)=>{sources!.check();prepared=await prepareDcp(raw,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock');};
+   const validate=async(raw:string)=>{sources!.check();prepared=await prepareDcp(raw,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock',participant.id);};
    if(live)await logNative(resourceId(),committed().map(row=>source.projection.node(row.key)!.contentKey),'exchange.native-context');
    const raw=await receive(transport,request,sources,value=>{if(alive&&ticket===generation)streamPreview(value,ticket);},requestAbort,live?validate:undefined,live?liveLimits.deadlineMs:30000);
    if(!alive||ticket!==generation)return;

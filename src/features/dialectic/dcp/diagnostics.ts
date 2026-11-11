@@ -17,7 +17,7 @@ export class DcpValidationError extends Error {
 export function validationDiagnostic(error:unknown,path='$'):ValidationDiagnostic {
  if(error instanceof DcpValidationError)return error.diagnostic;
  const message=error instanceof Error?error.message:'';
- const code:keyof typeof reasons=error instanceof SyntaxError?'json':/fields/.test(message)?'fields':/Unauthorized source handle|Anchor unavailable|Unavailable owned Entity|Gloss passage unavailable/.test(message)?'source-identity':/selector|Selector|anchor source|exact anchor|splits a Cell/.test(message)?'source':/markup|Markup|boundary|annotation tag|Empty annotation|closing tag|unclosed/.test(message)?'markup':/Duplicate|provisional ID|Unauthorized|handle|endpoints|owned arguments/.test(message)?'identity':/budget|size|depth|oversized/.test(message)?'budget':/Unsupported|unavailable in|authorable|deferred|admitted|unavailable until/.test(message)?'capability':'structure';
+ const code:keyof typeof reasons=error instanceof SyntaxError?'json':/fields/.test(message)?'fields':/Unauthorized source handle|Anchor unavailable|Unavailable owned Entity|Gloss passage unavailable|Semantic target must use current/.test(message)?'source-identity':/selector|Selector|anchor source|exact anchor|splits a Cell|semantic quote|Semantic target needs/.test(message)?'source':/markup|Markup|boundary|annotation tag|Empty annotation|closing tag|unclosed/.test(message)?'markup':/Duplicate|provisional ID|Unauthorized|handle|endpoints|owned arguments/.test(message)?'identity':/budget|size|depth|oversized/.test(message)?'budget':/Unsupported|unavailable in|authorable|deferred|admitted|unavailable until/.test(message)?'capability':'structure';
  return {code,path,message:reasons[code]};
 }
 export function safeDiagnostic(value:any):ValidationDiagnostic {
@@ -27,5 +27,5 @@ export function safeDiagnostic(value:any):ValidationDiagnostic {
 }
 
 /** Recovery remains read-only and shares the original exchange's budgets. */
-export const sourceRecoveryTools=['list_text_blocks','read_source','search_symposium'] as const;
+export const sourceRecoveryTools=['list_text_blocks','read_source','search_symposium','search_entities'] as const;
 export const allowsSourceRecovery=(value:unknown)=>{const d=safeDiagnostic(value);return d.code==='source-identity'||d.code==='source';};

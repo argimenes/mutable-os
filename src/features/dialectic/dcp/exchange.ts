@@ -1,3 +1,4 @@
+import {declarativeTarget,quoteCells} from './semantic-target';
 import {requireCapability,requireComposition,permits,vocabularyExample,type VocabularySnapshot} from './vocabulary-contract';
 import {vocabularyInstructions} from './authoring';
 import {preparePdfBindings,retainedPdfsEnabled,type PdfBinding} from './retained-pdfs';
@@ -65,7 +66,7 @@ export function request(...args:Parameters<typeof legacyRequest>|[...Parameters<
  result.authoring.examples=result.authoring.examples.map((e:any)=>vocabularyExample(e,vocabulary)).filter((e:any)=>e!==undefined);
  return result;
 }
-export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock'){
+export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id){
  const vocabulary=sources.vocabulary;
  const nativeAuthoring=sources.editor?.features.dcpNativeAuthoringStage1===true;
  const textAuthoring=nativeAuthoring&&sources.editor?.features.dcpNativeAuthoringStage2Text===true;
@@ -81,9 +82,10 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  if(response.protocol!=='dcp/1.0'||response.kind!=='contribution'||response.exchange!==exchangeId||!responseIntents.includes(response.intent??'reply'))throw Error('Invalid DCP response envelope');
  for(const field of semantics?['promotionRecommendations']:['entities','arguments','glosses','relations','promotionRecommendations'])if(list(response[field],64).length)throw Error(semantics?`${field} authoring remains deferred beyond Stage 4B`:`${field} authoring is unavailable until Stage 4B`);
  if(list(response.suggestions,4).length)throw Error('Continuation suggestions are not enabled in Stage 4A');
- const provenance:Provenance={version:1,actor,exchangeId,protocol:'dcp/1.0',sourceResourceId:resourceId,appliedTo:'generated',sourceAuthor:actor,participantId:defaultParticipant(resourceId,'ai').id};
+ const provenance:Provenance={version:1,actor,exchangeId,protocol:'dcp/1.0',sourceResourceId:resourceId,appliedTo:'generated',sourceAuthor:actor,participantId,createdUtc:new Date().toISOString()};
  const ids=new Set<string>();const claim=(id:string,kind:GeneratedIdentityKind)=>{validateGeneratedIdentity(id,kind);if(typeof id!=='string'||!/^[-a-zA-Z0-9_.:]{1,128}$/.test(id)||['__proto__','prototype','constructor'].includes(id)||ids.has(id)||sources.handles?.has(id))throw Error('Duplicate or invalid provisional ID');ids.add(id);};
- const definitions:Record<string,any>={},aliases=new Map<string,ReplyTarget>(),ranges=new Map<string,{key?:string;blockId:string;start:number;end:number;text:string;sourceAuthor:string}>(),annotations=new Map<string,any[]>();
+ const generatedText=new Map<string,ExistingBlockDto>();
+ const definitions:Record<string,any>={},aliases=new Map<string,ReplyTarget>(),ranges=new Map<string,{key?:string;blockId:string;start:number;end:number;text:string;sourceAuthor:string;revision?:string}>(),annotations=new Map<string,any[]>();
  const semantic=semanticPreparation(sources,resourceId,definitions,aliases,claim,provenance);if(semantics){path='$.entities';semantic.entities(response.entities);}
  const pdfBindings:PdfBinding[]=[];
  const imageBindings:ImageBinding[]=[],externalLeaves=new Map<string,BlockFragment>(),externalKinds:string[]=[];
@@ -105,6 +107,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
    keys(node,['id','kind','markup','ranges',...(node.kind==='heading'?['level']:[]),...(textAuthoring&&Object.hasOwn(node,'textStyle')?['textStyle']:[]),...(compoundAuthoring&&Object.hasOwn(node,'margins')?['margins']:[])]);const parsed=markup(node.markup,list(node.ranges,128),registry,provenance,claim,semantics?semantic.mark:undefined,nativeAuthoring,textAuthoring,vocabulary);characters+=[...parsed.text].length;if(characters>limits.outputCells)throw Error('DCP output Cell budget');
    const block=dto('standoff-editor-block',{text:parsed.text,standoffProperties:parsed.marks}),properties=block.standoffProperties as any[];
    for(const [alias,span]of parsed.anchors)properties.push(anchor(alias,{...span,blockId:String(block.id),text:[...parsed.text].slice(span.start,span.end).join(''),sourceAuthor:actor}));
+   generatedText.set(node.id,block);
    const text=node.kind==='heading'?prepareHeading(block,node.level):block;
    if(node.textStyle!=null)requireCapability(vocabulary,'configuration.text');
    if(node.margins!=null)requireCapability(vocabulary,'configuration.margins');
@@ -195,20 +198,48 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  if(response.replyTargets.length)requireCapability(vocabulary,'reference.reply');
  for(const [i,a] of list(response.anchors,limits.anchors).entries()){path='$.anchors['+i+']';
   keys(a,['id','source','revision','selector']);keys(a.selector,['exact','prefix','suffix']);claim(a.id,'r');
-  const found=await sources.exact(a.source,a.revision,a.selector),range={key:found.node.key,blockId:String(found.node.payload.id),start:found.start,end:found.end,text:found.text,sourceAuthor:found.sourceAuthor};
+  const found=await sources.exact(a.source,a.revision,a.selector),range={key:found.node.key,blockId:String(found.node.payload.id),start:found.start,end:found.end,text:found.text,sourceAuthor:found.sourceAuthor,revision:a.revision};
   let properties=annotations.get(range.key);if(!properties)annotations.set(range.key,properties=[]);properties.push(anchor(a.id,range));
  }
+ // Declarative targets resolve through the same native range/annotation path.
+ // Only host-prepared anchors enter canonical admission, never model DTOs.
+ let targetCount=list(response.anchors,limits.anchors).length;
+ const targetAliases=new Map<string,string>();
+ const resolveSemanticTarget=async(value:any):Promise<string>=>{
+  if(typeof value==='string')return value;
+  if(!semantics||!sources.editor.features.dcpSemanticWorkspace)throw Error('Declarative semantic targets disabled');
+  const whole=declarativeTarget(value),cacheKey=JSON.stringify(value),cached=targetAliases.get(cacheKey);if(cached)return cached;
+  if(++targetCount>limits.anchors)throw Error('Semantic target anchor budget exceeded');
+  let range:{key?:string;blockId:string;start:number;end:number;text:string;sourceAuthor:string;revision?:string},properties:any[];
+  const generated=generatedText.get(value.block);
+  if(generated){
+   if(value.revision!==null)throw Error('Generated target revision must be null');
+   const text=String(generated.text??'');if(!text.length)throw Error('Empty semantic TextBlock');
+   const span=whole?{start:0,end:[...text].length,text}:quoteCells(text,value.quote,value.prefix,value.suffix);
+   range={...span,blockId:String(generated.id),sourceAuthor:actor};properties=generated.standoffProperties as any[];
+  }else{
+   if(typeof value.revision!=='string'||sources.revisions.get(value.block)!==value.revision)throw Error('Semantic target must use current complete source authority');
+   const source=await sources.source(value.block),t=sources.target(value.block),n=sources.resolve(t).node;
+   if(t.kind!=='block'||!n||n.viewType!=='standoff-editor-block'||source.status!=='complete'||source.hasInlineObjects||source.revision!==value.revision||!source.text)throw Error('Semantic target needs a nonempty complete TextBlock');
+   const span=whole?{start:0,end:n.inlineContent.length,text:source.text}:await sources.exact(value.block,value.revision,{exact:value.quote,prefix:value.prefix,suffix:value.suffix});
+   range={key:n.key,blockId:String(n.payload.id),start:span.start,end:span.end,text:span.text,sourceAuthor:source.sourceAuthor,revision:value.revision};
+   properties=annotations.get(n.key)??[];annotations.set(n.key,properties);
+  }
+  let suffix=100000+targetCount,alias='new:r'+suffix;while(ids.has(alias))alias='new:r'+(++suffix);claim(alias,'r');properties.push(anchor(alias,range));targetAliases.set(cacheKey,alias);return alias;
+ };
  for(const [i,item] of list(response.interpretations,64).entries()){path='$.interpretations['+i+']';
   keys(item,['id','target','type','ref','attributes']);claim(item.id,'m');if(item.ref!==null&&!semantics||!nativeAuthoring&&list(item.attributes,16).length)throw Error('Interpretation references/attributes unavailable in 4A');
   const attrs=attributeValues(item.attributes);if(item.ref!==null&&Object.keys(attrs).length)throw Error('Entity reference attributes unavailable');
-  const range=ranges.get(item.target);if(!range?.key)throw Error('Interpretation needs a proposed exact source anchor');
-  const spec=item.ref!==null&&semantics?semantic.mark(item.type,item.ref):annotation(item.type,attrs,registry,provenance,nativeAuthoring,textAuthoring,vocabulary);if(spec.type!==ENTITY_REFERENCE&&spec.type!==INERT&&!classifications.includes(spec.type)&&!(nativeAuthoring&&legend(registry,true,textAuthoring).some(t=>t.type===spec.type)))throw Error('Only discursive classifications may be applied to existing sources in 4A');annotations.get(range.key)!.push({id:crypto.randomUUID(),...spec,start:range.start,end:range.end-1,metadata:{...spec.metadata,dcp:{...provenance,appliedTo:'existing-source',sourceAuthor:range.sourceAuthor}}});
+  item.target=await resolveSemanticTarget(item.target);const range=ranges.get(item.target);if(!range)throw Error('Interpretation needs a proposed passage anchor');
+  const destination=range.key?annotations.get(range.key)!:[...generatedText.values()].find(n=>n.id===range.blockId)?.standoffProperties as any[];if(!destination)throw Error('Interpretation target unavailable');
+  const spec=item.ref!==null&&semantics?semantic.mark(item.type,item.ref):annotation(item.type,attrs,registry,provenance,nativeAuthoring,textAuthoring,vocabulary);if(spec.type!==ENTITY_REFERENCE&&spec.type!==INERT&&!classifications.includes(spec.type)&&!(nativeAuthoring&&legend(registry,true,textAuthoring).some(t=>t.type===spec.type)))throw Error('Only discursive classifications may be applied to existing sources in 4A');destination.push({id:crypto.randomUUID(),...spec,start:range.start,end:range.end-1,metadata:{...spec.metadata,dcp:{...provenance,appliedTo:range.key?'existing-source':'generated',sourceAuthor:range.sourceAuthor,...(range.revision?{sourceRevision:range.revision}:{})}}});
  }
  if(semantics){
+  path='$.arguments';for(const a of list(response.arguments,64))a.anchor=await resolveSemanticTarget(a.anchor);
   path='$.relations';await semantic.argumentsAndRelations(response.arguments,response.relations);
   for(const [i,input] of list(response.glosses,32).entries()){path='$.glosses['+i+']';
-   const mark=semantic.gloss(input),range=ranges.get(input.target);
-   if(range){if(range.key){mark.metadata.dcp={...provenance,appliedTo:'existing-source',sourceAuthor:range.sourceAuthor};definitions[mark.annotationId].metadata.dcp=mark.metadata.dcp;}const properties=range.key?annotations.get(range.key)!:(()=>{const walk=(nodes:ExistingBlockDto[]):any=>{for(const n of nodes){if(n.id===range.blockId)return n.standoffProperties;const result=walk(ownedChildren(n));if(result)return result;}};return walk(children);})();properties.push({...mark,start:range.start,end:range.end-1});}
+   input.target=await resolveSemanticTarget(input.target);const mark=semantic.gloss(input),range=ranges.get(input.target);
+   if(range){if(range.key){mark.metadata.dcp={...provenance,appliedTo:'existing-source',sourceAuthor:range.sourceAuthor,...(range.revision?{sourceRevision:range.revision}:{})};definitions[mark.annotationId].metadata.dcp=mark.metadata.dcp;}const properties=range.key?annotations.get(range.key)!:(()=>{const walk=(nodes:ExistingBlockDto[]):any=>{for(const n of nodes){if(n.id===range.blockId)return n.standoffProperties;const result=walk(ownedChildren(n));if(result)return result;}};return walk(children);})();properties.push({...mark,start:range.start,end:range.end-1});}
    else {const t=semantic.target(input.target);if(t.kind!=='range')throw Error('Gloss needs an explicit passage anchor');sources.definition(t);const resolved=sources.resolve(t);if(resolved.status!=='resolved'||!resolved.segments?.length)throw Error('Gloss passage unavailable');const source=await sources.source(input.target);mark.metadata.dcp={...provenance,appliedTo:'existing-source',sourceAuthor:source.sourceAuthor??'unknown'};definitions[mark.annotationId].metadata.dcp=mark.metadata.dcp;for(const s of resolved.segments){const p=annotations.get(s.node.key)??[];p.push({...mark,id:crypto.randomUUID(),start:s.start,end:s.end-1});annotations.set(s.node.key,p);}}
   }
  }
