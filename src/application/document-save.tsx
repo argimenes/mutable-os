@@ -5,6 +5,7 @@ import {availableNativeFilename} from '../persistence/document-file-names.mjs';
 import {vaultContains,vaultRoot,vaultLeaf,type VaultLocation} from './document-vault';
 import {DocumentSaveCollision,type SaveCollisionChoice} from '../rendering/document-save-collision';
 import {DocumentDialog} from '../demo/document-dialog';
+import {beforeSaveCapture} from '../persistence/after-paint';
 
 export type SavePrompt = {kind:'collision';filename:string;suggested:string;overwriteUnavailable?:string;choose:(choice:SaveCollisionChoice)=>void} | {kind:'destination';root:string;filename:string;choose:(location?:VaultLocation)=>void};
 export function validateSaveDestination(root:string,folder:string,filename:string):VaultLocation {
@@ -35,6 +36,9 @@ export function createDocumentSave(editor:ReactiveEditor,options:{vault:()=>Prom
     if(!vault&&native.needsSaveDestination(id))throw Error('Open a Vault before saving this Document.');
     const resource=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='document-block'&&String((c.payload.metadata as any)?.documentId??c.payload.id)===id);
     if(!resource)throw Error('Document is no longer available');
+    // A queued contribution may already be included in the preceding save's
+    // catch-up generation. Do not capture those same bytes again.
+    if(submission&&!outside&&!native.needsSaveDestination(id)&&!native.hasPendingSave(id)&&!native.isDirty(id))return true;
     const meta=resource.payload.metadata as any;
     const name=submission?.defaultFilename??meta?.interchange?.suggestedFilename??meta?.title??source?.filename??'Document';
     const imported=!source&&!!meta?.interchange;
@@ -74,7 +78,14 @@ export function createDocumentSave(editor:ReactiveEditor,options:{vault:()=>Prom
      }
      return copy?native.saveCopy(id,target!,overwrite):native.save(id,target,overwrite);
     };
-    const result=vault?.run?await vault.run(action,first):await action();
+    let result=vault?.run?await vault.run(action,first):await action();
+    // Only commit-triggered Dialectic saves catch up edits made during I/O.
+    // Manual Save retains its one-generation policy. Failures stop the loop.
+    while(submission&&result?.phase==='saved'&&(result.dirty||native.isDirty(id))){
+     await beforeSaveCapture();check();
+     const next=()=>native.save(id);
+     result=vault?.run?await vault.run(next,false):await next();
+    }
     if(result?.phase!=='saved')throw Error(native.status(id));return true;
    }finally{saving=false;}
   },

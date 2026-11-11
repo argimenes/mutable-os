@@ -271,6 +271,9 @@ type CaptureAttempt = {
 type HistorySubscriber = { listener: (event: DeepReadonly<HistoryChanges>) => void; onError: CommitSubscriber["onError"] };
 
 export interface RepositoryChange {
+  /** Persisted resource owners affected on either side of this commit. */
+  resourceIds?: readonly string[];
+  resourceProvenanceChanged?: boolean;
   /** Lightweight identity/cause for occurrence-local history restoration.
    * Does not enable exact-record capture on ordinary typing. */
   commit?: { id: string; cause: CommitMetadata['cause'] };
@@ -316,6 +319,70 @@ export class CanonicalRepository {
   private readonly commitSubscribers = new Set<CommitSubscriber>();
   private readonly historySubscribers = new Set<HistorySubscriber>();
   private deliveringCommit = false;
+  private resourceGenerations = new Map<string, number>();
+  private resourceProvenanceGeneration = 0;
+
+  /** Monotonic committed-content generation, independent of history position.
+   * No traversal, snapshot, reactive subscription or serialization on reads. */
+  resourceGeneration(id: string): number {
+    // Legacy repositories without incoming ownership evidence fail closed.
+    return this.references.enriched ? Math.max(this.resourceGenerations.get(id) ?? 0, this.resourceProvenanceGeneration) : this.readState().revision;
+  }
+
+  /** Follow existing incoming ownership/location evidence, not occurrences.
+   * Both sides of a commit are inspected, including placement-only mutations,
+   * retained definitions, named relations and record-batch imports/restores. */
+  private changedResources(operations: readonly RepositoryOperation[], ids = new Set<string>()) {
+    if (!this.references.enriched) return ids;
+    const state = this.readState(), visited = new Set<string>();
+    const visit = (key: string | undefined) => {
+      if (!key || visited.has(key)) return; visited.add(key);
+      const c = state.contents[key]; if (!c) return;
+      if (c.viewType === 'document-block') {
+        const id = (c.payload.metadata as any)?.documentId ?? c.payload.id;
+        if (typeof id === 'string') ids.add(id);
+        return; // Nested Documents persist independently.
+      }
+      visit(c.definitionOwnerKey);
+      for (const pk of this.references.ownedKeys(key)) {
+        const p = state.placements[pk];
+        if (p && !p.externalReference && !p.resolvedReference) visit(this.locations.get(pk)?.ownerContentKey);
+      }
+    };
+    const placement = (key: string) => {
+      visit(this.locations.get(key)?.ownerContentKey);
+      const p = state.placements[key];
+      if (p && !p.externalReference && !p.resolvedReference && (p.kind !== 'reference' || p.resourceRegistration)) visit(p.contentKey);
+    };
+    for (const op of recordOperations(operations)) {
+      if (op.kind === 'put-content' || op.kind === 'remove-content') visit(op.kind === 'put-content' ? op.record.key : op.key);
+      else if (op.kind === 'put-placement' || op.kind === 'remove-placement') placement(op.kind === 'put-placement' ? op.record.key : op.key);
+      else if (op.kind === 'set-root') { placement(state.rootPlacementKey); placement(op.key); }
+    }
+    return ids;
+  }
+
+  private changesResourceProvenance(operations: readonly RepositoryOperation[]) {
+    // Identity/definition ownership can affect persisted foreign-reference
+    // provenance without changing a referring record. These rare mutations
+    // conservatively invalidate every save baseline; ordinary edits do not.
+    const state = this.readState();
+    for (const op of recordOperations(operations)) {
+      if (op.kind !== 'put-content' && op.kind !== 'remove-content') continue;
+      const before = state.contents[op.kind === 'put-content' ? op.record.key : op.key];
+      const after = op.kind === 'put-content' ? op.record : undefined;
+      if (!before || before.viewType === 'text-cell' || before.viewType === 'image-cell') continue;
+      if (after && (before.payload.id !== after.payload.id || before.definitionOwnerKey !== after.definitionOwnerKey) ||
+          before.viewType === 'document-block' && (!after || after.viewType !== before.viewType ||
+          (before.payload.metadata as any)?.documentId !== (after.payload.metadata as any)?.documentId)) return true;
+    }
+    return false;
+  }
+
+  private advanceResourceGenerations(operations: readonly RepositoryOperation[], ids: Set<string>, provenance: boolean) {
+    for (const id of this.changedResources(operations, ids)) this.resourceGenerations.set(id, this.readState().revision);
+    if (provenance) this.resourceProvenanceGeneration = this.readState().revision;
+  }
 
   constructor(initial: RepositoryState, options: RepositoryOptions = {}) {
     const validation: BoundaryValidation | undefined = options.resourceBoundaryEvidence !== false ? {} : undefined;
@@ -506,6 +573,7 @@ export class CanonicalRepository {
     next.revision = current.revision + 1;
     const identityDelta = this.identity?.validateCommit(operations);
     const capture = this.prepareCapture(current, operations, metadata, next);
+    const resources = this.changedResources(operations), provenance = this.changesResourceProvenance(operations);
     const commitId = createCommitId();
     const previousContents = new Map<ContentKey, ContentRecord | undefined>();
     for (const operation of recordOperations(operations)) {
@@ -544,6 +612,7 @@ export class CanonicalRepository {
       if (this.boundary) this.boundary.validation = validation!;
       if (identityDelta) this.identity!.acceptCommit(identityDelta);
       this.placementIdentity.acceptCommit(placementDelta);
+      this.advanceResourceGenerations(operations, resources, provenance);
       if (recordHistory) {
         this.undoStack.push(this.historyStorage.store(commitId, label, operations, inverse));
         this.redoStack = [];
@@ -551,7 +620,7 @@ export class CanonicalRepository {
       this.deliverCapture(capture, commitId, label, recordHistory);
       for (const subscriber of this.subscribers) subscriber(this.snapshot(), label);
       const origins = annotationOrigins(operations);
-      for (const subscriber of this.changeSubscribers) subscriber({ commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
+      for (const subscriber of this.changeSubscribers) subscriber({ resourceIds: this.references.enriched ? [...resources] : undefined, resourceProvenanceChanged: provenance, commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
     });
   }
 
@@ -583,6 +652,7 @@ export class CanonicalRepository {
     for (const subscriber of this.beforeSubscribers) subscriber(this.snapshot(), label);
     const identityDelta = this.identity?.validateCommit(prepared);
     const capture = this.prepareCapture(current, prepared, metadata);
+    const resources = this.changedResources(prepared), provenance = this.changesResourceProvenance(prepared);
     const commitId = createCommitId();
     batch(() => {
       // Remove old locations before installing new ones: a split transfers Cells
@@ -621,6 +691,7 @@ export class CanonicalRepository {
       if (this.boundary && !boundarySafe) this.boundary.validation = {error: "Unclassified fast mutation: resource ownership requires full admitted validation"};
       if (identityDelta) this.identity!.acceptCommit(identityDelta);
       if (placementDelta) this.placementIdentity.acceptCommit(placementDelta);
+      this.advanceResourceGenerations(prepared, resources, provenance);
       if (recordHistory) {
         this.undoStack.push(this.historyStorage.store(commitId, label, operations, inverse));
         this.redoStack = [];
@@ -628,7 +699,7 @@ export class CanonicalRepository {
       this.deliverCapture(capture, commitId, label, recordHistory);
       for (const subscriber of this.subscribers) subscriber(this.snapshot(), label);
       const origins = annotationOrigins(operations);
-      for (const subscriber of this.changeSubscribers) subscriber({ commit: { id: commitId, cause: metadata.cause }, label, previousContents, inlineOwner, split, childrenOwner, emptyParagraph, listWrap, taskStateOwner, structural, annotationOrigins: origins });
+      for (const subscriber of this.changeSubscribers) subscriber({ resourceIds: this.references.enriched ? [...resources] : undefined, resourceProvenanceChanged: provenance, commit: { id: commitId, cause: metadata.cause }, label, previousContents, inlineOwner, split, childrenOwner, emptyParagraph, listWrap, taskStateOwner, structural, annotationOrigins: origins });
     });
   }
 

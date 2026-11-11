@@ -16,6 +16,23 @@ import {nativeDocumentSession} from '../persistence/native-session';
 const cleanup:Array<()=>any>=[];afterEach(async()=>{for(const f of cleanup.splice(0).reverse())await f();document.body.replaceChildren();vi.unstubAllGlobals();vi.restoreAllMocks();});
 const wait=(f:()=>void)=>vi.waitFor(f,{timeout:6000});
 const click=(label:string)=>{const b=[...document.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label||b.getAttribute('aria-label')===label)!;expect(b,label).toBeTruthy();expect(b.disabled).toBe(false);b.click();};
+it('submission saving catches up edits made during I/O before reporting completion',async()=>{
+ const f=await setup();await fs.writeFile(path.join(f.root,'vault/Conversation.ink'),f.original);
+ await f.actions.serverDocument({folder:'vault',filename:'Conversation.ink'},new AbortController().signal);
+ const editor=f.session.editor,id=JSON.parse(f.original).resourceId;
+ const c=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='standoff-editor-block')!;
+ const p=Object.values(editor.repository.readState().placements).find(p=>p.contentKey===c.key)!;
+ let save!:ReturnType<typeof createDocumentSave>['save'];
+ const Host=()=>{const s=createDocumentSave(editor,{guard:()=>{},vault:async()=>({root:'vault'})});save=s.save;return <s.Dialogs/>;};cleanup.push(render(()=><Host/>,document.body));
+ let entered!:()=>void,resume!:()=>void;const arrived=new Promise<void>(r=>entered=r),held=new Promise<void>(r=>resume=r),actual=fetch,writes:any[]=[];
+ vi.stubGlobal('fetch',async(input:any,init:any)=>{const result=await actual(input,init);if(String(input)==='/api/native/save'){writes.push(JSON.parse(init.body));if(writes.length===1){entered();await held;}}return result;});
+ editor.commands.replaceInlineRange(p.key,0,0,'Before save ');
+ const saving=save(id,undefined,false,{defaultFilename:'Ignored.ink'});await arrived;
+ editor.commands.replaceInlineRange(p.key,0,0,'During save ');expect(f.native.isDirty(id)).toBe(true);resume();
+ expect(await saving).toBe(true);expect(writes).toHaveLength(2);expect(writes[0].generation.native).not.toContain('During save');expect(writes[1].generation.native).toContain('During save');
+ expect(f.native.isDirty(id)).toBe(false);expect(await fs.readFile(path.join(f.root,'vault/Conversation.ink'),'utf8')).toBe(writes[1].generation.native);
+ expect(await save(id,undefined,false,{defaultFilename:'Ignored.ink'})).toBe(true);expect(writes).toHaveLength(2);
+});
 async function setup(){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'ink-vault-save-'));cleanup.push(()=>fs.rm(root,{recursive:true,force:true}));await fs.mkdir(path.join(root,'vault'));await fs.mkdir(path.join(root,'outside'));
  const original=await fs.readFile('artifacts/flint-b1.2/rich.mutable.json','utf8');await fs.writeFile(path.join(root,'outside/Original.ink'),original);
@@ -83,6 +100,7 @@ it('submission saves preserve native names, choose collision-free date names, an
  const field=document.querySelector<HTMLInputElement>('[aria-label="Save Vault filename"]')!;field.value='My chosen name.ink';field.dispatchEvent(new Event('input',{bubbles:true}));click('Save in Vault');await copy;
  await save(id,undefined,false,{defaultFilename:'Conversation on November 11, 2026.ink'});expect(f.native.location(id)?.filename).toBe('My chosen name.ink');
  const fetchBefore=globalThis.fetch;let failed=false;const generations:string[]=[];
+ editor.commands.setPayloadField(key,'metadata',{...(record.payload.metadata as any),title:'A newer conversation title'});
  vi.stubGlobal('fetch',(input:any,init:any)=>{if(String(input).endsWith('/api/native/save')){generations.push(JSON.parse(init.body).generation.generation);if(!failed){failed=true;return Promise.reject(new TypeError('Failed to fetch'));}}return fetchBefore(input,init);});
  await expect(save(id,undefined,false,{defaultFilename:name})).rejects.toThrow('Failed to fetch');expect(f.native.hasPendingSave(id)).toBe(true);
  expect(await save(id,undefined,false,{defaultFilename:name})).toBe(true);expect(f.native.hasPendingSave(id)).toBe(false);expect(generations[1]).toBe(generations[0]);

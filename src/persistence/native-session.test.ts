@@ -11,6 +11,7 @@ import { createNativeDocumentStoreRouter } from '../../server/native-document-st
 import { normalizeDefinitionOwnership } from '../block-tree/definition-ownership';
 import * as markdown from './markdown';
 import { browserSaveDiagnostics } from './browser-save-diagnostics';
+import {ResourcePair} from './resource-pair';
 const cleanup:Array<()=>any>=[];afterEach(async()=>{for(const dispose of cleanup.splice(0).reverse())await dispose();vi.unstubAllGlobals();vi.restoreAllMocks();});
 async function host(readOnly=false) {
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'native-client-'));cleanup.push(()=>fs.rm(root,{recursive:true,force:true}));
@@ -130,6 +131,21 @@ it('keeps newer edits dirty when an earlier explicit save completes',async()=>{
  expect(await saving).toMatchObject({phase:'saved',dirty:true});expect(service.isDirty(id)).toBe(true);
  expect(await fs.readFile(path.join(f.root,'rich.mutable.json'),'utf8')).not.toContain('Later edit');
  expect(await service.save(id)).toMatchObject({phase:'saved',dirty:false});expect(service.isDirty(id)).toBe(false);
+});
+it('does not clear an edit made between save acknowledgement and session completion',async()=>{
+ const f=await host(),{editor,service}=f.make(),id=await service.open({folder:'.',filename:'rich.mutable.json'});
+ const c=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='standoff-editor-block')!;
+ const p=Object.values(editor.repository.readState().placements).find(p=>p.contentKey===c.key)!;
+ const original=ResourcePair.prototype.save;
+ vi.spyOn(ResourcePair.prototype,'save').mockImplementationOnce(async function(this:ResourcePair){
+   const result=await original.call(this);
+   editor.commands.replaceInlineRange(p.key,0,0,'After acknowledgement ');
+   return result;
+ });
+ expect(await service.save(id)).toMatchObject({phase:'saved',dirty:true});expect(service.isDirty(id)).toBe(true);
+ expect(await fs.readFile(path.join(f.root,'rich.mutable.json'),'utf8')).not.toContain('After acknowledgement');
+ expect(await service.save(id)).toMatchObject({phase:'saved',dirty:false});
+ expect(await fs.readFile(path.join(f.root,'rich.mutable.json'),'utf8')).toContain('After acknowledgement');
 });
 
 it.each([false,true])('tracks empty paragraph removal and undo incrementally (retained=%s)',async retained=>{

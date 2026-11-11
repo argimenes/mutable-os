@@ -46,12 +46,15 @@ export interface VaultRelocation {
 export class NativeDocumentSession {
   private legacyVaultDiscovery = false;
   private bindings = new Map<string, Binding>();
-  private compatibleSources = new Map<string,{location:DocumentLocation;byteHash:string;format:string;vault:string;canSave:boolean;message:string;dirty:boolean;busy:boolean;members:Set<string>;pending?:any}>();
+  private compatibleSources = new Map<string,{location:DocumentLocation;byteHash:string;format:string;vault:string;canSave:boolean;message:string;dirty:boolean;busy:boolean;members:Set<string>;pending?:any;pendingRevision?:number;savedRevision:number|undefined}>();
   private changed = createSignal(0);
   private localStatusChanges = createStore<Record<string, number>>({});
   private dirtyState = createStore<Record<string, boolean>>({});
   /** Per-resource flags: reading a tab indicator must never capture a Document. */
-  isDirty(id: string) { return this.dirtyState[0][id] ?? true; }
+  isDirty(id: string) {
+    const dirty=this.dirtyState[0][id]??true,b=this.bindings.get(id),s=this.compatibleSources.get(id);
+    return dirty || (b ? b.pair.dirty : s ? this.editor.repository.resourceGeneration(id)!==s.savedRevision : false);
+  }
   hasPendingSave(id: string) { return !!(this.bindings.get(id)?.pending || this.compatibleSources.get(id)?.pending); }
   /** A failed first destination is not a saved binding. Pending generations keep their destination. */
   needsSaveDestination(id: string) {
@@ -81,9 +84,12 @@ export class NativeDocumentSession {
   private candidates = new Set<string>();
   private relocations = new Map<string, { request: VaultRelocation; work?: Promise<unknown>; bindings: Array<{ id: string; baseline: Baseline; location: DocumentLocation }> }>();
   constructor(private editor: ReactiveEditor) {
-    const warn = (event: BeforeUnloadEvent) => { if (this.candidates.size || this.relocations.size || [...this.compatibleSources.values()].some(s=>s.dirty||s.pending) || [...this.bindings].some(([id,b]) => b.pending || b.relocation || this.isDirty(id))) { event.preventDefault(); event.returnValue = ''; } };
+    const warn = (event: BeforeUnloadEvent) => { if (this.candidates.size || this.relocations.size || [...this.compatibleSources].some(([id,s])=>this.isDirty(id)||s.pending) || [...this.bindings].some(([id,b]) => b.pending || b.relocation || this.isDirty(id))) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', warn);
     const stop = editor.repository.subscribeChanges(change => {
+      // Canonical owner generations also cover placement-only changes and
+      // foreign-provenance invalidation, which content membership alone misses.
+      const affectedResource = (id:string) => change.resourceProvenanceChanged || !change.resourceIds || change.resourceIds.includes(id);
       const oriented = change.structural?.tabOrientationOwner ?? change.structural?.sequenceMetadataOwner;
       const tabMetadata = change.structural?.tabMetadata;
       const membership = change.structural?.membership;
@@ -99,7 +105,7 @@ export class NativeDocumentSession {
           }
         };
         batch(() => {
-          for (const [id, b] of this.bindings) if (affected.some(key=>b.members.has(key))) {
+          for (const [id, b] of this.bindings) if (affectedResource(id)) {
             update(b.members);
             if (!b.pending && !b.busy && b.message !== 'Document changed — Save required') {
               b.message = 'Document changed — Save required';
@@ -107,7 +113,7 @@ export class NativeDocumentSession {
             }
             this.markDirty(id, true);
           }
-          for (const [id, s] of this.compatibleSources) if (affected.some(key=>s.members.has(key))) {
+          for (const [id, s] of this.compatibleSources) if (affectedResource(id)) {
             update(s.members);
             s.dirty = true;
             if (!s.busy && !s.pending && s.message !== 'Document changed — Save required') {
@@ -120,12 +126,12 @@ export class NativeDocumentSession {
         return;
       }
       for (const [id,b] of this.bindings) {
-        if (![...change.previousContents.keys(), ...(change.inlineOwner ? [change.inlineOwner] : [])].some(k => b.members.has(k))) continue;
+        if (!affectedResource(id)) continue;
         this.markDirty(id, true);
         if (!b.pending && !b.busy) b.message = 'Document changed — Save required';
         if (!change.inlineOwner) { try { b.members = this.updateMembers(b.members, id, change); } catch { b.message = 'Canonical source unavailable or ambiguous'; } }
       }
-      for(const [id,s] of this.compatibleSources){if(![...change.previousContents.keys(),...(change.inlineOwner?[change.inlineOwner]:[])].some(k=>s.members.has(k)))continue;s.dirty=true;this.markDirty(id,true);if(!change.inlineOwner){try{s.members=this.updateMembers(s.members,id,change);}catch{s.message="Canonical source unavailable or ambiguous";}}if(!s.busy&&!s.pending)s.message="Document changed — Save required";}
+      for(const [id,s] of this.compatibleSources){if(!affectedResource(id))continue;s.dirty=true;this.markDirty(id,true);if(!change.inlineOwner){try{s.members=this.updateMembers(s.members,id,change);}catch{s.message="Canonical source unavailable or ambiguous";}}if(!s.busy&&!s.pending)s.message="Document changed — Save required";}
       this.touch();
     });
     ownNativeSession(editor.repository, () => { this.disposed = true;this.notifyKnowledge();this.knowledgeListeners.clear(); stop(); window.removeEventListener('beforeunload', warn); });
@@ -297,7 +303,7 @@ export class NativeDocumentSession {
       const boundary=this.editor.repository.readCanonicalResourceBoundary(id);
       if(!old&&boundary.status!=='missing')throw Error('Canonical identity is already loaded without this source proof; no implicit adoption');
       if(!old||boundary.status!=='ready')admitNative(this.editor.repository,new TextEncoder().encode(nativeText(recognized.resource)),this.bank());
-      if(!old)this.compatibleSources.set(id,{location:{...location},byteHash:data.byteHash,format:recognized.format,vault,canSave:data.saveCapability==='in-place',message:data.saveCapability==='in-place'?'Opened Document — in-place Save available':data.saveReason,dirty:false,busy:false,members:new Set(Object.keys(captureNative(this.editor.repository.snapshot(),id).contents))});
+      if(!old)this.compatibleSources.set(id,{location:{...location},byteHash:data.byteHash,format:recognized.format,vault,canSave:data.saveCapability==='in-place',message:data.saveCapability==='in-place'?'Opened Document — in-place Save available':data.saveReason,dirty:false,busy:false,savedRevision:this.editor.repository.resourceGeneration(id),members:new Set(Object.keys(captureNative(this.editor.repository.snapshot(),id).contents))});
       this.markDirty(id,this.compatibleSources.get(id)!.dirty);markNativeBinding(this.editor.repository,id);this.touchStorage();this.touch();return id;
     }finally{this.opening--;this.notifyKnowledge();}
   }
@@ -347,7 +353,7 @@ export class NativeDocumentSession {
       const admitted=admitNativeWithResource(this.editor.repository,bytes,this.bank(),data.resourceId);
       const binding=existing??this.bind(data.resourceId,location,data.baseline,admitted.members);
       if(existing)binding.members=new Set(admitted.members);
-      binding.pair.acknowledgeOpen(nativeText(admitted.resource));binding.message=data.readOnly?'Opened native Document (server is read-only)':'Opened native Document';
+      binding.pair.acknowledgeOpen();binding.message=data.readOnly?'Opened native Document (server is read-only)':'Opened native Document';
       const contentKey=this.editor.repository.state.placements[admitted.placementKey].contentKey;
       this.editor.persistence.registerWorkspaceDocument(contentKey,data.resourceId,location.folder,location.filename);
       this.touch();expected?.completed();return data.resourceId;
@@ -382,7 +388,10 @@ export class NativeDocumentSession {
     if(b.relocationWork)await b.relocationWork;
     if(b.relocation)throw new Error('Recover pending relocation before Save');
     if(b.busy)return;b.busy=true;b.message=recovery?'Recovering captured generation…':'Saving Mutable JSON Document…';this.notifyKnowledge();this.touch();
-    try {const r=await (recovery?b.pair.recover():b.pair.save(b.comparedHash));
+    try {const completed=await (recovery?b.pair.recover():b.pair.save(b.comparedHash));
+      // A programmatic edit can run between promise continuations. Never clear
+      // a newer dirty notification using the coordinator's earlier result.
+      const r={...completed,dirty:completed.phase==='saved'?b.pair.dirty:true};
       const labels={saved:'Saved Mutable JSON Document',failed:'Save blocked','canonical-saved-markdown-pending':'Canonical saved; Markdown pending','confirmation-pending':'Confirmation pending'};
       b.message=labels[r.phase]+(r.dirty?' — newer/unsaved edits remain':'')+(r.error?`: ${r.error}`:'');
       if(r.phase==='saved'){b.comparedHash=undefined;this.markDirty(id,!!r.dirty);}
@@ -432,12 +441,15 @@ export class NativeDocumentSession {
     if(!s.canSave)throw Error(s.message);
     s.busy=true;s.message='Saving Document';this.notifyKnowledge();this.touch();
     try{
-      s.pending??={vault:s.vault,source:{resourceId:id,location:s.location,byteHash:s.byteHash},format:s.format,dependencies:this.dependencies(id),generation:crypto.randomUUID(),native:nativeText(captureNative(this.editor.repository.snapshot(),id))};
+      if(!s.pending){
+        s.pendingRevision=this.editor.repository.resourceGeneration(id);
+        s.pending={vault:s.vault,source:{resourceId:id,location:s.location,byteHash:s.byteHash},format:s.format,dependencies:this.dependencies(id),generation:crypto.randomUUID(),native:nativeText(captureNative(this.editor.repository.readState(),id))};
+      }
       const result=await request('save-recognized',s.pending);
       if(result.phase!=='saved'){s.message='Document Save pending: '+result.error;return result;}
-      s.byteHash=result.byteHash;const captured=s.pending.native;s.pending=undefined;
-      s.dirty=nativeText(captureNative(this.editor.repository.snapshot(),id))!==captured;this.markDirty(id,s.dirty);
-      s.message='Saved Document in place'+(s.dirty?' — newer edits remain':'');this.touchStorage();return result;
+      s.byteHash=result.byteHash;s.pending=undefined;
+      s.savedRevision=s.pendingRevision;s.dirty=this.editor.repository.resourceGeneration(id)!==s.savedRevision;s.pendingRevision=undefined;this.markDirty(id,s.dirty);
+      s.message='Saved Document in place'+(s.dirty?' — newer edits remain':'');this.touchStorage();return {...result,dirty:s.dirty};
     }catch(e){if((e as any).preflight)s.pending=undefined;s.message='Document Save blocked: '+String(e);throw e;}
     finally{s.busy=false;this.notifyKnowledge();this.touch();}
   }

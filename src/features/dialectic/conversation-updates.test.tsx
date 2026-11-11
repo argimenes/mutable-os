@@ -13,7 +13,6 @@ import {nativeDocumentSession} from '../../persistence/native-session';
 import {ConversationHistory} from './continuity';
 import {plainFragment} from '../../interchange/serializer';
 import {exportClipboard} from '../../interchange/transport';
-import {mockTransport} from './dcp/exchange';
 const cleanup:Array<()=>void>=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());vi.restoreAllMocks();vi.unstubAllGlobals();document.body.replaceChildren();});
 async function setup(titles=false){
@@ -56,7 +55,7 @@ it('starts and admits the first AI response while its contribution save is pendi
  save.mockImplementation(async(id,filename)=>(await native.save(id,{folder:'isolated',filename}))?.phase==='saved');
  // First-use provider configuration yields while the newly submitted contribution starts saving.
  vi.spyOn(DialecticProviderSession.prototype,'configure').mockImplementation(async function(this:DialecticProviderSession,settings){await vi.waitFor(()=>expect(writes).toHaveLength(1));this.settings=settings;this.ready=true;return true;});
- const generated=vi.fn(mockTransport);
+ const generated=vi.fn(async()=>'<response><p>A native response while saving.</p></response>');
  vi.spyOn(DialecticProviderSession.prototype,'transport').mockImplementation(function(this:DialecticProviderSession){return {run:generated,details:{version:1,adapterVersion:'4c-1',settings:this.settings,attempts:[],cost:{status:'unknown'}},commit:async()=>{},cancel:async()=>{}};});
  editor.commands.replaceInlineRange(text().key,0,0,'An ordinary first contribution');
  try{
