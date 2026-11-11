@@ -54,7 +54,7 @@ export class DialecticProviderSession {
      const attempt:LiveProvenance['attempts'][number]={receipt:turn.receipt,toolCalls:turn.calls,toolResultIds:[]};details.attempts.push(attempt);round++;
      if(turn.calls.length){
       calls+=turn.calls.length;if(calls>liveLimits.calls||repair&&(!recoverSources||turn.calls.some(c=>!sourceRecoveryTools.some(tool=>tool===c.tool))))throw Error('DCP tool budget exceeded.');const results=[];
-      for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`,result=await sources.tool({...call,id:toolId});attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
+      for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`,nativeResult=await sources.tool({...call,arguments:sources.xmlAuthoring?sources.xmlAuthoring.toolArguments(call.tool,call.arguments):call.arguments,id:toolId}),result=sources.xmlAuthoring?(call.tool==='describe_capabilities'?sources.xmlAuthoring.describe(nativeResult):sources.xmlAuthoring.project(nativeResult)):nativeResult;attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
       next={round,results};continue;
      }
      try{await validate?.(turn.text);prepared=!!details.continuity;if(prepared)retainedId=id;return turn.text;}

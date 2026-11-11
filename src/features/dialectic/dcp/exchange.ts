@@ -70,7 +70,7 @@ export function request(...args:Parameters<typeof legacyRequest>|[...Parameters<
  result.authoring.instructions+=inlineAliasInstructions(vocabulary.standoff);
  return result;
 }
-export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id,emptyFields?:1,proactiveSemantics?:1){
+export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id,emptyFields?:1,proactiveSemantics?:1,neutralPassages=false){
  checkProactiveSemantics(proactiveSemantics);
  const vocabulary=sources.vocabulary;
  const nativeAuthoring=sources.editor?.features.dcpNativeAuthoringStage1===true;
@@ -109,7 +109,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
   if(depth>limits.depth)throw Error('DCP composition depth exceeded');
   if(!node||typeof node!=='object')throw Error('Invalid composition node');requireComposition(vocabulary,node.kind);claim(node.id,'b');
   if(node.kind==='paragraph'||nativeAuthoring&&node.kind==='heading'){
-   keys(node,['id','kind','markup','ranges',...(node.kind==='heading'?['level']:[]),...(textAuthoring&&Object.hasOwn(node,'textStyle')?['textStyle']:[]),...(compoundAuthoring&&Object.hasOwn(node,'margins')?['margins']:[])]);const parsed=markup(node.markup,list(node.ranges,128),registry,provenance,claim,semantics?semantic.mark:undefined,nativeAuthoring,textAuthoring,vocabulary);characters+=[...parsed.text].length;if(characters>limits.outputCells)throw Error('DCP output Cell budget');
+   keys(node,['id','kind','markup','ranges',...(node.kind==='heading'?['level']:[]),...(textAuthoring&&Object.hasOwn(node,'textStyle')?['textStyle']:[]),...(compoundAuthoring&&Object.hasOwn(node,'margins')?['margins']:[])]);const parsed=markup(node.markup,list(node.ranges,128),registry,provenance,claim,semantics?semantic.mark:undefined,nativeAuthoring,textAuthoring,vocabulary,neutralPassages);characters+=[...parsed.text].length;if(characters>limits.outputCells)throw Error('DCP output Cell budget');
    const block=dto('standoff-editor-block',{text:parsed.text,standoffProperties:parsed.marks}),properties=block.standoffProperties as any[];
    for(const [alias,span]of parsed.anchors)properties.push(anchor(alias,{...span,blockId:String(block.id),text:[...parsed.text].slice(span.start,span.end).join(''),sourceAuthor:actor}));
    generatedText.set(node.id,block);
@@ -211,7 +211,16 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  let targetCount=list(response.anchors,limits.anchors).length;
  const targetAliases=new Map<string,string>();
  const resolveSemanticTarget=async(value:any):Promise<string>=>{
-  if(typeof value==='string')return value;
+  if(typeof value==='string'){
+   // XML passage aliases retain native anchor identity. Hydrate a single current
+   // segment for inline interpretation; multi-segment Glosses keep their existing path.
+   if(neutralPassages&&!ranges.has(value)&&sources.handles.get(value)?.kind==='range'){
+    const t=sources.target(value);sources.definition(t);const source=await sources.source(value),resolved=sources.resolve(t);
+    if(source.status!=='complete'||resolved.status!=='resolved'||!resolved.segments?.length)throw Error('Anchor unavailable');
+    if(resolved.segments.length===1){const s=resolved.segments[0];ranges.set(value,{key:s.node.key,blockId:String(s.node.payload.id),start:s.start,end:s.end,text:source.text,sourceAuthor:source.sourceAuthor,revision:source.revision});if(!annotations.has(s.node.key))annotations.set(s.node.key,[]);}
+   }
+   return value;
+  }
   if(!semantics||!sources.editor.features.dcpSemanticWorkspace)throw Error('Declarative semantic targets disabled');
   const whole=declarativeTarget(value),cacheKey=JSON.stringify(value),cached=targetAliases.get(cacheKey);if(cached)return cached;
   if(++targetCount>limits.anchors)throw Error('Semantic target anchor budget exceeded');

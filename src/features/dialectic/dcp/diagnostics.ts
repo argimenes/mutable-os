@@ -1,5 +1,6 @@
 /** Only host-owned vocabulary crosses into repair instructions; never raw errors. */
 const reasons = {
+ xml:'Return one complete response element with optional terminal definitions. Use enabled XML tags/attributes, unique local IDs and current @aliases. Preserve exact text; no DTD, HTML repair or surrounding fence.',
  json:'Return a complete JSON object matching the response schema.',
  fields:'Include exactly the required fields of this object.',
  'source-identity':'Obtain a fresh current-exchange source handle using bounded discovery, then read_source for its current revision. Historical handles and revisions cannot author content.',

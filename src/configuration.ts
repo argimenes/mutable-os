@@ -126,6 +126,8 @@ export type FeatureFlags = Readonly<{
   /** Validated structured mock exchanges; no live provider or Stage 4B authoring. */
   dialecticDcp: boolean;
   /** Bounded discovery of admitted DCP authoring capabilities. */
+  /** Experimental alternative provider dialect; native persistence is unchanged. */
+  dcpXmlAuthoring: boolean;
   dcpCapabilityCatalogue: boolean;
   /** Exchange-local authoring selection; no persistent settings or UI. */
   dcpVocabularySelection: boolean;
@@ -270,6 +272,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialectic: true,
   dialecticContributionActivity: true,
   dialecticDcp: true,
+  dcpXmlAuthoring: true,
   dcpCapabilityCatalogue: true,
   dcpVocabularySelection: true,
   dcpProactiveSemanticAuthoring: true,

@@ -1,3 +1,5 @@
+import {XmlContext} from './dcp/xml-context';
+import {xmlDialect} from './dcp/xml-authoring';
 import {ENTITY_REFERENCE} from '../../feature-api/scoped-entities';
 import {emptySemanticFieldsVersion} from './dcp/empty-fields';
 import {semanticWorkspace,enableSemanticWorkspace} from './dcp/workspace';
@@ -294,8 +296,9 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    if(editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics){enableSemanticWorkspace(request);Object.assign(request,{semanticWorkspace:await semanticWorkspace(sources,participant.id,structuralContext.sources.map((s:any)=>s.target).filter(Boolean))});}
    if(!alive||ticket!==generation||session()!==source)return;sources.check();
    if(live){request.cadence=live.settings.cadence;request.protocolKey={...request.protocolKey,version:request.protocolKey.version+'-c1'};}
+   if(live&&editor.features.dcpXmlAuthoring){sources.xmlAuthoring=new XmlContext(sources,exchangeId);Object.assign(request,{dialect:xmlDialect,xmlContext:sources.xmlAuthoring.request(request)});}
    let prepared:Awaited<ReturnType<typeof prepareDcp>>|undefined;
-   const validate=async(raw:string)=>{sources!.check();prepared=await prepareDcp(raw,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock',participant.id,emptySemanticFieldsVersion,proactiveSemantics);};
+   const validate=async(raw:string)=>{sources!.check();prepared=await prepareDcp(sources!.xmlAuthoring?JSON.stringify(sources!.xmlAuthoring.lower(raw)):raw,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock',participant.id,emptySemanticFieldsVersion,proactiveSemantics,!!sources!.xmlAuthoring);};
    if(live)await logNative(resourceId(),committed().map(row=>source.projection.node(row.key)!.contentKey),'exchange.native-context');
    const raw=await receive(transport,request,sources,value=>{if(alive&&ticket===generation)streamPreview(value,ticket);},requestAbort,live?validate:undefined,live?liveLimits.deadlineMs:30000);
    if(!alive||ticket!==generation)return;
@@ -311,7 +314,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    const repaired=editor.features.dialecticContributionActivity?repairedNotice(live):undefined;
    const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...participant,name:live?participant.name:'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,...(repaired?{notices:[repaired]}:{}),
     replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
-    dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,identityMap:result.aliases,annotationRefs:result.annotationRefs,intent:result.intent,...(live?{provider:live}:{})}};
+    dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,...(sources.xmlAuthoring?{xmlBindings:sources.xmlAuthoring.bindings()}:{}),identityMap:result.aliases,annotationRefs:result.annotationRefs,intent:result.intent,...(live?{provider:live}:{})}};
    const started=performance.now();
    editor.commands.boundedStructuralTransaction(live?'Add DCP AI response':'Add DCP mock response',()=>{
     result.preparedResources.check();

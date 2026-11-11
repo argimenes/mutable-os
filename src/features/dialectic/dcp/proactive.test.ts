@@ -17,7 +17,7 @@ it('negotiates the proactive policy once, preserving legacy policy, examples and
  r.authoring.proactiveSemantics=1;const state=conversation(defaultProviderSettings,r);
  expect(state.system).toContain(proactiveEditorialPolicy);expect(proactiveEditorialPolicy).not.toContain('establish the recurring');
  expect(state.input[0].content).not.toContain('Interpret substantive');
- expect(JSON.parse(state.input[0].content).authoring.instructions).toBeUndefined();
+ expect(JSON.parse(state.input[0].content).authoring?.instructions).toBeUndefined();
  expect(state.system).toContain(r.authoring.instructions);expect(r.authoring.examples).toBeDefined();
  expect(s.vocabulary!.capabilities).toEqual(expect.arrayContaining(['semantic.argument','semantic.entity-relation','semantic.argument-relation']));
  const limited=resolveVocabulary(f.editor,{profile:'general',disable:['standoff:mutable/entity-reference']});expect(limited.capabilities).not.toContain('semantic.entity');

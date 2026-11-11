@@ -1,3 +1,4 @@
+import type {XmlContext} from './xml-context';
 import {unwrap} from 'solid-js/store';
 import {hasNativeSourceReader} from './reading';
 import {resolveVocabulary,type VocabularySelection,type VocabularySnapshot} from './vocabulary';
@@ -19,6 +20,7 @@ import type {DialecticReferences,Resolution} from '../references';
 function* edges(n:BlockNode){yield* n.children;for(const name in n.ownedRelations)yield n.ownedRelations[name];}
 export type SourceStatus='complete'|'truncated'|'missing'|'ambiguous'|'unavailable'|'unauthorized';
 export class DcpSources {
+ xmlAuthoring?:XmlContext;
  readonly vocabulary:VocabularySnapshot|undefined;
  readonly capabilities:ReturnType<typeof capabilityCatalogue>|undefined;
  readonly handles=new Map<string,ReplyTarget>();

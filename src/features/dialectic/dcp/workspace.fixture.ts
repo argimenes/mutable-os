@@ -19,7 +19,7 @@ export function workspaceFixture(enabled=true,proactive=true){
   Object.assign(r,{structuralContext});if(enabled){enableSemanticWorkspace(r);Object.assign(r,{semanticWorkspace:await semanticWorkspace(sources,participantId,structuralContext.sources.map(x=>x.target).filter(Boolean))});}return r as any;
  };
  const admit=async(sources:DcpSources,value:any,participantId='agent-A',r?:any)=>{
-  const prepared=await prepare(JSON.stringify(value),value.exchange,owner,editor.visualEffects,sources,true,'ai',participantId,r?.authoring?.emptySemanticFields,r?.authoring?.proactiveSemantics);sources.check();
+  const prepared=await prepare(JSON.stringify(value),value.exchange,owner,editor.visualEffects,sources,true,'ai',participantId,r?.authoring?.emptySemanticFields,r?.authoring?.proactiveSemantics,r?.dialect==='xml/1');sources.check();
   editor.commands.boundedStructuralTransaction('Semantic workspace contribution',()=>{
    prepared.preparedResources.check();if(prepared.preparedResources.leaves.size)throw Error('Media outside fixture');
    if(Object.keys(prepared.definitions).length)editor.commands.setPayloadField(root.key,'linkedAnnotations',{...JSON.parse(JSON.stringify(root.payload.linkedAnnotations??{})),...prepared.definitions});
