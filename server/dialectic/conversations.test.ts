@@ -52,3 +52,17 @@ it('rebuilds after a repaired native commit with a lost ACK, and rejects content
  const next=await f.service.plan(m,'key');expect(next.recovery).toBe(true);expect(next.start).toBe(0);expect(next.generation).toBe(2);expect(f.remote.size).toBe(1);
  await expect(f.service.plan({...m,history:[{...e.stamp,text:'must never enter journal'} as any]},'key')).rejects.toThrow(/manifest/);
 },30000);
+it('initialises a high-priority contract once and rebuilds only when that contract changes',async()=>{
+ const f=await setup(),m=f.manifest,key='key',one=entry('human-1');m.history.push(one.stamp);
+ const contract='Stable DCP contract',p=await f.service.plan(m,key,contract);
+ const r=await f.service.begin(m,p,[one.item],'x1',key,new AbortController().signal,contract);
+ expect(f.remote.get(r.conversationId)![0]).toEqual({type:'message',role:'developer',content:contract});
+ await f.service.prepared(m,key,'x1',false);m.history.push(entry('ai-1').stamp);await f.service.acknowledge(m,key,r);
+ const two=entry('human-2');m.history.push(two.stamp);const p2=await f.service.plan(m,key,contract);
+ expect(p2.recovery).toBe(false);expect(p2.start).toBe(2);
+ const r2=await f.service.begin(m,p2,[two.item],'x2',key,new AbortController().signal,contract);
+ expect(r2.conversationId).toBe(r.conversationId);expect(f.remote.get(r.conversationId)!.filter(x=>x.role==='developer')).toHaveLength(1);
+ await f.service.prepared(m,key,'x2',false);m.history.push(entry('ai-2').stamp);await f.service.acknowledge(m,key,r2);
+ const changed=await f.service.plan(m,key,'Changed vocabulary contract');expect(changed.recovery).toBe(true);expect(changed.start).toBe(0);
+ await expect(f.service.begin(m,changed,[],'x3',key,new AbortController().signal,contract)).rejects.toThrow('contract changed');
+},30000);

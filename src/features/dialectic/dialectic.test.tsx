@@ -49,6 +49,8 @@ async function setup(enabled=true,registry=true,dcp=true,semantics=false,protect
  const port=documentApplicationPorts(editor).ports().find(p=>p.applicationId==='dialectic')!;
  expect(port?.session()).toBeTruthy();
  const c=createRoot(dispose=>{cleanup.push(dispose);return createDialecticController(editor,()=>port);});cleanup.push(()=>c.dispose());
+ // Stage qualification explicitly opts into the compatibility vocabulary.
+ if(nativeAuthoring&&vocabulary)c.configureVocabulary({profile:'all-qualified'});
  const text=()=>port.session()!.projection.node(c.resolve(c.target(c.draft()!.id))!.children[0])!;
  const type=(s:string)=>editor.commands.replaceInlineRange(text().key,0,0,s);
  return {session,editor,host,port,c,text,type};

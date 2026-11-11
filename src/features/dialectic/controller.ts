@@ -1,7 +1,7 @@
 import {ENTITY_REFERENCE} from '../../feature-api/scoped-entities';
 import {emptySemanticFieldsVersion} from './dcp/empty-fields';
 import {semanticWorkspace,enableSemanticWorkspace} from './dcp/workspace';
-import {allQualifiedSelection,copyVocabularySelection,vocabularyDescriptors,type VocabularySelection} from './dcp/vocabulary';
+import {conversationalSelection,copyVocabularySelection,vocabularyDescriptors,type VocabularySelection} from './dcp/vocabulary';
 import {createSubmissionSave} from './submission-save';
 import {createConversationTitle} from './conversation-title';
 import {createContributionActivity,repairedNotice,type ActivityCategory,type ActivityItem,type ActivitySummary} from './activity';
@@ -33,7 +33,7 @@ const metadata=(n:BlockNode|undefined)=>(n?.payload.metadata??{}) as Record<stri
 export function createDialecticController(editor:ReactiveEditor,port:Accessor<DocumentApplicationPort|undefined>){
  const providers=new DialecticProviderSession(editor.features.dcpTestPhaseLogging);
  const history=new ConversationHistory(editor);
- const [vocabularySelection,storeVocabulary]=createSignal<Readonly<VocabularySelection>>(allQualifiedSelection);
+ const [vocabularySelection,storeVocabulary]=createSignal<Readonly<VocabularySelection>>(conversationalSelection);
  const configureVocabulary=(input:VocabularySelection)=>{if(!editor.features.dcpVocabularySelection)throw Error('DCP vocabulary selection disabled');const next=copyVocabularySelection(input),ids=new Set(vocabularyDescriptors(editor).map(d=>d.id));for(const id of [...next.enable??[],...next.disable??[]])if(!ids.has(id))throw Error('Unknown DCP capability: '+id);if(next.disable?.includes('composition.paragraph'))throw Error('Paragraphs are required');storeVocabulary(next);};
  const [selectedAi,setSelectedAi]=createSignal<string>();
  const [providerMode,setProviderMode]=createSignal<'mock'|'live'>(editor.features.dialecticProviders&&editor.features.dialecticDcp?'live':'mock'),[providerReady,setProviderReady]=createSignal(false),[providerSettings,setProviderSettings]=createSignal({...providers.settings}),[providerNotice,setProviderNotice]=createSignal(''),[providerConfiguring,setProviderConfiguring]=createSignal(false);

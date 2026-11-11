@@ -1,15 +1,16 @@
 import {validationDiagnostic,allowsSourceRecovery,sourceRecoveryTools} from './diagnostics';
-import {defaultProviderSettings,liveLimits,type ProviderSettings,type ProviderTurn,type LiveProvenance} from './provider-contract';
+import {defaultProviderSettings,providerSettings,liveLimits,type ProviderSettings,type ProviderTurn,type LiveProvenance} from './provider-contract';
 import type {DcpTransport} from './exchange';
 import type {ContinuityManifest,HistoryItem} from './continuity-contract';
 import {parseConversationTitle} from '../title-contract';
 
-/** Application-session memory only. Disposal/reload forgets the local bearer token. */
+/** Credentials and bearer tokens are session-only. Only validated, nonsecret preferences survive reload. */
+const preferencesKey='mutable.dialectic.provider-settings.v1';
 export class DialecticProviderSession {
  private token='';private pending?:Promise<void>;private disposed=false;
  settings:ProviderSettings={...defaultProviderSettings};ready=false;
  private pagehide=()=>{void this.forget();};
- constructor(readonly testLogging=false){window.addEventListener('pagehide',this.pagehide);}
+ constructor(readonly testLogging=false){try{const saved=localStorage.getItem(preferencesKey);if(saved)this.settings=providerSettings(JSON.parse(saved));}catch{}window.addEventListener('pagehide',this.pagehide);}
  private async connect(){
   if(this.disposed)throw Error('Provider session closed.');if(this.token)return;
   if(!this.pending)this.pending=(async()=>{const r=await fetch('/api/dialectic/session',{method:'POST',signal:AbortSignal.timeout(10000),headers:{'x-mutable-dialectic':'1'}});const data=await r.json();if(!r.ok)throw Error(data.error??'Local provider broker unavailable.');this.token=data.token;if(this.disposed){await this.forget();throw Error('Provider session closed.');}})().finally(()=>{this.pending=undefined;});
@@ -21,7 +22,7 @@ export class DialecticProviderSession {
  }
  async diagnostic(event:unknown){if(!this.testLogging)return false;const r=await this.call('/diagnostics',event);return (await r.json()).logged===true;}
  async title(text:string,signal:AbortSignal){if(!this.ready)throw Error('Provider unavailable');return parseConversationTitle(await(await this.call('/utility/title',{text},signal)).json());}
- async configure(settings:ProviderSettings,key?:string){const response=await this.call('/settings',{settings,...(key?{key}:{})});const data=await response.json();this.settings=data.settings;this.ready=data.ready;return this.ready;}
+ async configure(settings:ProviderSettings,key?:string){const response=await this.call('/settings',{settings,...(key?{key}:{})});const data=await response.json();this.settings=providerSettings(data.settings);this.ready=data.ready;try{localStorage.setItem(preferencesKey,JSON.stringify(this.settings));}catch{}return this.ready;}
  private async closeExchange(id:string){if(!this.token)return;await fetch('/api/dialectic/exchange/'+id,{method:'DELETE',signal:AbortSignal.timeout(2000),headers:{'x-mutable-dialectic':'1','x-dialectic-session':this.token},keepalive:true}).catch(()=>undefined);}
  async forget(){const token=this.token;this.token='';this.ready=false;if(token)await fetch('/api/dialectic/session',{method:'DELETE',headers:{'x-mutable-dialectic':'1','x-dialectic-session':token},keepalive:true}).catch(()=>undefined);}
  dispose(){window.removeEventListener('pagehide',this.pagehide);this.disposed=true;void this.forget();}
@@ -37,7 +38,7 @@ export class DialecticProviderSession {
     let continuity:any;
     if(history&&this.settings.provider==='openai'){
      const native=await history();sources.check();
-     const response=await this.call('/continuity/prepare',{manifest:native.manifest},signal),preflight=await response.json();
+     const response=await this.call('/continuity/prepare',{manifest:native.manifest,request},signal),preflight=await response.json();
      if(!preflight.supported)throw Error('Persistent provider memory is unavailable on this server. Disable continuity explicitly to use stateless mode.');
      continuity={manifest:native.manifest,plan:preflight.plan,items:native.items.slice(preflight.plan.start)};
      if(preflight.plan.recovery)chunk('Rebuilding provider memory from native conversation history…');
@@ -47,7 +48,7 @@ export class DialecticProviderSession {
      sources.check();const response=await this.call('/exchange/'+id+'/turn',next,signal);if(!response.body)throw Error('Missing broker stream.');
      const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',wire=0,preview='',turn:ProviderTurn|undefined;
      try{while(true){const {done,value}=await reader.read();if(done)break;wire+=value.byteLength;if(wire>2*liveLimits.wireBytes)throw Error('Broker stream budget exceeded.');buffer+=decoder.decode(value,{stream:true});let end:number;
-      while((end=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);if(!line)continue;const event=JSON.parse(line);if(event.type==='error')throw Error(event.error);if(event.type==='delta'){preview+=event.text;if(preview.length>liveLimits.bytes)throw Error('DCP output budget exceeded.');chunk(preview);}else if(event.type==='result'){if(turn)throw Error('Duplicate provider result.');turn=event;}}
+      while((end=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);if(!line)continue;const event=JSON.parse(line);if(event.type==='error'){details.failure={message:String(event.error).slice(0,1000),...(event.receipt?{receipt:event.receipt}:{})};throw Error(event.error);}if(event.type==='delta'){preview+=event.text;if(preview.length>liveLimits.bytes)throw Error('DCP output budget exceeded.');chunk(preview);}else if(event.type==='result'){if(turn)throw Error('Duplicate provider result.');turn=event;}}
      }}finally{await reader.cancel().catch(()=>undefined);reader.releaseLock();}
      if(buffer.trim()||!turn)throw Error('Broker stream interrupted; no contribution committed.');sources.check();
      const attempt:LiveProvenance['attempts'][number]={receipt:turn.receipt,toolCalls:turn.calls,toolResultIds:[]};details.attempts.push(attempt);round++;

@@ -8,8 +8,9 @@ export type {VocabularySelection,VocabularySnapshot,VocabularyDescriptor,Vocabul
 // Preset membership references existing descriptor IDs; it defines no native types,
 // constructors or validation. User overrides remain independent of presets.
 const core=['composition.paragraph','composition.heading','composition.group','composition.list','composition.table','composition.code','source.anchor','source.classification','reference.reply',...['style/bold','style/italics','style/highlight','reference/url'].map(t=>'standoff:'+t)];
-const general=[...core,'composition.card-grid','composition.tabs','composition.surface','composition.tasks','configuration.margins','configuration.text','configuration.list-numbering','configuration.table-headers','composition.sticky-note','media.external-image','media.video','media.youtube','media.embed','semantic.gloss','semantic.entity','standoff:mutable/entity-reference'];
+const general=[...core,...['style/underline','style/strikethrough','dialectic/claim','dialectic/question','dialectic/speculation','dialectic/suggestion','dialectic/objection','dialectic/qualification'].map(t=>'standoff:'+t),'composition.card-grid','composition.tabs','composition.surface','composition.tasks','configuration.margins','configuration.text','configuration.list-numbering','configuration.table-headers','composition.sticky-note','media.external-image','media.video','media.youtube','media.embed','semantic.gloss','semantic.entity','standoff:mutable/entity-reference'];
 const research=[...general,'composition.pages','composition.source','semantic.entity','semantic.argument','semantic.argument-relation','semantic.entity-relation','media.image','media.retained-pdf','standoff:mutable/entity-reference'];
+export const conversationalSelection:Readonly<VocabularySelection>=Object.freeze({profile:'general'});
 export const allQualifiedSelection:Readonly<VocabularySelection>=Object.freeze({profile:'all-qualified'});
 export function copyVocabularySelection(input:VocabularySelection):Readonly<VocabularySelection>{
  if(!input||!['all-qualified','core','general','research'].includes(input.profile)||Object.keys(input).some(k=>!['profile','enable','disable'].includes(k)))throw Error('Invalid DCP vocabulary selection');
@@ -33,7 +34,7 @@ export function resolveVocabulary(editor:ReactiveEditor,input:VocabularySelectio
  const preset=selection.profile==='all-qualified'?descriptors.map(d=>d.id):selection.profile==='core'?core:selection.profile==='general'?general:research;
  const wanted=new Set(preset);
  if(editor.features.dcpProactiveSemanticAuthoring&&selection.profile==='general')for(const id of ['semantic.argument','semantic.argument-relation','semantic.entity-relation'])wanted.add(id);
- if(['general','research'].includes(selection.profile))for(const d of descriptors)if(d.standoff&&d.standoff!=='mutable/entity-reference')wanted.add(d.id);
+ if(selection.profile==='research')for(const d of descriptors)if(d.standoff&&d.standoff!=='mutable/entity-reference')wanted.add(d.id);
  selection.enable?.forEach(id=>wanted.add(id));selection.disable?.forEach(id=>wanted.delete(id));
  if(!wanted.has('composition.paragraph'))throw Error('A conversational vocabulary must allow paragraphs');
  const allowed=new Set(descriptors.filter(d=>wanted.has(d.id)&&d.available).map(d=>d.id));

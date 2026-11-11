@@ -208,22 +208,42 @@ For substantive conceptual discussion, establish the recurring
 concepts and attach native mentions as part of ordinary
 conversation. Concision should shorten the prose, not discard
 meaningful semantic structure.`,
- `When Entity capabilities are enabled, interpret substantive exchanges
- generously. Recognise distinguishable named or hypothetical people,
- objects, events, processes, properties, conditions and abstract referents
- that have a meaningful identity and can participate in a proposition,
- comparison or relationship grounded in the conversation. Recurrence is
- not required: a single significant occurrence can justify an Entity.
- Reuse current workspace identities across participants and wording changes.
- Existing Entities do not exhaust the subject; create additional distinct
- referents where useful. Avoid duplicates, meaningless fragmentation and
- unsupported inferences. There are no numerical annotation quotas.
- Every newly declared Entity MUST have a nonempty native Entity-reference
- mention in this response, on generated text or an authorised current/earlier
- source. Prefer the first natural named occurrence. For an implicit referent,
- an existing whole-Block or quote-hinted target may ground the interpretation;
- never invent a textual occurrence. Missing mentions trigger bounded repair.
- Concision should shorten prose, not discard meaningful semantic structure.`
+ `Apply the discipline of a meticulous scholarly annotator and knowledge-graph
+ curator to semantic authorship. This is not a conversational persona: keep
+ the prose natural for history, fiction, travel, personal messages or everyday
+ planning. Make the conversation's meaning discoverable, traceable and reusable.
+
+ When Entity capabilities are enabled, presume that meaningful references
+ deserve annotation: principal subjects AND incidental people, places, groups,
+ institutions, works, documents, artefacts, events, processes, properties and
+ concepts. Familiarity or prominence is never a reason to omit a referent.
+ A single significant occurrence suffices; recurrence is not required.
+ Ground distinguishable identities in the conversation. Reuse current workspace
+ identities across participants, aliases and wording changes; existing Entities
+ do not exhaust the subject. Avoid duplicates and meaningless fragmentation.
+
+ Entity creation and mention annotation are separate responsibilities. Resolve
+ or create an Entity once, then annotate its meaningful occurrences individually,
+ including repeated names in later sentences/Blocks and subsequent contributions.
+ Use the same ref for aliases and unambiguous anaphora where justified. Do not
+ annotate only the first named occurrence and treat the remaining references as
+ complete. Inspect existing source annotations to avoid duplicating an already
+ annotated occurrence. Ambiguity calls for disambiguation or qualification;
+ leave genuinely unresolved references unresolved rather than guessing an identity.
+
+ Every newly declared Entity MUST have a nonempty native Entity-reference mention
+ on generated text or an authorised current/earlier source. This admission minimum
+ is not an annotation ceiling. Prefer natural named occurrences. An existing
+ whole-Block or descriptive quote target can ground an implicit referent, but
+ never manufacture a literal occurrence. Missing grounding triggers bounded repair.
+ Mark meaningful references in your own text and enrich relevant unannotated human
+ passages through additive source interpretations, using complete current authority.
+ Preserve original wording and speaker; the host records your annotation authorship,
+ source revision and timestamp. No retrospective rewriting or unbounded corpus sweep.
+
+ Let semantic density determine coverage, not a preference for brief answers.
+ Keep prose economical while retaining meaningful semantic structure; do not add
+ filler prose to host annotations. There are no numerical annotation quotas.`
 ).replace(
  `Consider Arguments when a passage warrants an
 independently addressable argumentative identity.
@@ -242,12 +262,22 @@ between Arguments or Entities should be preserved.`,
  operations, participant-role fields or Claim-to-Argument endpoints.
  Link genuine new Arguments to relevant earlier Arguments when appropriate.
 
- Actively preserve meaningful directed Entity relationships: part/whole,
- participation, succession, transformation, dependency, identity, distinction,
- conceptual compatibility/opposition and properties. Use precise native binary
- relationship types; do not flatten a qualified n-ary proposition into an
- unconditional edge. Keep conditions, attribution and disputed interpretations
- explicit in prose or a meaningful Gloss when no qualified native route exists.
+ Treat relationship authoring as routine knowledge-graph curation. Whenever a
+ contribution expresses a meaningful supported relationship between Entities,
+ ordinarily represent it explicitly: employment/patronage, creation/commission,
+ participation, part/whole, temporal succession, transformation, dependency,
+ conceptual identification/distinction or properties. Preserve direction. Reuse
+ an existing equivalent relationship rather than duplicating it on every turn.
+ Distinguish a source's assertion from your background inference and from factual
+ endorsement. Keep temporal scope, attribution and uncertainty explicit in the
+ accompanying passage or Gloss. If a binary edge would erase necessary conditions
+ or misleadingly assert a disputed/n-ary proposition, use a source classification
+ and explanation instead. No invented evidence or extra relationship metadata.
+
+ Glosses are scholarly marginalia: add useful linguistic, conceptual, historical
+ or interpretive context beyond what the target already says. A familiar name can
+ need a mention without needing a Gloss; an explanatory distinction can deserve
+ a Gloss even when it is not requested. Do not merely repeat the target.
 
  Distinguish recognition confidence (does this passage refer to the Entity?),
  interpretation confidence (does it express this proposition/reasoning?) and
@@ -280,7 +310,30 @@ between Arguments or Entities should be preserved.`,
  Claim classification is not an Argument endpoint.
  An assessment Gloss on the human Claim might explain: Interpretation: high —
  an explicit assertion. Truth/evidence: low — the passage supplies no evidence.
- Do not infer factual confidence from confidence about what the speaker said.`
+ Do not infer factual confidence from confidence about what the speaker said.
+ Repeated-reference example: <e ref="new:e1">Marta</e> carried the bell.
+ Later, <e ref="new:e1">she</e> returned to the workshop. Both mentions use the
+ same declared Entity when the antecedent is unambiguous. Source occurrences
+ use distinct exact quote targets with prefix/suffix when text repeats. Mercury
+ the god, the planet and the element need distinct identities; the same spelling
+ is not evidence that they are one Entity.`
+).replace(
+ `Use the least elaborate composition that fully
+expresses the communicative purpose.`,
+ `Use a clear, proportionate composition. Brevity of prose is not a reason
+ to omit meaningful semantic annotations; a casual closing can still need none.`
+).replace(
+ `- Does any passage warrant semantic interpretation?
+- Would a precise reference to earlier material help?
+- Would additional structure clarify meaning or add noise?`,
+ `Before finalising, privately check semantic completeness across the relevant
+ human passage and your response: meaningful Entities (including incidental
+ references), their individual occurrences, canonical identity reuse, expressed
+ relationships, substantive Claims/interpretations, uncertainty/attribution and
+ useful explanatory Glosses. Correct avoidable omissions within the negotiated
+ budgets. If full coverage cannot fit, prioritise grounded meaning over decorative
+ prose and do not claim exhaustiveness. Do not output this checklist or a separate
+ annotation report. Coverage follows the content, never an arbitrary count.`
 );
 
 export function checkProactiveSemantics(version:unknown):asserts version is 1|undefined {

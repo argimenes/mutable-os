@@ -67,3 +67,10 @@ it.each(['openai','anthropic'] as const)('retains the %s selection through provi
  for(const [,init]of fetcher.mock.calls){const body=JSON.parse(String(init?.body));expect(provider==='openai'?body.text.format.schema:body.output_config.format.schema).toEqual(schema(v,provider));expect(body.tools.map((t:any)=>t.name)).toContain('read_source');}
  }
 });
+it('keeps ordinary conversation expressive without specialist widgets or the full standoff catalogue',async()=>{
+ const {conversationalSelection}=await import('./vocabulary');const e=editor(),v=resolveVocabulary(e,conversationalSelection);
+ expect(v.profile).toBe('general');for(const k of ['object3d','timer','canvas-preview','retained-pdf','pages','source'])expect(v.kinds).not.toContain(k);
+ for(const type of ['text/colour','text/background-colour','style/superscript','style/subscript'])expect(v.standoff).not.toContain(type);
+ for(const id of ['semantic.entity','semantic.entity-relation','semantic.argument','semantic.argument-relation','semantic.gloss','standoff:mutable/entity-reference'])expect(v.capabilities).toContain(id);
+ expect(JSON.stringify(schema(v))).not.toContain('Object3D');
+});

@@ -55,7 +55,7 @@ it('allows read-only discovery and reading during source repair, but never a sec
  expect(await(await f.call('/exchange/'+id+'/turn',{round:2,results:[{id:'discover',result:{items:[{blockId:'native',handle:'fresh'}]}}]})).text()).toContain('read');
  expect(await(await f.call('/exchange/'+id+'/turn',{round:3,results:[{id:'read',result:{handle:'fresh',revision:'fresh-revision',text:'Rain is forecast.'}}]})).text()).toContain('picnic');
  expect((await f.call('/exchange/'+id+'/turn',{round:4,repair:true,diagnostic:{code:'source'}})).status).toBe(400);expect(fetcher).toHaveBeenCalledTimes(4);
- const wire=JSON.parse(String(fetcher.mock.calls[3][1]?.body));expect(JSON.stringify(wire)).not.toContain('UNTRUSTED');expect(JSON.stringify(wire)).toContain('capabilityScope');expect(wire.instructions).toContain('Active DCP exchange: exchange');expect(JSON.stringify(wire)).toContain('single repair may use');
+ const wire=JSON.parse(String(fetcher.mock.calls[3][1]?.body));expect(JSON.stringify(wire)).not.toContain('UNTRUSTED');expect(JSON.stringify(wire)).toContain('capabilityScope');expect(wire.instructions).toContain('latest DCP request identifies the active exchange');expect(JSON.stringify(wire)).toContain('single repair may use');
 });
 it.each(['json','budget'])('does not grant source tools during %s repair',async code=>{
  const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai','invalid'))).mockResolvedValueOnce(sse(streamFixture('openai','',{id:'read',name:'read_source',arguments:{handle:'s'}})));
@@ -103,4 +103,12 @@ it('limits concurrent title requests and aborts utility work when credentials ar
  const title=f.call('/utility/title',{text:'First'});await vi.waitFor(()=>expect(started).toBe(true));
  expect((await f.call('/utility/title',{text:'Second'})).status).toBe(429);await f.call('/session',undefined,{},'DELETE');
  expect((await title).status).toBe(502);expect(aborted).toBe(true);expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('forwards a configured 16000 limit and preserves incomplete usage without admitting partial output',async()=>{
+ const events=streamFixture('openai','partial',undefined,'incomplete') as any[];
+ Object.assign(events.at(-1).response,{incomplete_details:{reason:'max_output_tokens'},usage:{input_tokens:100,output_tokens:16000,output_tokens_details:{reasoning_tokens:310}}});
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(events)),f=await fixture(fetcher);
+ expect((await f.call('/settings',{settings:{...defaultProviderSettings,maxOutputTokens:16000},key:'fixture-only'})).status).toBe(200);
+ const id=(await(await f.call('/exchange',{request:req})).json()).id,lines=(await(await f.call('/exchange/'+id+'/turn',{round:0})).text()).trim().split('\n').map(s=>JSON.parse(s));
+ const error=lines.at(-1);expect(error.type).toBe('error');expect(error.receipt).toMatchObject({stop:'max_output_tokens',usage:{output_tokens:16000,reasoning_tokens:310}});expect(lines.some(x=>x.type==='result')).toBe(false);expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body)).max_output_tokens).toBe(16000);
 });

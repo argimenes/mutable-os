@@ -12,9 +12,10 @@ export function workspaceFixture(enabled=true,proactive=true){
  const refs=new DialecticReferences(editor,view,root.key),sessions:DcpSources[]=[];
  const addHuman=(text:string)=>{const id=crypto.randomUUID();editor.commands.insert({id,type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'committed',author:'human',participant:defaultParticipant(owner,'human'),ordinal:++ordinal,replies:[]}},children:[{id:crypto.randomUUID(),type:'standoff-editor-block',text}]},{kind:'at',parentKey:root.key,index:root.children.length});return id;};
  const open=(profile:'general'|'research'='general')=>{const s=new DcpSources(editor,owner,()=>root.children.map(k=>view.node(k)!),k=>view.node(k),k=>view.parentOf(k),t=>refs.resolve(t),new AbortController().signal,id=>refs.relationsFor(id),120000,id=>refs.argumentsFor(id),{profile},refs);sessions.push(s);return s;};
- const req=async(sources:DcpSources,blockId:string,participantId='agent-A')=>{
+ const req=async(sources:DcpSources,blockId:string,participantId='agent-A',proactiveSemantics?:1)=>{
   const v=sources.vocabulary!,s=v.stages,primary=sources.issue({kind:'contribution',resourceId:owner,blockId});
   const r=request(crypto.randomUUID(),primary,[],[],editor.visualEffects,true,sources.capabilities,s[0],s[1],s[2],s[3],s[4],s[5],s[6],s[7],v),structuralContext=await sources.manifest([primary],enabled?64000-8192:64000);
+  if(proactiveSemantics)Object.assign(r.authoring,{proactiveSemantics});
   Object.assign(r,{structuralContext});if(enabled){enableSemanticWorkspace(r);Object.assign(r,{semanticWorkspace:await semanticWorkspace(sources,participantId,structuralContext.sources.map(x=>x.target).filter(Boolean))});}return r as any;
  };
  const admit=async(sources:DcpSources,value:any,participantId='agent-A',r?:any)=>{

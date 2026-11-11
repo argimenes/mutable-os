@@ -16,7 +16,7 @@ it.each(['openai','anthropic'] as Provider[])('%s removes only duplicate user gu
  for(const [,init]of fetcher.mock.calls){
   const body=JSON.parse(String(init?.body)),system=body.instructions??body.system,projected=JSON.parse((body.input??body.messages)[0].content);
   expect(system.split(full.protocolKey.text)).toHaveLength(2);expect(system.split(full.authoring.instructions)).toHaveLength(2);
-  expect(projected.protocolKey).toEqual({version:'fixture'});expect(projected.authoring).toEqual({version:1,examples:full.authoring.examples,emptySemanticFields:1});
+  expect(projected.protocolKey).toBeUndefined();expect(projected.authoring).toBeUndefined();const reference=JSON.parse(system.split('DCP AUTHORING REFERENCE (examples are illustrative placeholders, never source authority): ')[1].split('\nTOOL CONTINUATION:')[0]);expect(reference.authoring).toEqual({version:1,examples:full.authoring.examples,emptySemanticFields:1});
   expect(projected.semanticWorkspace).toEqual(full.semanticWorkspace);expect(projected.structuralContext).toEqual(full.structuralContext);
   const schema=body.text?.format.schema??body.output_config.format.schema;
   expect(schema.properties.suggestions).toBeUndefined();expect(schema.properties.promotionRecommendations).toBeUndefined();expect(schema.required).toContain('entities');
@@ -81,7 +81,7 @@ it('bounds stream bytes and hides upstream credentials and errors without retrie
  const state=()=>conversation({...defaultProviderSettings,model:'m'},request),signal=new AbortController().signal;
  const fetcher=vi.fn<typeof fetch>().mockResolvedValue(new Response('secret upstream diagnostic',{status:429}));await expect(providerTurn(state(),'secret',signal,()=>{},fetcher)).rejects.toThrow('rate limit');expect(fetcher).toHaveBeenCalledTimes(1);
  await expect(providerTurn(state(),'secret',signal,()=>{},async()=>{throw Error('Bearer secret');})).rejects.toThrow('Provider connection failed');
- await expect(providerTurn(state(),'secret',signal,()=>{},async()=>new Response('x'.repeat(1048577)))).rejects.toThrow('byte budget');
+ await expect(providerTurn(state(),'secret',signal,()=>{},async()=>new Response('x'.repeat(defaultProviderSettings.maxOutputTokens*1024+1)))).rejects.toThrow('byte budget');
 });
 it('compiles Anthropic schema without recursive references while retaining all core Block families',()=>{
  const schema=schemaFor('anthropic'),complete=new Set<string>();const walk=(v:any,seen=new Set<string>())=>{if(!v||typeof v!=='object')return;if(v.$ref){expect(seen.has(v.$ref),'recursive '+v.$ref).toBe(false);if(!complete.has(v.$ref)){walk(schema.$defs[v.$ref.split('/').at(-1)],new Set([...seen,v.$ref]));complete.add(v.$ref);}}else for(const [k,x]of Object.entries(v))if(k!=='$defs')walk(x,seen);};walk(schema);expect(schema.$defs.Table0).toBeTruthy();expect(schema.$defs.Node12.$ref).toBe('#/$defs/Paragraph');expect(schema.properties.intent.enum).toEqual(expect.arrayContaining(['reply','acknowledge','share','create']));
@@ -239,4 +239,25 @@ it.each(['openai','anthropic'] as Provider[])('%s title utility has no tools, hi
  expect((wire.input??wire.messages).filter((x:any)=>x.role==='user')).toHaveLength(1);
  const bad=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,'',{id:'call',name:'read_source',arguments:{handle:'forged'}})));
  await expect(providerTurn(titleConversation({...defaultProviderSettings,provider},'First'),'fixture',new AbortController().signal,()=>{},bad)).rejects.toThrow('Unadvertised');
+});
+it('keeps the initialised contract out of subsequent requests, preserves current authority and reports reasoning on exhaustion',async()=>{
+ const full={...request,authoring:{instructions:'Stable native grammar',examples:[{name:'example'}]},semanticWorkspace:{entities:[]},structuralContext:{sources:[{handle:'src:current:b1',revision:'fresh',text:'Current',status:'complete',exactAnchorEligible:true}]}};
+ const state=conversation(defaultProviderSettings,full);state.conversationId='conv_fixture';state.contractInitialised=true;
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture('openai',JSON.stringify(plainContribution('exchange')))));
+ await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(JSON.stringify(body)).not.toContain('Stable native grammar');expect(body.instructions.length).toBeLessThan(400);expect(JSON.parse(body.input[0].content).structuralContext).toEqual(full.structuralContext);expect(body.text.format.strict).toBe(true);
+ continuation(state,[],[]);const length=state.system.length;continuation(state,[],[]);expect(state.system.length).toBe(length);
+ const events=streamFixture('openai','partial',undefined,'incomplete') as any[];
+ Object.assign(events.at(-1).response,{incomplete_details:{reason:'max_output_tokens'},usage:{input_tokens:123,output_tokens:4096,output_tokens_details:{reasoning_tokens:310},input_tokens_details:{cached_tokens:64,cache_write_tokens:59}}});
+ const error=await providerTurn(state,'fixture',new AbortController().signal,()=>{},async()=>sse(events)).catch(e=>e);
+ expect(error.receipt).toMatchObject({stop:'max_output_tokens',usage:{input_tokens:123,output_tokens:4096,reasoning_tokens:310,cached_input_tokens:64,cache_write_input_tokens:59}});expect(error.message).toContain('configured output limit 4096');
+});
+it('bounds SSE transport separately from output tokens and native response size',async()=>{
+ const state=conversation({...defaultProviderSettings,maxOutputTokens:4096},request);
+ // Representative verbose SSE envelope overhead, with a small native reply.
+ const padding=Array.from({length:600},()=>({type:'response.output_text.delta',delta:'',padding:'x'.repeat(2000)}));
+ const fetcher=async()=>sse([...padding,...streamFixture('openai',JSON.stringify(plainContribution('exchange')))]);
+ const turn=await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);expect(turn.receipt.stop).toBe('completed');
+ const oversized=async()=>sse([...Array.from({length:2200},()=>padding[0]),...streamFixture('openai',JSON.stringify(plainContribution('exchange')))]);
+ await expect(providerTurn(state,'fixture',new AbortController().signal,()=>{},oversized)).rejects.toThrow('byte budget');
 });

@@ -4,7 +4,7 @@ import express from 'express';
 import {OpenAIConversations,type CavernScope} from './conversations.js';
 import type {ContinuityManifest,ContinuityReceipt} from '../../src/features/dialectic/dcp/continuity-contract.js';
 import {randomBytes} from 'node:crypto';
-import {conversation,continuation,providerTurn,repair,titleConversation,type ProviderConversation} from './providers.js';
+import {conversation,continuation,providerTurn,repair,titleConversation,ProviderIncompleteError,type ProviderConversation} from './providers.js';
 import {parseConversationTitle,titleLimits} from '../../src/features/dialectic/title-contract.js';
 import {liveLimits,providerSettings,type Provider,type ProviderCall,type ProviderSettings} from '../../src/features/dialectic/dcp/provider-contract.js';
 
@@ -69,7 +69,7 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
   }catch{if(!res.destroyed)res.status(502).json({error:'Automatic title generation failed. The conversation is unchanged.'});}
   finally{clearTimeout(timer);res.off('close',closed);if(s.utility===abort)s.utility=undefined;}
  });
- router.post('/continuity/prepare',async(req,res)=>{try{const s:Session=res.locals.session,key=sessionKey(s);if(!continuity||s.settings?.provider!=='openai'){res.json({supported:false});return;}if(!key)throw Error('Configure a provider first');res.json({supported:true,plan:await continuity.plan(req.body.manifest,key)});}catch(e){res.status(409).json({error:(e as Error).message});}});
+ router.post('/continuity/prepare',async(req,res)=>{try{const s:Session=res.locals.session,key=sessionKey(s);if(!continuity||s.settings?.provider!=='openai'){res.json({supported:false});return;}if(!key)throw Error('Configure a provider first');res.json({supported:true,plan:await continuity.plan(req.body.manifest,key,req.body.request?conversation(s.settings!,req.body.request).system:undefined)});}catch(e){res.status(409).json({error:(e as Error).message});}});
  router.post('/exchange',async(req,res)=>{
   const s:Session=res.locals.session;
   try{
@@ -81,9 +81,9 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    const e:Exchange={state:conversation({...s.settings},request),key,abort,timer:setTimeout(()=>release(s,id),liveLimits.deadlineMs),busy:false,round:0,calls:0,pending:[],repaired:false,final:false};e.timer.unref();s.exchanges.set(id,e);
    if(req.body.continuity){
     e.manifest=req.body.continuity.manifest;
-    try{e.receipt=await continuity!.begin(e.manifest!,req.body.continuity.plan,req.body.continuity.items,request.exchange,key,abort.signal);}
+    try{e.receipt=await continuity!.begin(e.manifest!,req.body.continuity.plan,req.body.continuity.items,request.exchange,key,abort.signal,req.body.continuity.plan.contractDigest?e.state.system:undefined);}
     catch(error){release(s,id);throw error;}
-    e.state.conversationId=e.receipt.conversationId;
+    e.state.conversationId=e.receipt.conversationId;e.state.contractInitialised=!!req.body.continuity.plan.contractDigest;
     e.state.system+='\nThis is a continuous native Document conversation. Projected history entries are attributed contributions; the DCP request is control information, not a second contribution. Historical handles are expired. Only handles issued in THIS exchange may author structures; retrieve fresh source handles to address remembered passages. Never infer a new conversation from reply ancestry.';
     e.state.onResponse=responseId=>continuity!.response(e.manifest!,key,request.exchange,responseId);
    }
@@ -120,11 +120,12 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
     emit({type:'result',...turn});res.end();
    }finally{res.off('close',closed);e.busy=false;}
   }catch(error){
-   await testLog.write('exchange.error',{error:String(error)}).catch(()=>undefined);release(s,id);
+   const receipt=error instanceof ProviderIncompleteError?error.receipt:undefined;
+   await testLog.write('exchange.error',{error:String(error),...(receipt?{receipt}:{})}).catch(()=>undefined);release(s,id);
    // Never forward provider/network errors: their messages may contain credentials or source text.
    const message=(error as Error).message;
    const safe=/^(Provider |Exchange |Unsupported provider|Invalid provider|Incomplete provider|Tool results|Stale provider|Only one enabled|Unexpected continuation)/.test(message)?message:'Provider exchange failed. Nothing was committed; usage/cost may be unknown.';
-   if(res.headersSent){if(!res.destroyed)res.end(JSON.stringify({type:'error',error:safe})+'\n');}else res.status(400).json({error:safe});
+   if(res.headersSent){if(!res.destroyed)res.end(JSON.stringify({type:'error',error:safe,...(receipt?{receipt}:{})})+'\n');}else res.status(400).json({error:safe});
   }
  });
  router.use((error:any,_req:any,res:any,_next:any)=>{res.status(400).json({error:'Invalid or oversized broker request.'});});
