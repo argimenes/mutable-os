@@ -5,7 +5,8 @@ const reasons = {
  'source-identity':'Obtain a fresh current-exchange source handle using bounded discovery, then read_source for its current revision. Historical handles and revisions cannot author content.',
  identity:'Use unique response-local IDs of the declared role: new:b for composition, new:r for source anchors, new:s for generated passages. Existing src: handles are host-issued. Styling reproduced quotations needs no id. When renaming an ID, update every dependent reference; never give a source anchor and reproduced text the same declaration ID.',
  source:'Use a complete current TextBlock source and its revision; quote exact text with unambiguous prefix/suffix.',
- markup:'Use only annotation and self-closing boundary tags, valid XML escapes and nonempty spans. Check boundary IDs.',
+ 'entity-mention':'Every new Entity needs a nonempty native mention: use e ref or annotation with mutable/entity-reference in generated text, or an interpretation with that ref on an authorised source target. Ground it in the intended passage; do not invent an occurrence or drop the Entity merely to pass validation.',
+ markup:'Use annotation, b, i, e and self-closing boundary tags, valid XML escapes and nonempty spans. Check boundary IDs.',
  capability:'Use only negotiated types and operations; check the endpoint kinds and allowed attributes.',
  budget:'Keep the response within the advertised size, nesting and item limits.',
  structure:'Correct the invalid native structure while preserving valid requested structures.'
@@ -28,4 +29,4 @@ export function safeDiagnostic(value:any):ValidationDiagnostic {
 
 /** Recovery remains read-only and shares the original exchange's budgets. */
 export const sourceRecoveryTools=['list_text_blocks','read_source','search_symposium','search_entities'] as const;
-export const allowsSourceRecovery=(value:unknown)=>{const d=safeDiagnostic(value);return d.code==='source-identity'||d.code==='source';};
+export const allowsSourceRecovery=(value:unknown)=>{const d=safeDiagnostic(value);return d.code==='source-identity'||d.code==='source'||d.code==='entity-mention';};

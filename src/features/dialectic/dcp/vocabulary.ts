@@ -24,6 +24,7 @@ export function vocabularyDescriptors(editor:ReactiveEditor):readonly Vocabulary
  const features={...editor.features,dcpNativeAuthoringStage1:true,dcpNativeAuthoringStage2Text:true,dcpNativeAuthoringStage2Layouts:true,dcpNativeAuthoringStage2Compounds:true,dcpNativeAuthoringStage2Widgets:true,dcpNativeAuthoringStage3ManagedImages:true,dcpNativeAuthoringStage3ExternalMedia:true,dcpNativeAuthoringStage3RetainedPdf:true};
  const descriptors=capabilityCatalogue({features,registry:editor.registry,visualEffects:editor.visualEffects}).selectable.map(d=>({...d,...(current.get(d.id)?.requiresAny?{requiresAny:current.get(d.id)!.requiresAny}:{}),available:current.get(d.id)?.available??false}));
  if(!descriptors.some(d=>d.standoff===ENTITY_REFERENCE))descriptors.push({id:'standoff:'+ENTITY_REFERENCE,purpose:entityMentionSemantic.purpose,requires:[],standoff:ENTITY_REFERENCE,available:false});
+ if(editor.features.dcpProactiveSemanticAuthoring)for(const d of descriptors)if(d.id==='semantic.entity')d.requires=[...d.requires,'standoff:'+ENTITY_REFERENCE];
  return descriptors;
 }
 export function resolveVocabulary(editor:ReactiveEditor,input:VocabularySelection=allQualifiedSelection):VocabularySnapshot {
@@ -31,6 +32,7 @@ export function resolveVocabulary(editor:ReactiveEditor,input:VocabularySelectio
  for(const id of [...selection.enable??[],...selection.disable??[]])if(!byId.has(id))throw Error('Unknown or unqualified DCP selection ID: '+id);
  const preset=selection.profile==='all-qualified'?descriptors.map(d=>d.id):selection.profile==='core'?core:selection.profile==='general'?general:research;
  const wanted=new Set(preset);
+ if(editor.features.dcpProactiveSemanticAuthoring&&selection.profile==='general')for(const id of ['semantic.argument','semantic.argument-relation','semantic.entity-relation'])wanted.add(id);
  if(['general','research'].includes(selection.profile))for(const d of descriptors)if(d.standoff&&d.standoff!=='mutable/entity-reference')wanted.add(d.id);
  selection.enable?.forEach(id=>wanted.add(id));selection.disable?.forEach(id=>wanted.delete(id));
  if(!wanted.has('composition.paragraph'))throw Error('A conversational vocabulary must allow paragraphs');

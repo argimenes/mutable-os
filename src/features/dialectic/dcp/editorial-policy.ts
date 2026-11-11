@@ -198,3 +198,91 @@ passes.
 The result should feel like a naturally authored rich
 document, not a plain-text chat message mechanically
 decorated after generation.`;
+
+/** Negotiated policy: historical requests without this marker retain their policy. */
+export const proactiveEditorialPolicy=dcpEditorialPolicy.replace(
+ `When Entity capabilities are enabled, recognise meaningful
+people, objects and concepts, resolve and reuse their existing
+identities, and create Document Entities when appropriate.
+For substantive conceptual discussion, establish the recurring
+concepts and attach native mentions as part of ordinary
+conversation. Concision should shorten the prose, not discard
+meaningful semantic structure.`,
+ `When Entity capabilities are enabled, interpret substantive exchanges
+ generously. Recognise distinguishable named or hypothetical people,
+ objects, events, processes, properties, conditions and abstract referents
+ that have a meaningful identity and can participate in a proposition,
+ comparison or relationship grounded in the conversation. Recurrence is
+ not required: a single significant occurrence can justify an Entity.
+ Reuse current workspace identities across participants and wording changes.
+ Existing Entities do not exhaust the subject; create additional distinct
+ referents where useful. Avoid duplicates, meaningless fragmentation and
+ unsupported inferences. There are no numerical annotation quotas.
+ Every newly declared Entity MUST have a nonempty native Entity-reference
+ mention in this response, on generated text or an authorised current/earlier
+ source. Prefer the first natural named occurrence. For an implicit referent,
+ an existing whole-Block or quote-hinted target may ground the interpretation;
+ never invent a textual occurrence. Missing mentions trigger bounded repair.
+ Concision should shorten prose, not discard meaningful semantic structure.`
+).replace(
+ `Consider Arguments when a passage warrants an
+independently addressable argumentative identity.
+
+Consider relationships when substantive connections
+between Arguments or Entities should be preserved.`,
+ `For each substantive exchange, analyse BOTH the human passage and your
+ own response: explicit propositions, supported premises, conclusions,
+ objections and qualifications. Read human/earlier sources with current
+ handles and revisions before annotating them. Preserve their speaker and
+ your authorship of the interpretation; classification is not endorsement.
+ A Claim is a proposition; an Argument contains justification for supporting
+ or challenging a proposition. Do not turn every assertion into an Argument.
+ DCP currently offers passage classification dialectic/claim and anchored
+ Arguments, not Vault n-ary Claim records or Traits. Do not fabricate those
+ operations, participant-role fields or Claim-to-Argument endpoints.
+ Link genuine new Arguments to relevant earlier Arguments when appropriate.
+
+ Actively preserve meaningful directed Entity relationships: part/whole,
+ participation, succession, transformation, dependency, identity, distinction,
+ conceptual compatibility/opposition and properties. Use precise native binary
+ relationship types; do not flatten a qualified n-ary proposition into an
+ unconditional edge. Keep conditions, attribution and disputed interpretations
+ explicit in prose or a meaningful Gloss when no qualified native route exists.
+
+ Distinguish recognition confidence (does this passage refer to the Entity?),
+ interpretation confidence (does it express this proposition/reasoning?) and
+ truth/evidential confidence (is the proposition supported?). Where uncertainty
+ matters, explain these separately in prose or an assessment Gloss, using rough
+ high/medium/low language: direct/unambiguous, reasonable but ambiguous, or
+ tentative/inferential. These are not calibrated probabilities. There are no
+ negotiated structured confidence fields; never add arbitrary metadata.
+
+ COMPACT SEMANTIC EXAMPLES (use only negotiated capabilities)
+ Entities new:e1 Maintained vessel, new:e2 Replacement planks, new:e3 Historical
+ continuity can be mentioned in: <e ref="new:e1">The maintained vessel</e> takes
+ <e ref="new:e2">replacement planks</e> while preserving
+ <e ref="new:e3">historical continuity</e>.
+ A binary Entity relation is {"id":"new:rel1","kind":"entity","type":"part-of",
+ "from":"new:e2","to":"new:e1"}. This describes the stipulated scenario,
+ not a settled answer to its identity question.
+ For an actually read human source, an interpretation can use
+ {"id":"new:m1","target":{"block":"src:b1","revision":"CURRENT_READ_REVISION",
+ "quote":"The maintained ship retains its identity.","prefix":"","suffix":""},"type":"dialectic/claim",
+ "ref":null,"attributes":[]}.
+ The same target with type mutable/entity-reference and ref new:e1 can ground
+ a newly declared Entity in human text. Replace illustrative handles/revisions
+ and quotes with actual current authority; never copy these placeholders.
+ An own justified passage can be <annotation id="new:s1" type="dialectic/qualification">
+ Continuity supports this identification because the vessel's use persists,
+ but material identity remains disputed.</annotation>, with
+ {"id":"new:arg1","anchor":"new:s1"} and an argument relation of type qualifies
+ from new:arg1 to an actually issued earlier Argument handle. A bare earlier
+ Claim classification is not an Argument endpoint.
+ An assessment Gloss on the human Claim might explain: Interpretation: high —
+ an explicit assertion. Truth/evidence: low — the passage supplies no evidence.
+ Do not infer factual confidence from confidence about what the speaker said.`
+);
+
+export function checkProactiveSemantics(version:unknown):asserts version is 1|undefined {
+ if(version!==undefined&&version!==1)throw Error('Unsupported proactive semantic policy');
+}

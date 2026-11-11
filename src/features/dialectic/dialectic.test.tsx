@@ -355,7 +355,7 @@ it('4B commits distinct semantic identities atomically and resolves live/unresol
   v.interpretations=[{id:'classification',target:'human',type:'dialectic/claim',ref:null,attributes:[]}];
   v.arguments=[{id:'human-argument',anchor:'human'},{id:'answer-argument',anchor:'generated'}];v.relations=[{id:'edge',kind:'argument',type:'supports',from:'answer-argument',to:'human-argument'},{id:'entity-edge',kind:'entity',type:'related-to',from:'e1',to:'e2'}];
   v.entities=[{id:'e1',name:'Evidence',typename:'Concept',description:'',aliases:['Support']},{id:'e2',name:'Inference',typename:'Concept',description:'',aliases:[]}];
-  v.glosses=[{id:'gloss',target:'human',type:'clarification',text:'An independent clarification'}];v.composition.push({id:'entity-text',kind:'paragraph',markup:'<annotation type="mutable/entity-reference" ref="e1">Evidence</annotation>',ranges:[]});v.replyTargets=['human-argument','e1'];return JSON.stringify(v);
+  v.glosses=[{id:'gloss',target:'human',type:'clarification',text:'An independent clarification'}];v.composition.push({id:'entity-text',kind:'paragraph',markup:'<annotation type="mutable/entity-reference" ref="e1">Evidence</annotation> supports <e ref="e2">Inference</e>',ranges:[]});v.replyTargets=['human-argument','e1'];return JSON.stringify(v);
  });
  expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(e.mounts.get(source.key)!.root).toBe(mount);
  const definitions:any=c.root()!.payload.linkedAnnotations,values:any[]=Object.values(definitions),data=c.frontier()!.data,aliases:any=data.dcp!.identityMap,arg=aliases['human-argument'];
@@ -392,7 +392,7 @@ it('4B rejects wrong-kind/foreign semantic endpoints and cancellation without pa
 it('4B shared Entity service admits local/Vault relationships through read-only scope-qualified resolution',async()=>{
  const f=await setup(true,true,true,true),c=f.c!,e=f.editor;f.type!('Source');c.submit();const get=vi.fn(async()=>({id:'global',name:'Global concept',revision:3,aliases:[]})),write=vi.fn(()=>{throw Error('SQL mutation forbidden');});cleanup.push(registerStandaloneEntityService(e,()=>({get,historyScope:async()=>'directory-A',scopeIdentity:async()=>'vault-A',create:write,rename:write,alias:write,dispose(){}} as any)));
  const original=c.session()!.projection.node(c.resolve(c.target(c.committed()[0].id))!.children[0])!;e.commands.setPayloadField(original.key,'standoffProperties',[{id:'global-mention',type:'codex/entity-reference',value:'global',start:0,end:5}]);
- await c.askMock(async(req,sources)=>{const parent=await sources.tool({id:'parent',tool:'read_source',arguments:{handle:req.primaryReply}}),source=await sources.tool({id:'text',tool:'read_source',arguments:{handle:parent.children[0]}}),global=source.annotations[0].entityHandle;expect(global).toBeTruthy();expect(global.length).toBeLessThanOrEqual(128);expect((await sources.tool({id:'entity',tool:'read_source',arguments:{handle:global}})).entity.name).toBe('Global concept');const v:any=dcpResponse(req.exchange);v.entities=[{id:'local',name:'Local concept',typename:'Concept',description:'Document owned',aliases:[]}];v.relations=[{id:'r',kind:'entity',type:'related-to',from:'local',to:global}];return JSON.stringify(v);});
+ await c.askMock(async(req,sources)=>{const parent=await sources.tool({id:'parent',tool:'read_source',arguments:{handle:req.primaryReply}}),source=await sources.tool({id:'text',tool:'read_source',arguments:{handle:parent.children[0]}}),global=source.annotations[0].entityHandle;expect(global).toBeTruthy();expect(global.length).toBeLessThanOrEqual(128);expect((await sources.tool({id:'entity',tool:'read_source',arguments:{handle:global}})).entity.name).toBe('Global concept');const v:any=dcpResponse(req.exchange);v.entities=[{id:'local',name:'Local concept',typename:'Concept',description:'Document owned',aliases:[]}];v.relations=[{id:'r',kind:'entity',type:'related-to',from:'local',to:global}];v.composition.push({id:'local-mention',kind:'paragraph',markup:'<e ref="local">Local concept</e>',ranges:[]});return JSON.stringify(v);});
  expect(c.notice()).toBe('');expect(write).not.toHaveBeenCalled();expect(get).toHaveBeenCalled();const values:any[]=Object.values(c.root()!.payload.linkedAnnotations??{}),r=values.find(d=>d.type===LOCAL_ENTITY_RELATION).metadata.scopedEntityRelation;expect(r.to).toEqual({scope:'vault',vaultId:'vault-A',entityId:'global'});
  const inventory=documentContextInventory(captureNative(e.repository.readState(),c.resourceId()));expect(inventory.entities).not.toContain(r.from.entityId);expect(inventory.localEntities).toHaveLength(1);expect(JSON.stringify(inventory.unresolved)).toContain('vault-A');
  const service=new ScopedEntities(e,c.root()!.key,c.resourceId());const local=JSON.parse(JSON.stringify(values.find(d=>d.type===LOCAL_ENTITY)));service.commit({[local.id]:{...local,isDeleted:true}});expect(service.local(r.from)).toBeUndefined();expect((c.root()!.payload.linkedAnnotations as any)[values.find(d=>d.type===LOCAL_ENTITY_RELATION).id]).toBeTruthy();e.repository.undo();expect(service.local(r.from)?.name).toBe('Local concept');await expect(service.resolve({scope:'vault',vaultId:'another',entityId:'global'})).rejects.toThrow(/another Vault/);expect(await service.resolve({scope:'document',resourceId:'another',entityId:r.from.entityId})).toBeUndefined();service.dispose();
@@ -407,7 +407,7 @@ it('4B reuses older argument handles without conflating classifications, and pre
 
 it('4B cancellation during asynchronous global-reference validation leaves no local semantic records',async()=>{
  const f=await setup(true,true,true,true),c=f.c!;f.type!('Human source');c.submit();let entered=false;cleanup.push(registerStandaloneEntityService(f.editor,()=>({scopeIdentity:async()=>'vault',get:()=>{entered=true;return new Promise(()=>{});},dispose(){}} as any)));
- const task=c.askMock(async(req,sources)=>{const global=sources.issue({kind:'entity',resourceId:c.resourceId(),entity:{scope:'vault',vaultId:'vault',entityId:'global'}}),v:any=dcpResponse(req.exchange);v.entities=[{id:'local',name:'Never committed',typename:'Concept',description:'',aliases:[]}];v.arguments=[{id:'a',anchor:'generated'}];v.relations=[{id:'r',kind:'entity',type:'related-to',from:'local',to:global}];return JSON.stringify(v);});
+ const task=c.askMock(async(req,sources)=>{const global=sources.issue({kind:'entity',resourceId:c.resourceId(),entity:{scope:'vault',vaultId:'vault',entityId:'global'}}),v:any=dcpResponse(req.exchange);v.entities=[{id:'local',name:'Never committed',typename:'Concept',description:'',aliases:[]}];v.arguments=[{id:'a',anchor:'generated'}];v.relations=[{id:'r',kind:'entity',type:'related-to',from:'local',to:global}];v.composition.push({id:'local-mention',kind:'paragraph',markup:'<e ref="local">Local concept</e>',ranges:[]});return JSON.stringify(v);});
  for(let i=0;i<20&&!entered;i++)await tick();expect(entered).toBe(true);c.cancel();await task;expect(c.committed()).toHaveLength(1);expect(Object.keys(c.root()!.payload.linkedAnnotations??{})).toHaveLength(0);
 });
 
@@ -1457,7 +1457,7 @@ it('rejects independently disabled semantic operations and Entity mentions witho
   const response:any={...dcpResponse(req.exchange),entities:[entity],composition:[{id:'new:b1',kind:'paragraph',markup:mode==='inline'?'<annotation type="mutable/entity-reference" ref="new:e1">Mention</annotation>':'<boundary id="new:pos1"/>Mention<boundary id="new:pos2"/>',ranges:mode==='range'?[{id:'new:s1',type:'mutable/entity-reference',from:'new:pos1',to:'new:pos2',ref:'new:e1',attributes:[]}]:[]}]};
   if(mode==='source'){const parent=await sources.source(req.primaryReply),text=await sources.source(parent.children[0]);response.anchors=[{id:'new:r1',source:text.handle,revision:text.revision,selector:{exact:'Semantic',prefix:'',suffix:''}}];response.interpretations=[{id:'new:m1',target:'new:r1',type:'mutable/entity-reference',ref:'new:e1',attributes:[]}];}
   return JSON.stringify(response);
- }).then(()=>{expect(c.notice()).toContain('DCP standoff disabled');expect(e.repository.state.revision).toBe(revision);});
+ }).then(()=>{expect(c.notice()).toContain('DCP capability disabled: semantic.entity');expect(e.repository.state.revision).toBe(revision);});
 });
 it('supports reduced-profile mock exchanges and the legacy selection-disabled path',async()=>{
  const f=await vocabularyFixture(),c=f.c!;f.type!('Mock');c.submit();c.configureVocabulary({profile:'core'});await c.askMock();expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
@@ -1591,4 +1591,34 @@ it('semantic workspace uses the selected AI participant in native provenance and
  await c.askMock(async req=>{expect(req.semanticWorkspace.forParticipant).toBe('other-agent');const v:any=dcpResponse(req.exchange);v.entities=[{id:'new:e1',name:'Authenticity',typename:'Concept',description:'Criteria of genuineness.',aliases:[]}];v.composition=[{id:'new:b1',kind:'paragraph',markup:'<annotation type="mutable/entity-reference" ref="new:e1">Authenticity</annotation> involves evidence.',ranges:[]}];v.glosses=[{id:'new:g1',target:{block:'new:b1',revision:null,whole:true},type:'qualification',text:'The relevant evidence depends on the criterion.'}];return JSON.stringify(v);});
  expect(c.notice()).toBe('');const definitions:any[]=Object.values(c.root()!.payload.linkedAnnotations??{});expect(definitions.find(d=>d.type==='mutable/entity').metadata.scopedEntity.provenance.participantId).toBe('other-agent');expect(definitions.find(d=>d.type==='mutable/gloss').metadata.dcp.participantId).toBe('other-agent');expect((c.committed().at(-1)!.data.dcp!.request as any).semanticWorkspace.forParticipant).toBe('other-agent');
  await c.askMock(async req=>{expect(req.semanticWorkspace.entities[0].name).toBe('Authenticity');expect(req.semanticWorkspace.glosses[0].author).toBe('other-agent');return JSON.stringify(dcpResponse(req.exchange));});expect(c.notice()).toBe('');
+});
+
+it('shows proactive Entity mentions and inspects them in place without canonical or per-keystroke background work',async()=>{
+ const f=await activityFixture(),c=f.c!,e=f.editor;await activityExchange(f);
+ const mention=f.host.querySelector<HTMLElement>('.dialectic-entity-mention[data-inline-index]');expect(mention).toBeTruthy();
+ const renderer=e.visualEffects.type('mutable/entity-reference')!.renderers[0];expect(renderer.params).toMatchObject({affectsLayout:false});
+ const scroll=vi.fn();Object.defineProperty(Element.prototype,'scrollIntoView',{configurable:true,value:scroll});cleanup.push(()=>delete (Element.prototype as any).scrollIntoView);
+ const revision=e.repository.state.revision,snapshots=vi.spyOn(e.repository,'snapshot'),transaction=vi.spyOn(e.commands,'boundedStructuralTransaction'),build=vi.spyOn(c.session()!.projection as any,'build');
+ window.getSelection()?.removeAllRanges();mention!.click();await tick();
+ expect(f.host.textContent).toContain('Alloy');expect(f.host.textContent).toContain('Bronze');expect(scroll).not.toHaveBeenCalled();expect(e.repository.state.revision).toBe(revision);expect(transaction).not.toHaveBeenCalled();expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+ const visits=c.references()!.diagnostics.treeVisits,network=vi.mocked(fetch).mock.calls.length,reads=vi.spyOn(c.references()!,'text');
+ for(let i=0;i<5;i++)f.type!('x');await tick();
+ expect(c.references()!.diagnostics.treeVisits).toBe(visits);expect(fetch).toHaveBeenCalledTimes(network);expect(reads).not.toHaveBeenCalled();expect(transaction).not.toHaveBeenCalled();expect(snapshots).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();
+});
+
+it('repairs a missing new Entity mention once through the live admission path and commits only the grounded response',async()=>{
+ const f=await setup(true,true,true,true),c=f.c!;f.type!('What counts as evidence?');c.submit();let request:any,turn=0;
+ const receipt={provider:'openai',model:'fixture',responseId:'response',usage:{input_tokens:1,output_tokens:1}};
+ vi.stubGlobal('fetch',vi.fn(async(url:any,init:any)=>{const body=init?.body&&JSON.parse(init.body);
+  if(url.endsWith('/session'))return Response.json({token:'token'});
+  if(url.endsWith('/settings'))return Response.json({settings:body.settings,ready:true});
+  if(url.endsWith('/exchange')){request=body.request;expect(request.authoring.proactiveSemantics).toBe(1);return Response.json({id:'e',settings:c.providerSettings()});}
+  if(url.endsWith('/turn')){turn++;expect(c.committed()).toHaveLength(1);if(turn===2)expect(body.diagnostic).toMatchObject({code:'entity-mention',path:'$.entities[0]'});
+   const value={...dcpResponse(request.exchange),composition:[{id:'new:b1',kind:'paragraph',markup:turn===1?'Evidence can support an inference.':'<e ref="new:e1">Evidence</e> can support an inference.',ranges:[]}],entities:[{id:'new:e1',name:'Evidence',typename:'Concept',description:'Support for an inference.',aliases:[]}]};
+   return new Response(JSON.stringify({type:'result',text:JSON.stringify(value),calls:[],receipt})+'\n');}
+  return Response.json({});
+ }));
+ await c.configureProvider({provider:'openai',model:'fixture',maxOutputTokens:2048,repair:true,cadence:'conversational'},'fixture');await c.ask();
+ expect(c.notice()).toBe('');expect(turn).toBe(2);expect(c.committed()).toHaveLength(2);expect(c.frontier()!.data.dcp!.provider!.attempts[0].diagnostic).toMatchObject({code:'entity-mention'});
+ const node=c.session()!.projection.node(c.resolve(c.target(c.frontier()!.id))!.children[0])!;expect((node.payload.standoffProperties as any[]).filter(p=>p.type==='mutable/entity-reference')).toHaveLength(1);
 });

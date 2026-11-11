@@ -1,3 +1,4 @@
+import {checkProactiveSemantics} from './editorial-policy';
 import {normalizeEmptySemanticFields} from './empty-fields';
 import {declarativeTarget,quoteCells} from './semantic-target';
 import {requireCapability,requireComposition,permits,vocabularyExample,type VocabularySnapshot} from './vocabulary-contract';
@@ -45,6 +46,7 @@ export const mockTransport:DcpTransport=async(request,sources,chunk,signal)=>{
   interpretations:excerpt?[{id:'interpretation',target:'passage',type:'dialectic/claim',ref:null,attributes:[]}]:[],
   entities:[],arguments:[],glosses:[],relations:[],suggestions:[],promotionRecommendations:[]};
  if(request.profile==='4b-1'&&excerpt){
+  response.composition[0].markup=response.composition[0].markup!.replace('evidence','<e ref="evidence">evidence</e>');
   Object.assign(response,{arguments:[{id:'source-argument',anchor:'passage'},{id:'question-argument',anchor:'question-passage'}],entities:[{id:'evidence',name:'Evidence',typename:'Concept',description:'Material bearing on the argument',aliases:[]}],relations:[{id:'qualification',kind:'argument',type:'qualifies',from:'question-argument',to:'source-argument'}],replyTargets:['source-argument']});
  }
  const selected=request.vocabulary&&vocabularyExample(response,request.vocabulary)===undefined?{...response,intent:'reply',replyTargets:[],composition:[{id:'opening',kind:'paragraph',markup:'What evidence would strengthen or challenge this point?',ranges:[]}],anchors:[],interpretations:[],entities:[],arguments:[],relations:[]}:response;
@@ -68,7 +70,8 @@ export function request(...args:Parameters<typeof legacyRequest>|[...Parameters<
  result.authoring.instructions+=inlineAliasInstructions(vocabulary.standoff);
  return result;
 }
-export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id,emptyFields?:1){
+export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id,emptyFields?:1,proactiveSemantics?:1){
+ checkProactiveSemantics(proactiveSemantics);
  const vocabulary=sources.vocabulary;
  const nativeAuthoring=sources.editor?.features.dcpNativeAuthoringStage1===true;
  const textAuthoring=nativeAuthoring&&sources.editor?.features.dcpNativeAuthoringStage2Text===true;
@@ -88,7 +91,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  const ids=new Set<string>();const claim=(id:string,kind:GeneratedIdentityKind)=>{validateGeneratedIdentity(id,kind);if(typeof id!=='string'||!/^[-a-zA-Z0-9_.:]{1,128}$/.test(id)||['__proto__','prototype','constructor'].includes(id)||ids.has(id)||sources.handles?.has(id))throw Error('Duplicate or invalid provisional ID');ids.add(id);};
  const generatedText=new Map<string,ExistingBlockDto>();
  const definitions:Record<string,any>={},aliases=new Map<string,ReplyTarget>(),ranges=new Map<string,{key?:string;blockId:string;start:number;end:number;text:string;sourceAuthor:string;revision?:string}>(),annotations=new Map<string,any[]>();
- const semantic=semanticPreparation(sources,resourceId,definitions,aliases,claim,provenance);if(semantics){path='$.entities';semantic.entities(response.entities);}
+ const semantic=semanticPreparation(sources,resourceId,definitions,aliases,claim,provenance,proactiveSemantics===1);if(semantics){path='$.entities';semantic.entities(response.entities);}
  const pdfBindings:PdfBinding[]=[];
  const imageBindings:ImageBinding[]=[],externalLeaves=new Map<string,BlockFragment>(),externalKinds:string[]=[];
  const checkExternal=()=>{for(const kind of externalKinds){

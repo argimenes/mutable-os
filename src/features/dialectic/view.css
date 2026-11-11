@@ -138,3 +138,14 @@
 .dialectic-chat [data-dialectic-draft=true] .reactive-standoff-flow:focus{outline:none}
 .dialectic-chat [data-dialectic-draft=true]:focus-within::after{border-color:#c8c8c8}
 .dialectic-chat [data-dialectic-draft=true] .dialectic-contribution-menu{inset-block-start:calc(var(--dialectic-feedback-space) + 10px)}
+
+/* Native Entity-reference cell effect: colour only, no layout/geometry work. */
+.dialectic-app .dialectic-entity-mention {
+ background-color: rgba(119, 88, 177, .09);
+ text-decoration: underline;
+ text-decoration-color: #8c73ad;
+ text-decoration-thickness: 1px;
+ text-underline-offset: 3px;
+ cursor: pointer;
+}
+.dialectic-app .dialectic-entity-mention:hover { background-color: rgba(119, 88, 177, .19); }

@@ -15,7 +15,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
  const c=props.c,modern=c.editor.features.dialecticConversationUpdates;
  const [sidebarOpen,setSidebarOpen]=createSignal(!modern),[inspectorOpen,setInspectorOpen]=createSignal(!modern);
  const [formatting,setFormatting]=createSignal(!modern);
- createEffect(()=>{if(c.activityInspection()||c.inspectedAnnotation())setInspectorOpen(true);});
+ createEffect(()=>{if(c.activityInspection()||c.inspectedAnnotation()||c.inspection()?.kind==='entity')setInspectorOpen(true);});
  let root!:HTMLElement;const [mounted,setMounted]=createSignal(false);
  const hosting=()=>mounted()&&!!c.session()?.host.port&&root.contains(c.session()!.host.port!.container)&&c.session()!.host.activity().visible;
  const act=(fn:()=>unknown)=>()=>c.run(fn);
@@ -23,6 +23,13 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
  onMount(()=>{
   queueMicrotask(()=>setMounted(true));
   const shortcut=(e:KeyboardEvent)=>{if(!root.contains(e.target as Node)||e.isComposing||e.altKey||e.shiftKey||!(e.metaKey||e.ctrlKey)||e.key.toLowerCase()!=='s'||(e.target as Element)?.closest('[role="dialog"]'))return;e.preventDefault();e.stopPropagation();void save();};
+  const entityClick=(event:MouseEvent)=>{
+   if(event.button!==0||event.metaKey||event.ctrlKey||event.altKey||event.shiftKey||window.getSelection()?.isCollapsed===false)return;
+   const cell=(event.target as Element)?.closest<HTMLElement>('.dialectic-entity-mention[data-inline-index]');
+   const block=cell?.closest<HTMLElement>('[data-runtime-key]');
+   if(cell&&block&&root.contains(cell)&&c.inspectEntityMention(block.dataset.runtimeKey!,Number(cell.dataset.inlineIndex))){event.preventDefault();event.stopPropagation();}
+  };
+  root.addEventListener('click',entityClick,true);onCleanup(()=>root.removeEventListener('click',entityClick,true));
   window.addEventListener('keydown',shortcut,true);onCleanup(()=>window.removeEventListener('keydown',shortcut,true));
  });
  const selected=()=>c.inspection(),row=()=>c.rows().find(r=>r.id===selected()?.blockId);

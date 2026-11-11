@@ -1,3 +1,4 @@
+import {DcpValidationError,safeDiagnostic} from './diagnostics';
 import {requireCapability,requireStandoff} from './vocabulary-contract';
 import type {GeneratedIdentityKind} from './identities';
 import {ARGUMENT,ARGUMENT_RELATION,argumentDefinition,argumentRelations} from '../arguments';
@@ -8,16 +9,17 @@ import type {DcpSources} from './sources';
 import type {ReplyTarget} from '../model';
 
 /** Exchange-local preparation. No canonical writes, SQL writes or implicit arguments. */
-export function semanticPreparation(sources:DcpSources,resourceId:string,definitions:Record<string,any>,aliases:Map<string,ReplyTarget>,claim:(id:string,kind:GeneratedIdentityKind)=>void,provenance:Provenance){
+export function semanticPreparation(sources:DcpSources,resourceId:string,definitions:Record<string,any>,aliases:Map<string,ReplyTarget>,claim:(id:string,kind:GeneratedIdentityKind)=>void,provenance:Provenance,requireMentions=false){
  const target=(handle:string)=>aliases.get(handle)??sources.target(handle);
  const record=(t:ReplyTarget)=>{const id=t.argumentId??t.entity?.entityId??t.anchorId??t.definitionId;return id&&definitions[id]||sources.definition(t);};
+ const created:string[]=[],mentioned=new Set<string>();
  const vaultReferences=new Map<string,ScopedEntityReference>();
  const entities=(items:any[])=>{if(items.length)requireCapability(sources.vocabulary,'semantic.entity');for(const input of list(items,64)){
-  keys(input,['id','name','typename','description','aliases']);claim(input.id,'e');const d=sources.entities.prepare(input,provenance);definitions[d.id]=d;
+  keys(input,['id','name','typename','description','aliases']);claim(input.id,'e');const d=sources.entities.prepare(input,provenance);definitions[d.id]=d;created.push(d.id);
   aliases.set(input.id,{kind:'entity',resourceId,entity:{scope:'document',resourceId,entityId:d.id}});
  }};
  const entityRef=(handle:string):ScopedEntityReference=>{const t=target(handle);if(t.kind!=='entity')throw Error('Expected a scoped Entity handle');if(t.entity.scope==='document'&&(t.entity.resourceId!==resourceId||(!localEntity(record(t))||record(t).isDeleted||record(t).metadata.scopedEntity.entity.deletedUtc)))throw Error('Unavailable owned Entity');if(t.entity.scope==='vault'){if(vaultReferences.size>=32)throw Error('Vault reference budget');vaultReferences.set(JSON.stringify(t.entity),t.entity);}return t.entity;};
- const mark=(type:string,handle:string)=>{requireStandoff(sources.vocabulary,type,true);if(type!==ENTITY_REFERENCE)throw Error('Reference is not admitted for this annotation type');return {type,metadata:{dcp:provenance,entityReference:entityRef(handle)}};};
+ const mark=(type:string,handle:string)=>{requireStandoff(sources.vocabulary,type,true);if(type!==ENTITY_REFERENCE)throw Error('Reference is not admitted for this annotation type');const ref=entityRef(handle);if(ref.scope==='document')mentioned.add(ref.entityId);return {type,metadata:{dcp:provenance,entityReference:ref}};};
  const argumentsAndRelations=async(args:any[],rels:any[])=>{
   if(args.length)requireCapability(sources.vocabulary,'semantic.argument');
   for(const a of list(args,64)){keys(a,['id','anchor']);claim(a.id,'arg');const anchor=target(a.anchor);if(anchor.kind!=='range'||anchor.resourceId!==resourceId)throw Error('Argument needs an owned passage anchor');if(!definitions[anchor.anchorId]){const d=sources.definition(anchor);if(!d||d.isDeleted)throw Error('Anchor unavailable');}
@@ -38,5 +40,5 @@ export function semanticPreparation(sources:DcpSources,resourceId:string,definit
  const gloss=(input:any)=>{requireCapability(sources.vocabulary,'semantic.gloss');keys(input,['id','target','type','text']);claim(input.id,'g');if(typeof input.type!=='string'||!input.type.trim()||input.type.includes(':')||input.type.length>128||typeof input.text!=='string'||!input.text.trim()||input.text.length>8192)throw Error('Invalid independent Gloss');
   const id=crypto.randomUUID();definitions[id]={id,type:GLOSS,value:input.type+': '+input.text,metadata:{gloss:{version:1,localId:crypto.randomUUID(),links:{}},dcp:provenance}};aliases.set(input.id,{kind:'gloss',resourceId,definitionId:id});return {id:crypto.randomUUID(),type:GLOSS,annotationId:id,metadata:{dcp:provenance}};
  };
- return {entities,mark,argumentsAndRelations,gloss,target,verify:async()=>{for(const ref of vaultReferences.values())await sources.verifyVaultEntity(ref);}};
+ return {entities,mark,argumentsAndRelations,gloss,target,verify:async()=>{if(requireMentions){const index=created.findIndex(id=>!mentioned.has(id));if(index>=0)throw new DcpValidationError(safeDiagnostic({code:'entity-mention',path:`$.entities[${index}]`}));}for(const ref of vaultReferences.values())await sources.verifyVaultEntity(ref);}};
 }

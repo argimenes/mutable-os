@@ -130,6 +130,7 @@ export type FeatureFlags = Readonly<{
   /** Exchange-local authoring selection; no persistent settings or UI. */
   dcpVocabularySelection: boolean;
   /** Derived committed semantic context and declarative passage targets. */
+  dcpProactiveSemanticAuthoring: boolean;
   dcpSemanticWorkspace: boolean;
   /** Native heading/grid/media/annotation projections and bounded inspection. */
   dcpNativeAuthoringStage1: boolean;
@@ -271,6 +272,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialecticDcp: true,
   dcpCapabilityCatalogue: true,
   dcpVocabularySelection: true,
+  dcpProactiveSemanticAuthoring: true,
   dcpSemanticWorkspace: true,
   dcpNativeAuthoringStage1: true,
   dcpNativeAuthoringStage2Text: true,

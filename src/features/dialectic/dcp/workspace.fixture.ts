@@ -6,8 +6,8 @@ import {DcpSources} from './sources';
 import {prepare,request} from './exchange';
 import {semanticWorkspace,enableSemanticWorkspace} from './workspace';
 export const workspaceOwner='11111111-1111-4111-8111-111111111111';
-export function workspaceFixture(enabled=true){
- const owner=workspaceOwner,editor=new ReactiveEditor({id:owner,type:'document-block',metadata:{dialectic:conversationMetadata},children:[]},{features:{nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,dialecticConversationUpdates:false,dialecticAutomaticTitles:false,dcpSemanticWorkspace:enabled}});
+export function workspaceFixture(enabled=true,proactive=true){
+ const owner=workspaceOwner,editor=new ReactiveEditor({id:owner,type:'document-block',metadata:{dialectic:conversationMetadata},children:[]},{features:{dcpProactiveSemanticAuthoring:proactive,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,dialecticConversationUpdates:false,dialecticAutomaticTitles:false,dcpSemanticWorkspace:enabled}});
  registerApplicationViews(editor);const view=editor.createView('workspace-fixture'),root=view.node(view.state.rootKey)!;let ordinal=0;
  const refs=new DialecticReferences(editor,view,root.key),sessions:DcpSources[]=[];
  const addHuman=(text:string)=>{const id=crypto.randomUUID();editor.commands.insert({id,type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'committed',author:'human',participant:defaultParticipant(owner,'human'),ordinal:++ordinal,replies:[]}},children:[{id:crypto.randomUUID(),type:'standoff-editor-block',text}]},{kind:'at',parentKey:root.key,index:root.children.length});return id;};
@@ -18,7 +18,7 @@ export function workspaceFixture(enabled=true){
   Object.assign(r,{structuralContext});if(enabled){enableSemanticWorkspace(r);Object.assign(r,{semanticWorkspace:await semanticWorkspace(sources,participantId,structuralContext.sources.map(x=>x.target).filter(Boolean))});}return r as any;
  };
  const admit=async(sources:DcpSources,value:any,participantId='agent-A',r?:any)=>{
-  const prepared=await prepare(JSON.stringify(value),value.exchange,owner,editor.visualEffects,sources,true,'ai',participantId,r?.authoring?.emptySemanticFields);sources.check();
+  const prepared=await prepare(JSON.stringify(value),value.exchange,owner,editor.visualEffects,sources,true,'ai',participantId,r?.authoring?.emptySemanticFields,r?.authoring?.proactiveSemantics);sources.check();
   editor.commands.boundedStructuralTransaction('Semantic workspace contribution',()=>{
    prepared.preparedResources.check();if(prepared.preparedResources.leaves.size)throw Error('Media outside fixture');
    if(Object.keys(prepared.definitions).length)editor.commands.setPayloadField(root.key,'linkedAnnotations',{...JSON.parse(JSON.stringify(root.payload.linkedAnnotations??{})),...prepared.definitions});

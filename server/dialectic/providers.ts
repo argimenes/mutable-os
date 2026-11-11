@@ -1,5 +1,5 @@
 import {checkEmptyFieldsVersion,emptySemanticFields} from '../../src/features/dialectic/dcp/empty-fields.js';
-import {dcpEditorialPolicy} from '../../src/features/dialectic/dcp/editorial-policy.js';
+import {dcpEditorialPolicy,proactiveEditorialPolicy,checkProactiveSemantics} from '../../src/features/dialectic/dcp/editorial-policy.js';
 import type {VocabularySnapshot} from '../../src/features/dialectic/dcp/vocabulary-contract.js';
 import {sourceOperationInstructions,vocabularySourceInstructions} from '../../src/features/dialectic/dcp/authoring.js';
 import {safeDiagnostic,allowsSourceRecovery} from '../../src/features/dialectic/dcp/diagnostics.js';
@@ -14,6 +14,7 @@ export function titleConversation(settings:ProviderSettings,text:string):Provide
   input:[{role:'user',content:JSON.stringify({firstContribution:text})}]};
 }
 export function conversation(settings:ProviderSettings,request:any):ProviderConversation {
+ checkProactiveSemantics(request.authoring?.proactiveSemantics);
  const emptyFields=request.authoring?.emptySemanticFields;checkEmptyFieldsVersion(emptyFields);
  // Preserve the full diagnostic request and high-priority instructions. Only
  // the provider-facing user projection omits their exact duplicate copies.
@@ -24,7 +25,7 @@ export function conversation(settings:ProviderSettings,request:any):ProviderConv
  return {settings,emptySemanticFields:emptyFields,semanticWorkspace:request.semanticWorkspaceAuthoring===1,...(vocabulary?{vocabulary}:{}),retainedPdfAuthoring:request.nativeAuthoring===1&&request.retainedPdfAuthoring===1,externalMediaAuthoring:request.nativeAuthoring===1&&request.externalMediaAuthoring===1,managedImageAuthoring:request.nativeAuthoring===1&&request.managedImageAuthoring===1,widgetAuthoring:request.nativeAuthoring===1&&request.widgetAuthoring===1,compoundAuthoring:request.nativeAuthoring===1&&request.compoundAuthoring===1,layoutAuthoring:request.nativeAuthoring===1&&request.layoutAuthoring===1,textAuthoring:request.nativeAuthoring===1&&request.textAuthoring===1,nativeAuthoring:request.nativeAuthoring===1,catalogue:request.capabilities?.version===1&&request.legend?.tools?.includes('describe_capabilities')===true,exchangeId:request.exchange,system:[
   'Active DCP exchange: '+request.exchange+'. Native GUIDs are durable identities; all handles/revisions from earlier exchanges in remembered requests, responses and tool results are expired historical diagnostics, never current authority.',
   request.protocolKey.text,
-  dcpEditorialPolicy,
+  request.authoring?.proactiveSemantics===1?proactiveEditorialPolicy:dcpEditorialPolicy,
   request.authoring?.instructions??'',
   vocabulary?vocabularySourceInstructions(vocabulary):sourceOperationInstructions,
   'Return a complete DCP contribution using the negotiated schema and exchange ID.',
