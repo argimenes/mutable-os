@@ -4,10 +4,12 @@ import { Router, type RequestHandler } from 'express';
 import { promises as fs, constants } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import multer from 'multer';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { PhextVFS } from '../src/phext/vfs.js';
 import { SqliteKnowledgeHost } from './sqlite-knowledge-host.js';
 import { createHistoryService } from './history-router.js';
 import { createNativeDocumentStoreRouter } from './native-document-store.mjs';
@@ -15,9 +17,14 @@ import { createDocumentStoreRouter } from './document-store.js';
 import { createWorkspaceStoreRouter } from './workspace-store.js';
 import { featureFlags } from '../src/configuration.js';
 import { createManagedAssetService } from './managed-assets-router.mjs';
+// (server/phext-settings.mjs is loaded by URL below, like the
+// other phext modules — a static import would not resolve from
+// the tsc-emitted dist tree.)
 import { normalizePolicy } from '../src/knowledge/policy.js';
 
-type Cavern = { path: string; name: string; cavernGuid: string; session: string };
+type CavernMode = 'phext' | 'native';
+type Cavern = { path: string; name: string; cavernGuid: string; session: string; mode: CavernMode };
+type ModeResolution = { mode: CavernMode | 'ambiguous' | 'none'; source: 'marker' | 'derived' | 'none' };
 type Preferences = { lastCavernPath?: string; recentCaverns: Array<Omit<Cavern, 'session'>> };
 const run = promisify(execFile);
 const fail = (message: string, status = 409): never => { throw Object.assign(new Error(message), { status }); };
@@ -25,8 +32,21 @@ const appHome = () => process.platform === 'darwin' ? path.join(os.homedir(), 'L
   : process.platform === 'win32' ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Mutable')
   : path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'mutable');
 
-export function createCavernLifecycle(options: { stateFile?: string } = {}) {
+/**
+ * H1 (bug hunt, 2026-11-05): the bound on lifecycle waits that have
+ * no rejection path of their own. A Cavern switch waits for the
+ * in-flight API requests to drain; one request that never finishes
+ * (a dead client, a half-open socket — no finish, no close) must
+ * not wedge the server permanently. After this long the switch
+ * proceeds anyway and logs it; the session fence then rejects the
+ * stragglers. close() bounds its wait on the serial queue the
+ * same way.
+ */
+const DRAIN_TIMEOUT_MS = 15_000;
+
+export function createCavernLifecycle(options: { stateFile?: string; drainTimeoutMs?: number } = {}) {
   const stateFile = options.stateFile || path.join(appHome(), 'caverns.json');
+  const drainTimeoutMs = options.drainTimeoutMs ?? DRAIN_TIMEOUT_MS;
   const router = Router();
   let preferences: Preferences = { recentCaverns: [] }, loaded = false, recovery: { path: string; error: string } | undefined;
   let current: Cavern | undefined, runtime: ReturnType<typeof stores> | undefined, switching = false;
@@ -34,6 +54,19 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
   const serial = <T>(action: () => Promise<T>): Promise<T> => {
     const work = tail.then(action); tail = work.then(() => {}, () => {}); return work;
   };
+  // The drain wait behind a Cavern switch, bounded by H1's timeout:
+  // resolves when the middleware's request counter reaches zero
+  // (the middleware invokes `drain`), or when the timeout fires —
+  // whichever comes first. `drain` is cleared on timeout so a late
+  // finish cannot resolve a later switch's wait early by mistake.
+  const waitForDrain = () => new Promise<void>(resolve => {
+    const timer = setTimeout(() => {
+      drain = undefined;
+      console.warn(`Cavern switch: ${requests} API request(s) still in flight after ${drainTimeoutMs} ms; proceeding without them.`);
+      resolve();
+    }, drainTimeoutMs);
+    drain = () => { clearTimeout(timer); resolve(); };
+  });
   const load = async () => {
     if (loaded) return;
     try {
@@ -56,6 +89,54 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     const expanded = input === '~' ? os.homedir() : input.startsWith('~/') ? path.join(os.homedir(), input.slice(2)) : input;
     return path.resolve(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'), expanded);
   };
+  // ---- Mode resolution (mode selection design §2). The mode is a
+  // per-Cavern property recorded in the Cavern's own state record:
+  // `mode` in the L7 `/.control/cavern-state.json` inside
+  // cavern.phext, or in `.mutable/cavern-state.json` on the native
+  // side. caverns.json is never the source of truth (it may cache
+  // the mode for recents badging only). This resolver is the only
+  // code that interprets the records and the layout.
+  const hasFile = async (candidate: string) => {
+    try { return (await fs.lstat(candidate)).isFile(); } catch { return false; }
+  };
+  const readNativeMarker = async (root: string): Promise<boolean> => {
+    try {
+      const state = JSON.parse(await fs.readFile(path.join(root, '.mutable', 'cavern-state.json'), 'utf8'));
+      return state?.mode === 'native';
+    } catch { return false; }
+  };
+  const readPhextMarker = (root: string): boolean => {
+    // A brief read-only VFS open for the L7 record; only used when
+    // the folder's contents make the answer matter (a phext is
+    // present). Multiple VFS instances over one file are coherent
+    // by the flush-generation discipline.
+    try {
+      const vfs = PhextVFS.open(path.join(root, 'cavern.phext'));
+      try {
+        const state = JSON.parse(vfs.readTextFile('/.control/cavern-state.json'));
+        return state?.mode === 'phext';
+      } finally { vfs.close(); }
+    } catch { return false; }
+  };
+  const resolveMode = async (root: string): Promise<ModeResolution> => {
+    const phextPresent = await hasFile(path.join(root, 'cavern.phext'));
+    const dbPresent = await hasFile(path.join(root, '.mutable', 'mutable.db'));
+    if (phextPresent && dbPresent) {
+      // Marker present → marker decides (an upgraded Cavern's
+      // normal state). The phext record is checked first: the one
+      // supported flow that leaves BOTH records behind is the
+      // upgrade, whose commit point is the phext-side record —
+      // the native record beside it is the frozen era's marker.
+      // No marker on either side → genuinely ambiguous: refuse
+      // and ask; never guess.
+      if (readPhextMarker(root)) return { mode: 'phext', source: 'marker' };
+      if (await readNativeMarker(root)) return { mode: 'native', source: 'marker' };
+      return { mode: 'ambiguous', source: 'none' };
+    }
+    if (phextPresent) return readPhextMarker(root) ? { mode: 'phext', source: 'marker' } : { mode: 'phext', source: 'derived' };
+    if (dbPresent) return (await readNativeMarker(root)) ? { mode: 'native', source: 'marker' } : { mode: 'native', source: 'derived' };
+    return { mode: 'none', source: 'none' };
+  };
   const inspect = async (input: unknown) => {
     let target = resolve(input);
     try {
@@ -65,15 +146,75 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
       let established = false;
       try { if (!(await fs.lstat(path.join(target, '.mutable'))).isDirectory()) fail('The .mutable location is not a directory.'); established = true; }
       catch (error) { if ((error as any).code !== 'ENOENT') throw error; }
-      return { path: target, name: path.basename(target), state: established ? 'cavern' : 'folder' };
+      // A phext-only Cavern whose knowledge has been unraveled may
+      // have no .mutable at all; the Cavern phext itself is the
+      // established marker then.
+      if (!established) {
+        try { if ((await fs.lstat(path.join(target, 'cavern.phext'))).isFile()) established = true; }
+        catch (error) { if ((error as any).code !== 'ENOENT') throw error; }
+      }
+      if (!established) return { path: target, name: path.basename(target), state: 'folder' as const };
+      // The client never interprets files itself: inspect reports
+      // the resolved mode (and whether it came from the Cavern's
+      // record or from layout derivation) alongside the state.
+      const resolution = await resolveMode(target);
+      return { path: target, name: path.basename(target), state: 'cavern' as const, mode: resolution.mode, modeSource: resolution.source };
     } catch (error) {
-      if ((error as any).code === 'ENOENT') return { path: target, name: path.basename(target), state: 'missing' };
+      if ((error as any).code === 'ENOENT') return { path: target, name: path.basename(target), state: 'missing' as const };
       throw error;
     }
   };
-  function stores(root: string) {
+  function stores(root: string, mode: CavernMode) {
     const sql = new SqliteKnowledgeHost({ root, entitiesEnabled: featureFlags.sqliteEntities, semanticServicesEnabled: featureFlags.sqliteSemanticServices, thesisEnabled: featureFlags.thesis, cardexEnabled: featureFlags.cardex, verifyCardexImage:async ref=>{if(!assets)throw Error("Managed assets unavailable");const {manifest}=await assets.store.get(ref.assetId,ref.cavernId);if(!["image/png","image/jpeg"].includes(manifest.mediaType))throw Error("Canonical image must be PNG or JPEG");} });
     const history = createHistoryService({ root });
+    // Mode wiring (design §3): the mode reaches every subsystem
+    // through REGISTRATION, and registration happens only here.
+    //
+    // Phext mode: every store lives in <root>/cavern.phext. The
+    // gates consumers (history, jobs, publications, managed assets)
+    // go through the stage-C gates phext backend; the native
+    // document stores through phext-fs (server/phext-fs.mjs) —
+    // documents, pair journals, relocation records, the legacy
+    // stores and uploads; the knowledge layer through the phext
+    // registry, its canonical records in L3 (SQLite survives only
+    // as an ephemeral replica in temp). Registration must complete
+    // before any consumer pins a directory, so establish() awaits
+    // `phextReady` before the stores are used.
+    //
+    // Native mode: no PhextVFS is opened and nothing is registered
+    // anywhere; `phextReady` stays undefined (every existing
+    // `await next.phextReady` tolerates that). Each subsystem then
+    // takes its disk branch by the absence of registration — gates
+    // to the disk backend + worker, document stores through
+    // phext-fs to real fs, knowledge to the disk foundation.
+    let phextVfs: PhextVFS | undefined;
+    let phextReady: Promise<void> | undefined;
+    if (mode === 'phext') {
+      phextVfs = PhextVFS.openOrCreate(path.join(root, 'cavern.phext'));
+      const vfs = phextVfs;
+      phextReady = (async () => {
+      const gates = await import(pathToFileURL(path.resolve('scripts/stage-c-gates/filesystem.mjs')).href);
+      gates.registerPhextBackend({ root, vfs });
+      const phextFs = await import(pathToFileURL(path.resolve('server/phext-fs.mjs')).href);
+      phextFs.registerPhextFs({ root, vfs });
+      const knowledge = await import(pathToFileURL(path.resolve('src/knowledge-sqlite/phext-registry.mjs')).href);
+      knowledge.registerPhextKnowledge({ root, phextPath: path.join(root, 'cavern.phext'), vfs });
+      // A migrated Cavern's strata record carries its
+      // remaining-on-disk list; preserve it across opens instead of
+      // overwriting it with an empty list.
+      let preservedOnDisk: unknown[] = [];
+      try {
+        const previous = JSON.parse(vfs.readTextFile('/.control/phext-strata.json'));
+        if (Array.isArray(previous?.onDisk)) preservedOnDisk = previous.onDisk;
+      } catch { /* a phext-born Cavern has no prior record */ }
+      vfs.writeFile('/.control/phext-strata.json', JSON.stringify({
+        v: 1,
+        phextBacked: { documents: 1, pairJournals: 2, knowledge: 3, history: 4, services: 5, assets: 6, control: 7, legacyDocumentStores: 1, documentSavesJournal: 3, uploads: 1 },
+        onDisk: preservedOnDisk,
+      }));
+      vfs.flush();
+      })();
+    }
     const coordinate = <T>(action: () => Promise<T>) => sql.foreground(action);
     const api = Router();
     // Applications share the root Cavern; they may still browse its subfolders.
@@ -113,16 +254,60 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
       indexWork = read().finally(() => { indexWork = undefined; });
       return indexWork;
     };
-    return { api, sql,
+    return { api, sql, mode, phextReady, phextVfs,
       async activateAssets(cavern: Cavern) {
         if(featureFlags.applicationServices)services=createApplicationServiceHost({root,cavernId:cavern.cavernGuid,nativeEnabled:featureFlags.nativeDocumentPersistence,publicationEnabled:featureFlags.webPublishing,academicEnabled:featureFlags.academicResourceLoaders,iiifEnabled:featureFlags.iiifResourceLoaders,crossResourceEnabled:featureFlags.crossResourceLoaders,structuredEnabled:featureFlags.structuredResources,deterministicEnabled:featureFlags.deterministicAcademicResources,webEnabled:featureFlags.webResourceViewers,everydayEnabled:featureFlags.everydayWebResources,academic:(request,signal)=>sql.academic(request,signal),assets:()=>assets?.store,knowledge:(request,signal)=>sql.entityLookup({vault:'.',request},signal,true)});
         if (featureFlags.managedAssetClipboard) { assets = createManagedAssetService({ root, cavernId: cavern.cavernGuid, session: cavern.session,crossResourceEnabled:featureFlags.crossResourceLoaders,structuredEnabled:featureFlags.structuredResources,deterministicEnabled:featureFlags.deterministicAcademicResources,webEnabled:featureFlags.webResourceViewers,inspectOriginal:(bytes,mediaType,signal)=>{if(!services)throw Error('Application services unavailable');return services.executor.run(['application/xml','application/epub+zip','application/x-bibtex','application/x-research-info-systems'].includes(mediaType)?{kind:'academic-original-inspect',bytes,mediaType}:mediaType==='application/pdf'?{kind:'pdf-inspect',bytes}:{kind:'json-inspect',bytes},signal);} }); return assets.recover(); } },
       async index(policy: any) { indexPolicy ??= normalizePolicy(policy); return indexStatus(); },
       async status() { return indexPolicy ? indexStatus() : undefined; },
-      async close() { await services?.close(); await assets?.close(); await indexWork?.catch(() => {}); await sql.close(); await history.dispose(); },
+      async close() { await services?.close(); await assets?.close(); await indexWork?.catch(() => {}); await sql.close(); await history.dispose(); if (mode === 'phext') { await phextReady?.catch(() => {}); const phextFs = await import(pathToFileURL(path.resolve('server/phext-fs.mjs')).href); phextFs.unregisterPhextFs(root); const knowledge = await import(pathToFileURL(path.resolve('src/knowledge-sqlite/phext-registry.mjs')).href); knowledge.unregisterPhextKnowledge(root); const gates = await import(pathToFileURL(path.resolve('scripts/stage-c-gates/filesystem.mjs')).href); await gates.unregisterPhextBackend(root); phextVfs?.close(); } },
     };
   }
-  const establish = async (input: unknown, intent: unknown, confirmed = false) => {
+  // Mode selection replaces the cutover's convert-on-encounter:
+  // opening a Cavern NEVER converts it. The mode is resolved from
+  // the Cavern's own record (resolveMode above) before any store
+  // opens; a derived mode is written into the record once the open
+  // succeeds, so derivation happens at most once and a failed open
+  // leaves the folder byte-identical. Generation happens only when
+  // phext is the resolved/chosen mode for a folder that has disk
+  // content but no phext yet — a folder being set up as a phext
+  // Cavern, or a legacy `.mutable` home with no database — and it is
+  // the non-destructive generation: originals stay in place.
+  const generateIfChosenPhext = async (root: string) => {
+    if (await hasFile(path.join(root, 'cavern.phext'))) return;
+    const entries = await fs.readdir(root).catch(() => [] as string[]);
+    if (!entries.length) return; // brand-new empty folder: stores() creates the phext at open
+    const transfer = await transferModule();
+    const hasKnowledge = await hasFile(path.join(root, '.mutable', 'mutable.db'));
+    await transfer.migrateCavernToPhext({
+      root, openVfs: PhextVFS, ...(hasKnowledge ? {} : { allowNoKnowledge: true }),
+    });
+  };
+  // Write/refresh the Cavern's own state record on the side its
+  // mode names. Spread-preserving: fields a flow does not own (a
+  // migration's migratedUtc) survive every refresh.
+  const writeStateRecord = async (root: string, mode: CavernMode, fields: Record<string, unknown>, openVfs?: PhextVFS) => {
+    if (mode === 'phext') {
+      const vfs = openVfs ?? PhextVFS.open(path.join(root, 'cavern.phext'));
+      try {
+        let state: Record<string, unknown> = { v: 1 };
+        try { state = { ...JSON.parse(vfs.readTextFile('/.control/cavern-state.json')) }; } catch { /* first write */ }
+        vfs.writeFile('/.control/cavern-state.json', JSON.stringify({ ...state, v: 1, mode: 'phext', ...fields }));
+        vfs.flush();
+      } finally { if (!openVfs) vfs.close(); }
+      return;
+    }
+    const statePath = path.join(root, '.mutable', 'cavern-state.json');
+    let state: Record<string, unknown> = { v: 1 };
+    try { state = { ...JSON.parse(await fs.readFile(statePath, 'utf8')) }; } catch { /* first write */ }
+    await fs.mkdir(path.dirname(statePath), { recursive: true });
+    const temporary = `${statePath}.${randomUUID()}.tmp`;
+    try {
+      await fs.writeFile(temporary, JSON.stringify({ ...state, v: 1, mode: 'native', ...fields }), { mode: 0o600, flag: 'wx' });
+      await fs.rename(temporary, statePath);
+    } finally { await fs.unlink(temporary).catch(() => {}); }
+  };
+  const establish = async (input: unknown, intent: unknown, confirmed = false, requestedMode?: unknown) => {
     await load();
     let target = await inspect(input);
     if (target.state === 'missing') {
@@ -137,22 +322,64 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
       if (!created && target.state === 'folder' && !confirmed) return { confirmation: true, target };
     } else if (target.state === 'folder' && !confirmed) return { confirmation: true, target };
     if (current?.path === target.path) return { current };
+    // Resolve the mode (design §2.4/§4.2). A recorded or derivable
+    // mode governs — a requested mode is honored only where a
+    // choice exists: at setup (no store layout yet) and as the
+    // answer to the ambiguous layout's question.
+    const chosen: CavernMode | undefined = requestedMode === 'phext' || requestedMode === 'native' ? requestedMode : undefined;
+    const resolution: ModeResolution = target.state === 'cavern' && 'mode' in target
+      ? { mode: target.mode as ModeResolution['mode'], source: (target as any).modeSource ?? 'none' }
+      : await resolveMode(target.path);
+    let mode: CavernMode;
+    if (resolution.mode === 'ambiguous') {
+      if (!chosen) fail('This Cavern holds both a phext store (cavern.phext) and a disk knowledge home (.mutable/mutable.db), and no recorded mode says which copy is current. Choose which copy Mutable should use.');
+      mode = chosen;
+      // The user's answer becomes the marker (§2.4) — recorded
+      // BEFORE the open, because it is the user's act rather than
+      // a derivation, and because the knowledge layer's own mode
+      // resolution must see the record while the open proceeds.
+      // (A derived mode, by contrast, is written only after a
+      // successful open, so a failed open leaves the folder
+      // byte-identical.)
+      await writeStateRecord(target.path, mode, {});
+    } else if (resolution.mode === 'none') {
+      mode = chosen ?? 'phext';
+    } else {
+      mode = resolution.mode;
+    }
+    if (mode === 'phext') await generateIfChosenPhext(target.path);
     switching = true;
     let next: ReturnType<typeof stores> | undefined;
     try {
-      if (requests) await new Promise<void>(done => { drain = done; });
+      if (requests) await waitForDrain();
       // Establish/open with the existing SQLite foundation; no replacement metadata.
-      next = stores(target.path);
+      next = stores(target.path, mode);
+      await next.phextReady;
       const established = await next.sql.establish('.');
-      const selected: Cavern = { path: target.path, name: target.name, cavernGuid: established.vaultGuid, session: randomUUID() };
+      const selected: Cavern = { path: target.path, name: target.name, cavernGuid: established.vaultGuid, session: randomUUID(), mode };
       const assetRecovery = await next.activateAssets(selected);
       if (assetRecovery?.diagnostics.length) console.warn('Managed asset recovery requires review:', assetRecovery.diagnostics);
       await persist({ lastCavernPath: selected.path, recentCaverns: [
-        { path: selected.path, name: selected.name, cavernGuid: selected.cavernGuid },
+        // The mode rides the recent entry as a display cache only;
+        // the Cavern's own record (written below) is authoritative.
+        { path: selected.path, name: selected.name, cavernGuid: selected.cavernGuid, mode: selected.mode },
         ...preferences.recentCaverns.filter(c => c.cavernGuid !== selected.cavernGuid && c.path !== selected.path),
       ].slice(0, 8) });
       await runtime?.close();
       runtime = next; next = undefined; current = selected; recovery = undefined;
+      // Cavern-scoped state lives in the Cavern's own state record —
+      // in phext mode the L7 record inside the phext (a migration's
+      // migratedUtc, written by the migration, is spread-preserved);
+      // in native mode `.mutable/cavern-state.json`. The recorded
+      // mode is written/refreshed here, on a successful open, which
+      // is also where a derived mode becomes a recorded one.
+      // `caverns.json` stays server installation state. Best-effort:
+      // a state record must never fail an open.
+      try {
+        await writeStateRecord(selected.path, mode, {
+          cavernGuid: selected.cavernGuid, lastOpenedUtc: new Date().toISOString(),
+        }, mode === 'phext' ? runtime.phextVfs : undefined);
+      } catch (error) { console.warn('Cavern state record was not updated:', error); }
       return { current, alreadyCavern: target.state === 'cavern' };
     } finally { await next?.close(); switching = false; }
   };
@@ -174,7 +401,15 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
   }));
   route('get', '/status', async () => { await load(); return view(); });
   route('post', '/inspect', req => inspect(req.body.path));
-  route('post', '/establish', req => serial(async () => ({ ...await establish(req.body.path, req.body.intent, req.body.confirmed === true), ...await view() })));
+  route('post', '/establish', req => serial(async () => ({ ...await establish(req.body.path, req.body.intent, req.body.confirmed === true, req.body.mode), ...await view() })));
+  // Close the current Cavern without opening another. The Cavern
+  // menu's Upgrade to Phext composes close → /migrate → establish;
+  // lastCavernPath is untouched, so a later startup restores it.
+  route('post', '/close', () => serial(async () => {
+    await runtime?.close();
+    runtime = undefined; current = undefined;
+    return view();
+  }));
   route('post', '/index', req => serial(async () => {
     if (!runtime || !current || req.body.session !== current.session) fail('The current Cavern changed.');
     return runtime.index(req.body.policy);
@@ -196,6 +431,110 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     await run(process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer.exe' : 'xdg-open', [current.path]);
     return { revealed: true };
   });
+  // ---- PhextVFS Phase 5: the exit ramps (migration, export,
+  // download, open-from-phext). The work itself lives in
+  // server/phext-cavern-transfer.mjs, loaded by URL like the other
+  // phext modules. /migrate is the explicit, strict form for a
+  // closed Cavern and, since mode selection, the non-destructive
+  // upgrade: it generates the phext and records the mode inside
+  // it, leaving the native tree untouched. Download and the
+  // settings bundle are phext-mode features and refuse by name in
+  // a native Cavern (design §3.2).
+  const NATIVE_MODE_REFUSAL = 'This Cavern is in Native mode; upgrade it to Phext to use this.';
+  const requirePhextMode = () => { if (runtime?.mode !== 'phext') fail(NATIVE_MODE_REFUSAL); };
+  const transferModule = () => import(pathToFileURL(path.resolve('server/phext-cavern-transfer.mjs')).href);
+  route('post', '/migrate', req => serial(async () => {
+    const target = resolve(req.body.path);
+    if (current?.path === target) fail('Close the Cavern before migrating it.');
+    const inspected = await inspect(target);
+    if (inspected.state !== 'cavern') fail('Only an established disk-mode Cavern can be migrated.');
+    const transfer = await transferModule();
+    return transfer.migrateCavernToPhext({ root: target, openVfs: PhextVFS });
+  }));
+  route('post', '/export-phext', req => serial(async () => {
+    const source = resolve(req.body.path);
+    const destination = resolve(req.body.destination);
+    const transfer = await transferModule();
+    return transfer.exportPhextCavernToDisk({ phextPath: path.join(source, 'cavern.phext'), openVfs: PhextVFS, destination });
+  }));
+  router.get('/download', async (req, res) => {
+    try {
+      if (!current || !runtime) fail('Choose a Cavern first.');
+      requirePhextMode();
+      await runtime.phextReady;
+      const vfs = runtime.phextVfs!;
+      // Download serves the CURRENT state: flush first, then read
+      // the phext from disk. The seal is produced from those
+      // uncompressed bytes, at export time only (safe model).
+      vfs.flush();
+      const bytes = await fs.readFile(path.join(current.path, 'cavern.phext'));
+      const format = req.query.format === 'xz' ? 'xz' : 'phext';
+      let body: Buffer = bytes;
+      let filename = `${current.name}.phext`;
+      if (format === 'xz') {
+        const transfer = await transferModule();
+        body = await transfer.sealPhext(bytes);
+        filename = `${current.name}.phext.xz`;
+      }
+      res.set({
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '')}"`,
+        'X-Cavern-Guid': current.cavernGuid,
+        'X-Cavern-Format': format,
+        'X-Cavern-Phext-Bytes': String(bytes.length),
+        'X-Cavern-Phext-Sha256': createHash('sha256').update(bytes).digest('hex'),
+        ...(format === 'xz' ? { 'X-Cavern-Sealed-Bytes': String(body.length) } : {}),
+      });
+      res.send(body);
+    } catch (error) {
+      res.status((error as any).status || 409).json({ Success: false, Error: (error as Error).message });
+    }
+  });
+  // Settings bundle (audit Part 2): capture is an explicit user
+  // action — the client sends the five domains' current values,
+  // the whole payload is validated before anything is written,
+  // and the L7 /.control/settings tree is rewritten in the open
+  // Cavern's phext. The read route returns the shipped copy for
+  // viewing; opening a Cavern never imports it.
+  const settingsModule = () => import(pathToFileURL(path.resolve('server/phext-settings.mjs')).href);
+  route('post', '/settings/capture', req => serial(async () => {
+    if (!current || !runtime) fail('Choose a Cavern first.');
+    requirePhextMode();
+    await runtime.phextReady;
+    const settings = await settingsModule();
+    const bundle = settings.validateSettingsCapture(req.body?.settings);
+    const outcome = settings.writeSettingsBundle(runtime.phextVfs!, bundle);
+    return { settings: { updatedUtc: outcome.updatedUtc, fields: outcome.written } };
+  }));
+  router.get('/settings', async (_req, res) => {
+    try {
+      if (!current || !runtime) fail('Choose a Cavern first.');
+      requirePhextMode();
+      await runtime!.phextReady;
+      const settings = await settingsModule();
+      res.json({ Success: true, Data: { settings: settings.readSettingsBundle(runtime!.phextVfs!) } });
+    } catch (error) {
+      res.status((error as any).status || 409).json({ Success: false, Error: (error as Error).message });
+    }
+  });
+  const phextUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 512 * 1024 * 1024, files: 1 } }).single('phext');
+  router.post('/open-phext', (req, res) => {
+    phextUpload(req, res, error => {
+      if (error) { res.status(409).json({ Success: false, Error: error.message }); return; }
+      void serial(async () => {
+        const file = (req as any).file as { buffer: Buffer; originalname: string } | undefined;
+        if (!file) fail('Choose a .phext or .phext.xz file to open.', 400);
+        const target = resolve((req.body as any)?.target);
+        const transfer = await transferModule();
+        const installed = await transfer.installPhextIntoFolder({
+          bytes: file.buffer, filename: file.originalname, targetDir: target, openVfs: PhextVFS,
+        });
+        const opened = await establish(target, 'open');
+        return { ...opened, ...(await view()), vaultGuid: installed.vaultGuid, sealed: installed.sealed };
+      }).then(data => res.json({ Success: true, Data: data }))
+        .catch(e => res.status((e as any).status || 409).json({ Success: false, Error: (e as Error).message }));
+    });
+  });
   const middleware: RequestHandler = (req, res, next) => {
     if (!runtime || !current || switching) { res.status(409).json({ Success: false, Error: 'Establish a Cavern before entering Mutable OS.' }); return; }
     if (req.header('X-Mutable-Cavern') !== current.session) { res.status(409).json({ Success: false, Error: 'The current Cavern changed. Reopen Mutable OS.' }); return; }
@@ -205,5 +544,15 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     res.once('finish', finish); res.once('close', finish);
     runtime.api(req, res, next);
   };
-  return { router, middleware, current: () => current, async close() { await tail; await runtime?.close(); } };
+  return { router, middleware, current: () => current, async close() {
+    // Bounded the same way as the drain wait (H1): a serial action
+    // that never settles must not hang shutdown forever either.
+    let settled = false;
+    await Promise.race([
+      tail.then(() => { settled = true; }),
+      new Promise<void>(resolve => setTimeout(resolve, drainTimeoutMs)),
+    ]);
+    if (!settled) console.warn(`Cavern lifecycle close: the serial queue was still busy after ${drainTimeoutMs} ms; closing anyway.`);
+    await runtime?.close();
+  } };
 }

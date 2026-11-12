@@ -1,11 +1,11 @@
 import express, { type Request, type Response } from "express";
 import path from "path";
 import multer, { type FileFilterCallback } from 'multer';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import bodyParser from 'body-parser';
 import fs from "fs";
-import { RecordId, Surreal } from "surrealdb";
-import { surrealdbNodeEngines } from "@surrealdb/node";
+import { RecordId, Surreal, Table } from "surrealdb";
+import { createNodeEngines } from "@surrealdb/node";
 import type { IBlockDto, StandoffEditorBlockDto, BlockType, IndexedBlock } from "./types";
 import { createNativeDocumentStoreRouter } from "./native-document-store.mjs";
 import { createDocumentStoreRouter } from "./document-store.js";
@@ -54,7 +54,7 @@ export async function initDb(): Promise<Surreal | undefined> {
   if (db) return db;
   // db = new Surreal();
   db = new Surreal({
-    engines: surrealdbNodeEngines(), // enable embedded Node engine
+    engines: createNodeEngines(), // enable embedded Node engine
   });
   try {
       // await db.connect("http://127.0.0.1:8000/rpc", {
@@ -159,7 +159,7 @@ export async function saveConcepts(claims: IConceptDto[]) {
       code: node.Code,
       deleted: node.IsDeleted
     } as any;
-    await db.upsert<Concept>(recordId, data);
+    await db.upsert<Concept>(recordId).content(data);
   }
 }
 
@@ -190,11 +190,9 @@ export async function saveSubsetOfConcepts(relations: SubsetOfConceptDto[]) {
   for (const relation of relations) {
     const sourceId = new RecordId("Concept", toId(relation.Source.Guid));
     const targetId = new RecordId("Concept", toId(relation.Target.Guid));
-    await db.insert_relation<SubsetOfConcept>('subset_of_concept', {
-      in: sourceId,
-      out: targetId,
+    await db.relate<SubsetOfConcept>(sourceId, new Table('subset_of_concept'), targetId, {
       primary: relation.IsPrimary
-    });
+    } as SubsetOfConcept);
   }
 }
 
@@ -206,7 +204,7 @@ export async function saveClaims(claims: IClaimDto[]) {
       role: node.Role,
       deleted: node.IsDeleted
     } as any;
-    await db.upsert<Claim>(recordId, data);
+    await db.upsert<Claim>(recordId).content(data);
   }
 }
 
@@ -218,7 +216,7 @@ export async function saveAgents(agents: IAgentDto[]) {
       type: node.AgentType,
       deleted: node.IsDeleted
     } as any;
-    await db.upsert<Agent>(recordId, data);
+    await db.upsert<Agent>(recordId).content(data);
   }
 }
 
@@ -251,14 +249,24 @@ app.use('/image-backgrounds', express.static(path.join(__dirname, baseBackground
 app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({limit: '50mb'}));
 
+// Mode selection (2026-11-06): the upload endpoint and the
+// /uploads static route follow the current Cavern's mode — the
+// phext engine (server/phext-uploads.mjs, loaded by URL like the
+// other phext modules) for a phext Cavern, the disk engine for a
+// native one; with no Cavern lifecycle (standalone mounts, native
+// by definition) uploads are disk, relative to the working folder.
+const phextUploads = await import(pathToFileURL(path.resolve('server/phext-uploads.mjs')).href);
+
 const cavern = featureFlags.cavernStartup ? createCavernLifecycle() : undefined;
 if (cavern) {
   app.use('/api/cavern', cavern.router);
   app.use('/api', cavern.middleware, (_req, res) => { res.status(404).json({ Success: false, Error: 'This service is unavailable in the current Cavern.' }); });
   app.use('/upload', cavern.middleware);
+  const phextUploadsStatic = phextUploads.createPhextUploadsStatic({ currentRoot: () => cavern.current()?.path });
   app.use('/uploads', (req, res, next) => {
     const selected = cavern.current();
     if (!selected) { res.sendStatus(409); return; }
+    if (selected.mode === 'phext') { phextUploadsStatic(req, res, next); return; }
     express.static(path.join(selected.path, 'uploads'))(req, res, next);
   });
 }
@@ -298,24 +306,51 @@ app.use("/api", createWorkspaceStoreRouter({
 }
 
 
-const storage = multer.diskStorage({
+// Multer stores through the engine matching the current Cavern's
+// mode, selected per request. The session fence
+// (X-Mutable-Cavern) is common to both branches and written once:
+// a Cavern upload must name the current Cavern's session. The
+// phext engine refuses a destination no Cavern phext covers; the
+// disk engine writes the Cavern's real uploads/ directory (created
+// on demand); standalone mode uses the relative uploads/ folder.
+const fencedCavern = (req: Request) => {
+  const selected = cavern?.current();
+  if (!selected || req.header('X-Mutable-Cavern') !== selected.session) throw new Error('Choose the current Cavern before uploading.');
+  return selected;
+};
+const phextStorage = phextUploads.createPhextUploadStorage({
+  destinationFor: (req: Request) => {
+    const selected = fencedCavern(req);
+    return { root: selected.path, directory: path.join(selected.path, 'uploads') };
+  },
+});
+const diskStorage = multer.diskStorage({
   destination: function (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) {
-    if (cavern) {
-      const selected = cavern.current();
-      if (!selected || req.header('X-Mutable-Cavern') !== selected.session) { cb(new Error('Choose the current Cavern before uploading.'), ''); return; }
-      const directory = path.join(selected.path, 'uploads');
-      fs.promises.mkdir(directory, { recursive: true }).then(() => cb(null, directory), error => cb(error, ''));
-      return;
-    }
-    cb(null, 'uploads');
+    if (!cavern) { cb(null, 'uploads'); return; }
+    let directory: string;
+    try { directory = path.join(fencedCavern(req).path, 'uploads'); }
+    catch (error) { cb(error as Error, ''); return; }
+    fs.promises.mkdir(directory, { recursive: true }).then(() => cb(null, directory), error => cb(error, ''));
   },
   filename: function (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) {
     cb(null, Date.now() + path.extname(file.originalname));
   },
 });
+const engineFor = (req: Request) => (cavern && cavern.current()?.mode === 'phext' ? phextStorage : diskStorage) as any;
+const storage = {
+  _handleFile(req: Request, file: Express.Multer.File, cb: (error: Error | null, info?: Partial<Express.Multer.File>) => void) {
+    engineFor(req)._handleFile(req, file, cb);
+  },
+  _removeFile(req: Request, file: Express.Multer.File, cb: (error: Error | null) => void) {
+    engineFor(req)._removeFile(req, file, cb);
+  },
+};
 
+// H3: requests are capped at the boundary; the phext engine
+// enforces the per-file cap again (see server/phext-uploads.mjs).
 const upload = multer({
   storage: storage,
+  limits: { fileSize: phextUploads.MAX_UPLOAD_FILE_BYTES, files: phextUploads.MAX_UPLOAD_FILES },
   fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     if (
       file.mimetype == 'image/png' ||
@@ -324,7 +359,6 @@ const upload = multer({
     ) {
       cb(null, true);
     } else {
-      cb(null, false);
       return cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
     }
   },
@@ -335,7 +369,7 @@ const uploadImages = upload.array('image');
 app.post('/upload', function(req: Request, res: Response) {
   uploadImages(req, res, function (err: any) {
     if (err) {
-      return res.status(400).send({ message: err.message });
+      return res.status(400).json({ Success: false, Error: err.message });
     }
     const files = (req as MulterRequest).files;
     res.json(files);
@@ -366,7 +400,7 @@ app.post('/api/graph/update-entity-references', async (req: Request, res: Respon
 
 app.post('/api/addToGraphJson', async (req: Request, res: Response) => {
   const { id, name } = req.body;
-  const results = await db.upsert<Agent>(new RecordId("Agent", id), { name } as Agent);
+  const results = await db.upsert<Agent>(new RecordId("Agent", id)).content({ name } as Agent);
   console.log('/api/addToGraphJson', { results, id, name });
   res.send({
     Success: true
@@ -559,7 +593,7 @@ const saveDocumentIndex = async (doc: IBlockDto) => {
       metadata: doc.metadata
   } as Document;
   //console.log({ documentData });
-  await db.upsert<Document>(new RecordId("Document", doc.id), documentData);
+  await db.upsert<Document>(new RecordId("Document", doc.id)).content(documentData);
   const textBlocks = blocks
     .filter(x => x.block.type == "standoff-editor-block")
     .map(x => x.block as any as StandoffEditorBlockDto);
@@ -575,7 +609,7 @@ const saveDocumentIndex = async (doc: IBlockDto) => {
         metadata: textBlock.metadata
     } as TextBlock;
     //console.log({ textBlockData });
-    await db.upsert<TextBlock>(new RecordId("TextBlock", textBlock.id), textBlockData);
+    await db.upsert<TextBlock>(new RecordId("TextBlock", textBlock.id)).content(textBlockData);
     const definitions = (doc as any).linkedAnnotations ?? {};
     let properties = (textBlock.standoffProperties ?? []).map((property: any) => {
       const shared = property.annotationId && definitions[property.annotationId];
@@ -596,14 +630,11 @@ const saveDocumentIndex = async (doc: IBlockDto) => {
         metadata: property.metadata
       } as StandoffProperty;
       //console.log({ standoffPropertyData });
-      await db.upsert<StandoffProperty>(new RecordId("StandoffProperty", property.id), standoffPropertyData);
+      await db.upsert<StandoffProperty>(new RecordId("StandoffProperty", property.id)).content(standoffPropertyData);
       const sourceId = new RecordId("StandoffProperty", property.id);
       const targetId = new RecordId("Agent", property.value);
       //console.log({ sourceId, targetId });
-      await db.insert_relation<StandoffProperty_RefersTo_Agent>('standoff_property_refers_to_agent', {
-        in: sourceId,
-        out: targetId
-      });
+      await db.relate<StandoffProperty_RefersTo_Agent>(sourceId, new Table('standoff_property_refers_to_agent'), targetId);
     }
   }
 }

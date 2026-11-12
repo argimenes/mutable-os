@@ -1,7 +1,23 @@
-/** Rebuildable Library presentation cache. Never used as storage/identity proof.
- * Verified discovery, Open, Save and relocation continue through NativeVaultStore.
+/** Library discovery — reconcile against the vault, with a
+ * rebuildable persisted presentation cache in native mode only.
+ *
+ * The class name is historical. The substantive work is the
+ * reconcile itself (walk, inspect, pair-state derivation); verified
+ * discovery, Open, Save and relocation continue through
+ * NativeVaultStore.
+ *
+ * The persisted cache at `.mutable/discovery-cache.json` (read on
+ * Browse, rewritten after a complete discovery pass; a failed write
+ * never fails Browse) is a NATIVE-mode mechanism: it returns with
+ * mode selection (2026-11-06) for vaults no phext backend covers,
+ * where its file routes through the phext-fs facade onto real disk
+ * exactly as before the cutover. In phext mode nothing is read or
+ * written: the VFS directory index scrolls (L9) are the listing
+ * source, every browse reconciles against them, and a cache file
+ * inside the VFS would be stored state the cutover deliberately
+ * removed.
  */
-import { promises as fs } from 'node:fs';
+import { promises as fs, phextFsBackendFor } from './phext-fs.mjs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { hash } from '../src/persistence/managed-pair.mjs';
@@ -22,6 +38,9 @@ export class VaultListingCache {
     if(!s.isDirectory())throw Error('Vault must be a directory');
     return `${this.store.root}:${s.dev}:${s.ino}`;
   }
+  /** The persisted cache exists only where no phext backend covers
+   * the vault — native mode (see the header). */
+  async persisted(vault) { return !phextFsBackendFor(await this.store.resolve(vault)); }
   async read(vault, identity) {
     try {
       const bytes=await this.store.read(join(vault,'.mutable/discovery-cache.json'),true);
@@ -57,15 +76,17 @@ export class VaultListingCache {
   }
   async browse(vault,{mode='cached',signal}={}) {
     signal?.throwIfAborted();
-    const identity=await this.root(vault),prior=await this.read(vault,identity);
+    const identity=await this.root(vault);
+    const persisted=await this.persisted(vault);
+    const prior=persisted?await this.read(vault,identity):undefined;
     signal?.throwIfAborted();
-    if(mode==='cached'&&prior)return {...prior.listing,readOnly:this.store.readOnly,cached:true};
     // Serialize publications, including full verification queued behind a scan.
     const before=this.work.get(vault)??Promise.resolve();
     const work=before.catch(()=>{}).then(async()=>{
       signal?.throwIfAborted();
-      const previous=await this.read(vault,identity);
-      return this.reconcile(vault,identity,previous,mode==='verify',signal);
+      if(mode==='cached'&&prior)return {...prior.listing,readOnly:this.store.readOnly,cached:true};
+      const previous=persisted?await this.read(vault,identity):undefined;
+      return this.reconcile(vault,identity,previous,mode==='verify',signal,persisted);
     });
     this.work.set(vault,work);
     try{return await work;}finally{if(this.work.get(vault)===work)this.work.delete(vault);}
@@ -78,7 +99,7 @@ export class VaultListingCache {
     return JSON.stringify([await this.store.stamp(p),await this.optionalStamp(markdownProjectionName(p)),
       await this.optionalStamp(home+'/receipt.json'),await this.optionalStamp(home+'/pending.json'),relocations]);
   }
-  async reconcile(vault,identity,prior,verify,signal) {
+  async reconcile(vault,identity,prior,verify,signal,persisted=false) {
     const folders=[],markdown=[],other=[],documents=[],diagnostics=[],entries=[],directories=[],files=[];
     const previous=new Map((prior?.entries??[]).map(e=>[e.path,e]));
     const inspections=new Map((prior?.entries??[]).map(e=>[e.byteHash,e.inspection]));
@@ -140,7 +161,7 @@ export class VaultListingCache {
     check();if(await this.root(vault)!==identity)throw Error('Vault changed during discovery');
     const paired=new Set(documents.filter(d=>d.state==='paired').map(d=>markdownProjectionName(join(d.location.folder,d.location.filename))));
     const listing={vault,folders,documents,markdown:markdown.filter(p=>!paired.has(p)),other,diagnostics,operations,documentSaves,readOnly:this.store.readOnly,complete:!diagnostics.length&&!documentSaves.length};
-    check();if(listing.complete)await this.write(vault,{version:VERSION,identity,vault,entries,listing},signal);
-    check();return {...listing,cached:false};
+    check();if(persisted&&listing.complete)await this.write(vault,{version:VERSION,identity,vault,entries,listing},signal);
+    return {...listing,cached:false};
   }
 }

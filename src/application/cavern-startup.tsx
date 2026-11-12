@@ -1,8 +1,9 @@
 import { For, Show, createContext, createSignal, onCleanup, onMount, useContext, untrack, type JSX } from 'solid-js';
 import './cavern-startup.css';
+import { currentSettingsCapture } from './settings-snapshot';
 
-export type CurrentCavern = { path: string; name: string; cavernGuid: string; session: string };
-type Target = { path: string; name: string; state: 'missing' | 'folder' | 'cavern' };
+export type CurrentCavern = { path: string; name: string; cavernGuid: string; session: string; mode?: 'phext' | 'native' };
+type Target = { path: string; name: string; state: 'missing' | 'folder' | 'cavern'; mode?: 'phext' | 'native' | 'ambiguous' | 'none'; modeSource?: 'marker' | 'derived' | 'none' };
 type Recovery = { path: string; error: string };
 type CavernContext = {
   current: () => CurrentCavern | undefined;
@@ -11,6 +12,7 @@ type CavernContext = {
   recent: () => Array<Omit<CurrentCavern, 'session'>>;
   open: (path: string) => void;
   reveal: () => void;
+  upgrade: () => Promise<void>;
   status: () => string;
 };
 const Context = createContext<CavernContext>();
@@ -42,8 +44,14 @@ export function CavernStartup(props: { children: (cavern: CurrentCavern) => JSX.
   const [recent, setRecent] = createSignal<Array<Omit<CurrentCavern, 'session'>>>([]);
   const [recovery, setRecovery] = createSignal<Recovery>();
   const [choosing, setChoosing] = createSignal(false), [mode, setMode] = createSignal<'open' | 'create'>('open');
+  // Mode selection (design §2.1): new Caverns default to Phext
+  // pre-selected. The choice is recorded by the server in the
+  // Cavern's own state record at establish; nothing global exists.
+  const [storageMode, setStorageMode] = createSignal<'phext' | 'native'>('phext');
   const [busy, setBusy] = createSignal(true), [error, setError] = createSignal('');
   const [folder, setFolder] = createSignal(''), [name, setName] = createSignal('');
+  const [phextOpen, setPhextOpen] = createSignal(false), [phextTarget, setPhextTarget] = createSignal('');
+  let phextFile: File | undefined;
   const [target, setTarget] = createSignal<Target>(), [index, setIndex] = createSignal<any>();
   let alive = true, polling = false, generation: string | undefined;
   // Every managed request is bound to the active server context, fencing stale tabs.
@@ -72,7 +80,28 @@ export function CavernStartup(props: { children: (cavern: CurrentCavern) => JSX.
   };
   const choose = (next: 'open' | 'create' = 'open') => {
     if (busy()) return;
-    setMode(next); setFolder(''); setName(''); setTarget(undefined); setError(''); setChoosing(true);
+    setMode(next); setFolder(''); setName(''); setTarget(undefined); setError(''); setPhextOpen(false); setStorageMode('phext'); setChoosing(true);
+  };
+  // Phase 5: open a Cavern from a received .phext / .phext.xz. The
+  // server verifies (and unlocks) the file, installs it into the
+  // target folder, then hands off to the normal establish flow.
+  const openFromPhext = async () => {
+    if (!phextFile) { setError('Choose a .phext or .phext.xz file.'); return; }
+    if (!safeToSwitch()) return;
+    setBusy(true); setError('');
+    try {
+      const form = new FormData();
+      form.append('phext', phextFile);
+      form.append('target', phextTarget());
+      const response = await originalFetch('/api/cavern/open-phext', { method: 'POST', body: form });
+      const result = await response.json().catch(() => undefined);
+      if (!response.ok || result?.Success === false || !result?.Data) {
+        throw new Error(typeof result?.Error === 'string' && result.Error ? result.Error : 'Mutable could not open a Cavern from that phext.');
+      }
+      if (!alive) return;
+      apply(result.Data); setChoosing(false); setPhextOpen(false); phextFile = undefined;
+    } catch (e) { if (alive) setError(String(e)); }
+    finally { if (alive) setBusy(false); }
   };
   const safeToSwitch = () => {
     if (!current()) return true;
@@ -80,18 +109,36 @@ export function CavernStartup(props: { children: (cavern: CurrentCavern) => JSX.
     window.dispatchEvent(event);
     return !event.defaultPrevented || window.confirm('There is unsaved or pending work. Switch Caverns and close this workspace? Cancel to save or recover it first.');
   };
-  const establish = async (resolved: Target, intent: 'open' | 'create', confirmed = false) => {
+  const establish = async (resolved: Target, intent: 'open' | 'create', confirmed = false, modeChoice?: 'phext' | 'native') => {
     if (current()?.path === resolved.path) { setChoosing(false); setTarget(undefined); setError(''); return; }
     if (!safeToSwitch()) return;
     // Freeze the workspace during establishment; failed opens retain its live work.
     // A successful context replacement disposes the old workspace through keyed Show.
     setChoosing(true); setBusy(true); setError('');
     try {
-      const value = await request('establish', { path: resolved.path, intent, confirmed });
+      const value = await request('establish', { path: resolved.path, intent, confirmed, ...(modeChoice ? { mode: modeChoice } : {}) });
       if (!alive) return;
       if (value.confirmation) { setTarget(value.target); return; }
       apply(value); setChoosing(false); setTarget(undefined);
     } catch (e) { if (alive) setError(String(e)); }
+    finally { if (alive) setBusy(false); }
+  };
+  // Mode selection §4.2/§5: upgrade the current native Cavern to
+  // Phext. The composition is close → migrate → establish; the
+  // migration is non-destructive (native files remain in place,
+  // frozen) and records the mode inside the generated phext, so the
+  // re-establish opens in phext mode from the record.
+  const upgrade = async () => {
+    const selected = current(); if (!selected || selected.mode !== 'native') return;
+    if (!safeToSwitch()) return;
+    setBusy(true); setError('');
+    try {
+      await request('close', {});
+      await request('migrate', { path: selected.path });
+      const value = await request('establish', { path: selected.path, intent: 'open', confirmed: true });
+      if (!alive) return;
+      apply(value);
+    } catch (e) { if (alive) setError(String(e)); throw e; }
     finally { if (alive) setBusy(false); }
   };
   const inspect = async (path: string, intent: 'open' | 'create') => {
@@ -104,9 +151,14 @@ export function CavernStartup(props: { children: (cavern: CurrentCavern) => JSX.
       if (resolved!.state === 'missing' && intent === 'open') throw new Error('This folder could not be found. Locate the Cavern or choose another folder.');
       setMode(intent);
       if (resolved!.state === 'folder') { setTarget(resolved); setChoosing(true); return; }
+      // A Cavern whose mode is only derivable from its layout is
+      // shown as a fact once (the open records it); a Cavern holding
+      // both layouts with no recorded mode asks which copy is
+      // current. A recorded mode opens directly.
+      if (resolved!.state === 'cavern' && (resolved!.mode === 'ambiguous' || resolved!.modeSource === 'derived')) { setTarget(resolved); setChoosing(true); return; }
     } catch (e) { if (alive) setError(String(e)); resolved = undefined; }
     finally { if (alive) setBusy(false); }
-    if (resolved && alive) await establish(resolved, intent);
+    if (resolved && alive) await establish(resolved, intent, false, intent === 'create' ? storageMode() : undefined);
   };
   const select = async () => {
     setBusy(true); setError('');
@@ -122,7 +174,7 @@ export function CavernStartup(props: { children: (cavern: CurrentCavern) => JSX.
     void inspect(mode() === 'create' ? createPath() : folder(), mode());
   };
   const context: CavernContext = {
-    current, choose, recent,
+    current, choose, recent, upgrade,
     open: path => { if (!busy()) void inspect(path, 'open'); },
     reveal: () => { void request('reveal', {}).catch(e => { if (alive) { setError(String(e)); setChoosing(true); } }); },
     status: () => index()?.pending ? 'Indexing Cavern…' : index()?.coverage?.state === 'incomplete' || index()?.coverage?.state === 'unknown' ? 'Cavern index needs attention' : '',
@@ -148,23 +200,44 @@ export function CavernStartup(props: { children: (cavern: CurrentCavern) => JSX.
   });
   onCleanup(() => { alive = false; if (window.fetch === boundFetch) window.fetch = originalFetch; });
   const recents = () => <Show when={recent().length}><div class="cavern-recents"><h2>Recent Caverns</h2><For each={recent()}>{c =>
-    <button type="button" disabled={busy()} onClick={() => void inspect(c.path, 'open')}><strong>{c.name}</strong><small>{c.path}</small></button>
+    <button type="button" disabled={busy()} onClick={() => void inspect(c.path, 'open')}><strong>{c.name}</strong><small>{c.path}</small><Show when={c.mode}><em class="cavern-mode-badge">{c.mode === 'phext' ? 'Phext' : 'Native'}</em></Show></button>
   }</For></div></Show>;
+  // The storage-mode choice, shared by the create form and the
+  // folder setup screen. Phext is pre-selected (design §2.1).
+  const modeChoice = () => <fieldset class="cavern-mode-choice" disabled={busy()}><legend>Storage mode</legend>
+    <label><input type="radio" name="cavern-storage-mode" checked={storageMode() === 'phext'} onChange={() => setStorageMode('phext')} /> Phext — everything in one <code>cavern.phext</code> file</label>
+    <label><input type="radio" name="cavern-storage-mode" checked={storageMode() === 'native'} onChange={() => setStorageMode('native')} /> Native — ordinary files in the folder</label>
+  </fieldset>;
   const chooser = () => <section class="cavern-card" role={current() ? 'dialog' : undefined} aria-modal={current() ? true : undefined} aria-label="Cavern setup" aria-busy={busy()}>
     <Show when={!choosing()} fallback={<>
-      <h1>{target() ? 'Set up this folder as a Cavern?' : mode() === 'create' ? 'Create New Cavern' : 'Open Cavern'}</h1>
-      <Show when={target()} keyed fallback={<form onSubmit={e => { e.preventDefault(); submit(); }}>
+      <h1>{phextOpen() ? 'Open Cavern from a Phext' : target() ? target()!.mode === 'ambiguous' ? 'Which copy should Mutable use?' : target()!.state === 'cavern' ? 'Open this Cavern?' : 'Set up this folder as a Cavern?' : mode() === 'create' ? 'Create New Cavern' : 'Open Cavern'}</h1>
+      <Show when={phextOpen()} fallback={<Show when={target()} keyed fallback={<form onSubmit={e => { e.preventDefault(); submit(); }}>
         <Show when={mode() === 'create'}><label>Cavern Name<input autofocus value={name()} disabled={busy()} onInput={e => setName(e.currentTarget.value)} placeholder="Leonardo Research" /></label></Show>
         <label>{mode() === 'create' ? 'Location (parent folder)' : 'Folder location'}<div class="cavern-location"><input autofocus={mode() === 'open'} value={folder()} disabled={busy()} onInput={e => setFolder(e.currentTarget.value)} placeholder="Choose a folder or enter its path" /><button type="button" disabled={busy()} onClick={() => void select()}>Browse…</button></div></label>
         <Show when={mode() === 'create' && folder() && name().trim()}><p>Resulting location: <code>{createPath()}</code></p></Show>
+        <Show when={mode() === 'create'}>{modeChoice()}</Show>
         <div class="cavern-actions"><button type="submit" class="cavern-primary" disabled={busy() || !folder().trim() || (mode() === 'create' && !name().trim())}>{mode() === 'create' ? 'Create Cavern' : 'Open Cavern'}</button><button type="button" disabled={busy()} onClick={() => { setChoosing(false); setError(''); }}>Cancel</button></div>
-      </form>}>{resolved => <>
+      </form>}>{resolved => <Show when={resolved.mode === 'ambiguous'} fallback={<Show when={resolved.state === 'cavern'} fallback={<>
         <p>{mode() === 'create' ? 'This folder already exists. Mutable can set it up as a Cavern.' : 'Mutable will add the infrastructure it needs to this folder.'} Existing files will remain in place.</p><code>{resolved.path}</code>
-        <div class="cavern-actions"><button class="cavern-primary" disabled={busy()} onClick={() => void establish(resolved, mode(), true)}>Set Up as Cavern</button><button disabled={busy()} onClick={() => { setTarget(undefined); setError(''); }}>{mode() === 'create' ? 'Choose Another Location' : 'Cancel'}</button></div>
-      </>}</Show>
+        {modeChoice()}
+        <div class="cavern-actions"><button class="cavern-primary" disabled={busy()} onClick={() => void establish(resolved, mode(), true, storageMode())}>Set Up as Cavern</button><button disabled={busy()} onClick={() => { setTarget(undefined); setError(''); }}>{mode() === 'create' ? 'Choose Another Location' : 'Cancel'}</button></div>
+      </>}>
+        <p>{resolved.mode === 'phext' ? 'This is a Phext Cavern — everything lives in one cavern.phext file.' : 'This is a Native Cavern — its content is ordinary files in the folder.'}</p><code>{resolved.path}</code>
+        <div class="cavern-actions"><button class="cavern-primary" disabled={busy()} onClick={() => void establish(resolved, mode(), true)}>Open Cavern</button><button disabled={busy()} onClick={() => { setTarget(undefined); setError(''); }}>Cancel</button></div>
+      </Show>}>
+        <p>This folder holds both a phext store (<code>cavern.phext</code>) and a disk knowledge home (<code>.mutable/mutable.db</code>), and no recorded mode says which copy is current. Your answer is recorded in the Cavern and used from then on.</p><code>{resolved.path}</code>
+        <div class="cavern-actions"><button class="cavern-primary" disabled={busy()} onClick={() => void establish(resolved, mode(), true, 'phext')}>Use the Phext Copy</button><button class="cavern-primary" disabled={busy()} onClick={() => void establish(resolved, mode(), true, 'native')}>Use the Native (Files) Copy</button><button disabled={busy()} onClick={() => { setTarget(undefined); setError(''); }}>Cancel</button></div>
+      </Show>}</Show>}>
+      <form onSubmit={e => { e.preventDefault(); void openFromPhext(); }}>
+        <p>A Cavern shared as one file: the raw <code>.phext</code>, or the sealed <code>.phext.xz</code> (its integrity is verified before anything is written). It is installed into a new, empty folder and opened.</p>
+        <label>Cavern phext file<input type="file" accept=".phext,.xz" disabled={busy()} onChange={e => { phextFile = e.currentTarget.files?.[0]; }} /></label>
+        <label>New folder for this Cavern<input autofocus value={phextTarget()} disabled={busy()} onInput={e => setPhextTarget(e.currentTarget.value)} placeholder="Enter the path of an empty folder" /></label>
+        <div class="cavern-actions"><button type="submit" class="cavern-primary" disabled={busy() || !phextTarget().trim()}>Open Cavern from Phext</button><button type="button" disabled={busy()} onClick={() => { setPhextOpen(false); setChoosing(false); setError(''); }}>Cancel</button></div>
+      </form>
+      </Show>
     </>}>
       <Show when={recovery()} keyed fallback={<><small>MUTABLE OS</small><h1>Welcome to Mutable OS</h1><p>Mutable stores your documents, objects and knowledge in a Cavern: an ordinary folder on your computer.</p></>}>{r => <><h1>Cavern unavailable</h1><p>Mutable could not open the previously selected Cavern:</p><code>{r.path}</code><p>{r.error}</p><button disabled={busy()} onClick={() => { choose('open'); void select(); }}>Locate Cavern…</button></>}</Show>
-      <div class="cavern-options"><div><h2>Create a New Cavern</h2><p>Create a new folder and set it up for Mutable OS.</p><button class="cavern-primary" disabled={busy()} onClick={() => choose('create')}>Create</button></div><div><h2>Open a Folder as a Cavern</h2><p>Use an existing folder as a Mutable Cavern.</p><button class="cavern-primary" disabled={busy()} onClick={() => { choose('open'); void select(); }}>Open</button></div></div>
+      <div class="cavern-options"><div><h2>Create a New Cavern</h2><p>Create a new folder and set it up for Mutable OS.</p><button class="cavern-primary" disabled={busy()} onClick={() => choose('create')}>Create</button></div><div><h2>Open a Folder as a Cavern</h2><p>Use an existing folder as a Mutable Cavern.</p><button class="cavern-primary" disabled={busy()} onClick={() => { choose('open'); void select(); }}>Open</button></div><div><h2>Open a Cavern from a Phext</h2><p>Unlock a Cavern shared as a single .phext or sealed .phext.xz file.</p><button class="cavern-primary" disabled={busy()} onClick={() => { setMode('open'); setTarget(undefined); setError(''); setPhextOpen(true); setChoosing(true); }}>Open from Phext…</button></div></div>
       {recents()}
       <Show when={current()}><button disabled={busy()} onClick={() => { setChoosing(false); setError(''); }}>Return to Mutable OS</button></Show>
     </Show>
@@ -190,6 +263,51 @@ export function CavernStartup(props: { children: (cavern: CurrentCavern) => JSX.
 export function CavernControl() {
   const cavern = useCurrentCavern();
   const [open, setOpen] = createSignal(false);
+  const [dlError, setDlError] = createSignal('');
+  const [settingsNote, setSettingsNote] = createSignal('');
+  const [confirmUpgrade, setConfirmUpgrade] = createSignal(false);
+  const [upgrading, setUpgrading] = createSignal(false);
+  // Mode selection §4.2/§5: upgrade this Cavern from Native to
+  // Phext. The terms are stated before anything runs; the action
+  // itself lives in CavernStartup (it owns the switch discipline).
+  const runUpgrade = async () => {
+    setUpgrading(true); setDlError('');
+    try { await cavern!.upgrade(); setConfirmUpgrade(false); setOpen(false); }
+    catch (e) { setDlError(String(e)); }
+    finally { setUpgrading(false); }
+  };
+  const nativeGateTitle = 'This Cavern is in Native mode; upgrade it to Phext to use this.';
+  // Settings bundle: ship a COPY of the current settings into this
+  // Cavern's phext (explicit action; opening a Cavern never imports
+  // settings back). The server validates all five domains before
+  // writing the L7 settings tree.
+  const updateShippedSettings = async () => {
+    setDlError(''); setSettingsNote('');
+    try {
+      const data = await request('settings/capture', { settings: currentSettingsCapture() });
+      setSettingsNote(`Settings copy updated in this Cavern (${data.settings.fields} fields, ${new Date(data.settings.updatedUtc).toLocaleString()}).`);
+    } catch (e) { setDlError(String(e)); }
+  };
+  // Phase 5: Download Cavern — the raw phext, or the xz-sealed form
+  // (sealed at export time from the current uncompressed state).
+  const download = async (format: 'phext' | 'xz') => {
+    setDlError('');
+    try {
+      const response = await fetch(`/api/cavern/download?format=${format}`);
+      if (!response.ok) {
+        const result = await response.json().catch(() => undefined);
+        throw new Error(typeof result?.Error === 'string' && result.Error ? result.Error : 'The Cavern download failed.');
+      }
+      const blob = await response.blob();
+      const filename = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') || '')?.[1]
+        || `${cavern!.current()!.name}.phext${format === 'xz' ? '.xz' : ''}`;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = filename; anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      setOpen(false);
+    } catch (e) { setDlError(String(e)); }
+  };
   let root!: HTMLDivElement;
   onMount(() => {
     if (!cavern) return;
@@ -202,9 +320,21 @@ export function CavernControl() {
     <button class="codex-system-bar__trigger" aria-label="Current Cavern" aria-expanded={open()} onClick={() => setOpen(!open())}>{cavern!.current()!.name} ▾</button>
     <span role="status" title={cavern!.status()}>{cavern!.status()}</span>
     <Show when={open()}><section class="cavern-menu" aria-label="Current Cavern settings"><strong>{cavern!.current()!.name}</strong><code>{cavern!.current()!.path}</code>
+      <span class="cavern-mode-line">{cavern!.current()!.mode === 'phext' ? 'Phext mode — everything in one cavern.phext file' : 'Native mode — ordinary files in the folder'}</span>
       <button onClick={() => act(() => cavern!.choose('open'))}>Open Another Cavern…</button><button onClick={() => act(() => cavern!.choose('create'))}>Create New Cavern…</button>
       <button onClick={() => act(() => cavern!.reveal())}>Reveal Cavern in {navigator.platform.includes('Mac') ? 'Finder' : 'File Manager'}</button>
-      <Show when={cavern!.recent().length > 1}><h3>Recent Caverns</h3><For each={cavern!.recent()}>{c => <button disabled={c.cavernGuid === cavern!.current()!.cavernGuid} onClick={() => act(() => cavern!.open(c.path))}><strong>{c.name}</strong><small>{c.path}</small></button>}</For></Show>
+      <button disabled={cavern!.current()!.mode !== 'phext'} title={cavern!.current()!.mode !== 'phext' ? nativeGateTitle : undefined} onClick={() => void download('phext')}>Download Cavern (.phext)</button><button disabled={cavern!.current()!.mode !== 'phext'} title={cavern!.current()!.mode !== 'phext' ? nativeGateTitle : undefined} onClick={() => void download('xz')}>Download Sealed Cavern (.phext.xz)</button>
+      <button disabled={cavern!.current()!.mode !== 'phext'} title={cavern!.current()!.mode !== 'phext' ? nativeGateTitle : undefined} onClick={() => void updateShippedSettings()}>Update Shipped Settings</button>
+      <Show when={cavern!.current()!.mode === 'native'}><p>Downloads and shipped settings are Phext-mode features.</p>
+        <Show when={!confirmUpgrade()} fallback={<>
+          <p>Mutable will generate <code>cavern.phext</code> from this Cavern and verify it. Your existing files stay exactly where they are, unchanged, as a snapshot Mutable will no longer update. The Cavern reopens in Phext mode.</p>
+          <button disabled={upgrading()} onClick={() => void runUpgrade()}>{upgrading() ? 'Upgrading…' : 'Confirm Upgrade to Phext'}</button>
+          <button disabled={upgrading()} onClick={() => setConfirmUpgrade(false)}>Cancel</button>
+        </>}><button onClick={() => setConfirmUpgrade(true)}>Upgrade to Phext…</button></Show>
+      </Show>
+      <Show when={settingsNote()}><p role="status">{settingsNote()}</p></Show>
+      <Show when={dlError()}><p class="cavern-error" role="alert">{dlError()}</p></Show>
+      <Show when={cavern!.recent().length > 1}><h3>Recent Caverns</h3><For each={cavern!.recent()}>{c => <button disabled={c.cavernGuid === cavern!.current()!.cavernGuid} onClick={() => act(() => cavern!.open(c.path))}><strong>{c.name}</strong><small>{c.path}</small><Show when={c.mode}><em class="cavern-mode-badge">{c.mode === 'phext' ? 'Phext' : 'Native'}</em></Show></button>}</For></Show>
     </section></Show>
   </div></Show>;
 }
