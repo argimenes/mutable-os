@@ -15,9 +15,9 @@ import {plainFragment} from '../../interchange/serializer';
 import {exportClipboard} from '../../interchange/transport';
 const cleanup:Array<()=>void>=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());vi.restoreAllMocks();vi.unstubAllGlobals();document.body.replaceChildren();});
-async function setup(titles=false){
+async function setup(titles=false,logging=false,autosave=true){
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'No test Vault'}),{headers:{'Content-Type':'application/json'}})));
- const workspace=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{dialecticAutomaticTitles:titles,dialecticConversationUpdates:true,nativeKnowledge:false,sqliteKnowledge:false,dcpTestPhaseLogging:false,flintProbe:false}}),editor=workspace.editor;cleanup.push(()=>workspace.dispose());
+ const workspace=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{dialecticAutomaticTitles:titles,dialecticConversationUpdates:true,dialecticAutosave:autosave,nativeKnowledge:false,sqliteKnowledge:false,dcpTestPhaseLogging:logging,flintProbe:false}}),editor=workspace.editor;cleanup.push(()=>workspace.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={workspace}/>,host));
  editor.installGateway(document);await editor.commandRegistry.execute('dialectic.open',{targetKey:workspace.projection.state.rootKey,args:undefined});await Promise.resolve();await Promise.resolve();
  const port=documentApplicationPorts(editor).ports().find(p=>p.applicationId==='dialectic')!;
@@ -119,4 +119,75 @@ it('applies a generated title only to Document metadata, preserving filename, co
  expect(c.committed().map(row=>row.id)).toEqual(before);expect(c.diagnostics.submissions).toBe(1);expect(native.location(c.resourceId())).toEqual(location);
  expect(await history.build(c.resourceId(),'ai',keys)).toEqual(original);expect(port.application.properties()?.title).toBe('Revising historical interpretations');
  expect(original.items[0].content).not.toContain('Generate a concise');
+});
+
+it.each(['exchange.materialised','contribution.committed'])('reveals admitted AI content while %s logging is pending',async kind=>{
+ const {editor,c,text}=await setup(false,true);
+ editor.setAssetContext(()=>({cavernId:'test',session:'test'}));
+ let block=false,release!:()=>void;
+ const pending=new Promise<void>(resolve=>release=resolve);
+ const diagnostic=vi.spyOn(DialecticProviderSession.prototype,'diagnostic').mockImplementation(async(event:any)=>{
+  if(block&&event.kind===kind)await pending;
+  return true;
+ });
+ vi.spyOn(DialecticProviderSession.prototype,'configure').mockImplementation(async function(this:DialecticProviderSession,settings){this.settings=settings;this.ready=true;return true;});
+ vi.spyOn(DialecticProviderSession.prototype,'transport').mockImplementation(function(this:DialecticProviderSession){return {
+  details:{version:1,adapterVersion:'4c-1',settings:this.settings,attempts:[],cost:{status:'unknown'}},
+  run:async()=>'<response><p>Visible before diagnostic uploads finish.</p></response>',commit:async()=>{},cancel:async()=>{},
+ };});
+ editor.commands.replaceInlineRange(text().key,0,0,'Hello');c.submit();
+ await vi.waitFor(()=>expect(diagnostic).toHaveBeenCalled());
+ diagnostic.mockClear();block=true;
+ const ensure=vi.spyOn(editor.focus,'ensureRendered');
+ const snapshot=vi.spyOn(editor.repository,'snapshot'),commit=vi.spyOn(editor.repository,'commit');
+ const exchange=c.ask();
+ try{
+  await vi.waitFor(()=>expect(diagnostic.mock.calls.some(([event]:any)=>event.kind===kind)).toBe(true));
+  const response=c.committed().at(-1)!;
+  expect(response.data.author).toBe('ai');
+  expect(c.inspection()).toEqual(c.target(response.id));
+  expect(c.dcpPreview()).toBe('');
+  await vi.waitFor(()=>expect(ensure).toHaveBeenCalledWith(response.key,expect.any(Function)));
+  expect(editor.mounts.get(response.key)?.root.textContent).toContain('Visible before diagnostic uploads finish.');
+  expect(snapshot).not.toHaveBeenCalled();expect(commit).toHaveBeenCalledTimes(1);
+ }finally{release();await exchange;}
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const timings=c.lastProviderExchange()?.localTimings;expect(timings?.validationAttempts).toBe(1);
+ for(const name of ['lowerMs','prepareMs','admissionMs','postAdmissionDiagnosticsMs','acknowledgementMs'] as const)expect(timings?.[name]).toBeGreaterThanOrEqual(0);
+});
+
+it('keeps the conversational layout and manual Save while autosave and diagnostic logging are off',async()=>{
+ const {editor,c,text,save,port,host}=await setup(false,false,false);
+ const manual=vi.spyOn(port.application.files!,'save').mockResolvedValue(undefined);
+ const diagnostic=vi.spyOn(DialecticProviderSession.prototype,'diagnostic');
+ const history=vi.spyOn(ConversationHistory.prototype,'build');
+ editor.commands.replaceInlineRange(text().key,0,0,'Manual-save conversation');c.submit();await c.askMock();
+ expect(c.committed()).toHaveLength(2);expect(save).not.toHaveBeenCalled();expect(c.saveState()).toBeUndefined();
+ expect(diagnostic).not.toHaveBeenCalled();expect(history).not.toHaveBeenCalled();
+ expect(host.querySelector('.dialectic-chat')).toBeTruthy();
+ expect(host.textContent).toContain('Save with ⌘S / Ctrl+S');expect(host.textContent).not.toContain('Contributions save automatically');
+ const button=[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='Save');expect(button).toBeTruthy();button!.click();
+ expect(manual).toHaveBeenCalledTimes(1);
+});
+
+
+it('keeps semantic failures quiet and toggles a persisted contribution warning without document work',async()=>{
+ const {editor,host,c,text}=await setup(false,false,false);
+ vi.spyOn(DialecticProviderSession.prototype,'configure').mockImplementation(async function(this:DialecticProviderSession,settings){this.settings=settings;this.ready=true;return true;});
+ const xml='<p id="p">A readable answer.</p><gloss target="missing" kind="scope">Cannot resolve.</gloss><gloss target="p" whole="true" kind="scope">A valid Gloss after the unresolved one.</gloss>';
+ vi.spyOn(DialecticProviderSession.prototype,'transport').mockImplementation(function(this:DialecticProviderSession){return {run:async(_r,_s,chunk,_signal,validate)=>{chunk(xml,'text');await validate?.(xml);return xml;},details:{version:1,adapterVersion:'4c-1',settings:this.settings,attempts:[],cost:{status:'unknown'}},commit:async()=>{},cancel:async()=>{}};});
+ editor.commands.replaceInlineRange(text().key,0,0,'Please explain.');await c.submitAndAsk();
+ expect(c.notice()).toBe('');expect(c.committed()).toHaveLength(2);
+ const row=c.committed()[1];expect(row.data.notices).toMatchObject([{version:1,severity:'warning',loss:true,detail:expect.stringContaining('missing')}]);
+ expect(c.contributionActivity(row.id)().counts.glosses).toBe(1);
+ await vi.waitFor(()=>expect(host.querySelector('[aria-label="Contribution warnings"]')).toBeTruthy());
+ const toggle=host.querySelector<HTMLElement>('[aria-label="Contribution warnings"]')!,details=toggle.parentElement as HTMLDetailsElement;
+ expect(details.open).toBe(false);expect(toggle.textContent?.trim()).toBe('');expect(toggle.querySelector('svg')).toBeTruthy();
+ const revision=editor.repository.state.revision,snapshots=vi.spyOn(editor.repository,'snapshot');
+ toggle.click();expect(details.open).toBe(true);expect(details.textContent).toContain('missing');toggle.click();expect(details.open).toBe(false);
+ expect(editor.repository.state.revision).toBe(revision);expect(snapshots).not.toHaveBeenCalled();
+ const {captureNative,nativeBytes,decodeNative}=await import('../../persistence/native-resource');
+ const restored=decodeNative(nativeBytes(captureNative(editor.repository.readState(),c.resourceId())));
+ expect(JSON.stringify(restored)).toContain('1 semantic operation was skipped');
+ editor.repository.undo();expect(c.committed()).toHaveLength(1);editor.repository.redo();expect(c.committed()[1].data.notices).toEqual(row.data.notices);
 });

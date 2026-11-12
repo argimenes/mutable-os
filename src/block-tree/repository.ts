@@ -294,6 +294,29 @@ export interface RepositoryChange {
 }
 
 export class CanonicalRepository {
+  private activeUndoGroup?: {record:(operations:RepositoryOperation[],inverse:RepositoryOperation[])=>void};
+  /** Native edits publish normally; only their Undo record is accumulated. The
+   * caller explicitly scopes each synchronous insertion, never unrelated edits. */
+  beginUndoGroup(label:string) {
+    const forward=new Map<string,RepositoryOperation>(),backward=new Map<string,RepositoryOperation>();
+    let closed=false,running=false;
+    const release=this.suspendHistory();
+    const key=(op:RepositoryOperation)=>{
+      if(op.kind==='record-batch'||op.kind==='set-root')throw Error('Grouped insertion requires bounded record operations');
+      return (op.kind.includes('content')?'c:':'p:')+('record' in op?op.record.key:op.key);
+    };
+    const group={record:(operations:RepositoryOperation[],inverse:RepositoryOperation[])=>{
+      for(const op of inverse){const k=key(op);if(!backward.has(k))backward.set(k,clone(op));}
+      for(const op of operations)forward.set(key(op),clone(op));
+    }};
+    // Prevent an unrelated edit from changing records whose original values
+    // belong to this open Undo group. Other Documents and the draft stay usable.
+    const stop=this.beforeCommit(operations=>{if(running){operations.forEach(key);return;}for(const op of operations){if(op.kind==='record-batch'||op.kind==='set-root'){if(forward.size)throw Error('Finish the current native insertion first');}else if(forward.has(key(op)))throw Error('This content is still receiving an AI response');}});
+    return {
+      run:<T>(operation:()=>T):T=>{if(closed||this.activeUndoGroup)throw Error('Native insertion group unavailable');running=true;this.activeUndoGroup=group;try{return operation();}finally{this.activeUndoGroup=undefined;running=false;}},
+      finish:()=>{if(closed)return;closed=true;stop();release();if(forward.size){this.undoStack.push(this.historyStorage.store(createCommitId(),label,[...forward.values()],[...backward.values()]));this.redoStack=[];}},
+    };
+  }
   private admission = new Set<(operations: readonly RepositoryOperation[], state: Readonly<RepositoryState>, metadata: CommitMetadata) => void>();
   /** Synchronous, read-only veto before validation/publication. No snapshots. */
   beforeCommit(guard: (operations: readonly RepositoryOperation[], state: Readonly<RepositoryState>, metadata: CommitMetadata) => void) {
@@ -614,7 +637,8 @@ export class CanonicalRepository {
       this.placementIdentity.acceptCommit(placementDelta);
       this.advanceResourceGenerations(operations, resources, provenance);
       if (recordHistory) {
-        this.undoStack.push(this.historyStorage.store(commitId, label, operations, inverse));
+        if(this.activeUndoGroup)this.activeUndoGroup.record(operations,inverse);
+        else this.undoStack.push(this.historyStorage.store(commitId, label, operations, inverse));
         this.redoStack = [];
       }
       this.deliverCapture(capture, commitId, label, recordHistory);
@@ -693,7 +717,8 @@ export class CanonicalRepository {
       if (placementDelta) this.placementIdentity.acceptCommit(placementDelta);
       this.advanceResourceGenerations(prepared, resources, provenance);
       if (recordHistory) {
-        this.undoStack.push(this.historyStorage.store(commitId, label, operations, inverse));
+        if(this.activeUndoGroup)this.activeUndoGroup.record(operations,inverse);
+        else this.undoStack.push(this.historyStorage.store(commitId, label, operations, inverse));
         this.redoStack = [];
       }
       this.deliverCapture(capture, commitId, label, recordHistory);

@@ -1,8 +1,18 @@
 import {For,Show,createMemo,createEffect} from 'solid-js';
+import type {ContributionNotice} from './model';
 import type {DialecticController} from './controller';
 import {activityCategories,activityLimits,type ActivityCategory,type ActivityItem} from './activity';
 const categories=Object.keys(activityCategories) as ActivityCategory[];
 const noticeLabel=(code:string)=>({'validation-repaired':'Response repaired','markdown-fallback':'Markdown fallback','partial-conversion':'Partial conversion','unsupported-media':'Unsupported media','incomplete-operation':'Incomplete operation'}[code]??code);
+/** Local disclosure only: opening a warning never edits the contribution. */
+export function ContributionWarnings(props:{notices:ContributionNotice[]}){
+ return <Show when={props.notices.length}><details class="dialectic-contribution-warning">
+  <summary aria-label="Contribution warnings" title="Some semantic operations could not be applied">
+   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 22 21H2Z" stroke-linejoin="round"/><path d="M12 9v5" stroke-linecap="round"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/></svg>
+  </summary>
+  <div class="dialectic-warning-explanation"><For each={props.notices}>{notice=><p>{notice.detail}</p>}</For></div>
+ </details></Show>;
+}
 export function ContributionActivityBar(props:{c:DialecticController;id:string}){
  const c=props.c,summary=c.contributionActivity(props.id),visible=()=>summary().items.length||summary().notices.length||summary().limited;
  return <Show when={visible()}><div class="dialectic-contribution-activity" data-contribution-activity={props.id} contentEditable={false} data-cross-text-controls onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()}>
@@ -11,9 +21,10 @@ export function ContributionActivityBar(props:{c:DialecticController;id:string})
     const meta=activityCategories[key],label=()=>`${summary().limited?'At least ':''}${summary().counts[key]} ${summary().counts[key]===1?meta.singular:meta.label}`;
     return <button data-activity-category={key} aria-label={label()} title={label()} onClick={e=>{e.stopPropagation();c.inspectActivity(props.id,key);}}><span class="dialectic-activity-full">{meta.symbol} {summary().limited?'≥':''}{summary().counts[key]} {summary().counts[key]===1?meta.singular:meta.label}</span><span class="dialectic-activity-compact" aria-hidden="true">[{meta.short}:{summary().limited?'≥':''}{summary().counts[key]}]</span></button>;
    }}</For>
+   <ContributionWarnings notices={summary().notices.filter(n=>n.severity==='warning')}/>
    <Show when={summary().limited}><button onClick={()=>c.inspectActivity(props.id,'unavailable')} title="Activity provenance is incomplete; counts may be incomplete">More activity may be recorded</button></Show>
   </div>
-  <Show when={summary().notices.length}><div class="dialectic-contribution-notices" role="group" aria-label="Contribution notices"><For each={summary().notices}>{notice=><button data-notice-code={notice.code} title={notice.detail} onClick={e=>{e.stopPropagation();c.inspectActivity(props.id,'notices');}}>! {noticeLabel(notice.code)}</button>}</For></div></Show>
+  <Show when={summary().notices.some(n=>n.severity!=='warning')}><div class="dialectic-contribution-notices" role="group" aria-label="Contribution notices"><For each={summary().notices.filter(n=>n.severity!=='warning')}>{notice=><button data-notice-code={notice.code} title={notice.detail} onClick={e=>{e.stopPropagation();c.inspectActivity(props.id,'notices');}}>! {noticeLabel(notice.code)}</button>}</For></div></Show>
  </div></Show>;
 }
 export function ContributionActivityInspector(props:{c:DialecticController}){

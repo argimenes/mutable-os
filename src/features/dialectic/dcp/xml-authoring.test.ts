@@ -52,7 +52,7 @@ it('reuses fresh Entity and passage aliases across exchanges without serial sear
  expect(()=>xx.resolve(x.alias(r.primaryReply))).toThrow();
 });
 
-it.each(['<response><p>x</p>','<response><p>x</p></response><response/>','<!DOCTYPE response><response><p>x</p></response>','<response><p>&bogus;</p></response>','<response><p><span id="same">x</span><span id="same">y</span></p></response>','<response><p><script>x</script></p></response>','<response><definitions/><p>x</p></response>','<response><p>x</p><definitions><claim id="c">x</claim></definitions></response>','<response><p>x</p><definitions><entity id="e" name="X" type="Person" confidence="0.8"/></definitions></response>'])('rejects malformed/unqualified syntax without repair-by-approximation: %s',xml=>{
+it.each(['<response><p>x</p>','<response><p>x</p></response><response/>','<!DOCTYPE response><response><p>x</p></response>','<response><p>&bogus;</p></response>','<response><p><span id="same">x</span><span id="same">y</span></p></response>','<response><p><script>x</script></p></response>','<response><p>x</p><definitions><claim id="c">x</claim></definitions></response>','<response><p>x</p><definitions><entity id="e" name="X" type="Person" confidence="0.8"/></definitions></response>'])('rejects malformed/unqualified syntax without repair-by-approximation: %s',xml=>{
  expect(()=>lowerXml(xml,'x',{resolve(){throw Error('forged')},revision(){throw Error('forged')}})).toThrow();
 });
 

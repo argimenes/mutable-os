@@ -27,7 +27,7 @@ export function findResource(state: RepositoryState, source: ResourceSource): Co
 // Structural ownership only; reference occurrences never become parents.
 // Cache is revision-bound and weakly held. No observer or input dispatch hook.
 const cache = new WeakMap<RepositoryState, { revision: number; owners: Map<string, Set<string>> }>();
-export function resourceOwner(state: RepositoryState, contentKey: string): ContentRecord | undefined {
+export function resourceOwner(state: RepositoryState, contentKey: string, lookup: typeof findResource = findResource): ContentRecord | undefined {
   let index = cache.get(state);
   if (!index || index.revision !== state.revision) {
     const owners = new Map<string, Set<string>>();
@@ -46,7 +46,7 @@ export function resourceOwner(state: RepositoryState, contentKey: string): Conte
       const id = metadata?.[c.viewType === "document-block" ? "documentId" : "workspaceId"] ?? c.payload.id;
       // Legacy identity-less roots still support local editing. Creating a
       // durable cross-resource descriptor requires resourceSource separately.
-      if (typeof id === "string" && id.trim() && findResource(state, resourceSource(c)!)?.key !== key) throw new Error("Ambiguous canonical resource identity");
+      if (typeof id === "string" && id.trim() && lookup(state, resourceSource(c)!)?.key !== key) throw new Error("Ambiguous canonical resource identity");
       return c;
     }
     const parents = index!.owners.get(key) ?? new Set<string>();
@@ -55,7 +55,7 @@ export function resourceOwner(state: RepositoryState, contentKey: string): Conte
     if (c.definitionOwnerKey) {
       const declared = state.contents[c.definitionOwnerKey];
       if (declared?.viewType !== "document-block" || structural && structural.key !== declared.key) throw new Error("Conflicting definition ownership");
-      findResource(state, resourceSource(declared)!);
+      lookup(state, resourceSource(declared)!);
       return declared;
     }
     return structural;

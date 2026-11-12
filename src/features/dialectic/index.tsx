@@ -26,7 +26,7 @@ export function createDialecticTextualFeature(editor:ReactiveEditor,get:(app:Doc
 export function createDialecticFeature(editor:ReactiveEditor):CodexFeature {
  return {id:'dialectic',activate(scope){
   if(editor.features.nativeTextProtection)scope.own(editor.textProtection.register(record=>{
-   const d=(record.payload.metadata as any)?.dialectic;return d?.kind==='contribution'&&d.state==='committed';
+   const d=(record.payload.metadata as any)?.dialectic;return d?.kind==='contribution'&&['committed','receiving'].includes(d.state);
   }));
   if(editor.features.dialecticDcp)scope.own(registerDcpTypes(editor.visualEffects,editor.features.scopedSemantics,editor.features.dcpProactiveSemanticAuthoring));
   scope.own(editor.visualEffects.registerType({type:RANGE_ANCHOR,renderers:[]}));

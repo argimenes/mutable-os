@@ -41,14 +41,15 @@ export class DialecticProviderSession {
      const response=await this.call('/continuity/prepare',{manifest:native.manifest,request},signal),preflight=await response.json();
      if(!preflight.supported)throw Error('Persistent provider memory is unavailable on this server. Disable continuity explicitly to use stateless mode.');
      continuity={manifest:native.manifest,plan:preflight.plan,items:native.items.slice(preflight.plan.start)};
-     if(preflight.plan.recovery)chunk('Rebuilding provider memory from native conversation history…');
+     if(preflight.plan.recovery)chunk('Rebuilding provider memory from native conversation history…','status');
     }
     const response=await this.call('/exchange',{request,...(continuity?{continuity}:{})},signal),start=await response.json();id=start.id;details.settings=start.settings;details.system=start.system;details.continuity=start.continuity;if(signal.aborted)throw Error('DCP cancelled');
     while(round<liveLimits.rounds){
+     chunk('','start');
      sources.check();const response=await this.call('/exchange/'+id+'/turn',next,signal);if(!response.body)throw Error('Missing broker stream.');
      const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',wire=0,preview='',turn:ProviderTurn|undefined;
      try{while(true){const {done,value}=await reader.read();if(done)break;wire+=value.byteLength;if(wire>2*liveLimits.wireBytes)throw Error('Broker stream budget exceeded.');buffer+=decoder.decode(value,{stream:true});let end:number;
-      while((end=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);if(!line)continue;const event=JSON.parse(line);if(event.type==='error'){details.failure={message:String(event.error).slice(0,1000),...(event.receipt?{receipt:event.receipt}:{})};throw Error(event.error);}if(event.type==='delta'){preview+=event.text;if(preview.length>liveLimits.bytes)throw Error('DCP output budget exceeded.');chunk(preview);}else if(event.type==='result'){if(turn)throw Error('Duplicate provider result.');turn=event;}}
+      while((end=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);if(!line)continue;const event=JSON.parse(line);if(event.type==='error'){details.failure={message:String(event.error).slice(0,1000),...(event.receipt?{receipt:event.receipt}:{})};throw Error(event.error);}if(event.type==='delta'){preview+=event.text;if(preview.length>liveLimits.bytes)throw Error('DCP output budget exceeded.');chunk(preview,'text');}else if(event.type==='result'){if(turn)throw Error('Duplicate provider result.');turn=event;}}
      }}finally{await reader.cancel().catch(()=>undefined);reader.releaseLock();}
      if(buffer.trim()||!turn)throw Error('Broker stream interrupted; no contribution committed.');sources.check();
      const attempt:LiveProvenance['attempts'][number]={receipt:turn.receipt,toolCalls:turn.calls,toolResultIds:[]};details.attempts.push(attempt);round++;
@@ -58,7 +59,7 @@ export class DialecticProviderSession {
       next={round,results};continue;
      }
      try{await validate?.(turn.text);prepared=!!details.continuity;if(prepared)retainedId=id;return turn.text;}
-     catch(error){const diagnostic=validationDiagnostic(error);attempt.diagnostic=diagnostic;attempt.rejectedResponse=turn.text;sources.check();if(repair||!details.settings.repair){details.failure={message:String(error).slice(0,1000),diagnostic};throw error;}repair=true;recoverSources=allowsSourceRecovery(diagnostic);attempt.repair=String(error).slice(0,1000);chunk('DCP validation failed; trying the enabled single repair…');next={round,repair:true,diagnostic};}
+     catch(error){const diagnostic=validationDiagnostic(error);attempt.diagnostic=diagnostic;attempt.rejectedResponse=turn.text;sources.check();if(repair||!details.settings.repair||(error as any)?.nativeContentRetained===true){details.failure={message:String(error).slice(0,1000),diagnostic};throw error;}repair=true;recoverSources=allowsSourceRecovery(diagnostic);attempt.repair=String(error).slice(0,1000);chunk('DCP validation failed; trying the enabled single repair…','status');next={round,repair:true,diagnostic};}
     }throw Error('DCP continuation limit exceeded.');
    }catch(error){details.failure??={message:String(error).slice(0,1000)};details.request=request;details.tools=sources.trail;await this.diagnostic({kind:'exchange.failure',documentId:sources.owner,exchangeId:request.exchange,details}).catch(()=>undefined);throw error;}finally{signal.removeEventListener('abort',close);if(id&&!prepared)await this.closeExchange(id);}
   };

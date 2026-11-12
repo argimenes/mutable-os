@@ -38,6 +38,10 @@ export class DcpSources {
  private text(n:BlockNode){let pending=this.textCache.get(n.contentKey);if(!pending){pending=canonicalSearchSource(this.editor.repository.readState(),n.contentKey,0,this.signal,24000);this.textCache.set(n.contentKey,pending);}return pending;}
  private entityRevisions=new Map<string,number>();
  readonly entities:ScopedEntities;
+ private ownAdmission=false;
+ /** Refresh only fences touched by this exchange's validated native writes.
+  * Unrelated edits still invalidate authority through the normal subscriber. */
+ admitOwn<T>(operation:()=>T):T{this.check();this.ownAdmission=true;try{return operation();}finally{this.ownAdmission=false;}}
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
  constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:(fromOrdinal?:number)=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[],selection?:VocabularySelection,readonly references?:DialecticReferences){
   this.deadline=Date.now()+Math.min(120000,Math.max(1,deadlineMs));
@@ -45,7 +49,7 @@ export class DcpSources {
   if(editor.features.dcpCapabilityCatalogue)this.capabilities=capabilityCatalogue(editor,this.vocabulary);
   let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;
   this.entities=new ScopedEntities(editor,rootKey,owner);
-  this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key))this.stale=true;});
+  this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key)){if(this.ownAdmission){this.fences.set(key,editor.repository.readState().contents[key]);this.textCache.delete(key);}else this.stale=true;}});
  }
  check(){if(this.signal.aborted)throw Error('DCP cancelled');if(Date.now()>this.deadline)throw Error('DCP deadline exceeded');if(this.stale)throw Error('Selected context changed; request a fresh DCP response.');for(const [h,text]of this.glossValues)if(this.resolve(this.target(h)).text!==text)throw Error('Selected context changed');for(const [key,record]of this.fences)if(this.editor.repository.readState().contents[key]!==record)throw Error('Selected context changed; request a fresh DCP response.');}
  fence(key:string){const c=this.editor.repository.readState().contents[key];if(!c)throw Error('Source unavailable');if(!this.fences.has(key))this.fences.set(key,c);this.check();}

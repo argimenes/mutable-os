@@ -40,5 +40,8 @@ export function semanticPreparation(sources:DcpSources,resourceId:string,definit
  const gloss=(input:any)=>{requireCapability(sources.vocabulary,'semantic.gloss');keys(input,['id','target','type','text']);claim(input.id,'g');if(typeof input.type!=='string'||!input.type.trim()||input.type.includes(':')||input.type.length>128||typeof input.text!=='string'||!input.text.trim()||input.text.length>8192)throw Error('Invalid independent Gloss');
   const id=crypto.randomUUID();definitions[id]={id,type:GLOSS,value:input.type+': '+input.text,metadata:{gloss:{version:1,localId:crypto.randomUUID(),links:{}},dcp:provenance}};aliases.set(input.id,{kind:'gloss',resourceId,definitionId:id});return {id:crypto.randomUUID(),type:GLOSS,annotationId:id,metadata:{dcp:provenance}};
  };
- return {entities,mark,argumentsAndRelations,gloss,target,verify:async()=>{if(requireMentions){const index=created.findIndex(id=>!mentioned.has(id));if(index>=0)throw new DcpValidationError(safeDiagnostic({code:'entity-mention',path:`$.entities[${index}]`}));}for(const ref of vaultReferences.values())await sources.verifyVaultEntity(ref);}};
+ // A failed streaming semantic operation must not leak prepared identities or
+ // grounding state into the next operation. Only exchange-local state is saved.
+ const checkpoint=()=>{const length=created.length,marks=new Set(mentioned),vault=new Map(vaultReferences);return()=>{created.length=length;mentioned.clear();marks.forEach(id=>mentioned.add(id));vaultReferences.clear();vault.forEach((v,k)=>vaultReferences.set(k,v));};};
+ return {entities,mark,argumentsAndRelations,gloss,target,checkpoint,verify:async()=>{if(requireMentions){const index=created.findIndex(id=>!mentioned.has(id));if(index>=0)throw new DcpValidationError(safeDiagnostic({code:'entity-mention',path:`$.entities[${index}]`}));}for(const ref of vaultReferences.values())await sources.verifyVaultEntity(ref);}};
 }

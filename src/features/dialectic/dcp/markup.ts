@@ -69,7 +69,7 @@ export function markup(source:string,ranges:any[],registry:VisualEffectRegistry,
   const start=boundaries.get(r.from),end=boundaries.get(r.to);if(start===undefined||end===undefined||end<=start)throw Error('Missing/reversed/empty range boundary');
   if(!(neutralPassages&&r.type==='dcp/passage'&&r.ref===null&&Object.keys(attrs).length===0))marks.push({id:crypto.randomUUID(),...(r.ref!==null&&reference?reference(r.type,r.ref):annotation(r.type,attrs,registry,provenance,nativeAuthoring,textAuthoring,vocabulary)),start,end:end-1});anchors.set(r.id,{start,end});
  }
- return {text,marks,anchors};
+ return {text,marks,anchors,boundaries};
 }
 export function keys(v:any,allowed:string[]){if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).some(k=>!allowed.includes(k))||allowed.some(k=>!Object.hasOwn(v,k)))throw Error('Invalid DCP object fields');}
 export function list(v:any,max:number){if(!Array.isArray(v)||v.length>max)throw Error('Invalid DCP array/budget');return v as any[];}

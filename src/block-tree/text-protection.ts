@@ -7,6 +7,13 @@ const equal=(a:unknown,b:unknown)=>a===b||JSON.stringify(a)===JSON.stringify(b);
 /** Canonical base-content protection; annotations remain ordinary native edits.
  * Applications contribute root predicates, never mutation implementations. */
 export class NativeTextProtection {
+ private receiving=new Set<string>();
+ /** Host-scoped append/finalisation of a receiving contribution. Existing
+  * submitted contributions never qualify for this temporary authoring scope. */
+ receivingInsertion<T>(key:string,operation:()=>T):T{
+  if((this.repository.readState().contents[key]?.payload.metadata as any)?.dialectic?.state!=='receiving')throw Error('Contribution is not receiving');
+  this.receiving.add(key);try{return operation();}finally{this.receiving.delete(key);if(this.roots.has(key))this.extend(key);}
+ }
  private rules=new Set<Rule>();private roots=new Map<string,Set<string>>();private protected=new Map<string,Set<string>>();
  private version=createSignal(0);private stops:(()=>void)[];
  readonly diagnostics={admissions:0,checked:0,indexed:0};
@@ -31,11 +38,15 @@ export class NativeTextProtection {
  }
  protect(key:string){return this.register(record=>record.key===key);}
  private add(root:string){
-  const state=this.repository.readState(),members=new Set<string>();
+  this.roots.set(root,new Set());this.extend(root);
+ }
+ private extend(root:string){
+  const state=this.repository.readState(),members=this.roots.get(root)!;
   const visit=(key:string)=>{if(members.has(key))return;const r=state.contents[key];if(!r)return;members.add(key);this.diagnostics.indexed++;
    let owners=this.protected.get(key);if(!owners)this.protected.set(key,owners=new Set());owners.add(root);
    for(const p of [...r.children,...Object.values(r.ownedRelations)]){const placement=state.placements[p];if(placement&&!placement.externalReference)visit(placement.contentKey);}
-  };visit(root);this.roots.set(root,members);
+  };const r=state.contents[root];if(!members.has(root))visit(root);else if(r)for(const p of [...r.children,...Object.values(r.ownedRelations)]){const c=state.placements[p];if(c&&!c.externalReference)visit(c.contentKey);}
+  this.version[1](n=>n+1);
  }
  private remove(root:string){for(const key of this.roots.get(root)??[]){const owners=this.protected.get(key)!;owners.delete(root);if(!owners.size)this.protected.delete(key);}this.roots.delete(root);}
  isProtected(key:string){this.version[0]();return this.protected.has(key);}
@@ -51,7 +62,7 @@ export class NativeTextProtection {
   // roots remain enforced; history is not a blanket bypass.
   const released=new Set<string>();
   if(history)for(const [key,r]of contents)if(this.roots.has(key)&&(!r||!this.matches(r)))released.add(key);
-  const protectedKey=(key:string)=>[...(this.protected.get(key)??[])].some(root=>!released.has(root));
+  const protectedKey=(key:string)=>[...(this.protected.get(key)??[])].some(root=>!released.has(root)&&!this.receiving.has(root));
   const fail=()=>{throw Error('Base content is protected; annotations remain available.');};
   for(const [key,next]of contents){
    const old=state.contents[key];if(!old)continue;this.diagnostics.checked++;

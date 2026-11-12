@@ -61,25 +61,34 @@ export function captureNative(state: DeepReadonly<RepositoryState>, resourceId: 
   }
   check([...ownerCounts.values()].every(count => count <= 1), "multiple canonical owners for one content record");
   // Implicit Workspace-root registries cannot silently become Document-owned.
+  // Capture is synchronous over one consistent state. Resolve each resource
+  // identity once, not once per annotation. Keep ambiguity/ownership checks;
+  // discard this memo after capture so later captures always revalidate.
+  const resources = new Map<string, ContentRecord | undefined>();
+  const lookup: typeof findResource = (sourceState, source) => {
+    const key = JSON.stringify([source.scope, source.resourceId]);
+    if (!resources.has(key)) resources.set(key, findResource(sourceState, source));
+    return resources.get(key);
+  };
   const dependencies = new Map<string, unknown[]>();
   for (const key of membership.keys()) {
     const c = state.contents[key];
     if (Array.isArray(c.payload.standoffProperties)) dependencies.set(key, c.payload.standoffProperties.map(property => {
       if (!id(property.annotationId) || externalDefinitionLink(property)) return clone(property);
-      const owner = linkedDefinitionOwner(state as RepositoryState, property, key);
+      const owner = linkedDefinitionOwner(state as RepositoryState, property, key, lookup);
       check(owner, `linked annotation ${property.annotationId} lacks Document ownership or explicit foreign provenance`);
       return owner.key === root.key ? clone(property) : { ...clone(property), externalDefinition: definitionProvenance(owner, property.annotationId) };
     }));
     for (const slot of slots(c)) {
       const p = state.placements[slot];
       if (!p.resolvedReference) continue;
-      const source = p.resolvedReference.source, owner = resourceOwner(state as RepositoryState, p.contentKey);
+      const source = p.resolvedReference.source, owner = resourceOwner(state as RepositoryState, p.contentKey, lookup);
       check(source.scope !== "unknown" && owner && sameResource(resourceSource(owner)!, source) &&
         p.resolvedReference.targetId === state.contents[p.contentKey]?.payload.id, "stale or ambiguous foreign binding provenance");
     }
   }
   const parent = Object.values(state.contents).find(c => slots(c).includes(owners[0].key));
-  const nestedRoot = parent && resourceOwner(state as RepositoryState, parent.key)?.viewType === "document-block";
+  const nestedRoot = parent && resourceOwner(state as RepositoryState, parent.key, lookup)?.viewType === "document-block";
   const rootPlacementId = nestedRoot ? `resource-root:${resourceId}` : durablePlacementId(owners[0], resourceId);
   const projected = clone(projectOwned(state as RepositoryState, resourceId, {
     contents: membership,

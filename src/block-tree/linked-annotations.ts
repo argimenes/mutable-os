@@ -11,14 +11,14 @@ export function linkedRegistry(state: RepositoryState, ownerKey = state.placemen
 /** Local definitions use canonical resource context; explicit provenance wins.
  * A legacy unqualified reference may use the old root registry only when no
  * local definition exists. Capture makes that legacy root dependency explicit. */
-export function linkedDefinitionOwner(state: RepositoryState, property: JsonObject, contentKey?: string): ContentRecord | undefined {
+export function linkedDefinitionOwner(state: RepositoryState, property: JsonObject, contentKey?: string, lookup: typeof findResource = findResource): ContentRecord | undefined {
   if (typeof property.annotationId !== "string") return;
   const external = externalDefinitionLink(property);
   if (external) {
     if (external.source.scope === "unknown" || external.version.kind !== "unpinned") return;
-    return findResource(state, external.source);
+    return lookup(state, external.source);
   }
-  const local = contentKey ? resourceOwner(state, contentKey) : undefined;
+  const local = contentKey ? resourceOwner(state, contentKey, lookup) : undefined;
   if (local && Object.hasOwn(linkedRegistry(state, local.key), property.annotationId)) return local;
   const root = state.contents[state.placements[state.rootPlacementKey].contentKey];
   if (Object.hasOwn(linkedRegistry(state), property.annotationId)) return root;

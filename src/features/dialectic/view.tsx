@@ -40,6 +40,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
    <div><strong>Dialectic</strong><span class="dialectic-subtitle"> Compositions in conversation</span></div>
    <nav aria-label="Conversation actions" onPointerDown={e=>e.preventDefault()}>
     <Show when={modern} fallback={<>{props.actions}<button onClick={()=>void save()}>Save</button></>}>
+     <Show when={!c.editor.features.dialecticAutosave}><button onClick={()=>void save()}>Save</button></Show>
      <button aria-label="Formatting" title="Formatting" aria-expanded={formatting()} onClick={()=>setFormatting(v=>!v)}>Aa</button>
      <button aria-expanded={inspectorOpen()} onClick={()=>setInspectorOpen(v=>!v)}>Context & AI</button>
     </Show>
@@ -70,7 +71,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     </div></Show>
    </aside>
    <main class="dialectic-main">
-    <div class="dialectic-reading-header"><span>{c.port()?.application.properties()?.title==='New conversation'?(c.port()?.application.files?.location()?.filename.replace(/\.ink$/,'')??'New conversation'):c.port()?.application.properties()?.title??'Conversation'}</span><span class="dialectic-muted">{modern?'Contributions save automatically':'Native Mutable Document'}</span></div>
+    <div class="dialectic-reading-header"><span>{c.port()?.application.properties()?.title==='New conversation'?(c.port()?.application.files?.location()?.filename.replace(/\.ink$/,'')??'New conversation'):c.port()?.application.properties()?.title??'Conversation'}</span><span class="dialectic-muted">{modern?(c.editor.features.dialecticAutosave?'Contributions save automatically':'Save with ⌘S / Ctrl+S'):'Native Mutable Document'}</span></div>
     <Show when={c.sequences.draft()&&hosting()}><SequenceAuthor c={c}/></Show>
     <Show when={c.sequences.presenting()&&hosting()}><SequenceReader c={c} textual={props.textual}/></Show>
     <div class="dialectic-retained-source" hidden={!!c.sequences.presenting()} inert={!!c.sequences.presenting()}>{props.children}</div>
@@ -146,7 +147,7 @@ function decorateMounts(c:DialecticController){
  const decorated=new Map<HTMLElement,{dispose:()=>void;slot:HTMLElement;host:HTMLElement;feedback:HTMLElement}>();
  const clear=(element:HTMLElement)=>{const d=decorated.get(element);if(!d)return;d.dispose();d.host.remove();d.feedback.remove();delete element.dataset.dialecticContribution;delete element.dataset.dialecticDraft;delete element.dataset.dialecticAuthor;delete d.slot.dataset.dialecticDraftSlot;decorated.delete(element);};
  createEffect(()=>{
-  const session=c.session(),rows=c.rows().map(r=>({key:r.key,id:r.id,label:r.data.state==='draft'?'':`${participantLabel(r.data).toUpperCase()} · ${r.data.ordinal}`,draft:r.data.state==='draft',author:r.data.author}));
+  const session=c.session(),rows=c.rows().map(r=>({key:r.key,id:r.id,label:r.data.state==='draft'?'':`${participantLabel(r.data).toUpperCase()} · ${r.data.ordinal}${r.data.state==='receiving'?' · Receiving…':''}`,draft:r.data.state==='draft',author:r.data.author}));
   let alive=true;
   queueMicrotask(()=>{if(!alive||session!==c.session())return;const keep=new Set<HTMLElement>();for(const r of rows){
    const element=c.editor.mounts.get(r.key)?.root as HTMLElement|undefined;if(!element)continue;keep.add(element);const doc=element.closest<HTMLElement>('[data-block-type="document-block"]');if(doc){doc.dataset.dialecticDocument='true';documents.add(doc);}element.dataset.dialecticContribution=r.label;element.dataset.dialecticDraft=String(r.draft);

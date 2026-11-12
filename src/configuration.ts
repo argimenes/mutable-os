@@ -15,8 +15,10 @@
  * disabled unless a host or dedicated demo explicitly enables it.
  */
 export type FeatureFlags = Readonly<{
-  /** Dialectic submission saves, conversational chrome and progress feedback. */
+  /** Dialectic conversational chrome and progress feedback. */
   dialecticConversationUpdates: boolean;
+  /** Optional contribution-boundary saves, independent of conversation chrome. */
+  dialecticAutosave: boolean;
   /** Isolated title utility; never a conversational contribution. */
   dialecticAutomaticTitles: boolean;
   /** Bounded native text flows. Opt-in pending browser qualification. */
@@ -128,6 +130,8 @@ export type FeatureFlags = Readonly<{
   /** Bounded discovery of admitted DCP authoring capabilities. */
   /** Experimental alternative provider dialect; native persistence is unchanged. */
   dcpXmlAuthoring: boolean;
+  /** Read-only fragment display before atomic native admission. */
+  dcpXmlStreaming: boolean;
   dcpCapabilityCatalogue: boolean;
   /** Exchange-local authoring selection; no persistent settings or UI. */
   dcpVocabularySelection: boolean;
@@ -214,6 +218,7 @@ export type FeatureFlags = Readonly<{
 
 export const featureFlags: FeatureFlags = Object.freeze({
   dialecticConversationUpdates: true,
+  dialecticAutosave: false,
   dialecticAutomaticTitles: true,
   virtualTextFlows: true,
   standoffCodeHighlighting: true,
@@ -273,6 +278,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialecticContributionActivity: true,
   dialecticDcp: true,
   dcpXmlAuthoring: true,
+  dcpXmlStreaming: true,
   dcpCapabilityCatalogue: true,
   dcpVocabularySelection: true,
   dcpProactiveSemanticAuthoring: true,
@@ -287,7 +293,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dcpNativeAuthoringStage3RetainedPdf: true,
   dialecticProviders: true,
   dialecticProviderContinuity: true,
-  dcpTestPhaseLogging: true,
+  dcpTestPhaseLogging: false,
   nativeTextProtection: true,
   scopedSemantics: true,
   cardex: true,

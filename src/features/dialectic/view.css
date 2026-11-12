@@ -149,3 +149,10 @@
  cursor: pointer;
 }
 .dialectic-app .dialectic-entity-mention:hover { background-color: rgba(119, 88, 177, .19); }
+
+.dialectic-contribution-warning{position:relative;color:#795319}
+.dialectic-contribution-warning>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:4px}
+.dialectic-contribution-warning>summary::-webkit-details-marker{display:none}
+.dialectic-contribution-warning>summary:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.dialectic-warning-explanation{max-width:36rem;padding:4px 8px;font-size:.85rem}
+.dialectic-warning-explanation p{margin:4px 0}

@@ -10,7 +10,7 @@ export type ContributionNoticeCode='markdown-fallback'|'partial-conversion'|'uns
 /** Host-recorded history, never a model claim or a mutable activity count. */
 export interface ContributionNotice extends Omit<import('../../interchange/diagnostics').InterchangeDiagnostic,'code'> {code:ContributionNoticeCode;target?:ReplyTarget}
 export interface Contribution {
- version:1;kind:'contribution';state:'draft'|'committed';author:'human'|'mock'|'ai';participant?:Participant;
+ version:1;kind:'contribution';state:'draft'|'receiving'|'committed';author:'human'|'mock'|'ai';participant?:Participant;
  ordinal?:number;createdUtc?:string;replies:ReplyTarget[];context?:ReplyTarget[];requestId?:string;
  discursiveReferences?:ReplyTarget[];dcp?:{version:1;profile:string;request:unknown;tools:unknown[];response:string;identityMap:unknown;annotationRefs?:{blockId:string;propertyId:string}[];intent:string;provider?:import('./dcp/provider-contract').LiveProvenance};
  replyExcerpts?:{target:ReplyTarget;text:string}[];consumedContext?:ConsumedContext;
@@ -19,7 +19,7 @@ export interface Contribution {
 export const conversationMetadata={version:1,kind:'conversation'} as const;
 export function contribution(value:unknown):Contribution|undefined {
  const v=value as Contribution|undefined;
- return v?.version===1&&v.kind==='contribution'&&['draft','committed'].includes(v.state)&&['human','mock','ai'].includes(v.author)&&Array.isArray(v.replies)?v:undefined;
+ return v?.version===1&&v.kind==='contribution'&&['draft','receiving','committed'].includes(v.state)&&['human','mock','ai'].includes(v.author)&&Array.isArray(v.replies)?v:undefined;
 }
 export function isConversation(value:unknown){const v=value as typeof conversationMetadata|undefined;return v?.version===1&&v.kind==='conversation';}
 export const textBlock=(text=''):ExistingBlockDto=>({id:crypto.randomUUID(),type:'standoff-editor-block',text});

@@ -1,4 +1,4 @@
-import {xmlAuthoringContract} from '../../src/features/dialectic/dcp/xml-contract.js';
+import {xmlAuthoringContract,wrappedXmlAuthoringContract} from '../../src/features/dialectic/dcp/xml-contract.js';
 import {checkEmptyFieldsVersion,emptySemanticFields} from '../../src/features/dialectic/dcp/empty-fields.js';
 import {dcpEditorialPolicy,proactiveEditorialPolicy,checkProactiveSemantics} from '../../src/features/dialectic/dcp/editorial-policy.js';
 import type {VocabularySnapshot} from '../../src/features/dialectic/dcp/vocabulary-contract.js';
@@ -21,7 +21,7 @@ export function conversation(settings:ProviderSettings,request:any):ProviderConv
  if(request.dialect!==undefined&&request.dialect!=='xml/1')throw Error('Unsupported DCP authoring dialect');
  if(request.dialect==='xml/1'){
   if(!request.xmlContext||request.xmlContext.dialect!=='xml/1'||request.xmlContext.exchange!==request.exchange)throw Error('Invalid XML exchange context');
-  return {settings,dialect:'xml/1',catalogue:request.capabilities?.version===1,semanticWorkspace:request.semanticWorkspaceAuthoring===1,exchangeId:request.exchange,system:xmlAuthoringContract,input:[{role:'user',content:JSON.stringify({...request.xmlContext,cadence:settings.cadence})}]};
+  return {settings,dialect:'xml/1',catalogue:request.capabilities?.version===1,semanticWorkspace:request.semanticWorkspaceAuthoring===1,exchangeId:request.exchange,system:request.xmlFragments===false?wrappedXmlAuthoringContract:xmlAuthoringContract,input:[{role:'user',content:JSON.stringify({...request.xmlContext,cadence:settings.cadence})}]};
  }
  // Preserve the full diagnostic request and high-priority instructions. Only
  // the provider-facing user projection omits their exact duplicate copies.
