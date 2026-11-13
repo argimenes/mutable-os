@@ -17,7 +17,8 @@ import { createSignal } from 'solid-js';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import type { Destination } from '../block-tree/types';
 import { resourceOwner, resourceSource } from '../block-tree/resource-identity';
-import { serializeSelection, plainFragment, type Slice } from '../interchange/serializer';
+import { serializeSelection, selectionText, plainFragment, type Slice } from '../interchange/serializer';
+import {ScopedSemanticCopyError} from '../block-tree/scoped-semantic-copy';
 import {assertCopyableDialectic} from '../features/dialectic/anchors';
 import {contribution, isConversation} from '../features/dialectic/model';
 import { materializeFragment } from '../interchange/materialize';
@@ -171,7 +172,21 @@ export class MutableClipboard {
     const mount = nodeKey ? this.editor.mounts.get(nodeKey) : undefined;
     const target = mount?.root ?? (event?.target instanceof Element ? event.target : undefined);
     if (target?.closest('[data-block-selection-handle], [data-block-selection-inspector], input, textarea, select, [role="dialog"]')) return;
-    const resolved = mount && nodeKey ? { nodeKey, handle: mount } : event ? this.editor.mounts.resolveEvent(event) : undefined;
+    let resolved = mount && nodeKey ? { nodeKey, handle: mount } : event ? this.editor.mounts.resolveEvent(event) : undefined;
+    if(event?.type==='copy'&&!nodeKey){
+      // Read-only prose may not take focus from the composer. Copy follows the
+      // actual browser selection, never a stale draft caret. Native multi-Block
+      // selections retain the browser's copy path; custom cross selections are
+      // handled above (including offscreen selections).
+      const selection=document.getSelection();
+      if(selection&&!selection.isCollapsed){
+        const element=(node:Node|null)=>node instanceof Element?node:node?.parentElement??null;
+        const anchor=this.editor.mounts.resolveElement(element(selection.anchorNode));
+        const head=this.editor.mounts.resolveElement(element(selection.focusNode));
+        if(!anchor||anchor.nodeKey!==head?.nodeKey)return;
+        resolved=anchor;
+      }
+    }
     if (!resolved || resolved.handle.inputPolicy !== 'standoff' || resolved.handle.composing) return;
     const node = this.editor.node(resolved.nodeKey); if (!node) return;
     if (event?.type === 'paste') this.ensureEmptyCaret(node.key, resolved.handle);
@@ -402,10 +417,20 @@ export class MutableClipboard {
     }, bookmark);
   }
   private write(b: Bookmark, cut: boolean, event?: ClipboardEvent, cross = false) {
-    const fragment = serializeSelection(this.editor.repository.readState(), b.slices, b.scope);
+    let fragment:MutableFragment;
+    try { fragment=serializeSelection(this.editor.repository.readState(), b.slices, b.scope); }
+    catch(error){
+      if(cut||b.kind!=='text'||!(error instanceof ScopedSemanticCopyError))throw error;
+      // Ordinary text copy must work for annotated prose. Do not export dangling
+      // identities, or silently turn Cut/native Block cloning into text copying.
+      const representations={'text/plain':selectionText(this.editor.repository.readState(),b.slices)};
+      if(event?.cancelable&&event.clipboardData){writeEventClipboard(event.clipboardData,representations);this.notify('Copied text.');}
+      else this.asyncTask(async()=>{await writeAsyncClipboard(representations);this.notify('Copied text.');});
+      return;
+    }
     for(const block of fragment.blocks)assertCopyableDialectic(block.data); // reject before clipboard write or Cut
     const representations = exportClipboard(fragment);
-    if (canWriteAsync() && (!event || event.isTrusted)) {
+    if (canWriteAsync() && !event?.clipboardData) {
       // Start the write within the activation callback; don't await a resolver first.
       this.asyncTask(async () => {
         await writeAsyncClipboard(representations);

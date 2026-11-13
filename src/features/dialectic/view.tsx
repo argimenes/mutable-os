@@ -1,3 +1,5 @@
+import {smallerImageEvent,type SmallerImageRequest} from './smaller-image-contract';
+import {ContributionNavigation,createContentsPreference} from './contents-view';
 import {ContributionActivityBar,ContributionActivityInspector} from './activity-view';
 import {render} from 'solid-js/web';
 import {ProviderSettingsView} from './provider-settings';
@@ -13,7 +15,8 @@ import type {DialecticController} from './controller';
 
 function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.Element;textual?:boolean}){
  const c=props.c,modern=c.editor.features.dialecticConversationUpdates;
- const [sidebarOpen,setSidebarOpen]=createSignal(!modern),[inspectorOpen,setInspectorOpen]=createSignal(!modern);
+ const contentsPreference=createContentsPreference(c.editor.features.dialecticSemanticContents,!modern),sidebarOpen=contentsPreference.open;
+ const [inspectorOpen,setInspectorOpen]=createSignal(!modern);
  const [formatting,setFormatting]=createSignal(!modern);
  createEffect(()=>{if(c.activityInspection()||c.inspectedAnnotation()||c.inspection()?.kind==='entity')setInspectorOpen(true);});
  let root!:HTMLElement;const [mounted,setMounted]=createSignal(false);
@@ -29,6 +32,8 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
    const block=cell?.closest<HTMLElement>('[data-runtime-key]');
    if(cell&&block&&root.contains(cell)&&c.inspectEntityMention(block.dataset.runtimeKey!,Number(cell.dataset.inlineIndex))){event.preventDefault();event.stopPropagation();}
   };
+  const smallerImage=(event:Event)=>{const request=(event as CustomEvent<SmallerImageRequest>).detail;event.stopPropagation();request.accept(c.smallerImage(request.nodeKey,request.originalUrl,request.signal,request.reason));};
+  root.addEventListener(smallerImageEvent,smallerImage);onCleanup(()=>root.removeEventListener(smallerImageEvent,smallerImage));
   root.addEventListener('click',entityClick,true);onCleanup(()=>root.removeEventListener('click',entityClick,true));
   window.addEventListener('keydown',shortcut,true);onCleanup(()=>window.removeEventListener('keydown',shortcut,true));
  });
@@ -55,15 +60,13 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
   <Show when={c.root()&&!c.valid()}><p class="dialectic-notice">This Document is not a Dialectic conversation. Its content is unchanged. Open a conversation or choose New.</p></Show>
   <div class="dialectic-body" data-sidebar-open={sidebarOpen()} data-inspector-open={inspectorOpen()}>
    <aside class="dialectic-sidebar" aria-label="Contributions">
-    <Show when={modern}><div class="dialectic-rail-actions">
-     <button aria-label={sidebarOpen()?'Collapse Contributions':'Expand Contributions'} title={sidebarOpen()?'Collapse Contributions':'Expand Contributions'} aria-expanded={sidebarOpen()} onClick={()=>setSidebarOpen(v=>!v)}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+    <Show when={modern||c.editor.features.dialecticSemanticContents}><div class="dialectic-rail-actions">
+     <button aria-label={sidebarOpen()?'Collapse Contributions':'Expand Contributions'} title={sidebarOpen()?'Collapse Contributions':'Expand Contributions'} aria-expanded={sidebarOpen()} onClick={()=>contentsPreference.toggle()}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
      <button aria-label="New contribution" title="New contribution" onClick={c.compose}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5M4 20l5-1L21 7l-4-4L5 15z"/></svg></button>
      <button aria-label="Return to present" title="Return to present" onClick={c.present}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v14m-6-6 6 6 6-6M4 21h16"/></svg></button>
     </div></Show>
-    <Show when={sidebarOpen()}><div class="dialectic-eyebrow">Contributions</div><p class="dialectic-muted">{c.committed().length} contributions · {c.frontier()?`Present #${c.frontier()!.data.ordinal}`:'Ready to begin'}</p></Show>
-    <div class="dialectic-contribution-list" tabIndex={0} aria-label="Contribution chronology">
-     <For each={c.committed()}>{r=><button class="dialectic-entry" aria-label={`Contribution ${r.data.ordinal}: ${participantLabel(r.data)}`} title={`Contribution ${r.data.ordinal}: ${participantLabel(r.data)}`} aria-current={selected()?.blockId===r.id?'true':undefined} onClick={act(()=>c.inspect(c.target(r.id)))}><span class="dialectic-number">{String(r.data.ordinal).padStart(2,'0')}</span><Show when={sidebarOpen()}><span>{participantLabel(r.data)}<small>{r.data.replies.length?`↳ ${r.data.replies.map(t=>c.label(t)).join(', ')}`:'New contribution'}</small></span></Show></button>}</For>
-    </div>
+    <Show when={sidebarOpen()}><div class="dialectic-eyebrow">{c.editor.features.dialecticSemanticContents?'Semantic Contents':'Contributions'}</div><p class="dialectic-muted">{c.committed().length} contributions · {c.frontier()?`Present #${c.frontier()!.data.ordinal}`:'Ready to begin'}</p></Show>
+    <ContributionNavigation c={c} expanded={sidebarOpen()}/>
     <Show when={sidebarOpen()}><div class="dialectic-sidebar-details">
      <Show when={!modern}><button class="dialectic-entry" onClick={c.compose}>＋ New contribution</button></Show>
      <div class="dialectic-history"><button disabled={c.cursor()<=0} onClick={()=>c.navigate(-1)}>← Back</button><button disabled={c.cursor()>=c.trail().length-1} onClick={()=>c.navigate(1)}>Forward →</button></div>
@@ -82,7 +85,7 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
    </main>
    <aside class="dialectic-inspector" hidden={modern&&!inspectorOpen()} inert={!!c.sequences.presenting()} aria-label="Conversation context">
     <div class="dialectic-eyebrow">INSPECTION</div>
-    <Show when={c.editor.features.dialecticContributionActivity}><ContributionActivityInspector c={c}/></Show>
+    <Show when={c.editor.features.dialecticContributionActivity||c.editor.features.dialecticSemanticContents}><ContributionActivityInspector c={c}/></Show>
     <h3>{selected()?c.label(selected()!):'Explore a contribution'}</h3>
     <Show when={row()}>{r=><p class="dialectic-muted">{r().data.createdUtc?new Date(r().data.createdUtc!).toLocaleString():'Draft'} · {c.editor.features.nativeTextProtection&&r().data.state==='committed'?'Original content protected · annotations welcome':'Content stays editable'}</p>}</Show>
     <button disabled={!selected()||['gloss','entity','argument-relation','entity-relation'].includes(selected()!.kind)} onClick={act(()=>{if(selected())c.setReply(selected());})}>Reply to this</button>

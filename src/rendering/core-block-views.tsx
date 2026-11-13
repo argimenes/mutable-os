@@ -1,4 +1,6 @@
 import { activeViewChild } from '../runtime/presentation-eligibility';
+import {observeContributionImage} from '../features/dialectic/image-load';
+import {ImageSizeGate} from '../features/dialectic/image-size-gate';
 import { tabOrientation } from '../block-tree/tab-orientation';
 import './tab-orientation.css';
 import { TableControl, CellControls } from './table-controls';
@@ -452,7 +454,7 @@ export function TabPanelView(props: BlockViewProps) {
 }
 
 export function ImageView(props: BlockViewProps) {
-  const { editor, projection } = useReactiveView();
+  const { editor, projection, passive } = useReactiveView();
   const node = () => projection.state.nodes[props.nodeKey];
   const metadata = () => node()?.payload.metadata as Record<string, unknown> | undefined;
   const appearance = createMemo(() => blockAppearance(node()));
@@ -460,10 +462,10 @@ export function ImageView(props: BlockViewProps) {
   useContainerMount(props.nodeKey, () => root);
   return (
     <figure ref={root} class={`abstract-block reactive-image ${appearance().classes.join(" ")}`} style={appearance().style} tabIndex={-1} {...data(props.nodeKey, node)}>
-      <img ref={image => createEffect(() => {
+      <ImageSizeGate editor={editor} projection={projection} nodeKey={props.nodeKey} source={()=>managedAsset(node()?.payload.asset)?'':String(metadata()?.url??node()?.payload.filename??'')} enabled={!passive&&editor.features.dialectic}>{source=><img ref={image => {createEffect(() => {
         const asset = managedAsset(node()?.payload.asset);
         if (asset) { const release = editor.assets.bind(image, asset); onCleanup(release); }
-      })} src={managedAsset(node()?.payload.asset) ? undefined : String(metadata()?.url ?? node()?.payload.filename ?? "") || undefined} alt={String(metadata()?.alt ?? "")} />
+      });if(!passive)observeContributionImage(editor,projection,props.nodeKey,image,source);}} src={source()||undefined} alt={String(metadata()?.alt ?? "")} />}</ImageSizeGate>
       <ChildBlocks parentKey={props.nodeKey} />
     </figure>
   );

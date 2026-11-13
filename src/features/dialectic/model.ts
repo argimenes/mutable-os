@@ -1,4 +1,4 @@
-import type {ExistingBlockDto} from '../../block-tree/types';
+import type {ExistingBlockDto,ContentRecord} from '../../block-tree/types';
 
 export type ReplyTarget = {resourceId:string;blockId?:string;anchorId?:string;definitionId?:string;argumentId?:string;entity?:import('../../feature-api/scoped-entities').ScopedEntityReference} & (
  {kind:'contribution'|'block';blockId:string}|{kind:'range';anchorId:string}|{kind:'gloss'|'argument-relation'|'entity-relation';definitionId:string}|{kind:'argument';argumentId:string}|{kind:'entity';entity:import('../../feature-api/scoped-entities').ScopedEntityReference});
@@ -6,20 +6,30 @@ export interface Participant {id:string;kind:'human'|'ai';name:string}
 export const defaultParticipant=(owner:string,kind:'human'|'ai'):Participant=>({id:owner+':'+kind,kind,name:kind==='human'?'Local author':'Mock assistant'});
 export const participantLabel=(c:Contribution)=>c.participant?.name??(c.author==='human'?'You':'Mock assistant');
 export interface ConsumedContext {version:1;items:{target:ReplyTarget;text:string;origins:('reply-target'|'selected')[];revisions:{contentKey:string;revision:number}[]}[];limits:{characters:number;blocks:number};}
-export type ContributionNoticeCode='markdown-fallback'|'partial-conversion'|'unsupported-media'|'incomplete-operation'|'validation-repaired';
+export type ContributionNoticeCode='markdown-fallback'|'partial-conversion'|'unsupported-media'|'incomplete-operation'|'validation-repaired'|'image-load';
 /** Host-recorded history, never a model claim or a mutable activity count. */
-export interface ContributionNotice extends Omit<import('../../interchange/diagnostics').InterchangeDiagnostic,'code'> {code:ContributionNoticeCode;target?:ReplyTarget}
+export interface ContributionNotice extends Omit<import('../../interchange/diagnostics').InterchangeDiagnostic,'code'> {
+ code:ContributionNoticeCode;target?:ReplyTarget;
+ imageLoad?:{version:1;blockId:string;originalUrl:string;method:'browser';byteLength?:number;automaticRepairAttempted?:boolean;replacement?:{url:string;byteLength:number|null};events:{outcome:'failed'|'delayed'|'loaded'|'full-requested'|'smaller-requested'|'smaller-loaded'|'smaller-failed'|'repair-requested'|'repair-loaded'|'repair-failed'|'retry-requested';at:string;detail?:string;candidateUrl?:string;receipt?:import('./dcp/provider-contract').ProviderReceipt}[]};
+}
 export interface Contribution {
  version:1;kind:'contribution';state:'draft'|'receiving'|'committed';author:'human'|'mock'|'ai';participant?:Participant;
  ordinal?:number;createdUtc?:string;replies:ReplyTarget[];context?:ReplyTarget[];requestId?:string;
  discursiveReferences?:ReplyTarget[];dcp?:{version:1;profile:string;request:unknown;tools:unknown[];response:string;identityMap:unknown;annotationRefs?:{blockId:string;propertyId:string}[];intent:string;provider?:import('./dcp/provider-contract').LiveProvenance};
  replyExcerpts?:{target:ReplyTarget;text:string}[];consumedContext?:ConsumedContext;
+ synopsis?:{version:1;text:string;author:'ai';participantId:string;exchangeId:string};
  notices?:ContributionNotice[];
 }
 export const conversationMetadata={version:1,kind:'conversation'} as const;
 export function contribution(value:unknown):Contribution|undefined {
  const v=value as Contribution|undefined;
  return v?.version===1&&v.kind==='contribution'&&['draft','receiving','committed'].includes(v.state)&&['human','mock','ai'].includes(v.author)&&Array.isArray(v.replies)?v:undefined;
+}
+/** Runtime notices do not change source text, identity, semantics or authority. */
+export function onlyContributionNoticesChanged(before:ContentRecord|undefined,after:ContentRecord|undefined):boolean {
+ if(!before||!after||!contribution((before.payload.metadata as any)?.dialectic)||!contribution((after.payload.metadata as any)?.dialectic))return false;
+ const source=(record:ContentRecord)=>{const {revision,...rest}=record,metadata=record.payload.metadata as any,{notices,...dialectic}=metadata.dialectic;return {...rest,payload:{...record.payload,metadata:{...metadata,dialectic}}};};
+ return JSON.stringify(source(before))===JSON.stringify(source(after));
 }
 export function isConversation(value:unknown){const v=value as typeof conversationMetadata|undefined;return v?.version===1&&v.kind==='conversation';}
 export const textBlock=(text=''):ExistingBlockDto=>({id:crypto.randomUUID(),type:'standoff-editor-block',text});

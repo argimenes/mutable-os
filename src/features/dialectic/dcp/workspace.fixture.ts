@@ -1,3 +1,4 @@
+import type {FeatureFlags} from '../../../configuration';
 import {ReactiveEditor} from '../../../reactive-editor/editor';
 import {registerApplicationViews} from '../../../application/features';
 import {DialecticReferences} from '../references';
@@ -6,8 +7,8 @@ import {DcpSources} from './sources';
 import {prepare,request} from './exchange';
 import {semanticWorkspace,enableSemanticWorkspace} from './workspace';
 export const workspaceOwner='11111111-1111-4111-8111-111111111111';
-export function workspaceFixture(enabled=true,proactive=true){
- const owner=workspaceOwner,editor=new ReactiveEditor({id:owner,type:'document-block',metadata:{dialectic:conversationMetadata},children:[]},{features:{dcpProactiveSemanticAuthoring:proactive,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,dialecticConversationUpdates:false,dialecticAutomaticTitles:false,dcpSemanticWorkspace:enabled}});
+export function workspaceFixture(enabled=true,proactive=true,features:Partial<FeatureFlags>={}){
+ const owner=workspaceOwner,editor=new ReactiveEditor({id:owner,type:'document-block',metadata:{dialectic:conversationMetadata},children:[]},{features:{dcpProactiveSemanticAuthoring:proactive,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,dialecticConversationUpdates:false,dialecticAutomaticTitles:false,dcpSemanticWorkspace:enabled,...features}});
  registerApplicationViews(editor);const view=editor.createView('workspace-fixture'),root=view.node(view.state.rootKey)!;let ordinal=0;
  const refs=new DialecticReferences(editor,view,root.key),sessions:DcpSources[]=[];
  const addHuman=(text:string)=>{const id=crypto.randomUUID();editor.commands.insert({id,type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'committed',author:'human',participant:defaultParticipant(owner,'human'),ordinal:++ordinal,replies:[]}},children:[{id:crypto.randomUUID(),type:'standoff-editor-block',text}]},{kind:'at',parentKey:root.key,index:root.children.length});return id;};

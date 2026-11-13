@@ -3,7 +3,8 @@ import {resourceOwner} from './resource-identity';
 import {ARGUMENT,ARGUMENT_RELATION} from '../features/dialectic/arguments';
 import {LOCAL_ENTITY,LOCAL_ENTITY_RELATION,ENTITY_REFERENCE} from '../feature-api/scoped-entities';
 const types=new Set([ARGUMENT,ARGUMENT_RELATION,LOCAL_ENTITY,LOCAL_ENTITY_RELATION]);
-export const semanticCopyError=()=>Error('Copy of scoped Entities or argument-linked passages needs semantic dependency remapping. Use native Document export; no content was changed.');
+export class ScopedSemanticCopyError extends Error {}
+export const semanticCopyError=()=>new ScopedSemanticCopyError('Copy of scoped Entities or argument-linked passages needs semantic dependency remapping. Use native Document export; no content was changed.');
 /** Both copy routes fail before Cut/paste rather than dropping dependent identities.
  * Whole-resource native persistence/export keeps the complete owned registry. */
 export function assertScopedSemanticCopy(state:RepositoryState,contentKey:string){

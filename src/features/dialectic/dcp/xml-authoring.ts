@@ -15,19 +15,27 @@ export function assertXmlReferenceKind(name:string,actual:string,expected?:strin
 }
 const classify=['claim','question','speculation','suggestion','objection','qualification'];
 
+/** Optional navigational metadata, never a native text Block or semantic ID. */
+export function xmlSynopsis(e:XmlElement):string|undefined {
+ if(Object.keys(e.attrs).length||e.children.some(c=>typeof c!=='string'))return;
+ const text=(e.children as string[]).join('').replace(/\s+/g,' ').trim();
+ if(!text||text.length>160||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text))return;
+ return text;
+}
 /** Envelope validation does not reinterpret already-admitted or skipped semantics. */
 export function xmlResponseElements(parsed:XmlElement[]){
  const wrapped=parsed[0]?.name==='response';
  if(wrapped&&parsed.length!==1||!wrapped&&parsed.some(e=>e.name==='response'))fail();
  const root=wrapped?parsed[0]:{name:'response',attrs:{},children:parsed};attrs(root,['intent','reply']);
- const all=elements(root),rows:Element[]=[],definitions:Element[]=[];
- for(const e of all){if(e.name==='definitions'){attrs(e,[]);definitions.push(...elements(e));}else if(xmlDefinitionNames.has(e.name))definitions.push(e);else rows.push(e);}
- return {root,rows,definitions};
+ const all=elements(root),rows:Element[]=[],definitions:Element[]=[],synopses:Element[]=[];
+ for(const e of all){if(e.name==='synopsis')synopses.push(e);else if(e.name==='definitions'){attrs(e,[]);for(const d of elements(e))(d.name==='synopsis'?synopses:definitions).push(d);}else if(xmlDefinitionNames.has(e.name))definitions.push(e);else rows.push(e);}
+ return {root,rows,definitions,synopses};
 }
 
 /** Lower intentions to existing DCP input. This never generates native DTOs. */
-export function lowerXml(text:string,exchange:string,authority:XmlAuthority){
- const {root,rows,definitions}=xmlResponseElements(parseXmlFragments(text));
+export function lowerXml(text:string,exchange:string,authority:XmlAuthority,onSynopsis?:(text:string)=>void){
+ const {root,rows,definitions,synopses}=xmlResponseElements(parseXmlFragments(text));
+ for(const e of synopses){const value=xmlSynopsis(e);if(value)onSynopsis?.(value);}
  if(!rows.length)fail();
  const defs:Element={name:'definitions',attrs:{},children:definitions};
  const symbols=new Map<string,{id:string;kind:string}>(),allocated=new WeakMap<Element,string>(),counts:Record<string,number>={};
@@ -60,6 +68,7 @@ export function xmlBlockLowerer(id:(e:Element)=>string,ref:(name:string,kinds?:s
   else if(['table','grid'].includes(e.name)){attrs(e,['id']);result={id:id(e),kind:e.name,rows:elements(e).map(row=>{if(row.name!=='tr')fail();attrs(row,[]);return elements(row).map(cell=>{if(cell.name!=='td')fail();attrs(cell,[]);return elements(cell).map(block);});})};}
   else if(e.name==='group'){attrs(e,['id']);result={id:id(e),kind:'group',children:elements(e).map(block)};}
   else if(e.name==='code'){attrs(e,['id','language']);result={id:id(e),kind:'code',language:a.language??'plain',text:textOnly(e)};}
+  else if(e.name==='image'){attrs(e,['id','src','alt'],['src']);empty(e);result={id:id(e),kind:'external-image',url:a.src,alt:a.alt??''};}
   else return fail();blocks.set(result.id,result);return result;
  };
  return block;
@@ -83,4 +92,4 @@ export function xmlDefinition(e:Element,{id,ref,authority,blocks,output}:{id:(e:
   else fail();
 }
 
-export const xmlSymbolKind=(e:XmlElement):string|undefined=>/^(p|h[1-6]|ul|ol|table|grid|group|code)$/.test(e.name)?'b':/^(span|mark|b|i|e|range)$/.test(e.name)?'s':({boundary:'pos',entity:'e',passage:'r',mention:'m',classify:'m',argument:'arg',gloss:'g',relation:'rel'} as Record<string,string>)[e.name];
+export const xmlSymbolKind=(e:XmlElement):string|undefined=>/^(p|h[1-6]|ul|ol|table|grid|group|code|image)$/.test(e.name)?'b':/^(span|mark|b|i|e|range)$/.test(e.name)?'s':({boundary:'pos',entity:'e',passage:'r',mention:'m',classify:'m',argument:'arg',gloss:'g',relation:'rel'} as Record<string,string>)[e.name];

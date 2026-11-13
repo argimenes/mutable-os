@@ -1,10 +1,11 @@
+import {smallerImageInput,smallerImageOutput,smallerImageLimits} from '../../src/features/dialectic/smaller-image-contract.js';
 import {DcpTestLog} from './test-log.js';
 import {allowsSourceRecovery,sourceRecoveryTools} from '../../src/features/dialectic/dcp/diagnostics.js';
 import express from 'express';
 import {OpenAIConversations,type CavernScope} from './conversations.js';
 import type {ContinuityManifest,ContinuityReceipt} from '../../src/features/dialectic/dcp/continuity-contract.js';
 import {randomBytes} from 'node:crypto';
-import {conversation,continuation,providerTurn,repair,titleConversation,ProviderIncompleteError,type ProviderConversation} from './providers.js';
+import {conversation,continuation,providerTurn,repair,titleConversation,smallerImageConversation,ProviderIncompleteError,type ProviderConversation} from './providers.js';
 import {parseConversationTitle,titleLimits} from '../../src/features/dialectic/title-contract.js';
 import {liveLimits,providerSettings,type Provider,type ProviderCall,type ProviderSettings} from '../../src/features/dialectic/dcp/provider-contract.js';
 
@@ -67,6 +68,23 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    abort.signal.throwIfAborted();
    res.json({title:parseConversationTitle(JSON.parse(turn.text))});
   }catch{if(!res.destroyed)res.status(502).json({error:'Automatic title generation failed. The conversation is unchanged.'});}
+  finally{clearTimeout(timer);res.off('close',closed);if(s.utility===abort)s.utility=undefined;}
+ });
+ // One isolated provider call per recovery request; no tools or history.
+ router.post('/utility/smaller-image',async(req,res)=>{
+  const s:Session=res.locals.session,key=sessionKey(s);
+  if(!s.settings||!key){res.status(400).json({error:'Configure an AI provider first.'});return;}
+  let input;try{input=smallerImageInput(req.body);}catch{res.status(400).json({error:'Invalid smaller image request.'});return;}
+  if(s.utility){res.status(429).json({error:'An AI background request is already active. Try again shortly.'});return;}
+  const abort=new AbortController();s.utility=abort;
+  const timer=setTimeout(()=>abort.abort(),smallerImageLimits.deadlineMs);timer.unref();
+  const closed=()=>{if(!res.writableEnded)abort.abort();};res.on('close',closed);
+  try{
+   const turn=await providerTurn(smallerImageConversation(s.settings,input),key,abort.signal,()=>{},fetcher);
+   abort.signal.throwIfAborted();const url=smallerImageOutput(JSON.parse(turn.text));
+   if(url===input.url)throw Error('Unchanged URL');
+   res.json({url,receipt:turn.receipt});
+  }catch{if(!res.destroyed)res.status(502).json({error:'The AI image request failed. You can retry the original image or request a replacement.'});}
   finally{clearTimeout(timer);res.off('close',closed);if(s.utility===abort)s.utility=undefined;}
  });
  router.post('/continuity/prepare',async(req,res)=>{try{const s:Session=res.locals.session,key=sessionKey(s);if(!continuity||s.settings?.provider!=='openai'){res.json({supported:false});return;}if(!key)throw Error('Configure a provider first');res.json({supported:true,plan:await continuity.plan(req.body.manifest,key,req.body.request?conversation(s.settings!,req.body.request).system:undefined)});}catch(e){res.status(409).json({error:(e as Error).message});}});

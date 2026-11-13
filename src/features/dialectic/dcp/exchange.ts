@@ -183,7 +183,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
   }
   if(externalMediaAuthoring&&['external-image','video','embed'].includes(node.kind)){
    keys(node,['id','kind','url',...(node.kind==='external-image'?['alt']:[])]);
-   externalKinds.push(node.kind);if(externalKinds.length>externalMediaLimits.nodes)throw Error('DCP external media budget exceeded');checkExternal();
+   externalKinds.push(node.kind);if(externalKinds.length+(stream?.counts.externalMedia??0)>externalMediaLimits.nodes)throw Error('DCP external media budget exceeded');checkExternal();
    if(node.kind==='external-image'){const block=prepareExternalImage(node.url,node.alt);return dto(block.type!,block);}
    const fragment=node.kind==='video'?prepareVideoReference(node.url):prepareWebsiteEmbed(node.url),slot=dto(node.kind==='video'?'mutable/video-block':'iframe-block');
    externalLeaves.set(String(slot.id),fragment);return slot;
@@ -299,7 +299,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  for(const [key,properties]of annotations){const n=sources.node(key);if(n)collect(String(n.payload.id),properties);}
  path='$.composition';const pdfs=await preparePdfBindings(sources,pdfBindings);const images=await prepareImageBindings(sources,imageBindings);
  const preparedResources={leaves:new Map([...pdfs.leaves,...images.leaves,...externalLeaves]),check:()=>{pdfs.check();images.check();checkExternal();}};
- if(stream){stream.nodes=nodes;stream.characters=characters;}
+ if(stream){stream.nodes=nodes;stream.characters=characters;stream.counts.externalMedia=(stream.counts.externalMedia??0)+externalKinds.length;}
  preparedResources.check();return {preparedResources,children,definitions:stream?Object.fromEntries(Object.entries(definitions).filter(([id])=>!priorDefinitions.has(id))):definitions,annotations,annotationRefs,discursiveReferences,intent:response.intent??'reply',aliases:Object.fromEntries(aliases),provenance};
  }catch(error){if(error instanceof DcpValidationError)throw error;const wrapped=new DcpValidationError(validationDiagnostic(error,path));wrapped.message=error instanceof Error?error.message:wrapped.message;throw wrapped;}
 }

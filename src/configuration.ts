@@ -125,6 +125,9 @@ export type FeatureFlags = Readonly<{
   dialectic: boolean;
   /** Native contribution effects and historical notices beside committed content. */
   dialecticContributionActivity: boolean;
+  dialecticLargeImageConsent: boolean;
+  dialecticSmallerImage: boolean;
+  dialecticSemanticContents: boolean;
   /** Validated structured mock exchanges; no live provider or Stage 4B authoring. */
   dialecticDcp: boolean;
   /** Bounded discovery of admitted DCP authoring capabilities. */
@@ -276,6 +279,9 @@ export const featureFlags: FeatureFlags = Object.freeze({
   thesis: true,
   dialectic: true,
   dialecticContributionActivity: true,
+  dialecticLargeImageConsent: true,
+  dialecticSmallerImage: true,
+  dialecticSemanticContents: true,
   dialecticDcp: true,
   dcpXmlAuthoring: true,
   dcpXmlStreaming: true,

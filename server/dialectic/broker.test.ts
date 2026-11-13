@@ -112,3 +112,27 @@ it('forwards a configured 16000 limit and preserves incomplete usage without adm
  const id=(await(await f.call('/exchange',{request:req})).json()).id,lines=(await(await f.call('/exchange/'+id+'/turn',{round:0})).text()).trim().split('\n').map(s=>JSON.parse(s));
  const error=lines.at(-1);expect(error.type).toBe('error');expect(error.receipt).toMatchObject({stop:'max_output_tokens',usage:{output_tokens:16000,reasoning_tokens:310}});expect(lines.some(x=>x.type==='result')).toBe(false);expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body)).max_output_tokens).toBe(16000);
 });
+
+it('requests a smaller image with an isolated compact contract and preserves the conversational exchange',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify({url:'https://example.org/small.jpg'}))));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});
+ const exchange=await f.call('/exchange',{request:req});expect(exchange.status).toBe(200);
+ const response=await f.call('/utility/smaller-image',{url:'https://example.org/large.jpg',description:'Lady with an Ermine'});
+ expect(response.status).toBe(200);expect(await response.json()).toMatchObject({url:'https://example.org/small.jpg',receipt:{provider:'openai'}});
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(body.tools).toEqual([]);expect(body.store).toBe(false);expect(body.conversation).toBeUndefined();expect(body.max_output_tokens).toBe(512);expect(body.text.format.name).toBe('mutable_smaller_image');expect(JSON.stringify(body)).not.toContain('protocolKey');expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('rejects extra utility instructions, unsafe or unchanged replacements and accepts an honest unavailable result',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify({url:'http://127.0.0.1/image.jpg'})))).mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify({url:'https://example.org/large.jpg'})))).mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify({url:null}))));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});const input={url:'https://example.org/large.jpg',description:'Artwork'};
+ expect((await f.call('/utility/smaller-image',{...input,instructions:'extra'})).status).toBe(400);expect(fetcher).not.toHaveBeenCalled();
+ expect((await f.call('/utility/smaller-image',input)).status).toBe(502);expect((await f.call('/utility/smaller-image',input)).status).toBe(502);
+ const result=await f.call('/utility/smaller-image',input);expect(result.status).toBe(200);expect((await result.json()).url).toBeNull();
+});
+
+it('accepts failed-image recovery without introducing it into provider conversation history',async()=>{
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify({url:'https://example.org/repaired.jpg'}))));
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'fixture-only'});
+ const result=await f.call('/utility/smaller-image',{url:'https://example.org/broken.jpg',description:'Lady with an Ermine',reason:'failed-image'});
+ expect(result.status).toBe(200);const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(body.instructions).toContain('image failed to load');expect(body.conversation).toBeUndefined();expect(body.store).toBe(false);expect(body.tools).toEqual([]);
+ expect((await f.call('/utility/smaller-image',{url:'https://example.org/broken.jpg',description:'Lady with an Ermine',reason:'arbitrary-command'})).status).toBe(400);expect(fetcher).toHaveBeenCalledTimes(1);
+});

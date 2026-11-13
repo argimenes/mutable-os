@@ -3,6 +3,7 @@ import {DcpValidationError,safeDiagnostic} from './diagnostics';
 import {lowerXml,xmlDialect,type XmlAuthority} from './xml-authoring';
 /** An exchange-local view of existing source authority, never a semantic registry. */
 export class XmlContext implements XmlAuthority {
+ synopsis?:string;
  private aliases=new Map<string,string>();private handles=new Map<string,string>();
  private revisions=new Map<string,string>();
  private epoch=crypto.randomUUID().replaceAll('-','').slice(0,10);
@@ -28,7 +29,7 @@ export class XmlContext implements XmlAuthority {
  describe(result:any):any{return {dialect:xmlDialect,status:result.status,omittedIds:result.omittedIds,limits:result.limits,...(result.items?{items:result.items.map((i:any)=>({id:i.id,purpose:i.purpose,authorable:!!xmlCapabilities[i.id]&&i.authorable===true,constraints:i.constraints,...(xmlCapabilities[i.id]?{syntax:xmlCapabilities[i.id]}:{reason:'No qualified XML route in this increment.'})}))}:{status:'unavailable',reason:'No qualified XML description'} )};}
  toolArguments(tool:string,args:Record<string,unknown>){const out={...args};if(tool==='read_source'){this.sources.check();out.handle=this.aliases.get(String(args.handle))??'unissued-xml-alias';}if(tool==='list_text_blocks'&&typeof args.contributionId==='string'){const t=this.sources.target(this.resolve(args.contributionId));if(t.kind!=='contribution')throw new DcpValidationError(safeDiagnostic({code:'source-identity'}));out.contributionId=t.blockId;}return out;}
  bindings(){return Object.fromEntries(this.aliases);}
- lower(text:string){this.sources.check();return lowerXml(text,this.exchange,this);}
+ lower(text:string){this.sources.check();this.synopsis=undefined;return lowerXml(text,this.exchange,this,value=>this.synopsis=value);}
 }
 export const xmlCapabilities:Record<string,string>={
  'composition.paragraph':'<p>Inline content</p>', 'composition.heading':'<h1> through <h6>; native heading levels.',
@@ -36,6 +37,7 @@ export const xmlCapabilities:Record<string,string>={
  'configuration.list-numbering':'<ol start="3">; native ordered-list start. No reversed/item-value XML attributes yet.',
  'composition.table':'<table><tr><td><p>Cell</p></td></tr></table>; nonempty rectangular rows; native bounds apply.',
  'composition.card-grid':'<grid><tr><td><p>Cell</p></td></tr></grid>; native grid preparation and bounds.',
+ 'media.external-image':'<image src="https://example.org/image.jpg" alt="Description"/>; native image Block, also inside grid cells. Use an actual image URL, not a page URL. No existing source Block required. Credential-free public HTTP(S) references only; native URL and size limits apply. Browser loads the image; remote availability is not verified. Embedding does not require search, acquisition or generation tools; do not invent URLs when retrieval is unavailable.',
  'composition.code':'<code language="typescript">const x = 1;</code>; XML-escape literal code; annotations are forbidden inside code.',
  'source.anchor':'<passage id="p" target="@b1" quote="exact text" prefix="" suffix=""/> in definitions. Complete source required. Neutral generated <span id="p">text</span>. Overlaps: inline <boundary id="a"/> and <boundary id="b"/>, then <range id="p" block="localBlockId" from="a" to="b"/> in definitions. Boundaries must be in that TextBlock.',
  'source.classification':'<classify target="passage" kind="claim|question|speculation|suggestion|objection|qualification"/>; also Block target with quote/context or whole="true".',

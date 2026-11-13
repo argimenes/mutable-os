@@ -1,4 +1,5 @@
 import {createApplicationServiceHost} from './application-services/host.js';
+import {imageReferenceRouter} from './image-reference.js';
 /** One application-level folder context; existing stores remain confined to it. */
 import { Router, type RequestHandler } from 'express';
 import { promises as fs, constants } from 'node:fs';
@@ -83,6 +84,7 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     });
     api.use('/sqlite/knowledge', sql.router());
     api.use('/history', history.router);
+    if(featureFlags.dialecticLargeImageConsent)api.use('/image-reference',imageReferenceRouter());
     if (featureFlags.nativeDocumentPersistence) api.use('/native', createNativeDocumentStoreRouter({ root, coordinate, defaultVault: '.', establishVault: vault => sql.establish(vault) }));
     api.use(createDocumentStoreRouter({ root, coordinate, history }));
     // Workspace files are ordinary files within this same Cavern.

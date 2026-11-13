@@ -15,7 +15,7 @@ import {keys} from './markup';
 import type {ReactiveEditor} from '../../../reactive-editor/editor';
 import type {BlockNode,ContentRecord} from '../../../block-tree/types';
 import type {ReplyTarget} from '../model';
-import {targetKey,contribution} from '../model';
+import {targetKey,contribution,onlyContributionNoticesChanged} from '../model';
 import type {DialecticReferences,Resolution} from '../references';
 function* edges(n:BlockNode){yield* n.children;for(const name in n.ownedRelations)yield n.ownedRelations[name];}
 export type SourceStatus='complete'|'truncated'|'missing'|'ambiguous'|'unavailable'|'unauthorized';
@@ -49,7 +49,12 @@ export class DcpSources {
   if(editor.features.dcpCapabilityCatalogue)this.capabilities=capabilityCatalogue(editor,this.vocabulary);
   let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;
   this.entities=new ScopedEntities(editor,rootKey,owner);
-  this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key)){if(this.ownAdmission){this.fences.set(key,editor.repository.readState().contents[key]);this.textCache.delete(key);}else this.stale=true;}});
+  this.stop=editor.repository.subscribeChanges(change=>{for(const key of change.previousContents.keys())if(this.fences.has(key)){
+   const current=editor.repository.readState().contents[key];
+   if(this.ownAdmission){this.fences.set(key,current);this.textCache.delete(key);}
+   else if(onlyContributionNoticesChanged(this.fences.get(key),current))this.fences.set(key,current);
+   else this.stale=true;
+  }});
  }
  check(){if(this.signal.aborted)throw Error('DCP cancelled');if(Date.now()>this.deadline)throw Error('DCP deadline exceeded');if(this.stale)throw Error('Selected context changed; request a fresh DCP response.');for(const [h,text]of this.glossValues)if(this.resolve(this.target(h)).text!==text)throw Error('Selected context changed');for(const [key,record]of this.fences)if(this.editor.repository.readState().contents[key]!==record)throw Error('Selected context changed; request a fresh DCP response.');}
  fence(key:string){const c=this.editor.repository.readState().contents[key];if(!c)throw Error('Source unavailable');if(!this.fences.has(key))this.fences.set(key,c);this.check();}

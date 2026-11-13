@@ -74,6 +74,12 @@ export class NativeTextProtection {
     if(this.roots.has(key)&&!this.matches(r))fail();
     const base=(c:ContentRecord)=>{
      const {standoffProperties,linkedAnnotations,...payload}=c.payload;
+     // Host-observed contribution notices are provenance, like annotations;
+     // updating them does not grant permission to rewrite authored content.
+     if(this.roots.has(c.key)&&(payload.metadata as any)?.dialectic?.kind==='contribution'){
+      const metadata=payload.metadata as any,{notices,...dialectic}=metadata.dialectic;
+      payload.metadata={...metadata,dialectic};
+     }
      // Selected tabs and media load status are presentation, not authored text.
      if(c.viewType==='tab-block'&&payload.metadata){const {active,...m}=payload.metadata as any;payload.metadata=m;}
      if(c.viewType==='image-cell'){const {status,...p}=payload;return {...c,payload:p,revision:0};}

@@ -11,6 +11,19 @@ import { clipProperties } from './ranges';
 import { emptyFragment, LIMITS, validateFragment, type FragmentBlock, type InterchangeScope, type MutableFragment, type Reference } from './fragment';
 
 export interface Slice { placementKey: string; start?: number; end?: number; gap?: boolean }
+/** Explicit text projection, not a clone of scoped semantic definitions. Work is
+ * bounded by selected Cells; no owner discovery or repository inventory. */
+export function selectionText(state:RepositoryState,slices:Slice[]):string {
+  return slices.map(slice=>{
+    const placement=state.placements[slice.placementKey],content=placement&&state.contents[placement.contentKey];
+    const {start,end}=slice;
+    if(!content||content.inlineKind!=='standoff'||start===undefined||end===undefined||!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>content.inlineContent.length)throw Error('Stale text selection.');
+    return content.inlineContent.slice(start,end).map(key=>{
+      const cell=state.contents[state.placements[key].contentKey];
+      return cell.viewType==='text-cell'?String(cell.payload.text??''):String(cell.payload.alt??'\uFFFC');
+    }).join('');
+  }).join('\n');
+}
 const omit = (data: JsonObject, keys: string[]) => Object.fromEntries(Object.entries(clone(data)).filter(([key, v]) => !keys.includes(key) && v !== undefined));
 
 /** Selected authored data only. Inline Cells are compact runs, never repository keys. */

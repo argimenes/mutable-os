@@ -1,5 +1,5 @@
 import {XmlFragments,type XmlElement} from './xml-fragments';
-import {xmlBlockLowerer,xmlDefinition,xmlDefinitionNames,xmlSymbolKind,assertXmlReferenceKind,xmlResponseElements,type XmlAuthority} from './xml-authoring';
+import {xmlBlockLowerer,xmlDefinition,xmlDefinitionNames,xmlSymbolKind,assertXmlReferenceKind,xmlResponseElements,xmlSynopsis,type XmlAuthority} from './xml-authoring';
 import {nativePreparationSession,semanticPreparationCheckpoint,prepare} from './exchange';
 import {DcpValidationError} from './diagnostics';
 import type {ContributionNotice} from '../model';
@@ -33,7 +33,7 @@ export class NativeXmlStream {
  private final?:{intent:string;discursiveReferences:import('../model').ReplyTarget[]};
  private consumed=0;
  private buffer='';
- constructor(private options:{editor:ReactiveEditor;sources:DcpSources;authority:XmlAuthority;exchange:string;owner:string;participant:string;apply:(result:NativePrepared)=>void}){
+ constructor(private options:{editor:ReactiveEditor;sources:DcpSources;authority:XmlAuthority;exchange:string;owner:string;participant:string;apply:(result:NativePrepared)=>void;onSynopsis?:(text:string)=>void}){
   this.parser=new XmlFragments(e=>{this.metrics.fragments++;this.pending=this.pending.then(async()=>{if(this.closed||this.error)return;try{await this.element(e);}catch(error){this.error=error;}});});
  }
  get started(){return this.metrics.blocks>0||!!this.memory.memory&&Object.keys(this.memory.memory.definitions).length>0;}
@@ -94,6 +94,7 @@ export class NativeXmlStream {
   if(this.closed)return;sources.check();this.options.apply(result);this.metrics.blocks+=result.children.length;
  }
  private async element(e:XmlElement){
+  if(e.name==='synopsis'){const text=xmlSynopsis(e);if(text)this.options.onSynopsis?.(text);else this.warn('Synopsis','Expected plain text, no attributes, and at most 160 characters.');return;}
   try{this.allocate(e);}catch(error){if(!xmlDefinitionNames.has(e.name))throw error;this.warn(e.name,error);return;}
   if(xmlDefinitionNames.has(e.name))this.waiting.push(e);
   else {

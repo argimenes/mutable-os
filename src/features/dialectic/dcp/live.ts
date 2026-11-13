@@ -1,3 +1,4 @@
+import {smallerImageOutput,type SmallerImageInput,type SmallerImageResult} from '../smaller-image-contract';
 import {validationDiagnostic,allowsSourceRecovery,sourceRecoveryTools} from './diagnostics';
 import {defaultProviderSettings,providerSettings,liveLimits,type ProviderSettings,type ProviderTurn,type LiveProvenance} from './provider-contract';
 import type {DcpTransport} from './exchange';
@@ -22,6 +23,11 @@ export class DialecticProviderSession {
  }
  async diagnostic(event:unknown){if(!this.testLogging)return false;const r=await this.call('/diagnostics',event);return (await r.json()).logged===true;}
  async title(text:string,signal:AbortSignal){if(!this.ready)throw Error('Provider unavailable');return parseConversationTitle(await(await this.call('/utility/title',{text},signal)).json());}
+ async smallerImage(input:SmallerImageInput,signal:AbortSignal):Promise<SmallerImageResult>{
+  if(!this.ready)throw Error('Configure the AI provider in AI settings first.');
+  const data=await(await this.call('/utility/smaller-image',input,signal)).json();
+  return {url:smallerImageOutput({url:data.url}),receipt:data.receipt};
+ }
  async configure(settings:ProviderSettings,key?:string){const response=await this.call('/settings',{settings,...(key?{key}:{})});const data=await response.json();this.settings=providerSettings(data.settings);this.ready=data.ready;try{localStorage.setItem(preferencesKey,JSON.stringify(this.settings));}catch{}return this.ready;}
  private async closeExchange(id:string){if(!this.token)return;await fetch('/api/dialectic/exchange/'+id,{method:'DELETE',signal:AbortSignal.timeout(2000),headers:{'x-mutable-dialectic':'1','x-dialectic-session':this.token},keepalive:true}).catch(()=>undefined);}
  async forget(){const token=this.token;this.token='';this.ready=false;if(token)await fetch('/api/dialectic/session',{method:'DELETE',headers:{'x-mutable-dialectic':'1','x-dialectic-session':token},keepalive:true}).catch(()=>undefined);}

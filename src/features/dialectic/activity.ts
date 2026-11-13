@@ -12,7 +12,7 @@ export type ActivityCategory=keyof typeof activityCategories;
 export interface ActivityItem {key:string;category:ActivityCategory;label:string;active:boolean;reason?:string;target?:ReplyTarget;annotation?:{blockId:string;propertyId:string};sources?:{blockId:string;propertyId:string}[]}
 export interface ActivitySummary {items:ActivityItem[];counts:Record<ActivityCategory,number>;notices:ContributionNotice[];limited:boolean}
 export const activityLimits={references:512,annotations:1024,identities:512,notices:32,inspector:64};
-const noticeCodes=new Set(['markdown-fallback','partial-conversion','unsupported-media','incomplete-operation','validation-repaired']);
+const noticeCodes=new Set(['markdown-fallback','partial-conversion','unsupported-media','incomplete-operation','validation-repaired','image-load']);
 export function repairedNotice(provider:LiveProvenance|undefined):ContributionNotice|undefined {
  if(provider?.attempts?.some(a=>a.repair&&a.rejectedResponse)&&!provider.failure&&!provider.attempts.at(-1)?.diagnostic)return {version:1,code:'validation-repaired',severity:'info',loss:false,detail:'The initial response failed native validation. A repaired response was validated and committed.'};
 }
@@ -31,8 +31,11 @@ export function createContributionActivity(data:Accessor<Contribution|undefined>
  const candidates=createMemo(()=>{
   diagnostics.candidates++;
   const row=data();if(!row||row.state!=='committed')return undefined;
+  // Notices can arrive after submission. Track their fields before unwrapping
+  // immutable authoring provenance; reconciliation retains the row identity.
+  const recordedNotices=Array.isArray(row.notices)?row.notices.map(n=>({...n})):[];
   const d=unwrap(row),replies=d.replies.filter(target),discursive=Array.isArray(d.discursiveReferences)?d.discursiveReferences:[],allRefs=d.author==='human'?[...replies,...discursive]:discursive.filter(t=>target(t)&&!replies.some(primary=>targetKey(primary)===targetKey(t)));
-  const recordedAnnotations=Array.isArray(d.dcp?.annotationRefs)?d.dcp.annotationRefs:[],recordedNotices=Array.isArray(d.notices)?d.notices:[];
+  const recordedAnnotations=Array.isArray(d.dcp?.annotationRefs)?d.dcp.annotationRefs:[];
   const refs=allRefs.slice(0,activityLimits.references).filter(target),annotations=recordedAnnotations.slice(0,activityLimits.annotations).filter(r=>r&&typeof r.blockId==='string'&&typeof r.propertyId==='string');
   const identities:ReplyTarget[]=[];let identityCount=0;
   for(const alias in (d.dcp?.identityMap as any)??{}){if(++identityCount>activityLimits.identities)break;const t=(d.dcp!.identityMap as any)[alias];if(target(t)&&createdCategory(t))identities.push(t);}

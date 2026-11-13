@@ -32,13 +32,14 @@ it.each(['original','corrected','malformed'])('replays the university response t
  if(mode==='malformed')xml+=`<gloss target="${authority.alias(block.handle)}" whole="true" kind="invalid:kind">Invalid kind after preparing an anchor.</gloss><classify target="${authority.alias(block.handle)}" quote="not in source" kind="claim"/><gloss target="missingPassage" kind="scope">Unresolved.</gloss><gloss target="central" kind="scope" surprise="invalid">Malformed attributes.</gloss><mention target="${authority.alias(block.handle)}" quote="absent entity" ref="unusable"/><entity id="unusable" name="Unusable" type="Concept"/><gloss target="central" kind="scope">Valid after failures.</gloss><p>Still rendered.</p>`;
  let contribution:BlockNode|undefined;
  const stream=new NativeXmlStream({editor:f.editor,sources,authority,exchange:request.exchange,owner:f.owner,participant:'agent-A',apply:result=>{
-  sources.admitOwn(()=>f.editor.commands.boundedStructuralTransaction('Replay native fragment',()=>{
+  const insert=()=>f.editor.commands.boundedStructuralTransaction('Replay native fragment',()=>{
    result.preparedResources.check();
    if(Object.keys(result.definitions).length)f.editor.commands.setPayloadField(f.root.key,'linkedAnnotations',{...JSON.parse(JSON.stringify(f.root.payload.linkedAnnotations??{})),...result.definitions});
    for(const [key,marks]of result.annotations)f.editor.commands.setPayloadField(key,'standoffProperties',[...JSON.parse(JSON.stringify(f.view.node(key)!.payload.standoffProperties??[])),...marks]);
-   if(!contribution)f.editor.commands.insert({id:crypto.randomUUID(),type:'container-block',children:result.children},{kind:'at',parentKey:f.root.key,index:f.root.children.length});
+   if(!contribution)f.editor.commands.insert({id:crypto.randomUUID(),type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'receiving',author:'ai',ordinal:2,replies:[]}},children:result.children},{kind:'at',parentKey:f.root.key,index:f.root.children.length});
    else {const at=contribution.children.length;result.children.forEach((child,index)=>f.editor.commands.insert(child,{kind:'at',parentKey:contribution!.key,index:at+index}));}
-  }));
+  });
+  sources.admitOwn(()=>contribution?f.editor.textProtection.receivingInsertion(contribution.contentKey,insert):insert());
   contribution??=f.view.node(f.root.children.at(-1)!)!;
   const newIds=new Set(result.children.map(c=>String(c.id)));
   for(const key of contribution.children){const n=f.view.node(key)!;if(newIds.has(String(n.payload.id)))stream.memory.nativeKeys.set(String(n.payload.id),n.key);}
@@ -51,6 +52,12 @@ it.each(['original','corrected','malformed'])('replays the university response t
  expect(contribution!.children.length).toBe(mode==='malformed'?20:19);
  const definitions=Object.values(f.root.payload.linkedAnnotations??{}) as any[];
  expect(definitions.filter(d=>d.type==='mutable/entity')).toHaveLength(19);
+ const coverage=f.refs.contentsTargets(String(contribution!.payload.id));
+ expect(coverage.filter(t=>t.kind==='entity')).toHaveLength(19);
+ expect(coverage.filter(t=>t.kind==='argument')).toHaveLength(6);
+ expect(coverage.filter(t=>t.kind.endsWith('-relation'))).toHaveLength(8);
+ expect(coverage.filter(t=>t.kind==='gloss')).toHaveLength(mode==='original'?3:mode==='malformed'?5:4);
+ const humanCoverage=f.refs.contentsTargets(human);expect(humanCoverage.filter(t=>t.kind==='entity')).toHaveLength(3);expect(humanCoverage.filter(t=>t.kind==='gloss')).toHaveLength(2);
  expect(Object.keys(stream.memory.memory!.definitions).sort()).toEqual(Object.keys(f.root.payload.linkedAnnotations??{}).sort());
  if(mode==='malformed')expect(stream.notices[0].detail).toContain('5 semantic operations were skipped');
  if(mode==='corrected')expect(stream.notices).toEqual([]);

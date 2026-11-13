@@ -26,6 +26,29 @@ try{
  await writeFile(path.join(directory,'first-fragment.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
  await evaluate('proof.continueScreenshot();true');
  await evaluate(`(async()=>{for(let i=0;i<1600;i++){if(proof.failure)throw Error(proof.failure);if(proof.result)return;await new Promise(r=>setTimeout(r,20));}throw Error('Fixture completion timeout')})()`);
- const result=await evaluate('proof.result');await writeFile(path.join(directory,'qualification.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+ await send('Browser.grantPermissions',{origin:'http://127.0.0.1:'+server.httpServer.address().port,permissions:['clipboardReadWrite','clipboardSanitizedWrite']});
+ const selectCopy=async across=>evaluate(`(()=>{
+  const {editor,port}=proof, view=port.session().projection;
+  const row=proof.committed().find(n=>n.payload.metadata.dialectic.author==='ai'&&n.children.length===2);
+  const first=view.node(row.children[0]),last=view.node(row.children[1]);
+  const draft=proof.text(),dm=editor.mounts.get(draft.key);dm.focus();dm.restoreInlineSelection({anchor:0,head:0});
+  editor.selections.setPrimary(draft.key,draft.contentKey,draft.viewId,0);
+  const a=editor.mounts.get(first.key),b=editor.mounts.get(last.key);
+  a.restoreInlineSelection({anchor:0,head:17});
+  if(${across}){const sel=document.getSelection(),range=sel.getRangeAt(0).cloneRange();b.restoreInlineSelection({anchor:0,head:8});const end=sel.getRangeAt(0);range.setEnd(end.endContainer,end.endOffset);sel.removeAllRanges();sel.addRange(range);}
+  return {selected:document.getSelection().toString(),revision:editor.repository.state.revision};
+ })()`);
+ const clipboard=[];
+ for(const across of [false,true]){
+  const selected=await selectCopy(across);
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'c',code:'KeyC',modifiers:4,windowsVirtualKeyCode:67,commands:['copy']},sessionId);
+  await send('Input.dispatchKeyEvent',{type:'keyUp',key:'c',code:'KeyC',modifiers:4,windowsVirtualKeyCode:67},sessionId);
+  const copied=await evaluate('navigator.clipboard.readText()');
+  const revision=await evaluate('proof.editor.repository.state.revision');
+  if(copied.replace(/\s+/g,' ').trim()!==selected.selected.replace(/\s+/g,' ').trim()||revision!==selected.revision)throw Error('Clipboard mismatch '+JSON.stringify({across,selected,copied,revision}));
+  clipboard.push({across,copied,unchanged:true});
+ }
+ console.log(JSON.stringify({clipboard},null,2));
+ const result={...await evaluate('proof.result'),clipboard};await writeFile(path.join(directory,'qualification.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
  await writeFile(path.join(directory,'committed.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
 }finally{socket?.close();browser?.kill('SIGTERM');await server?.close();await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
