@@ -118,7 +118,7 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
       indexWork = read().finally(() => { indexWork = undefined; });
       return indexWork;
     };
-    return { api, sql,
+    return { api, sql, attachmentServices:()=>assets&&services?{store:assets.store,executor:services.executor}:undefined,
       async activateAssets(cavern: Cavern) {
         if(featureFlags.semanticRetrieval&&featureFlags.derivedRetrieval){retrieval=new CavernRetrieval(sql,root,cavern.cavernGuid,{deferStartup:true});await retrieval.start();}
         if(featureFlags.applicationServices)services=createApplicationServiceHost({root,cavernId:cavern.cavernGuid,nativeEnabled:featureFlags.nativeDocumentPersistence,publicationEnabled:featureFlags.webPublishing,academicEnabled:featureFlags.academicResourceLoaders,iiifEnabled:featureFlags.iiifResourceLoaders,crossResourceEnabled:featureFlags.crossResourceLoaders,structuredEnabled:featureFlags.structuredResources,deterministicEnabled:featureFlags.deterministicAcademicResources,webEnabled:featureFlags.webResourceViewers,everydayEnabled:featureFlags.everydayWebResources,academic:(request,signal)=>sql.academic(request,signal),assets:()=>assets?.store,knowledge:(request,signal)=>sql.entityLookup({vault:'.',request},signal,true)});
@@ -211,5 +211,11 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     res.once('finish', finish); res.once('close', finish);
     runtime.api(req, res, next);
   };
-  return { router, middleware, current: () => current, async close() { await tail; await runtime?.close(); } };
+  return { router, middleware, current: () => current,
+    attachments(session:string) {
+      const selected=current,active=runtime,services=active?.attachmentServices();
+      const check=()=>{if(!selected||!active||!services||switching||current!==selected||runtime!==active||session!==selected.session)throw Error('Attachment Vault/session changed. Reopen the Document.');};
+      check();return {...services!,cavernId:selected!.cavernGuid,session,check};
+    },
+    async close() { await tail; await runtime?.close(); } };
 }

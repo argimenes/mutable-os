@@ -19,6 +19,8 @@ export type FeatureFlags = Readonly<{
   dialecticConversationUpdates: boolean;
   /** Optional contribution-boundary saves, independent of conversation chrome. */
   dialecticAutosave: boolean;
+  dialecticAttachments: boolean;
+  dialecticArtifacts: boolean;
   /** Isolated title utility; never a conversational contribution. */
   dialecticAutomaticTitles: boolean;
   /** Bounded native text flows. Opt-in pending browser qualification. */
@@ -226,6 +228,8 @@ export type FeatureFlags = Readonly<{
 export const featureFlags: FeatureFlags = Object.freeze({
   dialecticConversationUpdates: true,
   dialecticAutosave: false,
+  dialecticAttachments: true,
+  dialecticArtifacts: true,
   dialecticAutomaticTitles: true,
   virtualTextFlows: true,
   standoffCodeHighlighting: true,

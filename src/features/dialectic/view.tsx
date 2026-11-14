@@ -1,3 +1,4 @@
+import {AttachFiles,AttachmentCards,AttachmentStatus} from './attachments-view';
 import {smallerImageEvent,type SmallerImageRequest} from './smaller-image-contract';
 import {ContributionNavigation,createContentsPreference} from './contents-view';
 import {ContributionActivityBar,ContributionActivityInspector} from './activity-view';
@@ -19,12 +20,24 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
  const [inspectorOpen,setInspectorOpen]=createSignal(!modern);
  const [formatting,setFormatting]=createSignal(!modern);
  createEffect(()=>{if(c.activityInspection()||c.inspectedAnnotation()||c.inspection()?.kind==='entity')setInspectorOpen(true);});
+ const [fileDrag,setFileDrag]=createSignal(false);
  let root!:HTMLElement;const [mounted,setMounted]=createSignal(false);
  const hosting=()=>mounted()&&!!c.session()?.host.port&&root.contains(c.session()!.host.port!.container)&&c.session()!.host.activity().visible;
  const act=(fn:()=>unknown)=>()=>c.run(fn);
  const save=async()=>{try{await c.port()?.application.files?.save();}catch(e){c.run(()=>{throw e;});}};
  onMount(()=>{
   queueMicrotask(()=>setMounted(true));
+  const hasFiles=(event:DragEvent)=>!!event.dataTransfer?.files.length||Array.from(event.dataTransfer?.types??[]).includes('Files');
+  const clear=()=>setFileDrag(false);
+  const over=(event:DragEvent)=>{if(!c.editor.features.dialecticAttachments||!hasFiles(event))return;event.preventDefault();event.stopPropagation();if(event.dataTransfer)event.dataTransfer.dropEffect='copy';setFileDrag(true);};
+  const drop=(event:DragEvent)=>{clear();if(!c.editor.features.dialecticAttachments||!hasFiles(event))return;event.preventDefault();event.stopPropagation();void c.files.attach(Array.from(event.dataTransfer?.files??[]));};
+  const leave=(event:DragEvent)=>{if(!(event.relatedTarget instanceof Node)||!root.contains(event.relatedTarget))clear();};
+  const outside=(event:DragEvent)=>{if(fileDrag()&&(!(event.target instanceof Node)||!root.contains(event.target)))clear();};
+  const escape=(event:KeyboardEvent)=>{if(fileDrag()&&event.key==='Escape'){event.preventDefault();event.stopPropagation();clear();}};
+  root.addEventListener('dragenter',over,true);root.addEventListener('dragover',over,true);root.addEventListener('drop',drop,true);root.addEventListener('dragleave',leave);
+  window.addEventListener('dragover',outside,true);window.addEventListener('drop',outside,true);window.addEventListener('dragend',clear,true);window.addEventListener('blur',clear);window.addEventListener('keydown',escape,true);
+  onCleanup(()=>{root.removeEventListener('dragenter',over,true);root.removeEventListener('dragover',over,true);root.removeEventListener('drop',drop,true);root.removeEventListener('dragleave',leave);window.removeEventListener('dragover',outside,true);window.removeEventListener('drop',outside,true);window.removeEventListener('dragend',clear,true);window.removeEventListener('blur',clear);window.removeEventListener('keydown',escape,true);});
+
   const shortcut=(e:KeyboardEvent)=>{if(!root.contains(e.target as Node)||e.isComposing||e.altKey||e.shiftKey||!(e.metaKey||e.ctrlKey)||e.key.toLowerCase()!=='s'||(e.target as Element)?.closest('[role="dialog"]'))return;e.preventDefault();e.stopPropagation();void save();};
   const entityClick=(event:MouseEvent)=>{
    if(event.button!==0||event.metaKey||event.ctrlKey||event.altKey||event.shiftKey||window.getSelection()?.isCollapsed===false)return;
@@ -41,6 +54,8 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
  const resolved=()=>c.resolveReference(selected());
  const selectedTarget=c.exchangeTarget;
  return <section ref={root} class="dialectic-app" classList={{"dialectic-chat":modern}} data-formatting={formatting()} aria-label="Dialectic conversation">
+  {/* Receive drops outside protected contribution mounts; their native guards stay intact. */}
+  <Show when={fileDrag()}><div class="dialectic-file-drop" role="status" contentEditable={false} data-cross-text-controls>Drop files to attach to your draft</div></Show>
   <header class="dialectic-bar" data-cross-text-controls>
    <div><strong>Dialectic</strong><span class="dialectic-subtitle"> Compositions in conversation</span></div>
    <nav aria-label="Conversation actions" onPointerDown={e=>e.preventDefault()}>
@@ -78,9 +93,11 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <Show when={c.sequences.draft()&&hosting()}><SequenceAuthor c={c}/></Show>
     <Show when={c.sequences.presenting()&&hosting()}><SequenceReader c={c} textual={props.textual}/></Show>
     <div class="dialectic-retained-source" hidden={!!c.sequences.presenting()} inert={!!c.sequences.presenting()}>{props.children}</div>
+    <Show when={!c.sequences.presenting()}><AttachmentStatus c={c}/></Show>
     <div hidden={!!c.sequences.presenting()} class="dialectic-compose-bar" data-cross-text-controls onPointerDown={e=>e.preventDefault()}>
      <div><Show when={!modern}><strong>Your next contribution</strong></Show><small>{c.reply()?`Replying to ${c.label(c.reply()!)}`:modern?'Write a contribution':'New contribution at the chronological frontier'} <Show when={c.reply()}><button onClick={()=>c.setReply(undefined)}>Clear target</button></Show></small></div>
-     <Show when={!modern}><button onClick={c.compose}>Write</button></Show><Show when={modern&&c.busy()} fallback={<button class="dialectic-primary dialectic-send" aria-label="Submit contribution" title="Submit contribution" disabled={!c.valid()||c.busy()||c.providerConfiguring()||c.resending()||c.pasting()} onClick={()=>void c.submitAndAsk()}>{modern?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4m-6 6 6-6 6 6"/></svg>:'Submit'}</button>}><button class="dialectic-primary dialectic-send" aria-label="Cancel response" title="Cancel response" onClick={c.cancel}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1" fill="currentColor" stroke="none"/></svg></button></Show>
+     <AttachFiles c={c}/>
+     <Show when={!modern}><button onClick={c.compose}>Write</button></Show><Show when={modern&&c.busy()} fallback={<button class="dialectic-primary dialectic-send" aria-label="Submit contribution" title="Submit contribution" disabled={!c.valid()||c.busy()||c.providerConfiguring()||c.resending()||c.pasting()||!!c.files.pending()||!!c.files.failure()||!!c.fileProblem()} onClick={()=>void c.submitAndAsk()}>{modern?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V4m-6 6 6-6 6 6"/></svg>:'Submit'}</button>}><button class="dialectic-primary dialectic-send" aria-label="Cancel response" title="Cancel response" onClick={c.cancel}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1" fill="currentColor" stroke="none"/></svg></button></Show>
     </div>
    </main>
    <aside class="dialectic-inspector" hidden={modern&&!inspectorOpen()} inert={!!c.sequences.presenting()} aria-label="Conversation context">
@@ -150,7 +167,7 @@ function decorateMounts(c:DialecticController){
  const decorated=new Map<HTMLElement,{dispose:()=>void;slot:HTMLElement;host:HTMLElement;feedback:HTMLElement}>();
  const clear=(element:HTMLElement)=>{const d=decorated.get(element);if(!d)return;d.dispose();d.host.remove();d.feedback.remove();delete element.dataset.dialecticContribution;delete element.dataset.dialecticDraft;delete element.dataset.dialecticAuthor;delete d.slot.dataset.dialecticDraftSlot;decorated.delete(element);};
  createEffect(()=>{
-  const session=c.session(),rows=c.rows().map(r=>({key:r.key,id:r.id,label:r.data.state==='draft'?'':`${participantLabel(r.data).toUpperCase()} · ${r.data.ordinal}${r.data.state==='receiving'?' · Receiving…':''}`,draft:r.data.state==='draft',author:r.data.author}));
+  const session=c.session(),rows=c.rows().map(r=>({entry:r,key:r.key,id:r.id,label:r.data.state==='draft'?'':`${participantLabel(r.data).toUpperCase()} · ${r.data.ordinal}${r.data.state==='receiving'?' · Receiving…':''}`,draft:r.data.state==='draft',author:r.data.author}));
   let alive=true;
   queueMicrotask(()=>{if(!alive||session!==c.session())return;const keep=new Set<HTMLElement>();for(const r of rows){
    const element=c.editor.mounts.get(r.key)?.root as HTMLElement|undefined;if(!element)continue;keep.add(element);const doc=element.closest<HTMLElement>('[data-block-type="document-block"]');if(doc){doc.dataset.dialecticDocument='true';documents.add(doc);}element.dataset.dialecticContribution=r.label;element.dataset.dialecticDraft=String(r.draft);
@@ -159,8 +176,8 @@ function decorateMounts(c:DialecticController){
    if(!decorated.has(element)){
     const host=document.createElement('div');host.className='dialectic-contribution-tools';host.contentEditable='false';host.setAttribute('data-cross-text-controls','');element.appendChild(host);
     const feedback=document.createElement('div');feedback.className='dialectic-composer-feedback';feedback.contentEditable='false';element.prepend(feedback);
-    const stopFeedback=render(()=><Show when={c.editor.features.dialecticConversationUpdates&&c.draft()?.id===r.id}><ComposerProgress c={c}/></Show>,feedback);
-    const dispose=render(()=>{let menu!:HTMLDetailsElement;return <><div class="dialectic-contribution-menu"><details ref={menu} onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape'){menu.open=false;menu.querySelector('summary')?.focus();}}}><summary aria-label={`Contribution actions ${r.id}`} title="Contribution actions">···</summary><button disabled={c.busy()||c.providerConfiguring()||c.resending()} onClick={e=>{e.stopPropagation();menu.open=false;void c.resend(r.id);}}>Resend this text</button></details></div><Show when={c.editor.features.dialecticContributionActivity}><ContributionActivityBar c={c} id={r.id}/></Show></>;},host);
+    const stopFeedback=render(()=><><Show when={c.editor.features.dialecticConversationUpdates&&c.draft()?.id===r.id}><ComposerProgress c={c}/></Show><AttachmentCards c={c} items={r.entry.data?.attachments??[]} draft={r.entry.state()==='draft'}/></>,feedback);
+    const dispose=render(()=>{let menu!:HTMLDetailsElement;return <><div class="dialectic-contribution-menu"><details ref={menu} onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape'){menu.open=false;menu.querySelector('summary')?.focus();}}}><summary aria-label={`Contribution actions ${r.id}`} title="Contribution actions">···</summary><button disabled={c.busy()||c.providerConfiguring()||c.resending()} onClick={e=>{e.stopPropagation();menu.open=false;void c.resend(r.id);}}>Resend contribution</button></details></div><Show when={c.editor.features.dialecticContributionActivity}><ContributionActivityBar c={c} id={r.id}/></Show></>;},host);
     decorated.set(element,{dispose:()=>{dispose();stopFeedback();},slot,host,feedback});
    }
   }for(const element of decorated.keys())if(!keep.has(element))clear(element);});

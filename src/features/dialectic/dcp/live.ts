@@ -1,3 +1,5 @@
+import {attachments,attachmentLimits,type Attachment} from '../attachments-contract';
+import type {AssetContext} from '../../../runtime/managed-assets';
 import {smallerImageOutput,type SmallerImageInput,type SmallerImageResult} from '../smaller-image-contract';
 import {validationDiagnostic,allowsSourceRecovery,sourceRecoveryTools} from './diagnostics';
 import {defaultProviderSettings,providerSettings,liveLimits,type ProviderSettings,type ProviderTurn,type LiveProvenance} from './provider-contract';
@@ -11,15 +13,29 @@ export class DialecticProviderSession {
  private token='';private pending?:Promise<void>;private disposed=false;
  settings:ProviderSettings={...defaultProviderSettings};ready=false;
  private pagehide=()=>{void this.forget();};
- constructor(readonly testLogging=false){try{const saved=localStorage.getItem(preferencesKey);if(saved)this.settings=providerSettings(JSON.parse(saved));}catch{}window.addEventListener('pagehide',this.pagehide);}
+ constructor(readonly testLogging=false,private assetContext:()=>AssetContext=()=>({})){try{const saved=localStorage.getItem(preferencesKey);if(saved)this.settings=providerSettings(JSON.parse(saved));}catch{}window.addEventListener('pagehide',this.pagehide);}
  private async connect(){
   if(this.disposed)throw Error('Provider session closed.');if(this.token)return;
   if(!this.pending)this.pending=(async()=>{const r=await fetch('/api/dialectic/session',{method:'POST',signal:AbortSignal.timeout(10000),headers:{'x-mutable-dialectic':'1'}});const data=await r.json();if(!r.ok)throw Error(data.error??'Local provider broker unavailable.');this.token=data.token;if(this.disposed){await this.forget();throw Error('Provider session closed.');}})().finally(()=>{this.pending=undefined;});
   await this.pending;
  }
  private async call(path:string,body?:unknown,signal?:AbortSignal,method='POST'){
-  await this.connect();const response=await fetch('/api/dialectic'+path,{method,signal:signal??AbortSignal.timeout(10000),headers:{'content-type':'application/json','x-mutable-dialectic':'1','x-dialectic-session':this.token},...(body===undefined?{}:{body:JSON.stringify(body)})});
+  const scope={...this.assetContext()};await this.connect();const response=await fetch('/api/dialectic'+path,{method,signal:signal??AbortSignal.timeout(10000),headers:{...(body instanceof FormData?{}:{'content-type':'application/json'}),'x-mutable-dialectic':'1','x-dialectic-session':this.token,...(scope.session?{'X-Mutable-Cavern':scope.session}:{})},...(body===undefined?{}:{body:body instanceof FormData?body:JSON.stringify(body)})});
   if(!response.ok){if(response.status===401){this.token='';this.ready=false;}const e=await response.json().catch(()=>({}));throw Error(e.error??'Local provider broker request failed.');}return response;
+ }
+ async uploadAttachment(file:File,signal:AbortSignal):Promise<Attachment>{
+  const form=new FormData();form.append('file',file,file.name);form.append('name',file.name);
+  return attachments([(await(await this.call('/attachments/upload',form,signal)).json()).attachment])[0];
+ }
+ async attachmentBlob(attachment:Attachment,signal:AbortSignal):Promise<Blob>{
+  attachments([attachment]);const scope={...this.assetContext()};
+  const response=await this.call('/attachments/download',{attachment},signal);
+  if(!response.body)throw Error('Attachment bytes unavailable');
+  const reader=response.body.getReader(),parts:Uint8Array[]=[];let size=0;
+  try{for(;;){signal.throwIfAborted();const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>attachment.byteLength||size>attachmentLimits.fileBytes)throw Error('Attachment download limit exceeded');parts.push(r.value);}}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+  const blob=new Blob(parts.map(p=>new Uint8Array(p).buffer),{type:attachment.mediaType}),bytes=await blob.arrayBuffer();
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  signal.throwIfAborted();if(size!==attachment.byteLength||attachment.asset.assetId!=='sha256:'+hash||scope.session!==this.assetContext().session||scope.cavernId!==this.assetContext().cavernId)throw Error('Attachment integrity or Vault/session mismatch');return blob;
  }
  async diagnostic(event:unknown){if(!this.testLogging)return false;const r=await this.call('/diagnostics',event);return (await r.json()).logged===true;}
  async title(text:string,signal:AbortSignal){if(!this.ready)throw Error('Provider unavailable');return parseConversationTitle(await(await this.call('/utility/title',{text},signal)).json());}
@@ -59,9 +75,10 @@ export class DialecticProviderSession {
      }}finally{await reader.cancel().catch(()=>undefined);reader.releaseLock();}
      if(buffer.trim()||!turn)throw Error('Broker stream interrupted; no contribution committed.');sources.check();
      const attempt:LiveProvenance['attempts'][number]={receipt:turn.receipt,toolCalls:turn.calls,toolResultIds:[]};details.attempts.push(attempt);round++;
+     if(turn.attachments)details.attachments=attachments(turn.attachments);
      if(turn.calls.length){
       calls+=turn.calls.length;if(calls>liveLimits.calls||repair&&(!recoverSources||turn.calls.some(c=>!sourceRecoveryTools.some(tool=>tool===c.tool))))throw Error('DCP tool budget exceeded.');const results=[];
-      for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`,nativeResult=await sources.tool({...call,arguments:sources.xmlAuthoring?sources.xmlAuthoring.toolArguments(call.tool,call.arguments):call.arguments,id:toolId}),result=sources.xmlAuthoring?(call.tool==='describe_capabilities'?sources.xmlAuthoring.describe(nativeResult):sources.xmlAuthoring.project(nativeResult)):nativeResult;attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
+      for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`;if(call.tool==='create_attachment'){const value=await(await this.call('/exchange/'+id+'/artifact',{callId:call.id},signal)).json();if(value.attachment)details.attachments=attachments([...(details.attachments??[]),value.attachment]);attempt.toolResultIds.push(toolId);results.push({id:call.id,result:{status:value.attachment?'complete':'failed'}});continue;}const nativeResult=await sources.tool({...call,arguments:sources.xmlAuthoring?sources.xmlAuthoring.toolArguments(call.tool,call.arguments):call.arguments,id:toolId}),result=sources.xmlAuthoring?(call.tool==='describe_capabilities'?sources.xmlAuthoring.describe(nativeResult):sources.xmlAuthoring.project(nativeResult)):nativeResult;attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
       next={round,results};continue;
      }
      try{await validate?.(turn.text);prepared=!!details.continuity;if(prepared)retainedId=id;return turn.text;}

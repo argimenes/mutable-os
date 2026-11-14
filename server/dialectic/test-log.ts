@@ -11,7 +11,12 @@ export class DcpTestLog {
  private run=new Date().toISOString().replace(/[:.]/g,'-')+'-'+randomUUID();
  constructor(private root:()=>string,readonly enabled:boolean){}
  private clean(value:unknown,secrets:string[]=[]){
-  let text=JSON.stringify(value, (key,v)=>/^(authorization|cookie|set-cookie|(?:x-)?api[-_]?key|secret|token|x-dialectic-session)$/i.test(key)?'[REDACTED]':v);
+  function redact(this:any,key:string,v:any):any {
+   if(key==='body'&&typeof v==='string'){try{return JSON.stringify(JSON.parse(v),redact);}catch{return v;}}
+   if(key==='file_data'||key==='image_url'&&typeof v==='string'&&v.startsWith('data:')||key==='data'&&this?.type==='base64')return '[ATTACHMENT BYTES OMITTED]';
+   return /^(authorization|cookie|set-cookie|(?:x-)?api[-_]?key|secret|token|x-dialectic-session|x-mutable-cavern)$/i.test(key)?'[REDACTED]':v;
+  }
+  let text=JSON.stringify(value,redact);
   for(const secret of secrets.filter(s=>s.length>=8))text=text.split(secret).join('[REDACTED]');
   return text.replace(/sk-(?:proj-|ant-)?[a-zA-Z0-9_-]{16,}/g,'[REDACTED]');
  }

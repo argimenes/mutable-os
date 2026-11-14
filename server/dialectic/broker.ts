@@ -1,3 +1,6 @@
+import {attachmentRoutes,requestAttachmentContext,type AttachmentOptions} from './attachment-routes.js';
+import {resolveAttachments,createArtifact,type AttachmentContext} from './attachments.js';
+import {attachments,attachmentProviderProblem,type Attachment} from '../../src/features/dialectic/attachments-contract.js';
 import {smallerImageInput,smallerImageOutput,smallerImageLimits} from '../../src/features/dialectic/smaller-image-contract.js';
 import {DcpTestLog} from './test-log.js';
 import {allowsSourceRecovery,sourceRecoveryTools} from '../../src/features/dialectic/dcp/diagnostics.js';
@@ -11,9 +14,9 @@ import {liveLimits,providerSettings,type Provider,type ProviderCall,type Provide
 
 const loopback=(host:string)=>['localhost','127.0.0.1','[::1]','::1','::ffff:127.0.0.1'].includes(host);
 interface Session {utility?:AbortController;diagnosticId:string;origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
-interface Exchange {state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;recoverSources?:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
+interface Exchange {attachmentContext?:AttachmentContext;artifacts?:Map<string,{attachment?:Attachment;error?:string}>;state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;recoverSources?:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
 /** Local-only credential broker. No credential persistence, SQL, CORS or remote deployment mode. Optional diagnostics redact credentials. */
-export function createDialecticBroker(options:{fetcher?:typeof fetch;environment?:Record<string,string|undefined>;currentCavern?:()=>CavernScope|undefined;continuity?:boolean;testLogging?:boolean;logRoot?:string}={}){
+export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof fetch;environment?:Record<string,string|undefined>;currentCavern?:()=>CavernScope|undefined;continuity?:boolean;testLogging?:boolean;logRoot?:string}={}){
  const router=express.Router(),sessions=new Map<string,Session>(),environment=options.environment??process.env;
  const testLog=new DcpTestLog(()=>options.logRoot??options.currentCavern?.()?.path??process.cwd(),options.testLogging===true),fetcher=testLog.fetch(options.fetcher??fetch);
  const continuity=options.currentCavern&&options.continuity!==false?new OpenAIConversations(options.currentCavern,fetcher):undefined;
@@ -41,6 +44,7 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    void testLog.write('broker.request',{path:req.path,method:req.method,body:req.path==='/settings'?{settings:req.body?.settings}:req.body}).then(()=>next(),()=>res.status(503).json({error:'DCP diagnostic logging failed; check local disk access.'}));
   });
  });
+ attachmentRoutes(router,options);
  router.post('/diagnostics',(req,res)=>{res.json({logged:testLog.enabled});});
  router.post('/settings',(req,res)=>{
   const s:Session=res.locals.session;
@@ -95,8 +99,11 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
    const request=req.body?.request;if(!request||request.protocol!=='dcp/1.0'||!['4a-1','4b-1'].includes(request.profile)||typeof request.exchange!=='string'||request.exchange.length>128||typeof request.protocolKey?.text!=='string'||JSON.stringify(request).length>262144)throw Error('Invalid DCP request.');
    const key=s.keys[s.settings.provider]||environment[s.settings.provider==='openai'?'OPENAI_API_KEY':'ANTHROPIC_API_KEY'];if(!key)throw Error('Enter a session API key in AI settings.');
    if(req.body.continuity&&(!continuity||s.settings.provider!=='openai'))throw Error('Provider continuity is unavailable');
+   if(request.artifacts===1&&!options.artifactsEnabled||request.attachments?.length&&!options.attachmentsEnabled)throw Error('Attachment capability disabled');
+   const attachmentProblem=attachmentProviderProblem(s.settings.provider,attachments(request.attachments));if(attachmentProblem)throw Error(attachmentProblem);
    const id=randomBytes(16).toString('hex'),abort=new AbortController();
    const e:Exchange={state:conversation({...s.settings},request),key,abort,timer:setTimeout(()=>release(s,id),liveLimits.deadlineMs),busy:false,round:0,calls:0,pending:[],repaired:false,final:false};e.timer.unref();s.exchanges.set(id,e);
+   try{if(request.artifacts===1||request.attachments?.length){e.attachmentContext=requestAttachmentContext(options,req.header('X-Mutable-Cavern'));e.artifacts=new Map();e.state.attachmentInputs=await resolveAttachments(e.attachmentContext,request.attachments,abort.signal);}}catch(error){release(s,id);throw error;}
    if(req.body.continuity){
     e.manifest=req.body.continuity.manifest;
     try{e.receipt=await continuity!.begin(e.manifest!,req.body.continuity.plan,req.body.continuity.items,request.exchange,key,abort.signal,req.body.continuity.plan.contractDigest?e.state.system:undefined);}
@@ -113,15 +120,32 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
   const s:Session=res.locals.session,e=s.exchanges.get(String(req.params.id));
   try{if(!e?.receipt||!e.final||e.busy||!continuity)throw Error('Provider exchange is not ready for native acknowledgement');const result=await continuity.acknowledge(req.body.manifest,e.key,e.receipt);e.acknowledged=true;release(s,String(req.params.id));res.json(result);}catch(error){res.status(409).json({error:(error as Error).message});}
  });
+ router.post('/exchange/:id/artifact',async(req,res)=>{
+  const e:Exchange|undefined=res.locals.session.exchanges.get(String(req.params.id));
+  try{
+   if(!e||!e.state.artifacts||!e.attachmentContext||!e.artifacts||e.busy||e.final||e.repaired||e.abort.signal.aborted)throw Error('Artifact exchange unavailable');
+   const call=e.pending.find(c=>c.id===req.body.callId&&c.tool==='create_attachment');if(!call)throw Error('No matching artifact tool call');
+   e.attachmentContext.check();
+   if(!e.artifacts.has(call.id)){
+    e.busy=true;
+    try{const attachment=await createArtifact(e.attachmentContext,call.arguments,e.abort.signal);attachments([...e.artifacts.values()].flatMap(v=>v.attachment?[v.attachment]:[]).concat(attachment));e.artifacts.set(call.id,{attachment});}
+    catch(error){e.artifacts.set(call.id,{error:error instanceof Error?error.message:'File generation failed'});}
+    finally{e.busy=false;}
+   }
+   e.attachmentContext.check();e.abort.signal.throwIfAborted();res.json(e.artifacts.get(call.id));
+  }catch(error){res.status(409).json({error:error instanceof Error?error.message:'Artifact failed'});}
+ });
  router.post('/exchange/:id/turn',async(req,res)=>{
   const s:Session=res.locals.session,id=String(req.params.id),e=s.exchanges.get(id);
   if(e){const context=testLog.context.getStore();if(context){context.exchangeId=e.state.exchangeId;context.documentId=e.manifest?.documentId??context.documentId;}}
   if(!e||e.abort.signal.aborted){res.status(410).json({error:'Exchange expired or cancelled.'});return;}
   if(e.busy){res.status(409).json({error:'Provider round already running.'});return;}
   try{
+   e.attachmentContext?.check();
    if(req.body?.round!==e.round||e.round>=liveLimits.rounds)throw Error('Stale provider round or continuation budget exceeded.');
    if(e.pending.length){
     const results=req.body.results;if(!Array.isArray(results)||results.length!==e.pending.length||results.some((v,i)=>v.id!==e.pending[i].id)||req.body.repair)throw Error('Tool results do not match pending calls.');
+    for(const [i,call]of e.pending.entries())if(call.tool==='create_attachment'){const artifact=e.artifacts?.get(call.id);if(!artifact)throw Error('Tool results require completed artifact generation');results[i]={id:call.id,result:artifact.attachment?{status:'complete',filename:artifact.attachment.name,byteLength:artifact.attachment.byteLength,download:'host attachment card'}:{status:'failed',error:artifact.error}};}
     continuation(e.state,e.pending,results.map(v=>v.result));e.pending=[];
    }else if(e.final){if(!e.state.settings.repair||e.repaired||req.body.repair!==true)throw Error('Only one enabled validation repair is allowed.');e.recoverSources=allowsSourceRecovery(req.body.diagnostic);repair(e.state,req.body.diagnostic);e.repaired=true;e.final=false;}
    else if(e.round||req.body.results||req.body.repair)throw Error('Unexpected continuation.');
@@ -135,7 +159,8 @@ export function createDialecticBroker(options:{fetcher?:typeof fetch;environment
     e.calls+=turn.calls.length;if(e.calls>liveLimits.calls||e.repaired&&turn.calls.length&&(!e.recoverSources||turn.calls.some(c=>!sourceRecoveryTools.some(tool=>tool===c.tool))))throw Error('Provider tool budget exceeded.');
     await testLog.write('provider.turn',turn);e.pending=turn.calls;e.final=!turn.calls.length;
     if(e.final&&e.manifest&&e.receipt)await continuity!.prepared(e.manifest,e.key,e.receipt.exchangeId,e.repaired);
-    emit({type:'result',...turn});res.end();
+    e.attachmentContext?.check();
+    emit({type:'result',...turn,...(e.artifacts?{attachments:[...e.artifacts.values()].flatMap(v=>v.attachment?[v.attachment]:[])}:{})});res.end();
    }finally{res.off('close',closed);e.busy=false;}
   }catch(error){
    const receipt=error instanceof ProviderIncompleteError?error.receipt:undefined;

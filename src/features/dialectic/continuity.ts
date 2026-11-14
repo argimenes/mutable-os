@@ -1,3 +1,4 @@
+import {attachments} from './attachments-contract';
 import type {ReactiveEditor} from '../../reactive-editor/editor';
 import type {ContentRecord} from '../../block-tree/types';
 import {historyBaseJson,continuityLimits,type HistoryItem,type HistoryStamp,type ContinuityManifest,type ContinuityReceipt} from './dcp/continuity-contract';
@@ -35,7 +36,7 @@ export class ConversationHistory {
      const child=(pk:string)=>{const p=state.placements[pk];return p&&state.contents[p.contentKey]?project(state.contents[p.contentKey]):{unavailable:true};};
      return {blockId:r.payload.id,type:r.viewType,...(text?{text}:{}),...(m?.name?{name:m.name}:{}),...(annotations.length?{annotations}:{}),children:r.children.map(child),faces:Object.fromEntries(Object.entries(r.ownedRelations).map(([name,pk])=>[name,child(pk)]))};
     };
-    const content=JSON.stringify({kind:'native-contribution',documentId,id,participant:d.participant??{kind:d.author},createdUtc:d.createdUtc,ordinal:d.ordinal,replies:d.replies??[],composition:project(root)});
+    const content=JSON.stringify({kind:'native-contribution',documentId,id,participant:d.participant??{kind:d.author},createdUtc:d.createdUtc,ordinal:d.ordinal,replies:d.replies??[],...(d.attachments?.length?{attachments:attachments(d.attachments),attachmentAvailability:'Descriptors only in history. Original contents are supplied separately when this contribution is selected as context.'}:{}),composition:project(root)});
     const revision=root.revision;
     // Annotation strata may accumulate without changing what was said. Fresh DCP
     // retrieval carries their current state; they do not invalidate base history.

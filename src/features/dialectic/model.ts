@@ -13,6 +13,7 @@ export interface ContributionNotice extends Omit<import('../../interchange/diagn
  imageLoad?:{version:1;blockId:string;originalUrl:string;method:'browser';byteLength?:number;automaticRepairAttempted?:boolean;replacement?:{url:string;byteLength:number|null};events:{outcome:'failed'|'delayed'|'loaded'|'full-requested'|'smaller-requested'|'smaller-loaded'|'smaller-failed'|'repair-requested'|'repair-loaded'|'repair-failed'|'retry-requested';at:string;detail?:string;candidateUrl?:string;receipt?:import('./dcp/provider-contract').ProviderReceipt}[]};
 }
 export interface Contribution {
+ attachments?:import('./attachments-contract').Attachment[];
  version:1;kind:'contribution';state:'draft'|'receiving'|'committed';author:'human'|'mock'|'ai';participant?:Participant;
  ordinal?:number;createdUtc?:string;replies:ReplyTarget[];context?:ReplyTarget[];requestId?:string;
  discursiveReferences?:ReplyTarget[];dcp?:{version:1;profile:string;request:unknown;tools:unknown[];response:string;identityMap:unknown;annotationRefs?:{blockId:string;propertyId:string}[];intent:string;provider?:import('./dcp/provider-contract').LiveProvenance};

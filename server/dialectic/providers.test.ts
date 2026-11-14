@@ -252,6 +252,12 @@ it('keeps the initialised contract out of subsequent requests, preserves current
  const error=await providerTurn(state,'fixture',new AbortController().signal,()=>{},async()=>sse(events)).catch(e=>e);
  expect(error.receipt).toMatchObject({stop:'max_output_tokens',usage:{input_tokens:123,output_tokens:4096,reasoning_tokens:310,cached_input_tokens:64,cache_write_input_tokens:59}});expect(error.message).toContain('configured output limit 4096');
 });
+it.each(['openai','anthropic'] as const)('explicitly advertises PDF creation on continuing %s exchanges even after a prior refusal',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,artifacts:1});if(provider==='openai'){state.conversationId='conv_fixture';state.contractInitialised=true;}
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,'',{id:'make',name:'create_attachment',arguments:{filename:'report.pdf',format:'pdf',content:'A report'}})));
+ const turn=await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher),wire=JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+ expect(wire.tools.some((t:any)=>t.name==='create_attachment')).toBe(true);expect(wire.instructions??wire.system).toContain('you CAN create actual downloadable PDFs');expect(wire.instructions??wire.system).toContain('separate from the DCP native-block catalogue');expect(turn.calls[0].tool).toBe('create_attachment');
+});
 it('bounds SSE transport separately from output tokens and native response size',async()=>{
  const state=conversation({...defaultProviderSettings,maxOutputTokens:4096},request);
  // Representative verbose SSE envelope overhead, with a small native reply.
@@ -260,4 +266,12 @@ it('bounds SSE transport separately from output tokens and native response size'
  const turn=await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);expect(turn.receipt.stop).toBe('completed');
  const oversized=async()=>sse([...Array.from({length:2200},()=>padding[0]),...streamFixture('openai',JSON.stringify(plainContribution('exchange')))]);
  await expect(providerTurn(state,'fixture',new AbortController().signal,()=>{},oversized)).rejects.toThrow('byte budget');
+});
+
+it('rejects a complete Claude request above its encoded byte limit before contacting the provider',async()=>{
+ const state=conversation({...defaultProviderSettings,provider:'anthropic'},request),fetcher=vi.fn<typeof fetch>();
+ // UTF-8 byte size, not JS character count, governs the complete request.
+ state.input=[{role:'user',content:'é'.repeat(64000000)}];
+ await expect(providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher)).rejects.toThrow('complete request exceeds 128 MB');
+ expect(fetcher).not.toHaveBeenCalled();
 });

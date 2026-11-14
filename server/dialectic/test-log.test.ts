@@ -20,3 +20,9 @@ it('records provider HTTP errors and failed connections without leaking secrets'
 it('does no filesystem or stream work when the test flag is disabled',async()=>{
  const f=await fixture(false),fetcher=async()=>new Response('unchanged');expect(f.log.fetch(fetcher)).toBe(fetcher);await f.log.write('contribution',{text:'private'});expect(await readdir(f.root)).toEqual([]);
 });
+it('omits embedded attachment bytes from both provider wire formats while retaining useful request structure',async()=>{
+ const f=await fixture();
+ await f.log.write('provider.request',{headers:{'X-Mutable-Cavern':'private-vault-session'},body:JSON.stringify({input:[{content:[{type:'input_file',filename:'report.pdf',file_data:'data:application/pdf;base64,pdf-secret'},{type:'input_image',image_url:'data:image/png;base64,image-secret'},{type:'document',source:{type:'base64',media_type:'application/pdf',data:'anthropic-secret'}}]}]})});
+ const {rows}=await f.records(),wire=JSON.stringify(rows);for(const secret of ['pdf-secret','image-secret','anthropic-secret','private-vault-session'])expect(wire).not.toContain(secret);
+ const body=JSON.parse(rows[0].data.body);expect(body.input[0].content[0].filename).toBe('report.pdf');expect(body.input[0].content[0].file_data).toBe('[ATTACHMENT BYTES OMITTED]');
+});
