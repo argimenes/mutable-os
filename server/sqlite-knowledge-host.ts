@@ -10,6 +10,7 @@ import { entityCommand } from '../src/knowledge-sqlite/entities.mjs';
 import { NativeVaultStore } from './native-vault-store.mjs';
 import { createSavedIndexer } from './sqlite-saved-indexer';
 import {SqliteSavedScopes} from './sqlite-saved-scope';
+import {featureFlags} from '../src/configuration';
 import { normalizePolicy, policyKey } from '../src/knowledge/policy';
 
 const inside = (a:string,b:string) => a===b || b.startsWith(a+path.sep);
@@ -61,7 +62,7 @@ export class SqliteKnowledgeHost {
   private renew(token:string,l:any){clearTimeout(l.timer);l.timer=setTimeout(()=>{void this.release(token).catch(()=>{});},this.options.leaseMs??600000);l.timer.unref?.();}
   private entry(token:string){if(this.closed)throw Error('SQLite knowledge host closed');const l=this.leases.get(token);if(!l)throw Error('SQLite lease expired');this.renew(token,l);return l.entry;}
   private snapshot(e:any){return {session:this.session,vault:e.vault,vaultGuid:e.vaultGuid,epoch:e.epoch,readOnly:!!this.options.readOnly,pending:!!e.pending||this.active===e,coverage:structuredClone(e.coverage)};}
-  private invalidate(e:any,message:string){e.epoch++;e.fence=undefined;e.coverage=unknown(message);}
+  private invalidate(e:any,message:string){e.retrievalController?.abort();e.retrieval?.setAvailable(false);e.epoch++;e.fence=undefined;e.coverage=unknown(message);}
   private enqueue(e:any,full:boolean){if(this.closed||!e.client||this.options.readOnly)return;this.invalidate(e,'Saved reconciliation pending');e.pending=true;e.full ||= full;this.schedule();}
   private schedule(){if(this.closed||this.foregrounds||this.timer||this.running)return;this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},this.options.debounceMs??100);this.timer.unref?.();}
   // Only this short section, never the background CPU operation, blocks foreground storage.
@@ -94,12 +95,30 @@ export class SqliteKnowledgeHost {
           e.coverage={state:r.complete&&!status.incompleteResources&&!status.issueCount?'complete':'incomplete',complete:!!r.complete&&!status.incompleteResources&&!status.issueCount,
             resources:status.resources,incompleteResources:status.incompleteResources,issueCount:status.issueCount,
             diagnostics:[...r.issues.map((x:any)=>x.message),...status.issues.map((x:any)=>x.reason)].slice(0,32)};
+          if(e.coverage.complete)this.scheduleRetrieval(e);
         }catch(error){this.invalidate(e,String(error));if(controller.signal.aborted){this.metrics.cancellations++;e.full ||= full;}}
         finally{this.active=undefined;this.controller=undefined;}
       }
     };
     this.running=run();try{await this.running;}finally{this.running=undefined;if([...this.entries.values()].some(e=>e.pending))this.schedule();}
   }
+  /** Internal installation only. No browser route, automatic consent or foreground dependency. */
+  async attachRetrieval(token:string,service:any,consent?:any){
+    if(!featureFlags.derivedRetrieval)throw Error('Derived retrieval disabled');
+    const e=this.entry(token);if(service.vault!==e.root||service.vaultGuid!==e.vaultGuid)throw Error('Foreign retrieval service');
+    if(e.retrieval)throw Error('Retrieval service already attached');e.retrieval=service;e.retrievalConsent=consent;
+    if(e.coverage.complete)this.scheduleRetrieval(e);else service.setAvailable(false);
+  }
+  private scheduleRetrieval(e:any){
+    if(!e.retrieval)return;e.retrievalController?.abort();const controller=e.retrievalController=new AbortController();
+    e.retrieval.setAvailable(true);
+    // Starts outside source publication/foreground locks; the saved index never awaits it.
+    e.retrievalWork=new Promise<void>(resolve=>setImmediate(resolve)).then(()=>{
+      controller.signal.throwIfAborted();return e.retrieval.reconcile({consent:e.retrievalConsent,signal:controller.signal});
+    }).then((r:any)=>{if(e.retrievalController===controller)e.retrievalStatus=r;},(error:any)=>{if(e.retrievalController===controller)e.retrievalStatus={complete:false,error:String(error)};});
+  }
+  async retrievalStatus(token:string){const e=this.entry(token);return e.retrievalStatus??{complete:false,state:'unavailable'};}
+  async flushRetrieval(token:string){await this.entry(token).retrievalWork;return this.retrievalStatus(token);}
   async status(token:string){
     const e=this.entry(token),epoch=e.epoch;
     if(e.fence){try{await e.client.indexStatus();if(await this.store.readScopeFence(e.vault)!==e.fence&&epoch===e.epoch)this.invalidate(e,'Saved scope changed; Refresh required');}
@@ -298,12 +317,12 @@ export class SqliteKnowledgeHost {
   async release(token:string){
     this.semanticLeases.delete(token);
     return this.serialize(async()=>{const l=this.leases.get(token);if(!l)return {released:true};clearTimeout(l.timer);this.leases.delete(token);const e=l.entry;
-      if(--e.users===0){e.pending=false;if(this.active===e){this.controller?.abort(Error('Vault lease closed'));await this.running;}this.entries.delete(e.root);await e.client?.close();}
+      if(--e.users===0){e.pending=false;if(this.active===e){this.controller?.abort(Error('Vault lease closed'));await this.running;}this.entries.delete(e.root);e.retrievalController?.abort();await e.retrieval?.close();await e.client?.close();}
       return {released:true};});
   }
   async close(){this.closed=true;this.savedScopes?.close();clearTimeout(this.timer);this.controller?.abort(Error('Host shutdown'));await this.control;await this.foregroundTail;await this.running;
     for(const r of this.readers.values()){clearTimeout(r.timer);await r.opening.then(c=>c.close(),()=>{});}this.readers.clear();
-    for(const l of this.leases.values())clearTimeout(l.timer);this.leases.clear();for(const e of this.entries.values())await e.client?.close();this.entries.clear();}
+    for(const l of this.leases.values())clearTimeout(l.timer);this.leases.clear();for(const e of this.entries.values()){e.retrievalController?.abort();await e.retrieval?.close();await e.client?.close();}this.entries.clear();}
   router(){
     const router=Router();router.use(json({limit:'32kb'}));
     this.savedScopes??=new SqliteSavedScopes(this);router.use('/facts',this.savedScopes.router());

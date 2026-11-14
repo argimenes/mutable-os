@@ -18,3 +18,9 @@ await build({entryPoints:[fileURLToPath(new URL('worker-entry.mjs',source))],out
 await build({entryPoints:[fileURLToPath(new URL('../server/sqlite-saved-indexer.ts',import.meta.url))],outfile:fileURLToPath(new URL('../dist/server/sqlite-saved-indexer.js',import.meta.url)),bundle:true,platform:'node',format:'esm',target:'node22',external:['fs-ext']});
 await build({entryPoints:[fileURLToPath(new URL('../server/sqlite-knowledge-host.ts',import.meta.url))],outfile:fileURLToPath(new URL('../dist/server/sqlite-knowledge-host.js',import.meta.url)),bundle:true,platform:'node',format:'esm',target:'node22',external:['fs-ext','express'],plugins:[{name:'host-owned-worker-client',setup(b){b.onResolve({filter:/knowledge-sqlite\/client\.mjs$/},()=>({path:'./knowledge-sqlite/client.mjs',external:true}));}}]});
 await build({entryPoints:[fileURLToPath(new URL('../server/legacy-codex-import.ts',import.meta.url))],outfile:fileURLToPath(new URL('../dist/server/mutable-legacy-import.mjs',import.meta.url)),bundle:true,platform:'node',format:'esm',target:'node22',external:['fs-ext','express','better-sqlite3'],plugins:[{name:'import-owned-worker-client',setup(b){b.onResolve({filter:/knowledge-sqlite\/client\.mjs$/},()=>({path:'./knowledge-sqlite/client.mjs',external:true}));}}]});
+
+// Internal derived retrieval service: plain worker modules, native addon resolved at runtime.
+for(const name of ['client.mjs','worker.mjs','store.mjs','profile.mjs','provider.mjs','passages.mjs']){
+ const target=new URL('../dist/server/retrieval/'+name,import.meta.url);await mkdir(new URL('.',target),{recursive:true});
+ await copyFile(new URL('../src/retrieval/'+name,import.meta.url),target);
+}

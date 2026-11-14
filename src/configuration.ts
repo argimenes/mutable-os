@@ -115,6 +115,8 @@ export type FeatureFlags = Readonly<{
   nativeKnowledgeSaved: boolean;
   /** Vault-owned saved SQLite lifecycle only; does not change query/Entity providers. */
   sqliteKnowledge: boolean;
+  /** Internal consent-gated retrieval service; no Scry/Dialectic UI integration. */
+  derivedRetrieval: boolean;
   /** Canonical vault Entity resolver. Disabling never resumes legacy writes. */
   sqliteEntities: boolean;
   /** Typed canonical temporal, assertion and observation services. */
@@ -274,6 +276,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   nativeKnowledge: true,
   nativeKnowledgeSaved: false,
   sqliteKnowledge: true,
+  derivedRetrieval: true,
   sqliteEntities: true,
   sqliteSemanticServices: true,
   thesis: true,
