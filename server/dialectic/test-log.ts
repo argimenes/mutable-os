@@ -38,7 +38,8 @@ export class DcpTestLog {
    let response:Response;
    try{response=await fetcher(input,init);}catch(error){await log('provider.network-error',{error:String(error)});throw error;}
    await log('provider.response',{status:response.status,headers:Object.fromEntries(response.headers),contentType:response.headers.get('content-type'),providerRequestId:response.headers.get('x-request-id')??response.headers.get('request-id')});
-   if(!response.body)return response;
+   // Image payloads are retained by the attachment store, not duplicated in diagnostics.
+   if(!response.body||url==='https://api.openai.com/v1/images/generations')return response;
    const reader=response.body.getReader(),decoder=new TextDecoder();let text='',bytes=0,finished=false;
    const finish=async(status:string,error?:unknown)=>{if(finished)return;finished=true;text+=decoder.decode();await log('provider.response-body',{status,body:text,bytes,...(error?{error:String(error)}:{})});};
    // Capture the consumed wire stream, without teeing an unbounded second reader.

@@ -29,7 +29,7 @@ const proof:any={restored:!!restored,editor,session,port,rows,draft,text,host,ro
 (window as any).proof=proof;
 proof.seedHistory=()=>editor.commands.boundedStructuralTransaction('Drop regression fixture',()=>editor.commands.insert({id:crypto.randomUUID(),type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'committed',author:'human',ordinal:1,replies:[]}},children:[{id:crypto.randomUUID(),type:'standoff-editor-block',text:'Previously submitted contribution. Drop a PDF over this protected text.'}]},{kind:'before',anchorKey:draft().key}));
 proof.protectedText=()=>port.session()!.projection.node(rows().find(n=>(n.payload.metadata as any).dialectic.state==='committed')!.children[0])!;
-proof.type=()=>{editor.commands.replaceInlineRange(text().key,0,0,'Please read the attached files and create a PDF report and CSV result.');};
+proof.type=()=>{editor.commands.replaceInlineRange(text().key,0,0,'Please read the attached files and create a PDF report, CSV result and a garden image.');};
 proof.attachments=()=>rows().flatMap(n=>(n.payload.metadata as any).dialectic.attachments??[]);
 proof.save=()=>port.application.files!.save({folder:'isolated',filename:'Attachments.ink'});
 proof.roundTrip=()=>{const a=nativeBytes(captureNative(editor.repository.readState(),String(root().payload.id)));return new TextDecoder().decode(nativeBytes(decodeNative(a)))===new TextDecoder().decode(a);};

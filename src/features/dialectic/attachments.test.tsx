@@ -12,10 +12,10 @@ import {attachments,attachmentLimits,type Attachment} from './attachments-contra
 const cleanup:Array<()=>void>=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());vi.restoreAllMocks();vi.unstubAllGlobals();document.body.replaceChildren();});
 const file=(name='note.txt'):Attachment=>({version:1,id:crypto.randomUUID(),asset:{kind:'managed',cavernId:'vault',assetId:'sha256:'+'a'.repeat(64)},name,mediaType:'text/plain',byteLength:4,origin:'user',createdUtc:'2026-11-14T00:00:00Z'});
-async function setup(enabled=true,streaming=true){
+async function setup(enabled=true,streaming=true,imageGeneration=true){
  const controllers=vi.spyOn(controllerModule,'createDialecticController');
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:false,Error:'Isolated test'}))));
- const workspace=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{dialecticAttachments:enabled,dialecticArtifacts:enabled,dcpXmlStreaming:streaming,dialecticProviderContinuity:false,dialecticAutosave:false,dialecticAutomaticTitles:false,nativeKnowledge:false,sqliteKnowledge:false,dcpTestPhaseLogging:false,flintProbe:false}}),editor=workspace.editor;cleanup.push(()=>workspace.dispose());
+ const workspace=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{dialecticAttachments:enabled,dialecticArtifacts:enabled,dialecticImageGeneration:imageGeneration,dcpXmlStreaming:streaming,dialecticProviderContinuity:false,dialecticAutosave:false,dialecticAutomaticTitles:false,nativeKnowledge:false,sqliteKnowledge:false,dcpTestPhaseLogging:false,flintProbe:false}}),editor=workspace.editor;cleanup.push(()=>workspace.dispose());
  const host=document.body.appendChild(document.createElement('div'));cleanup.push(render(()=><WorkspacePresentationView session={workspace}/>,host));editor.installGateway(document);
  await editor.commandRegistry.execute('dialectic.open',{targetKey:workspace.projection.state.rootKey,args:undefined});await Promise.resolve();await Promise.resolve();
  const port=documentApplicationPorts(editor).ports().find(p=>p.applicationId==='dialectic')!;
@@ -83,13 +83,13 @@ it('rejects stale Vault results and preserves prior attachments when one of mult
  await c.files.attach([new File(['test'],'second.txt'),new File(['test'],'bad.pdf')]);expect(c.draft()!.data.attachments).toEqual([a]);expect(c.notice()).toContain('Invalid PDF');
  upload.mockImplementationOnce(async()=>{editor.setAssetContext(()=>({cavernId:'other',session:'changed'}));return file();});await c.files.attach([new File(['test'],'third.txt')]);expect(c.draft()!.data.attachments).toEqual([a]);expect(c.notice()).toContain('changed');
 });
-it.each([true,false])('carries selected files and Agent artifacts through the %s streaming path, resend and Undo',async streaming=>{
- const {c,editor}=await setup(true,streaming),input=file('input.txt'),output={...file('answer.pdf'),origin:'agent' as const,mediaType:'application/pdf'};
+it.each([[true,true],[false,true],[true,false],[false,false]])('carries files and artifacts through streaming=%s with image generation=%s, resend and Undo',async(streaming,imageGeneration)=>{
+ const {c,editor}=await setup(true,streaming,imageGeneration),input=file('input.txt'),output={...file('answer.pdf'),origin:'agent' as const,mediaType:'application/pdf'};
  vi.spyOn(DialecticProviderSession.prototype,'uploadAttachment').mockResolvedValue(input);await c.files.attach([new File(['test'],input.name)]);
  vi.spyOn(DialecticProviderSession.prototype,'configure').mockImplementation(async function(this:DialecticProviderSession,settings){this.settings=settings;this.ready=true;return true;});
  const requests:any[]=[];
  vi.spyOn(DialecticProviderSession.prototype,'transport').mockImplementation(function(this:DialecticProviderSession){const details={version:1 as const,adapterVersion:'4c-1' as const,settings:this.settings,attempts:[],cost:{status:'unknown' as const},attachments:[output]};return {details,run:async(request,_sources,_chunk,_signal,validate)=>{requests.push(request);const text='<response><p>Your file is ready.</p></response>';await validate?.(text);return text;},commit:async()=>{},cancel:async()=>{}};});
- await c.submitAndAsk();expect(c.notice()).toBe('');expect(requests[0].attachments).toEqual([input]);expect(c.committed().at(-1)!.data.attachments).toEqual([output]);
+ await c.submitAndAsk();expect(c.notice()).toBe('');expect(requests[0].attachments).toEqual([input]);expect(requests[0].imageGeneration).toBe(imageGeneration?1:undefined);expect(c.committed().at(-1)!.data.attachments).toEqual([output]);
  editor.repository.undo();expect(c.committed()).toHaveLength(1);editor.repository.redo();expect(c.committed().at(-1)!.data.attachments).toEqual([output]);
  await c.resend(c.committed()[0].id);expect(c.notice()).toBe('');expect(requests[1].attachments[0].asset).toEqual(input.asset);expect(requests[1].attachments[0].id).not.toBe(input.id);
 });

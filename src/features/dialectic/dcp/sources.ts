@@ -46,7 +46,7 @@ export class DcpSources {
  admitOwn<T>(operation:()=>T):T{this.check();this.ownAdmission=true;try{return operation();}finally{this.ownAdmission=false;}}
  private stale=false;private calls=0;private bytes=0;private deadline=Date.now()+30000;private stop:()=>void;
  constructor(readonly editor:ReactiveEditor,readonly owner:string,readonly roots:(fromOrdinal?:number)=>Iterable<BlockNode>,readonly node:(key:string)=>BlockNode|undefined,readonly parent:(key:string)=>BlockNode|undefined,readonly resolve:(t:ReplyTarget)=>Resolution,readonly signal:AbortSignal,readonly relations:(id:string)=>any[]=()=>[],deadlineMs=30000,readonly argumentsFor:(anchorId:string)=>string[]=()=>[],selection?:VocabularySelection,readonly references?:DialecticReferences){
-  this.deadline=Date.now()+Math.min(120000,Math.max(1,deadlineMs));
+  this.deadline=Date.now()+Math.min(300000,Math.max(1,deadlineMs));
   this.vocabulary=editor.features.dcpVocabularySelection?resolveVocabulary(editor,selection):undefined;
   if(editor.features.dcpCapabilityCatalogue)this.capabilities=capabilityCatalogue(editor,this.vocabulary);
   let rootNode=roots()[Symbol.iterator]().next().value as BlockNode|undefined;while(rootNode&&rootNode.viewType!=='document-block')rootNode=parent(rootNode.key);if(!rootNode)throw Error('Symposium placement unavailable');const rootKey=rootNode.key;

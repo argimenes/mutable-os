@@ -21,6 +21,7 @@ export type FeatureFlags = Readonly<{
   dialecticAutosave: boolean;
   dialecticAttachments: boolean;
   dialecticArtifacts: boolean;
+  dialecticImageGeneration: boolean;
   /** Isolated title utility; never a conversational contribution. */
   dialecticAutomaticTitles: boolean;
   /** Bounded native text flows. Opt-in pending browser qualification. */
@@ -230,6 +231,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialecticAutosave: false,
   dialecticAttachments: true,
   dialecticArtifacts: true,
+  dialecticImageGeneration: true,
   dialecticAutomaticTitles: true,
   virtualTextFlows: true,
   standoffCodeHighlighting: true,

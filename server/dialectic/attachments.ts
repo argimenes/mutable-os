@@ -1,3 +1,4 @@
+import {imageGenerationLimits} from '../../src/features/dialectic/image-generation-contract.js';
 import {randomUUID,createHash} from 'node:crypto';
 import {attachmentLimits,attachmentName,attachmentExtensions,attachments,type Attachment} from '../../src/features/dialectic/attachments-contract.js';
 // @ts-ignore Existing JavaScript image admission service.
@@ -20,8 +21,8 @@ export async function retainAttachment(context:AttachmentContext,name:string,byt
   if(inspection.pages>attachmentLimits.pdfPages)throw Error('Attachments support PDFs with at most 100 pages');
   metadata={mediaType:'application/pdf'};
  }else if(['png','jpg','jpeg'].includes(ext)){
-  if(bytes.length>5*1024*1024)throw Error('Image attachments are limited to 5 MiB');
-  metadata=await validateImportedImage(Buffer.from(bytes),signal);
+  if(bytes.length>(origin==='agent'?imageGenerationLimits.bytes:5*1024*1024))throw Error(origin==='agent'?'Generated image exceeds 20 MB':'Image attachments are limited to 5 MiB');
+  metadata=await validateImportedImage(Buffer.from(bytes),signal,origin==='agent'?'dialectic-generated':undefined);
   if(metadata.mediaType!==(ext==='png'?'image/png':'image/jpeg')||Number(metadata.width)>8000||Number(metadata.height)>8000)throw Error('Image type mismatch or dimensions exceed 8000 pixels');
  }else{
   if(bytes.length>attachmentLimits.textBytes)throw Error('Text attachments are limited to 200,000 UTF-8 bytes');
@@ -42,7 +43,7 @@ export async function retainAttachment(context:AttachmentContext,name:string,byt
  }catch(error){if((error as {code?:string}).code!=='ENOENT')throw error;}
  const lease=await context.store.begin();
  try{
-  const manifest=await context.store.stage(lease,Buffer.from(bytes),metadata,'dialectic-attachment');context.check();signal.throwIfAborted();
+  const manifest=await context.store.stage(lease,Buffer.from(bytes),metadata,origin==='agent'&&metadata.mediaType.startsWith('image/')?'dialectic-generated':'dialectic-attachment');context.check();signal.throwIfAborted();
   await context.store.publish(lease);context.check();signal.throwIfAborted();
   await context.store.finish(lease,'dialectic-attachment');context.check();
   return attachments([{version:1,id:randomUUID(),asset:{kind:'managed',cavernId:context.cavernId,assetId:manifest.assetId},name,mediaType:manifest.mediaType,byteLength:manifest.byteLength,origin,createdUtc:new Date().toISOString()}])[0];

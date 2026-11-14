@@ -12,6 +12,7 @@ export function ProviderSettingsView(props:{c:DialecticController}){
   <p>Keys entered here stay in the local server’s session memory. Server environment credentials remain available after reload or Forget keys. Credentials are never saved in this Document.</p>
   <Show when={c.editor.features.dialecticProviderContinuity&&settings().provider==='openai'}><p>Ask includes preceding contributions in this Document. OpenAI retains conversation memory; forgetting keys does not delete it. The Document remains authoritative.</p></Show>
   <Show when={JSON.stringify(settings())!==JSON.stringify(c.providerSettings())}><p role="status">Changes are not applied yet. Use session settings before submitting a contribution.</p></Show>
+  <Show when={c.editor.features.dialecticImageGeneration&&c.editor.features.dialecticArtifacts}><p>Ask for an image to generate a PNG attachment with OpenAI. Image generation uses your OpenAI API account and is billed separately from chat. With Anthropic chat, configure an OpenAI session key first, then switch back, or use the server’s OpenAI key.</p></Show>
   <form onSubmit={e=>{e.preventDefault();const secret=key.value;key.value='';void c.configureProvider(settings(),secret||undefined);}}>
    <fieldset disabled={c.busy()||c.providerConfiguring()}>
     <Show when={c.aiParticipants().length>1}><label>AI participant <select aria-label="AI participant" value={c.aiParticipant().id} onChange={e=>c.setSelectedAi(e.currentTarget.value)}><For each={c.aiParticipants()}>{p=><option value={p.id}>{p.name}</option>}</For></select></label></Show>

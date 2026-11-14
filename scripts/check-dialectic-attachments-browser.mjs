@@ -6,6 +6,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
 import express from 'express';
+import sharp from 'sharp';
 import {build} from 'esbuild';
 import {createServer} from 'vite';
 import {ManagedAssetStore} from '../server/managed-assets.mjs';
@@ -17,12 +18,14 @@ const profile=await mkdtemp(path.join(tmpdir(),'dialectic-files-')),vault=path.j
 await build({stdin:{contents:"export {NodePreparationExecutor} from './server/application-services/executor.ts';",resolveDir:process.cwd()},outfile:path.join(profile,'executor.mjs'),bundle:true,platform:'node',format:'esm',target:'node22'});
 const {NodePreparationExecutor}=await import(pathToFileURL(path.join(profile,'executor.mjs')).href),executor=new NodePreparationExecutor(undefined,path.resolve('dist/server/application-services/preparation-worker.mjs'));
 const cavernId=crypto.randomUUID(),session=crypto.randomUUID(),store=new ManagedAssetStore({root:vault,cavernId,session});
-let server,browser,socket,broker,saved;const wires=[];let turn=0,saves=0,uploads=0;
+const generatedPng=await sharp({create:{width:512,height:384,channels:3,background:'#42786b'}}).png().toBuffer();
+let server,browser,socket,broker,saved;const wires=[];let turn=0,saves=0,uploads=0,imageRequests=0;
 try{
- broker=createDialecticBroker({environment:{OPENAI_API_KEY:'isolated-fixture-key'},continuity:false,attachmentsEnabled:true,artifactsEnabled:true,attachmentContext:token=>{assert.equal(token,session);return {store,executor,cavernId,session,check(){}};},fetcher:async(_url,init)=>{
+ broker=createDialecticBroker({environment:{OPENAI_API_KEY:'isolated-fixture-key'},continuity:false,attachmentsEnabled:true,artifactsEnabled:true,imageGenerationEnabled:true,attachmentContext:token=>{assert.equal(token,session);return {store,executor,cavernId,session,check(){}};},fetcher:async(_url,init)=>{
+  if(String(_url)==='https://api.openai.com/v1/images/generations'){imageRequests++;await new Promise(resolve=>setTimeout(resolve,1000));return new Response(JSON.stringify({data:[{b64_json:generatedPng.toString('base64')}]}));}
   wires.push(JSON.parse(init.body));turn++;
-  const tool=turn===1?{id:'pdf',name:'create_attachment',arguments:{filename:'Report.pdf',format:'pdf',content:'Attachment report\nThe supplied file contains source evidence.'}}:turn===2?{id:'csv',name:'create_attachment',arguments:{filename:'Result.csv',format:'csv',content:'result\n42\n'}}:undefined;
-  return sse(streamFixture('openai',tool?'':'<response><p>The attached evidence has been read. Your Report.pdf and Result.csv are ready to download.</p></response>',tool));
+  const tool=turn===1?{id:'pdf',name:'create_attachment',arguments:{filename:'Report.pdf',format:'pdf',content:'Attachment report\nThe supplied file contains source evidence.'}}:turn===2?{id:'csv',name:'create_attachment',arguments:{filename:'Result.csv',format:'csv',content:'result\n42\n'}}:turn===3?{id:'image',name:'generate_image',arguments:{filename:'Garden.png',prompt:'A sunlit garden',size:'1024x1024',quality:'medium'}}:undefined;
+  return sse(streamFixture('openai',tool?'':'<response><p>The attached evidence has been read. Your Report.pdf, Result.csv and Garden.png are ready to download.</p></response>',tool));
  }});
  server=await createServer({cacheDir:'node_modules/.cache/dialectic-attachments',server:{host:'127.0.0.1',port:0},plugins:[{name:'isolated-attachments',configureServer(s){
   const app=express();app.use((req,_res,next)=>{if(req.path==='/attachments/upload')uploads++;next();});app.use(broker.router);s.middlewares.use('/api/dialectic',app);
@@ -62,19 +65,24 @@ try{
  const {root:dom}=await send('DOM.getDocument',{},sessionId),{nodeId}=await send('DOM.querySelector',{nodeId:dom.nodeId,selector:'[aria-label="Choose attachments"]'},sessionId);
  await send('DOM.setFileInputFiles',{nodeId,files:[pickerFile]},sessionId);await wait('proof.attachments().length===3');console.log('Drop confirmation and file picker passed');assert.equal(saves,0);
  await evaluate(`proof.type();document.querySelector('[aria-label="Submit contribution"]').click();true`);
- await wait(`proof.attachments().length===5 && !document.querySelector('[aria-label="Cancel response"]')`);
- console.log('Agent files received');assert(wires[0].input[0].content.some(p=>p.type==='input_file'));assert(JSON.stringify(wires[0]).includes('source evidence'));assert.equal(turn,3);assert.equal(saves,0);
+ await wait(`document.querySelector('.dialectic-response-progress')?.textContent.includes('Generating image')`);
+ await wait(`proof.attachments().length===6 && !document.querySelector('[aria-label="Cancel response"]')`);
+ console.log('Agent files received');assert(wires[0].input[0].content.some(p=>p.type==='input_file'));assert(JSON.stringify(wires[0]).includes('source evidence'));assert.equal(turn,4);assert.equal(imageRequests,1);assert.equal(saves,0);
+ await evaluate(`(()=>{[...document.querySelectorAll('.dialectic-attachment')].find(c=>c.querySelector('strong').textContent==='Garden.png').scrollIntoView({block:'center'});return true;})()`);
+ await wait(`document.querySelector('img[alt="Garden.png"]')?.naturalWidth===512`);
  assert.deepEqual(await evaluate('proof.boundedTyping()'),{snapshots:0,scans:0,requests:0});assert.equal(await evaluate('proof.roundTrip()'),true);
  await evaluate(`(()=>{const card=[...document.querySelectorAll('.dialectic-attachment')].find(c=>c.querySelector('strong').textContent==='Report.pdf');[...card.querySelectorAll('button')].find(b=>b.textContent==='Preview').click();})()`);
  await wait(`document.querySelector('.dialectic-attachment-preview .textLayer')?.textContent.includes('Attachment report')`);await evaluate(`document.querySelector('.dialectic-attachment-preview').scrollIntoView({block:'center'});true`);console.log('PDF preview rendered');
  await writeFile(path.join(directory,'pdf-preview.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
  await evaluate('proof.save()');assert.equal(saves,1);
- await send('Page.navigate',{url:origin+'/__attachment-proof?reload=1'},sessionId);await wait('window.proof?.ready && proof.restored && proof.attachments().length===5');
+ await send('Page.navigate',{url:origin+'/__attachment-proof?reload=1'},sessionId);await wait('window.proof?.ready && proof.restored && proof.attachments().length===6');
  const downloadDirectory=path.join(profile,'downloads');await mkdir(downloadDirectory);await send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:downloadDirectory});
  await evaluate(`(()=>{const card=[...document.querySelectorAll('.dialectic-attachment')].find(c=>c.querySelector('strong').textContent==='Result.csv');[...card.querySelectorAll('button')].find(b=>b.textContent==='Download').click();})()`);
  const {readFile}=await import('node:fs/promises');let downloaded;for(let i=0;i<200;i++){try{downloaded=await readFile(path.join(downloadDirectory,'Result.csv'),'utf8');break;}catch{await new Promise(r=>setTimeout(r,50));}}assert.equal(downloaded,'result\n42\n');
+ await evaluate(`(()=>{const card=[...document.querySelectorAll('.dialectic-attachment')].find(c=>c.querySelector('strong').textContent==='Garden.png');[...card.querySelectorAll('button')].find(b=>b.textContent==='Download').click();})()`);
+ let downloadedImage;for(let i=0;i<200;i++){try{downloadedImage=await readFile(path.join(downloadDirectory,'Garden.png'));break;}catch{await new Promise(r=>setTimeout(r,50));}}assert.deepEqual(downloadedImage,generatedPng);assert.equal(imageRequests,1);
  await writeFile(path.join(directory,'reopened.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
- const result={passed:true,realChromeDrop:true,dropOverProtectedHistory:true,largeUploadConfirmation:true,cancelBeforeUpload:true,pickerUpload:true,nativePdfInput:true,textInput:true,agentPdfAndCsv:true,pdfPreview:true,manualSaveCount:saves,reopenedAttachments:5,downloadedBytes:downloaded,boundedTyping:{snapshots:0,scans:0,requests:0},provider:'deterministic OpenAI wire fixture; no paid requests'};
+ const result={passed:true,realChromeDrop:true,dropOverProtectedHistory:true,largeUploadConfirmation:true,cancelBeforeUpload:true,pickerUpload:true,nativePdfInput:true,textInput:true,agentPdfAndCsv:true,pdfPreview:true,manualSaveCount:saves,reopenedAttachments:6,imageGeneration:true,automaticImagePreview:true,exactImageDownload:true,downloadedBytes:downloaded,boundedTyping:{snapshots:0,scans:0,requests:0},provider:'deterministic OpenAI wire fixture; no paid requests'};
  await writeFile(path.join(directory,'qualification.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }finally{socket?.close();browser?.kill('SIGTERM');broker?.dispose();await executor.close();await store.close();server?.httpServer?.closeAllConnections();let timer;await Promise.race([server?.close(),new Promise(resolve=>timer=setTimeout(resolve,5000))]);clearTimeout(timer);await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
 process.exit(0);

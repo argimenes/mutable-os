@@ -148,14 +148,14 @@ function Chrome(props:{c:DialecticController;children:JSX.Element;actions?:JSX.E
     <Show when={row()?.data.consumedContext}><details><summary>Material supplied to assistant</summary><p>Captured input, not evidence of internal model attention.</p><For each={row()?.data.consumedContext?.items}>{item=><div><button onClick={act(()=>c.inspect(item.target))}>{c.label(item.target)}</button><small>{item.origins.join(' + ')}</small><blockquote>{item.text}</blockquote></div>}</For></details></Show>
    </aside>
   </div>
-  <footer class="dialectic-status"><span>{modern&&c.saveState()?.pending?'Saving conversation…':c.busy()?'Preparing response…':c.port()?.application.files?.status()??'Ready'}{c.port()?.application.properties()?.unsaved?' · Unsaved changes':''}</span><span>{modern?'Dialectic':'Chronology ≠ context ≠ presentation'}</span></footer>
+  <footer class="dialectic-status"><span>{modern&&c.saveState()?.pending?'Saving conversation…':c.busy()?c.responseStatus():c.port()?.application.files?.status()??'Ready'}{c.port()?.application.properties()?.unsaved?' · Unsaved changes':''}</span><span>{modern?'Dialectic':'Chronology ≠ context ≠ presentation'}</span></footer>
  </section>;
 }
 
 /** Label existing container mounts without replacing children or creating a renderer fork. */
 export function ComposerProgress(props:{c:DialecticController}){
  return <><Show when={props.c.pasting()}><div class="dialectic-paste-progress" role="status"><span class="dialectic-spinner" aria-hidden="true"/>Pasting…</div></Show>
-  <Show when={props.c.busy()||props.c.providerConfiguring()}><div class="dialectic-response-progress" role="status" aria-label="Waiting for AI response"><span aria-hidden="true"><i>.</i><i>.</i><i>.</i></span><span class="dialectic-sr-only">Waiting for AI response</span></div></Show></>;
+  <Show when={props.c.busy()||props.c.providerConfiguring()}><div class="dialectic-response-progress" role="status" aria-label="Waiting for AI response"><span aria-hidden="true"><i>.</i><i>.</i><i>.</i></span><span class="dialectic-sr-only">{props.c.responseStatus()}</span><Show when={props.c.responseStatus()==='Generating image…'}><span>Generating image…</span></Show></div></Show></>;
 }
 const decorationOwners=new WeakMap<DialecticController,{users:number;dispose:()=>void}>();
 function decorate(c:DialecticController){

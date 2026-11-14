@@ -9,7 +9,7 @@ export const defaultProviderSettings:ProviderSettings={provider:'openai',model:d
 export const outputTokenLimits={min:512,max:16384};
 export const liveLimits={deadlineMs:120000,calls:6,rounds:8,bytes:262144,wireBytes:1048576};
 export const responseIntents=['reply','acknowledge','share','create','propose','challenge','qualify','clarify','compare','elaborate','synthesise','ask','answer','other'];
-export interface ProviderCall {id:string;tool:'create_attachment'|'read_source'|'search_symposium'|'list_text_blocks'|'describe_capabilities'|'search_entities';arguments:Record<string,unknown>}
+export interface ProviderCall {id:string;tool:'generate_image'|'create_attachment'|'read_source'|'search_symposium'|'list_text_blocks'|'describe_capabilities'|'search_entities';arguments:Record<string,unknown>}
 export interface ProviderTurn {text:string;calls:ProviderCall[];receipt:ProviderReceipt;attachments?:import('../attachments-contract').Attachment[]}
 export interface ProviderReceipt {provider:Provider;model:string;responseId?:string;startedUtc:string;completedUtc:string;usage:Record<string,number>|null;stop:string;cost:{status:'unknown'}}
 /** Browser phase durations, not provider generation time or proof of a displayed frame.

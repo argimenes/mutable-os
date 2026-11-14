@@ -2,7 +2,7 @@ import multer from 'multer';
 import type {Router} from 'express';
 import {attachments,attachmentLimits} from '../../src/features/dialectic/attachments-contract.js';
 import {retainAttachment,resolveAttachments,type AttachmentContext} from './attachments.js';
-export interface AttachmentOptions {attachmentsEnabled?:boolean;artifactsEnabled?:boolean;attachmentContext?:(session:string)=>AttachmentContext|undefined}
+export interface AttachmentOptions {attachmentsEnabled?:boolean;artifactsEnabled?:boolean;imageGenerationEnabled?:boolean;attachmentContext?:(session:string)=>AttachmentContext|undefined}
 export function requestAttachmentContext(options:AttachmentOptions,session:unknown){
  if(typeof session!=='string'||!session)throw Error('Open a Vault before using attachments');
  const context=options.attachmentContext?.(session);if(!context)throw Error('Attachment storage unavailable');context.check();return context;

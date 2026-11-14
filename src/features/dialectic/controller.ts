@@ -1,3 +1,4 @@
+import {imageGenerationLimits} from './image-generation-contract';
 import {createAttachments} from './attachments';
 import {attachments,attachmentProviderProblem,type Attachment} from './attachments-contract';
 import {retrievalForeground} from '../../application/retrieval-client';
@@ -56,7 +57,8 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  let presentationTrace:ReturnType<typeof observeContributionPresentation>|undefined;
  let requestAbort:AbortController|undefined;
  let nativeReceiving:{stop:(reason:string)=>void}|undefined;
- const [dcpPreview,setDcpPreview]=createSignal('');
+ const [dcpPreview,setDcpPreview]=createSignal(''),[responseStatus,setResponseStatus]=createSignal('Preparing response…');
+ const updateResponseStatus=(value:string,event?:string)=>{if(event==='status')setResponseStatus(value);else if(event==='start')setResponseStatus('Preparing response…');};
  const [lastProviderExchange,setLastProviderExchange]=createSignal<LiveProvenance>();
  let previewTimer:ReturnType<typeof setTimeout>|undefined,previewText='';
  const clearPreview=()=>{if(previewTimer!==undefined)clearTimeout(previewTimer);previewTimer=undefined;previewText='';setDcpPreview('');};
@@ -300,6 +302,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const exchangeTarget=()=>reply()??(inspection()&&!['entity','argument-relation','entity-relation'].includes(inspection()!.kind)?inspection():undefined)??(frontier()?target(frontier()!.id):undefined);
  const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget,live?:LiveProvenance,lifecycle?:{commit():Promise<void>;cancel():Promise<void>})=>{
   if(busy())return;
+  const deadlineMs=live?(editor.features.dialecticImageGeneration&&editor.features.dialecticArtifacts&&editor.readAssetContext().session?imageGenerationLimits.deadlineMs:liveLimits.deadlineMs):30000;
   const participant={...aiParticipant()};let ticket=0,sources:DcpSources|undefined,requestForInspection:unknown;
   try{
    setNotice('');clearPreview();guard();const to=explicit??exchangeTarget();
@@ -307,8 +310,8 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    const selectedTargets=structuredClone(unwrap(context())),targets=[to,...selectedTargets.filter(t=>targetKey(t)!==targetKey(to))];
    for(const t of targets)if(!['gloss','entity','argument-relation','entity-relation'].includes(t.kind))requireCommittedTarget(t);
    const captured=capture(targets),source=session()!,exchangeId=crypto.randomUUID();
-   clearPreview();ticket=++generation;presentationTrace?.dispose();presentationTrace=undefined;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setDcpPreview('Preparing structured exchange…');
-   sources=new DcpSources(editor,resourceId(),function*(fromOrdinal=1){const rows=committed();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((rows[mid].data.ordinal??0)<fromOrdinal)lo=mid+1;else hi=mid;}for(let i=lo;i<rows.length;i++)yield source.projection.node(rows[i].key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),live?liveLimits.deadlineMs:30000,id=>references()!.argumentsFor(id),vocabularySelection(),references());
+   clearPreview();ticket=++generation;presentationTrace?.dispose();presentationTrace=undefined;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setResponseStatus('Preparing response…');setDcpPreview('Preparing structured exchange…');
+   sources=new DcpSources(editor,resourceId(),function*(fromOrdinal=1){const rows=committed();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((rows[mid].data.ordinal??0)<fromOrdinal)lo=mid+1;else hi=mid;}for(let i=lo;i<rows.length;i++)yield source.projection.node(rows[i].key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),deadlineMs,id=>references()!.argumentsFor(id),vocabularySelection(),references());
    for(const key of captured.revisions.keys())sources.fence(key);
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
    const structuralContext=await sources.manifest([primary,...selected],editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics?64000-8192:64000);
@@ -322,7 +325,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     const selectedFiles=attachments([...chosen.values()]),problem=attachmentProviderProblem(providerSettings().provider,selectedFiles);if(problem)throw Error(problem);
     Object.assign(request,{attachments:selectedFiles});
    }
-   if(editor.features.dialecticArtifacts&&editor.readAssetContext().session)Object.assign(request,{artifacts:1});
+   if(editor.features.dialecticArtifacts&&editor.readAssetContext().session)Object.assign(request,{artifacts:1,...(editor.features.dialecticImageGeneration?{imageGeneration:1}:{})});
    requestForInspection=request;Object.assign(request,{structuralContext,task:{action:'respond',focus:primary,participantRequest:structuralContext.sources[0]?.sourceAuthor==='human'?{handle:primary,text:captured.items[0].text}:null}});
    if(editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics){enableSemanticWorkspace(request);Object.assign(request,{semanticWorkspace:await semanticWorkspace(sources,participant.id,structuralContext.sources.map((s:any)=>s.target).filter(Boolean))});}
    if(!alive||ticket!==generation||session()!==source)return;sources.check();
@@ -372,7 +375,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     };
     nativeReceiving={stop:finish};
     try{
-     raw=await receive(transport,request,sources,(value,event)=>{if(!alive||ticket!==generation||done)return;streamPreview(value,ticket);if(event==='status')return;if(event==='start'){if(node)throw new NativeStreamError('A native response cannot be replaced after insertion');stream.stop();stream=createStream();return;}stream.write(value);},requestAbort,async text=>{summary=await stream.finish(text);},liveLimits.deadlineMs);
+     raw=await receive(transport,request,sources,(value,event)=>{if(!alive||ticket!==generation||done)return;updateResponseStatus(value,event);streamPreview(value,ticket);if(event==='status')return;if(event==='start'){if(node)throw new NativeStreamError('A native response cannot be replaced after insertion');stream.stop();stream=createStream();return;}stream.write(value);},requestAbort,async text=>{summary=await stream.finish(text);},deadlineMs);
      if(!done){summary=await stream.finish(raw);finish();clearPreview();if(node)setInspection({kind:'contribution',resourceId:owner,blockId:id});await lifecycle?.commit();}
     }catch(error){const message=error instanceof Error?error.message:String(error);finish(message);if(node)throw new NativeStreamError('Response interrupted; received native content was retained and can be undone. '+message.replace(/Nothing was committed\.?/g,''));throw error;}finally{finish('Response interrupted');}
     return;
@@ -387,7 +390,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     try{prepared=await prepareDcp(input,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock',participant.id,emptySemanticFieldsVersion,proactiveSemantics,!!sources!.xmlAuthoring);}finally{localTimings.prepareMs+=performance.now()-started;}
    };
    if(live)await logNative(resourceId(),committed().map(row=>source.projection.node(row.key)!.contentKey),'exchange.native-context');
-   const raw=await receive(transport,request,sources,value=>{if(alive&&ticket===generation)streamPreview(value,ticket);},requestAbort,live?validate:undefined,live?liveLimits.deadlineMs:30000);
+   const raw=await receive(transport,request,sources,(value,event)=>{if(alive&&ticket===generation){updateResponseStatus(value,event);streamPreview(value,ticket);}},requestAbort,live?validate:undefined,deadlineMs);
    if(!alive||ticket!==generation)return;
    if(session()!==source)throw Error('Conversation changed; DCP response discarded');guard();sources.check();
    if(!prepared)await validate(raw);const result=prepared!,d=draft();if(!d)throw Error('Restore the draft before adding a response');
@@ -494,7 +497,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   signal.throwIfAborted();if(!alive||resourceId()!==document)throw Error('Conversation changed.');
   return result;
  };
- return {files,fileProblem,attachmentBlob,smallerImage,contentsRows,contentsActivity,contentsSynopsis,inspectContents,inspectEntityMention,titleNotice:titles.notice,titlePending:titles.pending,saveState,retrySave,pasting,activityInspection,inspectActivity,inspectActivityItem,contributionActivity,activityDiagnostics,vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
+ return {responseStatus,files,fileProblem,attachmentBlob,smallerImage,contentsRows,contentsActivity,contentsSynopsis,inspectContents,inspectEntityMention,titleNotice:titles.notice,titlePending:titles.pending,saveState,retrySave,pasting,activityInspection,inspectActivity,inspectActivityItem,contributionActivity,activityDiagnostics,vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
   references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,aiParticipants,aiParticipant,setSelectedAi,historyDiagnostics:history.diagnostics,
   dispose(){files.dispose();titles.dispose();submissionSave.dispose();sequences.dispose();alive=false;cancel();providers.dispose();history.dispose();choices.clear();pending.clear();preview.dispose();for(const entry of activities.values())entry.dispose();activities.clear();},capture,
  };

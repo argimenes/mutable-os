@@ -4,6 +4,7 @@ export const attachmentLimits={count:8,fileBytes:100000000,totalBytes:100000000,
 export const attachmentSize=(bytes:number)=>bytes>=1000000?`${(bytes/1000000).toFixed(2)} MB`:bytes>=1000?`${(bytes/1000).toFixed(1)} kB`:`${bytes} bytes`;
 /** The local retention limit is separate from provider request limits. */
 export function attachmentProviderProblem(provider:'openai'|'anthropic',files:readonly Pick<Attachment,'mediaType'|'byteLength'>[]):string|undefined {
+ if(provider==='anthropic'&&files.some(f=>f.mediaType.startsWith('image/')&&f.byteLength>5*1024*1024))return 'Claude accepts images up to 5 MiB each. Choose a smaller image for this request; the original remains available to download.';
  const pdfBytes=files.filter(f=>f.mediaType==='application/pdf').reduce((n,f)=>n+f.byteLength,0);
  if(provider==='openai'&&pdfBytes>=50000000)return 'OpenAI accepts less than 50 MB of PDF inputs per request. Split or reduce the selected PDFs to use this provider.';
  // Base64 adds one third to the first-party Claude 128 MB request budget.

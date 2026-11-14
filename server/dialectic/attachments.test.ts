@@ -3,7 +3,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {randomUUID,createHash} from 'node:crypto';
+import {randomUUID,createHash,randomBytes} from 'node:crypto';
 import express from 'express';
 import sharp from 'sharp';
 // @ts-ignore Existing immutable original store.
@@ -63,9 +63,9 @@ it('creates real PDFs in the bounded worker and exact UTF-8/JSON artifacts, with
  await expect(createArtifact(context,{filename:'../bad.pdf',format:'pdf',content:'x'},signal)).rejects.toThrow();
  await expect(createArtifact(context,{filename:'bad.json',format:'json',content:'no'},signal)).rejects.toThrow();
 },15000);
-async function brokerFixture(provider:'openai'|'anthropic'='openai',enabled=true){
+async function brokerFixture(provider:'openai'|'anthropic'='openai',enabled=true,images=false,openaiKey=true){
  const f=await storage(),fetcher=vi.fn<typeof fetch>();
- const broker=createDialecticBroker({fetcher,environment:{},attachmentsEnabled:enabled,artifactsEnabled:enabled,attachmentContext:session=>{if(session!==f.context.session)throw Error('stale session');return f.context;}}),app=express();app.use('/broker',broker.router);
+ const broker=createDialecticBroker({fetcher,environment:images&&openaiKey?{OPENAI_API_KEY:'fixture-image-key'}:{},imageGenerationEnabled:images,attachmentsEnabled:enabled,artifactsEnabled:enabled,attachmentContext:session=>{if(session!==f.context.session)throw Error('stale session');return f.context;}}),app=express();app.use('/broker',broker.router);
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));stops.push(()=>broker.dispose(),()=>new Promise<void>(resolve=>server.close(()=>resolve())));
  const origin='http://127.0.0.1:'+(server.address() as any).port;let token='';
  const call=(path:string,body?:unknown,extra:Record<string,string>={})=>fetch(origin+'/broker'+path,{method:'POST',headers:{origin,'x-mutable-dialectic':'1','x-dialectic-session':token,'X-Mutable-Cavern':f.context.session,...(body instanceof FormData?{}:{'content-type':'application/json'}),...extra},...(body===undefined?{}:{body:body instanceof FormData?body:JSON.stringify(body)})});
@@ -104,4 +104,37 @@ it('retains and resolves an exact 100 MB PDF through the real worker and store, 
 it('rejects provider-incompatible local attachments before contacting a provider',async()=>{
  const f=await brokerFixture(),ref={version:1,id:'fixture',name:'large.pdf',asset:{kind:'managed',cavernId:f.context.cavernId,assetId:'sha256:'+'a'.repeat(64)},origin:'user',mediaType:'application/pdf',byteLength:60000000,createdUtc:new Date().toISOString()};
  const response=await f.call('/exchange',{request:{protocol:'dcp/1.0',profile:'4b-1',exchange:'x',protocolKey:{text:'x'},attachments:[ref]}});expect(response.status).toBe(400);expect((await response.json()).error).toContain('50 MB');expect(f.fetcher).not.toHaveBeenCalled();
+});
+
+it.each(['openai','anthropic'] as const)('generates and retains an image requested by %s, then downloads identical bytes without another generation',async provider=>{
+ const f=await brokerFixture(provider,true,true),png=await sharp({create:{width:32,height:24,channels:3,background:'#207050'}}).png().toBuffer();
+ const args={filename:'Garden.png',prompt:'A garden in sunlight',size:'1024x1024',quality:'medium'};
+ f.fetcher.mockResolvedValueOnce(sse(streamFixture(provider,'',{id:'image',name:'generate_image',arguments:args}))).mockResolvedValueOnce(new Response(JSON.stringify({data:[{b64_json:png.toString('base64')}]}))).mockResolvedValueOnce(sse(streamFixture(provider,JSON.stringify(plainContribution('exchange','Your Garden.png is attached.')))));
+ const start=await(await f.call('/exchange',{request:{protocol:'dcp/1.0',profile:'4b-1',exchange:'exchange',protocolKey:{text:'Respond in DCP'},artifacts:1,imageGeneration:1}})).json(),path='/exchange/'+start.id;
+ expect(start.error).toBeUndefined();expect(await(await f.call(path+'/turn',{round:0})).text()).toContain('generate_image');
+ const artifact=await(await f.call(path+'/artifact',{callId:'image'})).json();expect(artifact.error).toBeUndefined();expect(artifact.attachment).toMatchObject({origin:'agent',mediaType:'image/png',name:'Garden.png'});
+ expect(f.fetcher.mock.calls[1][0]).toBe('https://api.openai.com/v1/images/generations');expect(JSON.parse(String(f.fetcher.mock.calls[1][1]?.body))).toMatchObject({prompt:args.prompt,n:1,output_format:'png'});
+ expect(new Headers(f.fetcher.mock.calls[1][1]?.headers).get('authorization')).toBe('Bearer '+(provider==='openai'?'fixture-only-key':'fixture-image-key'));
+ expect(await(await f.call(path+'/artifact',{callId:'image'})).json()).toEqual(artifact);expect(f.fetcher).toHaveBeenCalledTimes(2);
+ const result=await(await f.call(path+'/turn',{round:1,results:[{id:'image',result:{filename:'forged.png'}}]})).text();expect(result).toContain(artifact.attachment.asset.assetId);expect(String(f.fetcher.mock.calls[2][1]?.body)).toContain('Garden.png');expect(String(f.fetcher.mock.calls[2][1]?.body)).not.toContain('forged.png');
+ const download=await f.call('/attachments/download',{attachment:artifact.attachment});expect(Buffer.from(await download.arrayBuffer())).toEqual(png);expect(f.fetcher).toHaveBeenCalledTimes(3);
+},15000);
+it('does not advertise image generation when the server flag is off, even if the client requests it',async()=>{
+ const f=await brokerFixture();f.fetcher.mockResolvedValueOnce(sse(streamFixture('openai',JSON.stringify(plainContribution('exchange')))));
+ const start=await(await f.call('/exchange',{request:{protocol:'dcp/1.0',profile:'4b-1',exchange:'exchange',protocolKey:{text:'DCP'},artifacts:1,imageGeneration:1}})).json();await(await f.call('/exchange/'+start.id+'/turn',{round:0})).text();
+ expect(JSON.parse(String(f.fetcher.mock.calls[0][1]?.body)).tools.some((t:any)=>t.name==='generate_image')).toBe(false);
+});
+
+it('retains generated PNGs above the ordinary import ceiling without widening local image uploads',async()=>{
+ const {context}=await storage(),signal=new AbortController().signal;
+ const png=await sharp(randomBytes(2100*2100*3),{raw:{width:2100,height:2100,channels:3}}).png().toBuffer();expect(png.length).toBeGreaterThan(10*1024*1024);
+ await expect(retainAttachment(context,'Upload.png',png,'user',signal)).rejects.toThrow('5 MiB');
+ const ref=await retainAttachment(context,'Generated.png',png,'agent',signal);expect(ref.byteLength).toBe(png.length);expect(ref.asset.assetId).toBe('sha256:'+createHash('sha256').update(png).digest('hex'));
+ const [{bytes}]=await resolveAttachments(context,[ref],signal);expect(createHash('sha256').update(bytes).digest('hex')).toBe(ref.asset.assetId.slice(7));
+},20000);
+
+it('does not offer image generation to Claude without an OpenAI credential',async()=>{
+ const f=await brokerFixture('anthropic',true,true,false);f.fetcher.mockResolvedValueOnce(sse(streamFixture('anthropic',JSON.stringify(plainContribution('exchange')))));
+ const start=await(await f.call('/exchange',{request:{protocol:'dcp/1.0',profile:'4b-1',exchange:'exchange',protocolKey:{text:'DCP'},artifacts:1,imageGeneration:1}})).json();await(await f.call('/exchange/'+start.id+'/turn',{round:0})).text();
+ expect(JSON.parse(String(f.fetcher.mock.calls[0][1]?.body)).tools.some((t:any)=>t.name==='generate_image')).toBe(false);expect(f.fetcher.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages');
 });

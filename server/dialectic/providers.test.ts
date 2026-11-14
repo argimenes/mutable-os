@@ -275,3 +275,10 @@ it('rejects a complete Claude request above its encoded byte limit before contac
  await expect(providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher)).rejects.toThrow('complete request exceeds 128 MB');
  expect(fetcher).not.toHaveBeenCalled();
 });
+
+it.each(['openai','anthropic'] as const)('advertises image generation and current instructions on continuing %s conversations',async provider=>{
+ const state=conversation({...defaultProviderSettings,provider},{...request,artifacts:1,imageGeneration:1});if(provider==='openai'){state.conversationId='conv_fixture';state.contractInitialised=true;}
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,'',{id:'image',name:'generate_image',arguments:{filename:'Forest.png',prompt:'A forest',size:'auto',quality:'auto'}})));
+ const turn=await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher),wire=JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+ expect(wire.tools.some((t:any)=>t.name==='generate_image')).toBe(true);expect(wire.instructions??wire.system).toContain('Current image-generation capability');expect(turn.calls[0].tool).toBe('generate_image');
+});

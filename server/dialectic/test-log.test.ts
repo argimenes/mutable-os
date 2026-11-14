@@ -26,3 +26,9 @@ it('omits embedded attachment bytes from both provider wire formats while retain
  const {rows}=await f.records(),wire=JSON.stringify(rows);for(const secret of ['pdf-secret','image-secret','anthropic-secret','private-vault-session'])expect(wire).not.toContain(secret);
  const body=JSON.parse(rows[0].data.body);expect(body.input[0].content[0].filename).toBe('report.pdf');expect(body.input[0].content[0].file_data).toBe('[ATTACHMENT BYTES OMITTED]');
 });
+
+it('passes large image responses through without logging base64 or applying the text stream budget',async()=>{
+ const f=await fixture(),wire=JSON.stringify({data:[{b64_json:'a'.repeat(4*1024*1024)}]});
+ const response=await f.log.fetch(async()=>new Response(wire))('https://api.openai.com/v1/images/generations',{headers:{authorization:'Bearer fixture-image-secret'},body:JSON.stringify({prompt:'A garden'})});
+ expect(await response.text()).toBe(wire);const {rows}=await f.records();expect(rows.some(r=>r.event==='provider.response')).toBe(true);expect(rows.some(r=>r.event==='provider.response-body')).toBe(false);expect(JSON.stringify(rows)).not.toContain('fixture-image-secret');
+});

@@ -1,3 +1,5 @@
+import {generateImage} from './image-generation.js';
+import {imageGenerationLimits} from '../../src/features/dialectic/image-generation-contract.js';
 import {attachmentRoutes,requestAttachmentContext,type AttachmentOptions} from './attachment-routes.js';
 import {resolveAttachments,createArtifact,type AttachmentContext} from './attachments.js';
 import {attachments,attachmentProviderProblem,type Attachment} from '../../src/features/dialectic/attachments-contract.js';
@@ -14,7 +16,7 @@ import {liveLimits,providerSettings,type Provider,type ProviderCall,type Provide
 
 const loopback=(host:string)=>['localhost','127.0.0.1','[::1]','::1','::ffff:127.0.0.1'].includes(host);
 interface Session {utility?:AbortController;diagnosticId:string;origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
-interface Exchange {attachmentContext?:AttachmentContext;artifacts?:Map<string,{attachment?:Attachment;error?:string}>;state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;recoverSources?:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
+interface Exchange {imageKey?:string;attachmentContext?:AttachmentContext;artifacts?:Map<string,{attachment?:Attachment;error?:string}>;state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;recoverSources?:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
 /** Local-only credential broker. No credential persistence, SQL, CORS or remote deployment mode. Optional diagnostics redact credentials. */
 export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof fetch;environment?:Record<string,string|undefined>;currentCavern?:()=>CavernScope|undefined;continuity?:boolean;testLogging?:boolean;logRoot?:string}={}){
  const router=express.Router(),sessions=new Map<string,Session>(),environment=options.environment??process.env;
@@ -101,8 +103,10 @@ export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof
    if(req.body.continuity&&(!continuity||s.settings.provider!=='openai'))throw Error('Provider continuity is unavailable');
    if(request.artifacts===1&&!options.artifactsEnabled||request.attachments?.length&&!options.attachmentsEnabled)throw Error('Attachment capability disabled');
    const attachmentProblem=attachmentProviderProblem(s.settings.provider,attachments(request.attachments));if(attachmentProblem)throw Error(attachmentProblem);
+   const imageKey=request.artifacts===1&&request.imageGeneration===1&&options.imageGenerationEnabled?(s.keys.openai||environment.OPENAI_API_KEY):undefined;
+   const effectiveRequest={...request,imageGeneration:imageKey?1:undefined};
    const id=randomBytes(16).toString('hex'),abort=new AbortController();
-   const e:Exchange={state:conversation({...s.settings},request),key,abort,timer:setTimeout(()=>release(s,id),liveLimits.deadlineMs),busy:false,round:0,calls:0,pending:[],repaired:false,final:false};e.timer.unref();s.exchanges.set(id,e);
+   const e:Exchange={imageKey,state:conversation({...s.settings},effectiveRequest),key,abort,timer:setTimeout(()=>release(s,id),imageKey?imageGenerationLimits.deadlineMs:liveLimits.deadlineMs),busy:false,round:0,calls:0,pending:[],repaired:false,final:false};e.timer.unref();s.exchanges.set(id,e);
    try{if(request.artifacts===1||request.attachments?.length){e.attachmentContext=requestAttachmentContext(options,req.header('X-Mutable-Cavern'));e.artifacts=new Map();e.state.attachmentInputs=await resolveAttachments(e.attachmentContext,request.attachments,abort.signal);}}catch(error){release(s,id);throw error;}
    if(req.body.continuity){
     e.manifest=req.body.continuity.manifest;
@@ -124,11 +128,11 @@ export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof
   const e:Exchange|undefined=res.locals.session.exchanges.get(String(req.params.id));
   try{
    if(!e||!e.state.artifacts||!e.attachmentContext||!e.artifacts||e.busy||e.final||e.repaired||e.abort.signal.aborted)throw Error('Artifact exchange unavailable');
-   const call=e.pending.find(c=>c.id===req.body.callId&&c.tool==='create_attachment');if(!call)throw Error('No matching artifact tool call');
+   const call=e.pending.find(c=>c.id===req.body.callId&&(c.tool==='create_attachment'||c.tool==='generate_image'&&e.state.imageGeneration&&e.imageKey));if(!call)throw Error('No matching artifact tool call');
    e.attachmentContext.check();
    if(!e.artifacts.has(call.id)){
     e.busy=true;
-    try{const attachment=await createArtifact(e.attachmentContext,call.arguments,e.abort.signal);attachments([...e.artifacts.values()].flatMap(v=>v.attachment?[v.attachment]:[]).concat(attachment));e.artifacts.set(call.id,{attachment});}
+    try{const attachment=call.tool==='generate_image'?await generateImage(e.attachmentContext,call.arguments,e.imageKey!,e.abort.signal,fetcher):await createArtifact(e.attachmentContext,call.arguments,e.abort.signal);attachments([...e.artifacts.values()].flatMap(v=>v.attachment?[v.attachment]:[]).concat(attachment));e.artifacts.set(call.id,{attachment});}
     catch(error){e.artifacts.set(call.id,{error:error instanceof Error?error.message:'File generation failed'});}
     finally{e.busy=false;}
    }
@@ -145,7 +149,7 @@ export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof
    if(req.body?.round!==e.round||e.round>=liveLimits.rounds)throw Error('Stale provider round or continuation budget exceeded.');
    if(e.pending.length){
     const results=req.body.results;if(!Array.isArray(results)||results.length!==e.pending.length||results.some((v,i)=>v.id!==e.pending[i].id)||req.body.repair)throw Error('Tool results do not match pending calls.');
-    for(const [i,call]of e.pending.entries())if(call.tool==='create_attachment'){const artifact=e.artifacts?.get(call.id);if(!artifact)throw Error('Tool results require completed artifact generation');results[i]={id:call.id,result:artifact.attachment?{status:'complete',filename:artifact.attachment.name,byteLength:artifact.attachment.byteLength,download:'host attachment card'}:{status:'failed',error:artifact.error}};}
+    for(const [i,call]of e.pending.entries())if(call.tool==='create_attachment'||call.tool==='generate_image'){const artifact=e.artifacts?.get(call.id);if(!artifact)throw Error('Tool results require completed artifact generation');results[i]={id:call.id,result:artifact.attachment?{status:'complete',filename:artifact.attachment.name,byteLength:artifact.attachment.byteLength,download:'host attachment card'}:{status:'failed',error:artifact.error}};}
     continuation(e.state,e.pending,results.map(v=>v.result));e.pending=[];
    }else if(e.final){if(!e.state.settings.repair||e.repaired||req.body.repair!==true)throw Error('Only one enabled validation repair is allowed.');e.recoverSources=allowsSourceRecovery(req.body.diagnostic);repair(e.state,req.body.diagnostic);e.repaired=true;e.final=false;}
    else if(e.round||req.body.results||req.body.repair)throw Error('Unexpected continuation.');

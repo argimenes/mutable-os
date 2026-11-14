@@ -1,7 +1,9 @@
-import {For,Show,createMemo,createSignal,onCleanup} from 'solid-js';
+import {For,Show,createMemo,createSignal,onCleanup,onMount} from 'solid-js';
 import type {DialecticController} from './controller';
 import {attachmentAccept,attachmentSize,type Attachment} from './attachments-contract';
 import type {PdfViewer} from '../../pdf/viewer';
+// Preview only mounted, visible generated images; serialize automatic reads.
+let imagePreviewQueue=Promise.resolve();
 
 export function AttachFiles(props:{c:DialecticController}){
  let input!:HTMLInputElement;const c=props.c;
@@ -27,15 +29,17 @@ export function AttachmentCards(props:{c:DialecticController;items:Attachment[];
 }
 function AttachmentCard(props:{c:DialecticController;file:Attachment;draft:boolean}){
  const [busy,setBusy]=createSignal(false),[error,setError]=createSignal(''),[preview,setPreview]=createSignal(false),[url,setUrl]=createSignal(''),[page,setPage]=createSignal(1),[pages,setPages]=createSignal(1),[text,setText]=createSignal('');
- let host!:HTMLDivElement,viewer:PdfViewer|undefined,abort:AbortController|undefined,alive=true;
+ let card!:HTMLElement,host!:HTMLDivElement,viewer:PdfViewer|undefined,abort:AbortController|undefined,alive=true;
  const close=()=>{abort?.abort();viewer?.destroy();viewer=undefined;if(url())URL.revokeObjectURL(url());setUrl('');setPreview(false);setBusy(false);};
  onCleanup(()=>{alive=false;close();});
+ const downloadUrl=(object:string)=>{const a=document.createElement('a');a.href=object;a.download=props.file.name;document.body.append(a);a.click();a.remove();};
  const open=async(download:boolean)=>{
+  if(download&&preview()&&url()){downloadUrl(url());return;}
   close();setError('');setBusy(true);const current=abort=new AbortController();
   try{
    const blob=await props.c.attachmentBlob(props.file,current.signal);current.signal.throwIfAborted();if(!alive)return;
    const object=URL.createObjectURL(blob);setUrl(object);
-   if(download){const a=document.createElement('a');a.href=object;a.download=props.file.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(object),1000);setUrl('');}
+   if(download){downloadUrl(object);setTimeout(()=>URL.revokeObjectURL(object),1000);setUrl('');}
    else{
     setPreview(true);
     if(props.file.mediaType==='application/pdf'){
@@ -46,8 +50,15 @@ function AttachmentCard(props:{c:DialecticController;file:Attachment;draft:boole
   }catch(e){if(alive&&!current.signal.aborted)setError(e instanceof Error?e.message:String(e));}
   finally{if(alive&&abort===current)setBusy(false);}
  };
+ onMount(()=>{
+  if(props.file.origin!=='agent'||!props.file.mediaType.startsWith('image/'))return;
+  const show=()=>{imagePreviewQueue=imagePreviewQueue.then(async()=>{if(alive&&!preview()&&!busy())await open(false);});};
+  if(typeof IntersectionObserver==='undefined'){show();return;}
+  const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();show();}},{rootMargin:'100px'});
+  observer.observe(card);onCleanup(()=>observer.disconnect());
+ });
  const changePage=async(value:number)=>{if(busy()||value<1||value>pages())return;setBusy(true);try{await viewer?.page(value-1,1);setPage(value);}catch(e){setError(String(e));}finally{setBusy(false);}};
- return <article class="dialectic-attachment" onPointerDown={e=>e.stopPropagation()}>
+ return <article ref={card} class="dialectic-attachment" onPointerDown={e=>e.stopPropagation()}>
   <strong>{props.file.name}</strong><small>{Math.ceil(props.file.byteLength/1024)} KiB · {props.draft?'Local · sent on Submit':props.file.origin==='agent'?'Generated file':'Attached file'}</small>
   <div><button disabled={busy()} onClick={()=>void open(true)}>Download</button><button disabled={busy()} onClick={()=>void open(false)}>Preview</button><Show when={props.draft}><button disabled={!!props.c.files.pending()||props.c.busy()} onClick={()=>props.c.files.remove(props.file.id)}>Remove</button></Show><Show when={busy()}><button onClick={close}>Cancel</button></Show></div>
   <Show when={error()}><p role="alert">{error()}</p></Show>
