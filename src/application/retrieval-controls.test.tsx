@@ -12,3 +12,15 @@ it('first-use refusal is explicit and later permission changes separate Document
  const click=(text:string)=>{([...document.querySelectorAll('button')].find(b=>b.textContent===text) as HTMLButtonElement).click();};click('Not now');await vi.waitFor(()=>expect(state.decision).toBe('declined'));expect(last).toMatchObject({indexDocuments:false,embedQueries:false});await vi.waitFor(()=>expect(document.querySelector('dialog')).toBeNull());
  launch();await vi.waitFor(()=>expect(document.querySelector('dialog')).toBeTruthy());const boxes=document.querySelectorAll<HTMLInputElement>('input[type=checkbox]');boxes[0].click();click('Apply permissions');await vi.waitFor(()=>expect(last.indexDocuments).toBe(true));expect(last.embedQueries).toBe(false);expect(document.querySelector('dialog')?.textContent).toContain('Unsaved content');
 });
+it('shows remaining applied allowances and never substitutes zero when accounting is unavailable',async()=>{
+ HTMLDialogElement.prototype.showModal=function(){this.open=true;};HTMLDialogElement.prototype.close=function(){this.open=false;};
+ let state:any={decision:'enabled',documents:true,queries:false,documentTokens:50000,queryTokens:5000,documentTokensUsed:25042,queryTokensUsed:0,indexed:229,known:2314,provider:{configured:true},index:{complete:false,state:'indexing'}};
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({Success:true,Data:state}))));
+ let launch:()=>void=()=>{};clean.push(render(()=><RetrievalControls launcher={f=>{launch=f;}}/>,document.body));launch();
+ await vi.waitFor(()=>expect(document.querySelector('dialog')?.textContent).toContain('24958 remaining of 50000 tokens'));
+ (document.querySelector('input[type=number]') as HTMLInputElement).value='100';document.querySelector('input[type=number]')!.dispatchEvent(new Event('input',{bubbles:true}));
+ expect(document.querySelector('dialog')?.textContent).toContain('24958 remaining');
+ state={...state,documentTokensUsed:null,indexed:null,index:{state:'unavailable'}};launch();
+ await vi.waitFor(()=>expect(document.querySelector('dialog')?.textContent).toContain('usage and remaining allowance unavailable'));
+ expect(document.querySelector('dialog')?.textContent).toContain('unknown indexed');
+});

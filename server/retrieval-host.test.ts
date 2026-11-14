@@ -62,3 +62,13 @@ it('rejects externally changed, missing, pending-save and symlink sources before
  await fs.rename(file,path.join(f.root,'real.json'));await fs.symlink('real.json',file);expect((await query()).results).toHaveLength(0);
  expect((await f.host.status()).documentTokensUsed).toBe(0);
 });
+it('reports unavailable accounting after worker failure and explicitly resumes without renewing consent',async()=>{
+ const f=await fixture();await f.save('A distinctive saved passage.');
+ await f.host.configure({indexDocuments:true,embedQueries:false,documentTokens:2000,queryTokens:500});await f.settle();
+ const before=await f.host.status(),prefs=await fs.readFile(path.join(f.root,'.mutable/retrieval-preferences.json'),'utf8');
+ await (f.host as any).service.terminate();
+ const failed=await f.host.status();expect(failed.index.state).toBe('unavailable');expect(failed.documentTokensUsed).toBeNull();expect(failed.indexed).toBeNull();
+ await f.host.refresh();await f.sql.flush();await f.settle();
+ const resumed=await f.host.status();expect(resumed.indexed).toBe(1);expect(resumed.documentTokensUsed).toBe(before.documentTokensUsed);expect(resumed.error).toBe('');
+ expect(await fs.readFile(path.join(f.root,'.mutable/retrieval-preferences.json'),'utf8')).toBe(prefs);
+});

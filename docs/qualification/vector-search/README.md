@@ -1,5 +1,8 @@
 # Vector retrieval investigation evidence
 
+**Current milestone status: A–C accepted; Milestone C formally accepted and closed on 14 November 2026.** See the [final acceptance record](../../development/NATIVE_VECTOR_SEARCH_RAG_MILESTONE_C_FINAL_ACCEPTANCE.md) for evidence and non-blocking future improvements. No further qualification or paid calls are required; subsequent work is deferred pending separate authorisation. The investigation and earlier experiment entries below are historical.
+
+
 Local measurements on 13 November 2026. No hosted embeddings, local-model downloads, application integration, or writes to existing `.ink`/SQLite files.
 
 - `exact-probe.json`: synthetic Float32 exact retrieval on temporary disk databases, source-ID lookup, rollback and reopening. This does not measure semantic relevance, ANN, native range resolution or browser latency.

@@ -1,5 +1,8 @@
 # Native Vector Search and RAG Investigation
 
+**Current status — 14 November 2026:** Milestones A–C have been accepted. Milestone C is formally closed; see the [final acceptance record](NATIVE_VECTOR_SEARCH_RAG_MILESTONE_C_FINAL_ACCEPTANCE.md). Its remaining limitations are non-blocking future improvement opportunities. No further development, testing or paid calls will be initiated for this milestone. The investigation and proposed sequence below are retained as historical design context; optional extensions require separate authorisation.
+
+
 14 November 2026 · Investigation and measurements begun 13 November · Investigation only · Implementation requires review
 
 Mutable can add useful semantic retrieval without changing `.ink`, replacing SQLite, or involving a generative model in ordinary search. Start with **sqlite-vec 0.1.9 exact search**, ordinary passage metadata, and a separately configured embedding provider. Use **structure-aware passages**, combine vector results with existing lexical and semantic retrieval, and keep indexing outside editing and save completion.

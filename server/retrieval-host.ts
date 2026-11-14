@@ -17,7 +17,7 @@ export class CavernRetrieval {
  }
  resume(){if(this.preferences.decision==='enabled')void this.ensure().catch(e=>{this.lastError=String(e);});}
  private providerAvailable(){return !!process.env.OPENAI_API_KEY||!!this.options.providerModule;}
- private lastError='';
+ private lastError='';private serviceError='';
  private settings(){return {indexing:this.preferences.decision==='enabled'&&!!this.preferences.documents&&this.providerAvailable(),delayMs:this.options.delayMs??750,beforeDocument:async(signal:AbortSignal)=>{while(Date.now()<this.quietUntil){signal.throwIfAborted();await new Promise(r=>setTimeout(r,100));}}};}
  private async ensure(){
   if(this.closed)throw Error('Cavern retrieval closed');if(this.opening)return this.opening;if(this.service)return;
@@ -44,11 +44,11 @@ export class CavernRetrieval {
   });this.tail=work.then(()=>{},()=>{});return work;
  }
  async status(){
-  let index:any,storage:any;try{if(this.service){index=await this.sql.retrievalStatus(this.lease!);storage=await this.service.status();}}catch(e){this.lastError=String(e);}
-  const spent=(grant:any)=>{const row=storage?.usage?.find((r:any)=>r.grantId===grant?.id);return Math.max(row?.reserved??0,row?.actual??0);};
-  return {vaultGuid:this.vaultGuid,decision:this.preferences.decision,provider:{kind:'hosted',name:'OpenAI',model:'text-embedding-3-small',configured:!!process.env.OPENAI_API_KEY||!!this.options.providerModule,localAvailable:false},documents:!!this.preferences.documents,queries:!!this.preferences.queries,documentTokens:this.preferences.documents?.maxTokens??50000,queryTokens:this.preferences.queries?.maxTokens??5000,documentTokensUsed:spent(this.preferences.documents),queryTokensUsed:spent(this.preferences.queries),index:index??{complete:false,state:'not-indexed'},indexed:storage?.resources??0,known:storage?.knownResources??null,error:this.lastError,coverage:'Saved Documents only; unsaved content is not covered',reauthorizationRequired:!!storage&&[this.preferences.documents,this.preferences.queries].some(g=>g&&g.indexId!==storage.indexId)};
+  let index:any,storage:any;try{if(this.service){index=await this.sql.retrievalStatus(this.lease!);storage=await this.service.status();this.serviceError='';}}catch(e){this.serviceError=String(e);index={...index,state:'unavailable',complete:false};}
+  const spent=(grant:any)=>{if(!storage)return grant?null:0;const row=storage?.usage?.find((r:any)=>r.grantId===grant?.id);return Math.max(row?.reserved??0,row?.actual??0);};
+  return {vaultGuid:this.vaultGuid,decision:this.preferences.decision,provider:{kind:'hosted',name:'OpenAI',model:'text-embedding-3-small',configured:!!process.env.OPENAI_API_KEY||!!this.options.providerModule,localAvailable:false},documents:!!this.preferences.documents,queries:!!this.preferences.queries,documentTokens:this.preferences.documents?.maxTokens??50000,queryTokens:this.preferences.queries?.maxTokens??5000,documentTokensUsed:spent(this.preferences.documents),queryTokensUsed:spent(this.preferences.queries),index:index??{complete:false,state:'not-indexed'},indexed:storage?.resources??null,known:storage?.knownResources??null,error:this.serviceError||this.lastError,coverage:'Saved Documents only; unsaved content is not covered',reauthorizationRequired:!!storage&&[this.preferences.documents,this.preferences.queries].some(g=>g&&g.indexId!==storage.indexId)};
  }
- async refresh(){await this.ensure();if(this.preferences.decision!=='enabled')throw Error('Indexing authorisation required');void this.sql.refresh(this.lease!).catch(e=>{this.lastError=String(e);});return this.status();}
+ async refresh(){const work=this.tail.then(async()=>{if(this.preferences.decision!=='enabled')throw Error('Indexing authorisation required');if(this.service?.isClosed()){clearInterval(this.timer);if(this.lease){await this.sql.detachRetrieval(this.lease);await this.sql.release(this.lease);}this.service=undefined;this.lease=undefined;}await this.ensure();void this.sql.refresh(this.lease!).catch(e=>{this.lastError=String(e);});return this.status();});this.tail=work.then(()=>{},()=>{});return work;}
  async query(input:any,signal?:AbortSignal){
   if(typeof input.query!=='string'||input.query.length>1000||!input.query.trim()||!['lexical','hybrid'].includes(input.strategy)||input.resourceId!==undefined&&typeof input.resourceId!=='string')throw Error('Invalid retrieval query');
   if(input.strategy==='hybrid'&&!this.preferences.queries)throw Error('Query embedding authorisation required — Workspace → Index Cavern');

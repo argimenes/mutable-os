@@ -66,6 +66,8 @@ The test provider is not shipped by the server build. It performs no network req
 
 ## Milestone C integration
 
+**Accepted and closed by the user on 14 November 2026.** See the [final acceptance record](../../docs/development/NATIVE_VECTOR_SEARCH_RAG_MILESTONE_C_FINAL_ACCEPTANCE.md). Partial production coverage, native opening latency, serial retrieval calls and incomplete end-to-end answer testing remain non-blocking future improvements. No further milestone testing or paid calls are planned; subsequent development requires separate authorisation.
+
 `server/retrieval-host.ts` owns `.mutable/retrieval-preferences.json` and its explicit server-derived grants. A scope grant adds `scope: {version:1, kind:'saved-vault-maintenance'|'interactive-queries', vaultGuid}`. It is still bound to the provider/model, Vault, index lifetime, expiry and cumulative token cap. Maintenance authorises future saved revisions within that Vault; it never authorises query uploads. Revocation cancels pending work. Renewal is an explicit UI action permitting another stated allowance, including retrying an unknown outcome; background work never renews a grant. Missing/rebuilt indexes require a new explicit grant.
 
 The current storage topology is retained: one Vault per opened Cavern, independent consent/indexes on Cavern switching, no nested Vault enrollment. `Workspace → Index Cavern` provides first-use acceptance/refusal, permissions, caps, progress, errors and Refresh/resume. Refusal requires neither a provider nor a working retrieval sidecar. Hosted credentials use the server's `OPENAI_API_KEY`; no local provider is advertised as installed and there is no hosted fallback.

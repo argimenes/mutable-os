@@ -89,3 +89,9 @@ test('foreground pause defers maintenance without blocking lexical queries or in
  const consent={approved:true,indexId:(await s.status()).indexId,id:'paused',vaultGuid:f.vaultGuid,model:profile.model,maxTokens:500,expiresAt:'9999-12-31T23:59:59Z',documents:[{resourceId:'resource',contentHash:saved.hash}]};
  const start=performance.now(),job=s.index('resource',{consent});const lexical=await s.query('ship',{strategy:'lexical'});assert.equal(lexical.results.length,1);assert.equal((await s.status()).receipts.length,0);await job;assert(performance.now()-start>=240);assert.equal((await s.status()).receipts.length,1);
 });
+test('maintenance stops on worker loss and subsequent requests retain the terminal failure',async t=>{
+ const f=await fixture(t,{delayMs:300});await f.save();const s=await f.open();let entered;
+ const started=new Promise(r=>entered=r),job=s.reconcile({onProgress:()=>entered()});
+ const failed=assert.rejects(job,/worker stopped|cancelled|superseded/i);await started;await new Promise(r=>setTimeout(r,30));await s.terminate();await failed;
+ assert.equal(s.isClosed(),true);await assert.rejects(s.status(),/worker stopped/i);
+});

@@ -86,7 +86,7 @@ function createCompletionModel(props:{editor:ReactiveEditor;panel:PanelSession;c
   <div class="autocomplete-actions"><button onClick={close}>Cancel</button><Show when={s.source.brackets&&!props.editor.features.scryProvisionalCells}><button onClick={()=>s.close(true)}>Keep literal brackets</button></Show></div>
   </section><section class="autocomplete-candidates" aria-label="Scry matches">
   <Show when={s.state.retrievalStatus}><p role="status">{s.state.retrievalStatus}</p></Show>
-  <div role="status" aria-live="polite">{s.state.busy?'Searching…':`${s.state.rows.length} candidates`}</div>
+  <div role="status" aria-live="polite">{s.state.kind==='block'&&s.state.pending?'Opening selected passage…':s.state.busy?'Searching…':`${s.state.rows.length} candidates`}</div>
   <div id={id} role="listbox" aria-label="Completion candidates" class="autocomplete-results"><For each={s.state.rows}>{(row,i)=><button id={`${id}-${i()}`} role="option" aria-selected={s.state.selected===row.id} aria-disabled={row.disabled} disabled={s.state.pending||row.disabled} onPointerDown={e=>e.preventDefault()} onClick={()=>{s.select(row.id);void s.choose();}} onMouseMove={()=>s.select(row.id)}><strong>{row.name}</strong><small>{row.reason}{s.state.kind==='block'?'':` · ${row.id}`}</small></button>}</For></div>
   </section></div>}>
    <EntitySearch api={data.api} panel={{...props.panel,data:data.entityData()}} completion={{session:s,target:data.entityData,adjust:data.adjust,controls:data.controls}}/>
