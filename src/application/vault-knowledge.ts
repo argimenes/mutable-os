@@ -1,3 +1,5 @@
+import {policyKey} from '../knowledge/policy';
+import {retrievalRequest} from './retrieval-client';
 import {graphemeBoundaries} from '../input/graphemes';
 import type { FactsQueryProvider, SavedSourceEvidence } from './facts-query-provider';
 import type { ReactiveEditor } from '../reactive-editor/editor';
@@ -144,6 +146,24 @@ export class VaultKnowledge implements ApplicationKnowledge {
     await this.refresh(hit.stamp);if(this.hits.get(id)!==hit)throw new Error('Search result expired');
     const target=this.target(hit.target,hit.stamp.vault);if(target.blockId!==hit.target.blockId||target.location!==hit.target.location)throw new Error('Search target identity or location changed');
     await this.host.navigate(target,hit.passage,()=>{try{return this.hits.get(id)===hit&&this.valid(hit.stamp);}catch{return false;}});
+  };
+  /** Saved retrieval carries evidence only; reuse verified Open and native reveal. */
+  activateRetrieval=async(hit:any,current:()=>boolean)=>{
+    const selected=current;current=()=>selected()&&this.live&&(!this.native.knowledgeEvidence(hit?.source?.resourceId).location||!this.native.isDirty(hit.source.resourceId));
+    this.host.guard();if(!this.live||!current()||!this.host.activateSaved)throw Error('Retrieval navigation unavailable');
+    const source=hit?.source,span=source?.spans?.[0];if(!span||span.resourceId!==source.resourceId||!source.path||!source.rootBlockId)throw Error('Invalid retrieved passage');
+    if(source.format&&source.format!=='mutable-document')throw Error('Open this legacy source manually before navigating');
+    const native=this.native.knowledgeEvidence(source.resourceId);
+    if(native.pending||native.location&&(this.native.isDirty(source.resourceId)||native.byteHash!==source.sourceHash))throw Error('Saved passage differs from the live Document; save or use live search');
+    await retrievalRequest('verify',{vaultGuid:source.vaultGuid,resourceId:source.resourceId,stamp:hit.stamp});
+    if(!current())throw Error('Retrieval navigation superseded');
+    const parts=source.path.split('/'),filename=parts.pop(),location={folder:parts.join('/')||'.',filename};
+    const target={documentId:source.resourceId,blockId:source.rootBlockId,title:filename,location:source.path};
+    const prefix='mutable-saved-sql-v3:';if(typeof source.extractionProfile!=='string'||!source.extractionProfile.startsWith(prefix))throw Error('Unsupported saved extraction profile');
+    const policy=policyKey(JSON.parse(source.extractionProfile.slice(prefix.length)));
+    const evidence={resourceId:source.resourceId,rootBlockId:source.rootBlockId,location,byteHash:source.sourceHash,policy};
+    const exact=hit.text.slice(span.chunkStart,span.chunkEnd);
+    await this.host.activateSaved(target,{blockId:span.blockGuid,start:span.start,end:span.end,coordinate:span.coordinate},evidence,current,exact);
   };
   /** Explicit lookup pool; consumers filter this bounded pool without rescanning on typing. */
   completionTargets=async()=>{this.host.guard();const vault=this.host.vault();await vault.ensureVerified();this.host.guard();if(!this.live||this.host.vault()!==vault)throw Error("Document picker context changed");return this.scope(vault);};

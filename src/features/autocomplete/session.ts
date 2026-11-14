@@ -13,6 +13,8 @@ export interface CompletionHost {
   historyScope(): Promise<string>;
   documentEntities(): CompletionCandidate[];
   documents(): Promise<CompletionCandidate[]>;
+  passages?(query:string,strategy:'lexical'|'hybrid',signal:AbortSignal):Promise<{rows:CompletionCandidate[];status:string}>;
+  navigatePassage?(row:CompletionCandidate,current:()=>boolean):Promise<void>;
   commands(query?: string): CompletionCandidate[];
   valid(source: CompletionSource): boolean;
   commit(source: CompletionSource, entity: CanonicalEntity, text: string): void;
@@ -21,7 +23,7 @@ export interface CompletionHost {
   dismiss(keepLiteral?: boolean): void|boolean;
 }
 /** One occurrence, one source bookmark, cancellable optional reads, no canonical state ownership. */
-interface State {phase:'active'|'confirmed'|'cancelled';sourceText:string;searchQuery:string;queryMode:'following-source'|'independent';kind:CompletionKind;input:string;scope:CompletionScope;rows:CompletionCandidate[];selected:string;busy:boolean;pending:boolean;error:string;expanded:boolean;revision:number}
+interface State {phase:'active'|'confirmed'|'cancelled';sourceText:string;searchQuery:string;queryMode:'following-source'|'independent';kind:CompletionKind;input:string;scope:CompletionScope;rows:CompletionCandidate[];selected:string;busy:boolean;pending:boolean;error:string;retrievalStatus:string;expanded:boolean;revision:number}
 export class CompletionSession {
   readonly state:State; private set:SetStoreFunction<State>;
   source: CompletionSource;
@@ -36,7 +38,7 @@ export class CompletionSession {
   constructor(readonly host: CompletionHost, source: CompletionSource, kind: CompletionKind, input: string) {
     this.source = source;
     const parsed = inputParts(kind, input);
-    [this.state,this.set] = createStore<State>({ phase:'active', sourceText:source.brackets?source.literal:source.inline?parsed.mention:source.literal, searchQuery:parsed.query, queryMode:kind!=='command'&&input.includes(' : ')?'independent':'following-source', kind, input, scope:'blend' as CompletionScope, rows:[] as CompletionCandidate[], selected:'', busy:false, pending:false, error:'', expanded:!source.inline, revision:0 });
+    [this.state,this.set] = createStore<State>({ phase:'active', sourceText:source.brackets?source.literal:source.inline?parsed.mention:source.literal, searchQuery:parsed.query, queryMode:kind!=='command'&&input.includes(' : ')?'independent':'following-source', kind, input, scope:'blend' as CompletionScope, rows:[] as CompletionCandidate[], selected:'', busy:false, pending:false, error:'', retrievalStatus:'', expanded:!source.inline, revision:0 });
     this.local = kind === 'entity' ? host.documentEntities() : [];
     this.refresh();
   }
@@ -52,7 +54,7 @@ export class CompletionSession {
   inventoryChanged() { this.local=this.host.documentEntities(); this.refresh(); }
   clearHistory() { if(this.historyKey)clearUsage(this.historyKey); this.refresh(); }
   private publish(rows: CompletionCandidate[]) {
-    const parsed=this.parsed, scope=parsed.scope??this.state.scope, ranked=rank(rows,parsed.query,scope).slice(0,100);
+    const parsed=this.parsed, scope=parsed.scope??this.state.scope, ranked=(this.state.kind==='block'?[...new Map(rows.map(r=>[r.id,r])).values()]:rank(rows,parsed.query,scope)).slice(0,100);
     this.set({rows:ranked,selected:ranked.some(r=>r.id===this.state.selected&&!r.disabled)?this.state.selected:ranked.find(r=>!r.disabled)?.id??''});
   }
   suspend() { this.suspended=true;clearTimeout(this.timer);this.controller?.abort();++this.generation;this.set('busy',false); }
@@ -60,7 +62,8 @@ export class CompletionSession {
     if(this.suspended||this.disposed)return;
     clearTimeout(this.timer); this.controller?.abort(); const generation=++this.generation;
     if(this.state.kind==='command'){this.set({busy:false,error:'',selected:''});this.publish(this.host.commands(this.parsed.query));return;}
-    this.set({busy:true,error:''}); this.timer=setTimeout(()=>void this.resolve(generation),150);
+    if(this.state.kind==='block')this.publish([]);
+    this.set({busy:true,error:'',retrievalStatus:''}); this.timer=setTimeout(()=>void this.resolve(generation),150);
   }
   private async resolve(generation: number) {
     const controller=this.controller=new AbortController(), signal=controller.signal;
@@ -69,7 +72,14 @@ export class CompletionSession {
       const {query,scope:override}=this.parsed, scope=override??this.state.scope;
       const matches=(r: CompletionCandidate)=>!query||r.name.toLocaleLowerCase().includes(query.toLocaleLowerCase());
       if(this.state.kind==='command') { this.publish(this.host.commands(query)); return; }
-      if(this.state.kind==='block') { this.publish([]); this.set('error','Block drill-down is not yet supported by the native reference picker. Text remains literal.'); return; }
+      if(this.state.kind==='block') {
+        if(!query||!this.host.passages){this.publish([]);return;}
+        const lexical=await this.host.passages(query,'lexical',signal);if(!current())return;this.publish(lexical.rows);this.set('retrievalStatus',lexical.status);
+        await new Promise<void>(resolve=>setTimeout(resolve,450));if(!current())return;
+        try{const semantic=await this.host.passages(query,'hybrid',signal);if(current()){this.publish([...lexical.rows,...semantic.rows.filter(r=>!lexical.rows.some(l=>l.id===r.id))]);this.set('retrievalStatus',semantic.status);}}
+        catch(e){if(current())this.set('retrievalStatus',`Lexical results retained. ${String(e)}`);}
+        return;
+      }
       if(this.state.kind==='document') { const rows=await (this.documentPool??=this.host.documents()); if(current())this.publish(rows.filter(matches)); return; }
       if(['blend','document'].includes(scope))this.publish(this.local.filter(matches));
       this.historyKey??=await this.host.historyScope(); if(!current())return;
@@ -90,6 +100,7 @@ export class CompletionSession {
     const source=this.source;
     try {
       this.assertSource(source);
+      if(this.state.kind==='block'){await this.host.navigatePassage?.(row,()=>this.alive&&generation===this.generation);if(this.alive)this.complete();return;}
       if(this.state.kind==='command') { this.host.command(source,row.id); this.complete(); return; }
       const label=replace||!this.parsed.mention?row.name:this.parsed.mention;
       if(this.state.kind==='document') { await this.host.reference(source,row,label); if(this.alive)this.complete(); return; }

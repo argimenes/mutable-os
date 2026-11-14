@@ -20,7 +20,9 @@ await build({entryPoints:[fileURLToPath(new URL('../server/sqlite-knowledge-host
 await build({entryPoints:[fileURLToPath(new URL('../server/legacy-codex-import.ts',import.meta.url))],outfile:fileURLToPath(new URL('../dist/server/mutable-legacy-import.mjs',import.meta.url)),bundle:true,platform:'node',format:'esm',target:'node22',external:['fs-ext','express','better-sqlite3'],plugins:[{name:'import-owned-worker-client',setup(b){b.onResolve({filter:/knowledge-sqlite\/client\.mjs$/},()=>({path:'./knowledge-sqlite/client.mjs',external:true}));}}]});
 
 // Internal derived retrieval service: plain worker modules, native addon resolved at runtime.
-for(const name of ['client.mjs','worker.mjs','store.mjs','profile.mjs','provider.mjs','passages.mjs']){
+await build({entryPoints:[fileURLToPath(new URL('../server/retrieval-saved-source.mjs',import.meta.url))],outfile:fileURLToPath(new URL('../dist/server/retrieval/saved-source.mjs',import.meta.url)),bundle:true,platform:'node',format:'esm',target:'node22',external:['fs-ext']});
+for(const name of ['client.mjs','worker.mjs','store.mjs','consent.mjs','profile.mjs','provider.mjs','passages.mjs']){
  const target=new URL('../dist/server/retrieval/'+name,import.meta.url);await mkdir(new URL('.',target),{recursive:true});
  await copyFile(new URL('../src/retrieval/'+name,import.meta.url),target);
 }
+await build({entryPoints:[fileURLToPath(new URL('../server/retrieval-host.ts',import.meta.url))],outfile:fileURLToPath(new URL('../dist/server/retrieval-host.js',import.meta.url)),bundle:true,platform:'node',format:'esm',target:'node22',external:['express'],plugins:[{name:'retrieval-owned-worker-client',setup(b){b.onResolve({filter:/retrieval\/client\.mjs$/},()=>({path:'./retrieval/client.mjs',external:true}));}}]});

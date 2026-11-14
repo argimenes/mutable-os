@@ -1,3 +1,5 @@
+import {retrievalRequest} from '../../application/retrieval-client';
+import {nativeDocumentSession} from '../../persistence/native-session';
 import { isTabCommandQuery, parseTabCommand, tabCommandCandidates, tabCommands } from '../../runtime/tab-commands';
 import { parseTableCommand, tableCommandCandidates, tableCommands } from '../../runtime/table-commands';
 import { taskPrefixOpening, cancelTaskPrefix } from '../../runtime/text-lists';
@@ -92,6 +94,12 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
    let service:import("../../feature-api/entities").EntityService|undefined;try{if(kind==='document')service=api.entities?.(source.nodeKey);}catch{/* Non-Entity commands remain usable. */}
    const session=new CompletionSession({service,historyScope:()=>service?.historyScope?.()??Promise.resolve(`session:${source.viewId}`),
     canDismiss,
+    passages:editor.features.semanticRetrieval?async(query,strategy,signal)=>{
+     const result=await retrievalRequest('query',{query,strategy,key:`scry:${source.viewId}`,limit:20},signal);
+     const native=nativeDocumentSession(editor);
+     return {rows:result.results.filter((hit:any)=>{const evidence=native.knowledgeEvidence(hit.source.resourceId);return !evidence.location||!native.isDirty(hit.source.resourceId)&&evidence.byteHash===hit.source.sourceHash&&!evidence.pending;}).map((hit:any)=>({id:`${hit.source.resourceId}:${hit.source.spans[0]?.blockGuid}:${hit.source.spans[0]?.start}`,name:hit.text.slice(0,180),reason:`${strategy==='lexical'?'FTS5':'Semantic'} · ${hit.source.path} · ${hit.source.format&&hit.source.format!=='mutable-document'?'Open this legacy source manually to navigate':'saved passage'}`,disabled:!!hit.source.format&&hit.source.format!=='mutable-document',data:hit})),status:'Partial saved-source coverage; unsaved Documents remain outside this index. Indexing and permissions: Workspace → Index Cavern.'};
+    }:undefined,
+    navigatePassage:async(row,current)=>completionDocuments(editor,source.nodeKey).activateRetrieval(row.data,current),
     documentEntities:()=>[], // Entity inventory and search belong to LER.
     documents:async()=>{const pool=await completionDocuments(editor,source.nodeKey).completionTargets();return pool.sources.map(t=>({id:t.documentId,name:t.title,reason:`Document · ${t.location}`,data:t}));},
     commands:(query='')=>{
@@ -105,10 +113,11 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
      ...(editor.features.glossMode?[{id:'gloss.create',name:'gloss',reason:'Write a Document-local Gloss'}]:[]),
      {id:'entity',name:'entity',reason:'Resolve an Entity or create explicitly'},
      {id:'link',name:'link',reason:'Reference an available native Document'},
+     ...(editor.features.semanticRetrieval?[{id:'search',name:'search',reason:'Scry: search saved passages, lexical first then semantic'}]:[]),
      {id:'entity.list.open',name:'backlinks',reason:'Open the current Document Entity references'},
      {id:'thesis.createProposition',name:'proposition',reason:'Open a Thesis draft'},
      {id:'date',name:'date',reason:'Insert today’s local ISO date'},
-    ].filter(r=>['entity','link','date'].includes(r.id)||editor.commandRegistry.canExecute(r.id,{targetKey:source.nodeKey,args:undefined})).filter(r=>!query||r.name.toLowerCase().includes(query.toLowerCase()))];},
+    ].filter(r=>['entity','link','date','search'].includes(r.id)||editor.commandRegistry.canExecute(r.id,{targetKey:source.nodeKey,args:undefined})).filter(r=>!query||r.name.toLowerCase().includes(query.toLowerCase()))];},
     valid,
     commit:(s,e,label)=>{
      if(!valid(s))throw Error('Stale source');
@@ -138,6 +147,7 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
       editor.commandRegistry.execute(id,{targetKey:s.nodeKey,args:{invocation:s.inline?{nodeKey:s.nodeKey,contentKey:s.contentKey,placementKey:s.placementKey,version:s.version,start:s.start,end:s.end,coordinate:'cell'}:undefined}});return;
      }
      if(surfaceCommands.some(c=>c.id===id)){queueMicrotask(()=>{if(valid(s))editor.surfaces.run(id,s.nodeKey,{nodeKey:s.nodeKey,start:s.start,end:s.end,version:s.version});});return;}
+     if(id==='search'){queueMicrotask(()=>open(s,'block',''));return;}
      if(id==='entity'||id==='link') {queueMicrotask(()=>open(s,id==='entity'?'entity':'document',''));return;}
      if(id==='date'){const now=new Date(),label=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;editor.commands.replaceInlineRange(s.nodeKey,s.start,s.end,label);restore(s,s.start+label.length);return;}
      if(!editor.commandRegistry.canExecute(id,{targetKey:s.nodeKey,args:undefined}))throw Error('Action unavailable');
@@ -350,6 +360,7 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
    return false;
   }};
   const explicit=(key:string)=>{const h=editor.mounts.get(key),r=h?.captureInlineSelection?.();if(!r||r.anchor===r.head)throw Error('Select a phrase, or type @ to open Autocomplete');const s=snapshot(key,Math.min(r.anchor,r.head),Math.max(r.anchor,r.head),false);open(s,'entity',s.literal);};
+  if(editor.features.semanticRetrieval)api.register.command({id:'autocomplete.search',label:'Scry: search passages',canExecute:({targetKey})=>editor.node(targetKey)?.viewType==='standoff-editor-block',execute:({targetKey})=>{const r=editor.mounts.get(targetKey)?.captureInlineSelection?.()??{anchor:0,head:0};const source=snapshot(targetKey,Math.min(r.anchor,r.head),Math.max(r.anchor,r.head),false);open(source,'block',source.literal);}});
   api.register.command({id:'autocomplete.open',label:'Autocomplete selected text',canExecute:({targetKey})=>editor.node(targetKey)?.viewType==='standoff-editor-block',execute:({targetKey})=>explicit(targetKey)});
   api.register.binding({id:'autocomplete.open',name:'Autocomplete selected text',description:'Keep the selected phrase and edit an independent query',category:'Autocomplete',tags:[],scope:'editor/standoff',defaults:[chord(keyboard(';','Ctrl'),keyboard('a'))],handler:ctx=>ctx.run('autocomplete.open')});
   api.register.action({id:'autocomplete.open',slot:'document-actions',command:'autocomplete.open',label:'Autocomplete',title:'Autocomplete selected text',binding:'autocomplete.open'});

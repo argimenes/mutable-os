@@ -1,3 +1,4 @@
+import {retrievalForeground} from '../../application/retrieval-client';
 import {imageContributionOwner} from './image-load';
 import {NativeXmlStream,NativeStreamError} from './dcp/native-stream';
 import {observeContributionPresentation} from './presentation-diagnostics';
@@ -326,6 +327,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
      if(node)sources!.admitOwn(()=>group.run(()=>editor.textProtection.receivingInsertion(node!.contentKey,()=>editor.commands.boundedStructuralTransaction('Receive contribution Synopsis',()=>editor.commands.setPayloadField(node!.key,'metadata',{...structuredClone(unwrap(node!.payload.metadata??{})) as object,dialectic:{...structuredClone(unwrap((node!.payload.metadata as any).dialectic)),synopsis}})))));
     },apply:result=>{
      if(done||!alive||ticket!==generation)return;
+     if(editor.features.semanticRetrieval)retrievalForeground();
      const viewport=editor.mounts.get(draftRow.key)?.root.closest<HTMLElement>('.dialectic-canvas'),follow=viewport&&viewport.scrollHeight-viewport.scrollTop-viewport.clientHeight<180;
      const apply=()=>editor.commands.boundedStructuralTransaction('Receive native DCP fragment',()=>{
       result.preparedResources.check();
@@ -387,6 +389,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
     dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,...(sources.xmlAuthoring?{xmlBindings:sources.xmlAuthoring.bindings()}:{}),identityMap:result.aliases,annotationRefs:result.annotationRefs,intent:result.intent,...(live?{provider:live}:{})}};
    const started=performance.now();
+   if(editor.features.semanticRetrieval)retrievalForeground();
    editor.commands.boundedStructuralTransaction(live?'Add DCP AI response':'Add DCP mock response',()=>{
     result.preparedResources.check();
     if(Object.keys(result.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,unknown>,...result.definitions});

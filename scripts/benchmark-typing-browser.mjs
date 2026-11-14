@@ -51,6 +51,11 @@ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) =
    const host = document.createElement('div'); document.body.append(host);
    host.style.cssText = 'position:fixed;inset:0;overflow:auto;background:white;z-index:99999';
    const documentUrl = ${JSON.stringify(process.env.BENCHMARK_DOCUMENT_URL ?? "")};
+   const retrievalUrl=${JSON.stringify(process.env.BENCHMARK_RETRIEVAL_URL??'')};
+   if(retrievalUrl){
+    const original=window.fetch.bind(window);window.fetch=(input,init)=>String(input).startsWith('/api/retrieval/')?original(retrievalUrl+String(input).slice('/api/retrieval'.length),init):original(input,init);
+    const retrieval=await import('/src/application/retrieval-client.ts');await retrieval.retrievalRequest('status');retrieval.retrievalForeground();
+   }
    const mountStarted = performance.now();
    const dto = documentUrl ? (await (await fetch(documentUrl)).json()).Data.document : {id:'typing-benchmark-document',type:'document-block',children:Array.from({length:${Number(process.env.BENCHMARK_BLOCKS ?? 250)}},(_,i)=>({id:'bench-'+i,type:'standoff-editor-block',text:'x'.repeat(100),standoffProperties:[{type:'style/bold',start:40,end:60}]}))};
    const codeMode=${JSON.stringify(process.env.BENCHMARK_CODE??'')}, codeEnabled=${JSON.stringify(process.env.BENCHMARK_CODE_HIGHLIGHT!=='off')};

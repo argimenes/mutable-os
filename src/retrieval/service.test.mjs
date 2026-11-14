@@ -65,3 +65,27 @@ test('interruption during actual passage/vector publication rolls the sidecar tr
  }finally{store.close();}
  await f.open();assert((await f.service.query('vessel')).results.length>0);
 });
+test('native FTS is immediate without embedding consent, with exact Unicode source and current-Symposium filtering',async t=>{
+ const f=await fixture(t,{external:true});await f.save('A😀e\u0301 — continuity and ship repair.');const s=await f.open();
+ const found=await s.query('ship',{strategy:'lexical'});assert.equal(found.results.length,1);assert.equal(found.usage,0);assert.equal((await s.status()).receipts.length,0);assert.equal(found.results[0].source.rootBlockId,'resource');assert.equal(found.results[0].source.spans[0].start,0);
+ assert.equal((await s.query('ship',{strategy:'lexical',resourceId:'foreign'})).results.length,0);
+ await f.save('Nothing nautical remains.');assert.equal((await s.query('ship',{strategy:'lexical'})).results.length,0);
+});
+test('explicit persistent scope authorises future saved revisions but never queries or foreign Vaults',async t=>{
+ const f=await fixture(t,{external:true});await f.save();const s=await f.open();const grant={approved:true,id:'scope-documents',indexId:(await s.status()).indexId,vaultGuid:f.vaultGuid,model:profile.model,maxTokens:500,expiresAt:'9999-12-31T23:59:59Z',scope:{version:1,kind:'saved-vault-maintenance',vaultGuid:f.vaultGuid}};
+ await s.index('resource',{consent:grant});await f.save('A new revision changes the source text.');await s.index('resource',{consent:grant});assert.equal((await s.status()).receipts.length,2);
+ await assert.rejects(s.query('new query',{consent:grant}),/scope not approved/);
+ await s.close();await f.open();await f.save('A third saved revision after restart.');await f.service.index('resource',{consent:grant});
+ const queryGrant={...grant,id:'scope-queries',scope:{...grant.scope,kind:'interactive-queries'}};await f.service.query('third',{consent:queryGrant});await assert.rejects(f.service.query('fourth',{consent:{...queryGrant,vaultGuid:'foreign'}}));
+ const result=await f.service.query('third',{strategy:'hybrid',resourceId:'foreign',consent:queryGrant});assert.equal(result.results.length,0);
+});
+test('bounded maintenance yields between Documents and reports progress without resetting receipts',async t=>{
+ const f=await fixture(t);await f.save();const s=await f.open(),progress=[];let boundaries=0;const start=performance.now();const r=await s.reconcile({delayMs:40,beforeDocument:()=>{boundaries++;},onProgress:p=>progress.push(p)});
+ assert(r.complete);assert.equal(boundaries,1);assert(performance.now()-start>=40);assert.equal(progress.at(-1).processed,1);
+ const unchanged=await s.reconcile();assert.equal(unchanged.results[0].projectionReads,0);
+});
+test('foreground pause defers maintenance without blocking lexical queries or initiating uploads',async t=>{
+ const f=await fixture(t,{external:true});const saved=await f.save(),s=await f.open();s.pauseMaintenance(250);
+ const consent={approved:true,indexId:(await s.status()).indexId,id:'paused',vaultGuid:f.vaultGuid,model:profile.model,maxTokens:500,expiresAt:'9999-12-31T23:59:59Z',documents:[{resourceId:'resource',contentHash:saved.hash}]};
+ const start=performance.now(),job=s.index('resource',{consent});const lexical=await s.query('ship',{strategy:'lexical'});assert.equal(lexical.results.length,1);assert.equal((await s.status()).receipts.length,0);await job;assert(performance.now()-start>=240);assert.equal((await s.status()).receipts.length,1);
+});

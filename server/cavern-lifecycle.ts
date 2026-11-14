@@ -1,3 +1,4 @@
+import {CavernRetrieval} from './retrieval-host.js';
 import {createApplicationServiceHost} from './application-services/host.js';
 import {imageReferenceRouter} from './image-reference.js';
 /** One application-level folder context; existing stores remain confined to it. */
@@ -77,6 +78,8 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     const history = createHistoryService({ root });
     const coordinate = <T>(action: () => Promise<T>) => sql.foreground(action);
     const api = Router();
+    let retrieval:CavernRetrieval|undefined;
+    api.use('/retrieval',(req,res,next)=>retrieval?retrieval.router()(req,res,next):res.status(409).json({Success:false,Error:'Semantic retrieval unavailable'}));
     // Applications share the root Cavern; they may still browse its subfolders.
     api.use((req, res, next) => {
       if (req.body?.vault !== undefined && req.body.vault !== '.') { res.status(409).json({ Success: false, Error: 'Use the current Cavern. Open another Cavern from the Mutable system control.' }); return; }
@@ -117,11 +120,12 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     };
     return { api, sql,
       async activateAssets(cavern: Cavern) {
+        if(featureFlags.semanticRetrieval&&featureFlags.derivedRetrieval){retrieval=new CavernRetrieval(sql,root,cavern.cavernGuid,{deferStartup:true});await retrieval.start();}
         if(featureFlags.applicationServices)services=createApplicationServiceHost({root,cavernId:cavern.cavernGuid,nativeEnabled:featureFlags.nativeDocumentPersistence,publicationEnabled:featureFlags.webPublishing,academicEnabled:featureFlags.academicResourceLoaders,iiifEnabled:featureFlags.iiifResourceLoaders,crossResourceEnabled:featureFlags.crossResourceLoaders,structuredEnabled:featureFlags.structuredResources,deterministicEnabled:featureFlags.deterministicAcademicResources,webEnabled:featureFlags.webResourceViewers,everydayEnabled:featureFlags.everydayWebResources,academic:(request,signal)=>sql.academic(request,signal),assets:()=>assets?.store,knowledge:(request,signal)=>sql.entityLookup({vault:'.',request},signal,true)});
         if (featureFlags.managedAssetClipboard) { assets = createManagedAssetService({ root, cavernId: cavern.cavernGuid, session: cavern.session,crossResourceEnabled:featureFlags.crossResourceLoaders,structuredEnabled:featureFlags.structuredResources,deterministicEnabled:featureFlags.deterministicAcademicResources,webEnabled:featureFlags.webResourceViewers,inspectOriginal:(bytes,mediaType,signal)=>{if(!services)throw Error('Application services unavailable');return services.executor.run(['application/xml','application/epub+zip','application/x-bibtex','application/x-research-info-systems'].includes(mediaType)?{kind:'academic-original-inspect',bytes,mediaType}:mediaType==='application/pdf'?{kind:'pdf-inspect',bytes}:{kind:'json-inspect',bytes},signal);} }); return assets.recover(); } },
-      async index(policy: any) { indexPolicy ??= normalizePolicy(policy); return indexStatus(); },
+      async index(policy: any) { indexPolicy ??= normalizePolicy(policy); const result=await indexStatus();retrieval?.resume();return result; },
       async status() { return indexPolicy ? indexStatus() : undefined; },
-      async close() { await services?.close(); await assets?.close(); await indexWork?.catch(() => {}); await sql.close(); await history.dispose(); },
+      async close() { await retrieval?.close(); await services?.close(); await assets?.close(); await indexWork?.catch(() => {}); await sql.close(); await history.dispose(); },
     };
   }
   const establish = async (input: unknown, intent: unknown, confirmed = false) => {

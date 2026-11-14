@@ -117,6 +117,8 @@ export type FeatureFlags = Readonly<{
   sqliteKnowledge: boolean;
   /** Internal consent-gated retrieval service; no Scry/Dialectic UI integration. */
   derivedRetrieval: boolean;
+  /** User-facing retrieval; uploads still require persistent explicit consent. */
+  semanticRetrieval: boolean;
   /** Canonical vault Entity resolver. Disabling never resumes legacy writes. */
   sqliteEntities: boolean;
   /** Typed canonical temporal, assertion and observation services. */
@@ -277,6 +279,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   nativeKnowledgeSaved: false,
   sqliteKnowledge: true,
   derivedRetrieval: true,
+  semanticRetrieval: true,
   sqliteEntities: true,
   sqliteSemanticServices: true,
   thesis: true,

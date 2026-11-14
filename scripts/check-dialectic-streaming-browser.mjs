@@ -4,7 +4,7 @@ import {mkdtemp,rm,mkdir,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createServer} from 'vite';
-const directory='artifacts/dcp-streaming';await mkdir(directory,{recursive:true});
+const directory=process.env.DCP_OUTPUT??'artifacts/dcp-streaming';await mkdir(directory,{recursive:true});
 const profile=await mkdtemp(path.join(tmpdir(),'dcp-stream-proof-'));let server,browser,socket;
 try{
  server=await createServer({cacheDir:'node_modules/.cache/dcp-stream-proof',server:{host:'127.0.0.1',port:0},plugins:[{name:'isolated-stream-proof',configureServer(s){s.middlewares.use((req,res,next)=>{
@@ -21,6 +21,7 @@ try{
  await send('Runtime.enable',{},sessionId);await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false},sessionId);
  await send('Page.navigate',{url:'http://127.0.0.1:'+server.httpServer.address().port+'/__stream-proof'},sessionId);
  await evaluate(`(async()=>{for(let i=0;i<1600;i++){if(window.proof?.ready)return;await new Promise(r=>setTimeout(r,20));}throw Error('Fixture startup timeout')})()`);
+ if(process.env.RETRIEVAL_PRIORITY_URL)await evaluate(`(async()=>{const original=window.fetch.bind(window);window.fetch=(input,init)=>String(input).startsWith('/api/retrieval/')?original(${JSON.stringify(process.env.RETRIEVAL_PRIORITY_URL)}+String(input).slice('/api/retrieval'.length),init):original(input,init);const r=await import('/src/application/retrieval-client.ts');await r.retrievalRequest('status');})()`);
  await evaluate('proof.run().catch(e=>{proof.failure=String(e);console.error(e)});true');
  await evaluate(`(async()=>{for(let i=0;i<1200;i++){if(proof.failure)throw Error(proof.failure);if(proof.firstScreenshot)return;await new Promise(r=>setTimeout(r,20));}throw Error('No first fragment')})()`);
  await writeFile(path.join(directory,'first-fragment.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));

@@ -1,3 +1,5 @@
+import {retrievalRequest} from '../../../application/retrieval-client';
+import {nativeDocumentSession} from '../../../persistence/native-session';
 import type {XmlContext} from './xml-context';
 import {unwrap} from 'solid-js/store';
 import {hasNativeSourceReader} from './reading';
@@ -174,7 +176,27 @@ export class DcpSources {
    const self=this;stack.push((function*(){for(const key of edges(n)){const child=self.node(key);if(child)yield child;}})());
    if(visited%32===0)await new Promise(r=>setTimeout(r,0));
   }
-  return this.record(call,{status:truncated?'truncated':'complete',items,coverage:{visited:Math.min(visited,512),characters},omissions:truncated?['Search result, traversal or character budget']:[]});
+  let semanticStatus='disabled';
+  if(this.editor.features.semanticRetrieval&&items.length<limit){
+   const native=nativeDocumentSession(this.editor),saved=native.knowledgeEvidence(this.owner);
+   if(!saved.location||saved.pending||native.isDirty(this.owner))semanticStatus='Unsaved Symposium: live lexical discovery retained; saved semantic coverage is incomplete';
+   else try{
+    const result=await retrievalRequest('query',{query,strategy:'hybrid',resourceId:this.owner,limit,key:`dcp:${this.owner}`},AbortSignal.any([this.signal,AbortSignal.timeout(5000)]));this.check();
+    const now=native.knowledgeEvidence(this.owner);if(native.isDirty(this.owner)||now.pending||now.byteHash!==saved.byteHash)throw Error('Symposium changed during retrieval');
+    for(const hit of result.results){
+     if(hit.source.resourceId!==this.owner||hit.source.sourceHash!==saved.byteHash)continue;
+     for(const span of hit.source.spans??[]){if(items.length>=limit)break;if(span.resourceId!==this.owner)continue;
+      const target:ReplyTarget={kind:'block',resourceId:this.owner,blockId:span.blockGuid},resolved=this.resolve(target);
+      if(resolved.status!=='resolved'||!resolved.node||!this.committed(resolved.node)||items.some(i=>i.target?.blockId===span.blockGuid))continue;
+      const source=await this.source(this.issue(target));this.check();const exact=hit.text.slice(span.chunkStart,span.chunkEnd);
+      if(source.status!=='complete'||!exact||!source.text?.includes(exact))continue;
+      if(this.diagnostics.characters+source.text.length>100000){truncated=true;break;}this.diagnostics.characters+=source.text.length;
+      items.push({handle:source.handle,target:source.target,owner:source.owner,kind:source.kind,revision:source.revision,sourceAuthor:source.sourceAuthor,contribution:source.contribution,excerpt:exact.slice(0,500),readRequired:true,retrieval:'saved-semantic'});
+     }
+    }semanticStatus='Partial saved semantic coverage; native handles reissued in this exchange';
+   }catch{this.check();semanticStatus='Semantic retrieval unavailable; live lexical discovery retained';}
+  }
+  return this.record(call,{status:truncated?'truncated':'complete',items,semanticStatus,coverage:{visited:Math.min(visited,512),characters},omissions:truncated?['Search result, traversal or character budget']:[]});
  }
  async searchEntities(input:any){
   if(!this.editor.features.dcpSemanticWorkspace||!this.editor.features.scopedSemantics||!this.references)throw Error('Entity discovery unavailable');

@@ -1,3 +1,4 @@
+import {retrievalForeground} from '../application/retrieval-client';
 import {isNativeDocumentName,nativeDocumentStem,isDerivedMarkdownName} from './document-file-names.mjs';
 import { batch, createSignal } from 'solid-js';
 import { createStore } from 'solid-js/store';
@@ -285,10 +286,12 @@ export class NativeDocumentSession {
   }
   async open(location: DocumentLocation, importText = false, signal?: AbortSignal) {
     signal?.throwIfAborted();
+    if(this.editor.features.semanticRetrieval)retrievalForeground();
     this.opening++;this.notifyKnowledge();try{return await this.openResource(location,importText,undefined,signal);}finally{this.opening--;this.notifyKnowledge();}
   }
   async openCompatible(location:DocumentLocation,vault:string,signal?:AbortSignal) {
     signal?.throwIfAborted();
+    if(this.editor.features.semanticRetrieval)retrievalForeground();
     this.opening++;this.notifyKnowledge();
     try {
       const data=await request('recognize',{location},signal);signal?.throwIfAborted();if(this.disposed)throw Error('Document session closed');
@@ -309,7 +312,7 @@ export class NativeDocumentSession {
   }
   /** Selected result only. The caller owns navigation; admission retains all native guards. */
   async openVerified(location: DocumentLocation, expected: {resourceId:string;byteHash:string}, guard:()=>void, signal?:AbortSignal, verify?:()=>Promise<void>) {
-    guard(); signal?.throwIfAborted(); this.opening++;this.notifyKnowledge();const epoch=this.knowledgeEpoch;
+    guard(); signal?.throwIfAborted(); if(this.editor.features.semanticRetrieval)retrievalForeground();this.opening++;this.notifyKnowledge();const epoch=this.knowledgeEpoch;
     const check=()=>{guard();signal?.throwIfAborted();if(this.knowledgeEpoch!==epoch)throw Error('Native operation changed during selected Open');};
     let revision=this.editor.repository.state.revision;
     try{const id=await this.openResource(location,false,{...expected,check,signal,verify,completed:()=>{revision=this.editor.repository.state.revision;}});return {id,revision};}finally{this.opening--;this.notifyKnowledge();}

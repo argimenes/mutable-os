@@ -2,7 +2,7 @@
 
 `openRetrievalService()` owns one worker and one `.mutable/retrieval.db` per existing Vault. Its source connection opens `mutable.db` read-only. It never decodes or writes Documents, modifies canonical SQL tables, opens a generative-provider session, or registers an HTTP/UI route.
 
-`derivedRetrieval` defaults to true in configuration; the knowledge host checks it on internal attachment. Availability does not authorize external uploads. No application currently attaches this service automatically. Scry and Dialectic integration remain Milestone C work requiring review.
+`derivedRetrieval` defaults to true in configuration; the knowledge host checks it on internal attachment. Availability does not authorize external uploads. Milestone C attaches this service through `CavernRetrieval` after explicit Cavern opt-in, or on a local lexical search. The separate `semanticRetrieval` flag controls the user-facing integration. Document and query uploads remain separately consent-gated.
 
 ## Host contract
 
@@ -63,3 +63,15 @@ Missing sidecars initialize safely from confirmed projections. An incompatible p
 Build: `node scripts/build-sqlite-foundation.mjs`. Service checks: `node --test --test-concurrency=1 src/retrieval/service.test.mjs`. Save-hook checks: `vitest run server/sqlite-knowledge-host.test.ts`.
 
 The test provider is not shipped by the server build. It performs no network requests and is selected only by qualification callers. [Qualification report](../../docs/development/NATIVE_VECTOR_SEARCH_RAG_MILESTONE_B_QUALIFICATION.md).
+
+## Milestone C integration
+
+`server/retrieval-host.ts` owns `.mutable/retrieval-preferences.json` and its explicit server-derived grants. A scope grant adds `scope: {version:1, kind:'saved-vault-maintenance'|'interactive-queries', vaultGuid}`. It is still bound to the provider/model, Vault, index lifetime, expiry and cumulative token cap. Maintenance authorises future saved revisions within that Vault; it never authorises query uploads. Revocation cancels pending work. Renewal is an explicit UI action permitting another stated allowance, including retrying an unknown outcome; background work never renews a grant. Missing/rebuilt indexes require a new explicit grant.
+
+The current storage topology is retained: one Vault per opened Cavern, independent consent/indexes on Cavern switching, no nested Vault enrollment. `Workspace → Index Cavern` provides first-use acceptance/refusal, permissions, caps, progress, errors and Refresh/resume. Refusal requires neither a provider nor a working retrieval sidecar. Hosted credentials use the server's `OPENAI_API_KEY`; no local provider is advertised as installed and there is no hosted fallback.
+
+The Cavern service opts into worker-side exact-file verification (`verifySavedSources`). Each candidate must have a complete canonical SQL projection and matching saved file bytes, with native-pair/Document-save recovery, relocation and path guards intact. A pending or incomplete whole-Cavern sweep does not disable independently verified sources. Query verification is bounded to the returned candidates and 40 MiB of file bytes; omissions remain explicit partial coverage. Indexing checks before upload and before publication; no whole-Document decode or whole-Vault discovery is added. Internal callers without this verifier retain the original whole-scope gate. Maintenance runs in sequential Documents with a 750 ms gap. `pauseMaintenance()` uses a worker-shared deadline; foreground Document opens and streamed/native Contribution admission request a five-second pause, throttled and only when indexing is enabled. The existing canonical saved-index scheduler also respects this boundary. No keystroke hook was added, and no Save awaits retrieval. Already-running native planning may finish its bounded unit; this is cooperative priority, not CPU preemption.
+
+Scry's `/search` command and `autocomplete.search` action use native `BlockSearch` FTS5 even without vector enrollment. Query embeddings follow a further 450 ms debounce and merge behind existing lexical rows. Same-Symposium DCP `search_symposium` can supplement live lexical results; dirty/unbound/pending sources stay on native live discovery. Returned semantic previews use newly issued local handles after native validation, not saved handles or additional permissions.
+
+[Milestone C qualification](../../docs/development/NATIVE_VECTOR_SEARCH_RAG_MILESTONE_C_QUALIFICATION.md).

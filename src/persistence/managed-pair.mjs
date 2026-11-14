@@ -5,9 +5,13 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { promisify } from "node:util";
-let nativeLock;
-try { nativeLock = promisify(createRequire(import.meta.url)("fs-ext").flock); } catch { /* optional native capability */ }
-export const nativeFlock = (...args) => nativeLock ? nativeLock(...args) : Promise.reject(Object.assign(new Error("Native pair locking is unavailable on this server"), { code: "ENOSYS" }));
+let nativeLock, nativeLockLoaded=false;
+// Read-only worker consumers use hashing/path verification, never file locks.
+// fs-ext is not context-aware: importing it eagerly in several workers can crash Node.
+export const nativeFlock = (...args) => {
+ if(!nativeLockLoaded){nativeLockLoaded=true;try{nativeLock=promisify(createRequire(import.meta.url)("fs-ext").flock);}catch{/* optional native capability */}}
+ return nativeLock ? nativeLock(...args) : Promise.reject(Object.assign(new Error("Native pair locking is unavailable on this server"), { code: "ENOSYS" }));
+};
 const flock = nativeFlock;
 import { createHash, randomUUID } from "node:crypto";
 import { decodeNative } from "./native-resource";

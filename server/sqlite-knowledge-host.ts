@@ -19,6 +19,8 @@ export class SqliteKnowledgeHost {
   readonly session=randomUUID(); readonly store:any;
   private entries=new Map<string,any>(); private leases=new Map<string,any>();
   private control=Promise.resolve(); private running?:Promise<void>; private timer?:ReturnType<typeof setTimeout>;
+  private quietUntil=0;
+  pauseBackground(ms=5000){this.quietUntil=Date.now()+Math.min(10000,Math.max(0,ms));if(this.active){this.active.pending=true;this.controller?.abort(Error('Foreground presentation priority'));}for(const e of this.entries.values())e.retrieval?.pauseMaintenance?.(ms);this.schedule();}
   private foregrounds=0; private foregroundTail=Promise.resolve(); private closed=false;
   readonly metrics={sweeps:0,cancellations:0,foregroundWaitMs:0,maxForegroundWaitMs:0};
   private semanticLeases=new Set<string>();
@@ -58,13 +60,21 @@ export class SqliteKnowledgeHost {
       return {lease,...this.snapshot(e)};
     });
   }
+  async acquireRetrieval(vault:string){return this.acquireContext(vault,normalizePolicy(),true);}
   async establish(vault:string){const opened=await this.acquireContext(vault,normalizePolicy(),true);try{if(!opened.vaultGuid)throw Error('Mutable Vault infrastructure unavailable');return {vault:opened.vault,vaultGuid:opened.vaultGuid};}finally{await this.release(opened.lease);}}
   private renew(token:string,l:any){clearTimeout(l.timer);l.timer=setTimeout(()=>{void this.release(token).catch(()=>{});},this.options.leaseMs??600000);l.timer.unref?.();}
   private entry(token:string){if(this.closed)throw Error('SQLite knowledge host closed');const l=this.leases.get(token);if(!l)throw Error('SQLite lease expired');this.renew(token,l);return l.entry;}
   private snapshot(e:any){return {session:this.session,vault:e.vault,vaultGuid:e.vaultGuid,epoch:e.epoch,readOnly:!!this.options.readOnly,pending:!!e.pending||this.active===e,coverage:structuredClone(e.coverage)};}
-  private invalidate(e:any,message:string){e.retrievalController?.abort();e.retrieval?.setAvailable(false);e.epoch++;e.fence=undefined;e.coverage=unknown(message);}
+  private invalidate(e:any,message:string){
+    e.retrievalController?.abort();e.retrieval?.setAvailable(e.retrieval.verifiesSavedSources===true);
+    if(e.retrieval)e.retrievalStatus={complete:false,state:'waiting-for-saved-projection'};
+    e.epoch++;e.fence=undefined;e.coverage=unknown(message);
+    // Independently verified saved files remain usable when another file or the
+    // whole-scope sweep is pending. The worker still fences every source and epoch.
+    if(e.retrieval?.verifiesSavedSources)this.scheduleRetrieval(e);
+  }
   private enqueue(e:any,full:boolean){if(this.closed||!e.client||this.options.readOnly)return;this.invalidate(e,'Saved reconciliation pending');e.pending=true;e.full ||= full;this.schedule();}
-  private schedule(){if(this.closed||this.foregrounds||this.timer||this.running)return;this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},this.options.debounceMs??100);this.timer.unref?.();}
+  private schedule(){if(this.closed||this.foregrounds||this.timer||this.running)return;this.timer=setTimeout(()=>{this.timer=undefined;void this.flush();},Math.max(this.options.debounceMs??100,this.quietUntil-Date.now()));this.timer.unref?.();}
   // Only this short section, never the background CPU operation, blocks foreground storage.
   private critical?:Promise<any>;
   private protect=(action:()=>Promise<any>,signal?:AbortSignal):Promise<any>=>{
@@ -82,7 +92,7 @@ export class SqliteKnowledgeHost {
     if(this.closed)return;
     if(this.foregrounds){await this.foregroundTail;return this.flush();}
     const run=async()=>{
-      while(!this.closed&&!this.foregrounds){
+      while(!this.closed&&!this.foregrounds&&Date.now()>=this.quietUntil){
         const e=[...this.entries.values()].find(e=>e.pending&&e.users>0);if(!e)break;
         e.pending=false;const full=e.full;e.full=false;const epoch=e.epoch;
         this.active=e;const controller=this.controller=new AbortController();
@@ -95,7 +105,7 @@ export class SqliteKnowledgeHost {
           e.coverage={state:r.complete&&!status.incompleteResources&&!status.issueCount?'complete':'incomplete',complete:!!r.complete&&!status.incompleteResources&&!status.issueCount,
             resources:status.resources,incompleteResources:status.incompleteResources,issueCount:status.issueCount,
             diagnostics:[...r.issues.map((x:any)=>x.message),...status.issues.map((x:any)=>x.reason)].slice(0,32)};
-          if(e.coverage.complete)this.scheduleRetrieval(e);
+          if(e.coverage.complete||e.retrieval?.verifiesSavedSources)this.scheduleRetrieval(e);
         }catch(error){this.invalidate(e,String(error));if(controller.signal.aborted){this.metrics.cancellations++;e.full ||= full;}}
         finally{this.active=undefined;this.controller=undefined;}
       }
@@ -103,20 +113,23 @@ export class SqliteKnowledgeHost {
     this.running=run();try{await this.running;}finally{this.running=undefined;if([...this.entries.values()].some(e=>e.pending))this.schedule();}
   }
   /** Internal installation only. No browser route, automatic consent or foreground dependency. */
-  async attachRetrieval(token:string,service:any,consent?:any){
+  async attachRetrieval(token:string,service:any,consent?:any,options:any={}){
     if(!featureFlags.derivedRetrieval)throw Error('Derived retrieval disabled');
     const e=this.entry(token);if(service.vault!==e.root||service.vaultGuid!==e.vaultGuid)throw Error('Foreign retrieval service');
-    if(e.retrieval)throw Error('Retrieval service already attached');e.retrieval=service;e.retrievalConsent=consent;
-    if(e.coverage.complete)this.scheduleRetrieval(e);else service.setAvailable(false);
+    if(e.retrieval)throw Error('Retrieval service already attached');e.retrieval=service;e.retrievalConsent=consent;e.retrievalOptions=options;
+    if(e.coverage.complete||e.retrieval?.verifiesSavedSources)this.scheduleRetrieval(e);else service.setAvailable(false);
   }
   private scheduleRetrieval(e:any){
-    if(!e.retrieval)return;e.retrievalController?.abort();const controller=e.retrievalController=new AbortController();
+    if(!e.retrieval)return;if(e.retrievalOptions?.indexing===false){e.retrieval.setAvailable(true);e.retrievalStatus={complete:false,state:'indexing-disabled'};return;}e.retrievalController?.abort();const controller=e.retrievalController=new AbortController();
     e.retrieval.setAvailable(true);
     // Starts outside source publication/foreground locks; the saved index never awaits it.
-    e.retrievalWork=new Promise<void>(resolve=>setImmediate(resolve)).then(()=>{
-      controller.signal.throwIfAborted();return e.retrieval.reconcile({consent:e.retrievalConsent,signal:controller.signal});
-    }).then((r:any)=>{if(e.retrievalController===controller)e.retrievalStatus=r;},(error:any)=>{if(e.retrievalController===controller)e.retrievalStatus={complete:false,error:String(error)};});
+    e.retrievalStatus={complete:false,state:'indexing'};
+    e.retrievalWork=new Promise<void>(resolve=>setTimeout(resolve,e.retrievalOptions?.delayMs??0)).then(()=>{
+      controller.signal.throwIfAborted();return e.retrieval.reconcile({consent:e.retrievalConsent,signal:controller.signal,delayMs:e.retrievalOptions?.delayMs??0,beforeDocument:e.retrievalOptions?.beforeDocument,onProgress:(progress:any)=>{if(e.retrievalController===controller)e.retrievalStatus={complete:false,state:'indexing',...progress};}});
+    }).then((r:any)=>{if(e.retrievalController===controller)e.retrievalStatus={...r,complete:r.complete&&e.coverage.complete,coverage:structuredClone(e.coverage)};},(error:any)=>{if(e.retrievalController===controller)e.retrievalStatus={complete:false,error:String(error)};});
   }
+  async detachRetrieval(token:string){const e=this.entry(token);e.retrievalController?.abort();const service=e.retrieval;e.retrieval=undefined;await service?.close();e.retrievalStatus=undefined;}
+  configureRetrieval(token:string,consent:any,options:any){const e=this.entry(token);e.retrievalController?.abort();e.retrieval?.invalidate();e.retrievalConsent=consent;e.retrievalOptions=options;if(e.coverage.complete||e.retrieval?.verifiesSavedSources)this.scheduleRetrieval(e);}
   async retrievalStatus(token:string){const e=this.entry(token);return e.retrievalStatus??{complete:false,state:'unavailable'};}
   async flushRetrieval(token:string){await this.entry(token).retrievalWork;return this.retrievalStatus(token);}
   async status(token:string){
