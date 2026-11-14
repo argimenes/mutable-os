@@ -37,7 +37,8 @@
 
 /* Keep the one retained native composer at the bottom of the conversation viewport. */
 .dialectic-canvas>.reactive-tabs{display:flex;flex-direction:column}
-.dialectic-canvas>.reactive-tabs>.reactive-tabs__panel{display:flex;flex-direction:column;flex:1;padding-bottom:0}
+/* Inactive Documents remain mounted; do not override their native hidden state. */
+.dialectic-canvas>.reactive-tabs>.reactive-tabs__panel:not([hidden]){display:flex;flex-direction:column;flex:1;padding-bottom:0}
 .dialectic-canvas .reactive-document-occurrence{display:flex;flex-direction:column;flex:1}
 .dialectic-canvas .reactive-document-occurrence__content{display:flex;flex-direction:column;flex:1;padding-bottom:0}
 .dialectic-canvas [data-dialectic-document]{display:flex;flex-direction:column;flex:1}
