@@ -31,7 +31,7 @@ try{
  await send('Page.navigate',{url:origin+'/__attachment-proof'},sessionId);await wait(`window.proof?.ready && document.querySelector('[aria-label="Choose attachments"]')`);console.log('Attachment fixture ready');
 
  await evaluate(`(()=>{proof.firstId=proof.root().payload.id;proof.firstSession=proof.port.session();proof.port.application.renameDocument(proof.firstId,'First session');proof.editor.commands.replaceInlineRange(proof.text().key,0,0,'First session unsaved draft');return true;})()`);
- await evaluate(`[...document.querySelectorAll('.dialectic-app button')].find(b=>b.textContent==='New').click();true`);
+ await evaluate(`document.querySelector('.dialectic-canvas .dialectic-add-conversation').click();true`);
  await wait('proof.root().payload.id!==proof.firstId');
  await evaluate(`(()=>{proof.secondId=proof.root().payload.id;proof.port.application.renameDocument(proof.secondId,'Second session');proof.editor.commands.replaceInlineRange(proof.text().key,0,0,'Second session saved draft');return true;})()`);
  await evaluate(`proof.port.application.files.save({folder:'isolated',filename:'Second.ink'})`);assert.equal(saves,1);

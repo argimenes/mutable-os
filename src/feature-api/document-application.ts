@@ -1,5 +1,5 @@
 import type {SavedProviderCoverage} from './backlinks';
-import type { Component } from "solid-js";
+import type { Component, JSX } from "solid-js";
 import type { DocumentFormat } from "../features/document-formats/model";
 import type { ExistingBlockDto } from "./index";
 
@@ -13,7 +13,7 @@ export interface DocumentApplicationInstance {
   recentDocuments?: { items(): readonly RecentApplicationDocument[]; open(id: string): Promise<void>; remove(id: string): void };
   renameDocument(id: string, title: string): void;
   closeActiveTab(): void;
-  tabs: Component;
+  tabs: Component<{ afterTabs?: JSX.Element }>;
   vault?: ApplicationVault;
   knowledge?: ApplicationKnowledge;
   /** Entity-reference inventory in the active Document occurrence. */

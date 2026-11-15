@@ -91,7 +91,7 @@ try{
   await writeFile('artifacts/dcp-source-claim/ui.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));await click('[...document.querySelectorAll(".workspace-presentations button")].find(e=>e.textContent==="Textual")');await wait(`document.querySelector('.dialectic-textual')`);
   await wait('document.querySelector(".dialectic-textual .dialectic-contribution-menu")');assert.equal(await evaluate('document.querySelectorAll(".dialectic-textual .dialectic-contribution-menu").length'),13);
   await evaluate(`proof.editor.commandRegistry.execute('workspace.presentation.desktop',{targetKey:proof.session.projection.state.rootKey,args:undefined})`);await wait(`document.querySelector('.dialectic-app .dialectic-canvas [data-dialectic-draft="true"]')`);assert(await evaluate('proof.editor.mounts.get(proof.text().key)===proof.draftMount'));
-  await click(button('New'));await wait('proof.committed().length===0');await wait('document.querySelectorAll(".dialectic-contribution-menu").length===1');
+  await click(button('Add Conversation'));await wait('proof.committed().length===0');await wait('document.querySelectorAll(".dialectic-contribution-menu").length===1');
   const empty=await evaluate(`(()=>{const e=proof.editor.mounts.get(proof.draft().key).root;return {bottom:e.getBoundingClientRect().bottom,viewportBottom:e.closest('.dialectic-canvas').getBoundingClientRect().bottom};})()`);assert(Math.abs(empty.bottom-empty.viewportBottom)<2,'Empty composer is not bottom aligned');
   await writeFile('artifacts/dcp-source-claim/ui.json',JSON.stringify({geometry,ui,empty,textualRoundTrip:true},null,2));console.log({ui,empty,textualRoundTrip:true});throw Error('UI_ONLY_DONE');
  }

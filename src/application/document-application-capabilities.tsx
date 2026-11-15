@@ -32,7 +32,7 @@ import { createFormattedDocument, documentFormats, readDocumentFormat } from "..
 import type { ApplicationVault } from "../feature-api/document-application";
 import { nativeDocumentSession } from "../persistence/native-session";
 import { documentRootPlacements } from "../block-tree/resource-registration";
-import { Show, For, batch, createMemo, createSignal, createEffect, untrack, onCleanup, onMount } from "solid-js";
+import { Show, For, batch, createMemo, createSignal, createEffect, untrack, onCleanup, onMount, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { ReactiveEditor } from "../reactive-editor/editor";
 import type { FeatureScope } from "../feature-api";
@@ -240,7 +240,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
         editor.overlays.open({ ownerKey: props.nodeKey, viewType: "context-menu", data: { documentTab: key },
           anchor: event instanceof MouseEvent ? { x: event.clientX, y: event.clientY } : { x: rect.left, y: rect.bottom } });
       };
-      const tabs = () => <div class="reactive-tabs" data-tab-orientation={tabOrientation(row()?.payload.metadata, editor.features.verticalTabs)}><Show when={tabCloseError()}><p role="alert">{tabCloseError()}</p></Show><div class="reactive-tabs__labels" role="tablist" aria-orientation={tabOrientation(row()?.payload.metadata, editor.features.verticalTabs)} data-cross-text-controls={retainedSessions ? "" : undefined}><For each={tabKeys()}>{key => {
+      const tabs = (tabProps: { afterTabs?: JSX.Element }) => <div class="reactive-tabs" data-tab-orientation={tabOrientation(row()?.payload.metadata, editor.features.verticalTabs)}><Show when={tabCloseError()}><p role="alert">{tabCloseError()}</p></Show><div class="reactive-tabs__labels" role="tablist" aria-orientation={tabOrientation(row()?.payload.metadata, editor.features.verticalTabs)} data-cross-text-controls={retainedSessions ? "" : undefined}><For each={tabKeys()}>{key => {
         const title = () => resolve(tabId(key) ?? '')?.title ?? String((editor.node(key)?.payload.metadata as any)?.name ?? 'Unavailable Document');
         onCleanup(() => tabButtons.delete(key));
         return <div class="flint-document-tab" role="presentation" data-active={activeTab() === key} data-native-context-menu
@@ -250,7 +250,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
           <Show when={detachment}><button type="button" aria-label={`Document actions: ${title()}`} onPointerDown={e=>e.preventDefault()} onClick={event=>openTabMenu(key,event)}>⋯</button></Show>
           <button type="button" class="flint-document-tab__close" aria-label={`Close Document: ${title()}`} title={`Close ${title()}`} onClick={event => { event.stopPropagation(); closeTab(key); }}>×</button>
         </div>;
-      }}</For></div><For each={tabKeys()}>{key=>{
+      }}</For>{tabProps.afterTabs}</div><For each={tabKeys()}>{key=>{
         const [visited, setVisited] = createSignal(false);
         createEffect(() => { if (activeTab() === key) setVisited(true); });
         return <Show when={retainedSessions ? visited() : activeTab() === key}>

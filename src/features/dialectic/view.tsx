@@ -186,12 +186,16 @@ function decorateMounts(c:DialecticController){
  onCleanup(()=>{for(const element of decorated.keys())clear(element);for(const doc of documents)delete doc.dataset.dialecticDocument;});
 }
 
+function AddConversationTab(props:{create:()=>void;disabled?:boolean}){
+ return <button type="button" class="dialectic-add-conversation" aria-label="Add Conversation" title="Add Conversation" disabled={props.disabled} onClick={()=>props.create()}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>;
+}
+
 export function DialecticDesktop(props:{application:DocumentApplicationInstance;controller:DialecticController;create:()=>void}){
  const [open,setOpen]=createSignal(false),[opening,setOpening]=createSignal(false),[error,setError]=createSignal('');
  let alive=true;onCleanup(()=>{alive=false;});
  decorate(props.controller);
- return <><Chrome c={props.controller} actions={<><button disabled={opening()} onClick={()=>props.controller.run(props.create)}>New</button><button disabled={opening()} onClick={()=>{setError('');setOpen(true);}}>Open…</button><button disabled={opening()} onClick={()=>void props.application.vault?.choose?.()}>Vault…</button><Show when={opening()}><span role="status">Opening Document…</span></Show></>}>
-  <div class="dialectic-canvas"><props.application.tabs/></div>
+ return <><Chrome c={props.controller} actions={<><button disabled={opening()} onClick={()=>props.controller.run(props.create)}>Add Conversation</button><button disabled={opening()} onClick={()=>{setError('');setOpen(true);}}>Open…</button><button disabled={opening()} onClick={()=>void props.application.vault?.choose?.()}>Vault…</button><Show when={opening()}><span role="status">Opening Document…</span></Show></>}>
+  <div class="dialectic-canvas"><props.application.tabs afterTabs={<AddConversationTab disabled={opening()} create={()=>props.controller.run(props.create)}/>}/></div>
  </Chrome><Show when={open()}><DocumentBrowser mode="open" initialLocation={props.application.files?.location()} busy={opening()} error={error()} onClose={()=>setOpen(false)} onChoose={async location=>{
    if(opening())return false;setOpening(true);setError('');
    // Release this chooser's modal before the retained host selects the loaded tab.
@@ -202,7 +206,7 @@ export function DialecticDesktop(props:{application:DocumentApplicationInstance;
    finally{if(alive)setOpening(false);}
   }}/></Show></>;
 }
-export function DialecticTextual(props:{controller:DialecticController;port:DocumentApplicationPort;active:()=>boolean}){
+export function DialecticTextual(props:{controller:DialecticController;port:DocumentApplicationPort;active:()=>boolean;create:()=>void}){
  const host=useTextualApplicationHost(),c=props.controller,editor=c.editor;
  decorate(c);
  let slot!:HTMLDivElement,surface!:HTMLDivElement,viewport!:HTMLDivElement,root!:HTMLDivElement;
@@ -216,8 +220,8 @@ export function DialecticTextual(props:{controller:DialecticController;port:Docu
   onCleanup(restore);queueMicrotask(()=>editor.documentSessions?.presentations.restorePosition(s,true));
  });});
  return <div ref={root} class="dialectic-textual" data-mwm-window={props.port.windowId()} inert={!props.active()} style={{'--tw-prose-width':`${Math.max(20,host.grid().columns-58)}ch`}}>
-  <Chrome c={c} textual>
-   <div class="reactive-tabs__labels" role="tablist" aria-label="Conversations"><For each={props.port.tabs()}>{t=><div role="presentation" class="flint-document-tab"><button role="tab" aria-selected={props.port.activeTab()===t.key} onClick={()=>props.port.selectTab(t.key)}>{t.title}<Show when={t.dirty}><span aria-label="Unsaved changes"> *</span></Show><Show when={c.conversations?.status(t.documentId??'')}>{s=><span role="status"> · {s()}</span>}</Show></button><button aria-label={`Close Document: ${t.title}`} onClick={()=>props.port.closeTab?.(t.key)}>×</button></div>}</For></div>
+  <Chrome c={c} textual actions={<button onClick={()=>c.run(props.create)}>Add Conversation</button>}>
+   <div class="reactive-tabs__labels" role="tablist" aria-label="Conversations"><For each={props.port.tabs()}>{t=><div role="presentation" class="flint-document-tab"><button role="tab" aria-selected={props.port.activeTab()===t.key} onClick={()=>props.port.selectTab(t.key)}>{t.title}<Show when={t.dirty}><span aria-label="Unsaved changes"> *</span></Show><Show when={c.conversations?.status(t.documentId??'')}>{s=><span role="status"> · {s()}</span>}</Show></button><button aria-label={`Close Document: ${t.title}`} onClick={()=>props.port.closeTab?.(t.key)}>×</button></div>}</For><AddConversationTab create={()=>c.run(props.create)}/></div>
    <div ref={viewport} class="dialectic-canvas tw-flint-editor"><div ref={slot} class="tw-flint-slot"/><div ref={surface}/></div>
   </Chrome><Show when={props.port.prompt()} keyed>{prompt=><TextualSavePrompt prompt={prompt} grid={host.grid()}/>}</Show>
  </div>;

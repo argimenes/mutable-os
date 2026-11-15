@@ -15,12 +15,12 @@ import {RANGE_ANCHOR} from './anchors';
 
 export const dialecticApplication=applicationKey<DocumentApplicationPort>('dialectic');
 /** Presentation contribution is independent of the application registration. */
-export function createDialecticTextualFeature(editor:ReactiveEditor,get:(app:DocumentApplicationInstance)=>DialecticController):CodexFeature {
+export function createDialecticTextualFeature(editor:ReactiveEditor,get:(app:DocumentApplicationInstance)=>DialecticController,create:(app:DocumentApplicationInstance)=>void):CodexFeature {
  return {id:'dialectic-textual',activate(scope){scope.own(applicationPresentations(editor).registerPresentation(dialecticApplication,{
   id:'dialectic.textual.editor',workspace:'textual',default:true,entryPriority:1,interaction:'exclusive-session',
   available:()=>editor.features.textualWorkspace&&editor.documentSessions?undefined:'Textual requires retained Document sessions',
   admit:p=>{try{const s=p.session();if(s)editor.documentSessions?.presentations.check(s);}catch(e){return String(e);}},
-  view:p=><DialecticTextual controller={get(p.instance.application)} port={p.instance} active={p.host.active}/>,
+  view:p=><DialecticTextual controller={get(p.instance.application)} port={p.instance} active={p.host.active} create={()=>create(p.instance.application)}/>,
  }));}};
 }
 export function createDialecticFeature(editor:ReactiveEditor):CodexFeature {
@@ -58,6 +58,6 @@ export function createDialecticFeature(editor:ReactiveEditor):CodexFeature {
     const id=createConversation();placement=editor.commands.insert({id:crypto.randomUUID(),type:'window-block',metadata:{title:'Dialectic',position:{x:60,y:65},size:{w:Math.min(1250,Math.max(780,window.innerWidth-120)),h:Math.min(860,Math.max(560,window.innerHeight-130))},...editor.windowManager?.launchMetadata()},children:[conversationTabs([{id,title:'New conversation'}])]},{kind:'at',parentKey:parent,index:0});
    });editor.windowManager?.activatePlacement(placement);
   }},scope.owner));
-  if(editor.features.applicationPresentations)scope.own(editor.featureHost.activate(createDialecticTextualFeature(editor,get)));
+  if(editor.features.applicationPresentations)scope.own(editor.featureHost.activate(createDialecticTextualFeature(editor,get,app=>app.openDocument(createConversation()))));
  }};
 }

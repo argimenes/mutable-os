@@ -46,7 +46,7 @@ try{
  const waitJobs=async count=>{for(let i=0;i<200&&jobs.length<count;i++)await new Promise(r=>setTimeout(r,50));assert.equal(jobs.length,count,await evaluate('document.body.innerText.slice(-5000)'));};
  const type=async text=>{await evaluate(`proof.editor.focus.request(proof.text().key,{reason:'qualification',caret:'end'});true`);await send('Input.insertText',{text},sessionId);};
  const submit=()=>evaluate(`document.querySelector('[aria-label="Submit contribution"]').click();true`);
- const next=()=>evaluate(`[...document.querySelectorAll('.dialectic-app button')].find(b=>b.textContent==='New').click();true`);
+ const next=()=>evaluate(`(()=>{const add=document.querySelector('.dialectic-canvas .dialectic-add-conversation');if(add.parentElement.lastElementChild!==add)throw Error('Add Conversation must follow the last tab');add.click();return true;})()`);
  await evaluate(`proof.firstId=proof.root().payload.id;proof.firstSession=proof.port.session();proof.port.application.renameDocument(proof.firstId,'First conversation');true`);
  await type('Question in A');await submit();await waitJobs(1);
  jobs[0].write('<response><p>A is streaming in its native Document.</p>');
@@ -59,6 +59,10 @@ try{
  await evaluate(`proof.textualSession=proof.port.session();proof.editor.commandRegistry.execute('workspace.presentation.textual',{targetKey:proof.session.projection.state.rootKey,args:undefined})`);
  await wait(`document.querySelector('.dialectic-textual .reactive-standoff-flow')`);assert.equal(jobs[0].signal.aborted,false);assert.equal(jobs[1].signal.aborted,false);assert.equal(await evaluate('proof.port.session()===proof.textualSession'),true);
  assert.equal(await evaluate(`document.querySelectorAll('.dialectic-textual [role="tab"]').length`),2);
+ await evaluate(`(()=>{const add=document.querySelector('.dialectic-textual .dialectic-add-conversation');if(add.parentElement.lastElementChild!==add)throw Error('Textual add control must follow the last tab');add.click();return true;})()`);
+ await wait(`document.querySelectorAll('.dialectic-textual [role="tab"]').length===3`);assert.notEqual(await evaluate('proof.root().payload.id'),await evaluate('proof.secondId'));assert.equal(jobs[0].signal.aborted,false);assert.equal(jobs[1].signal.aborted,false);
+ await evaluate(`proof.port.closeTab(proof.port.activeTab());true`);await wait('proof.port.session()===proof.textualSession');
+
  await evaluate(`proof.editor.commandRegistry.execute('workspace.presentation.desktop',{targetKey:proof.session.projection.state.rootKey,args:undefined})`);await wait(`!document.querySelector('.dialectic-textual')`);assert.equal(await evaluate('proof.port.session()===proof.textualSession'),true);
 
  jobs[1].finish('<response><p>B finished first.</p></response>');await wait(`proof.rows().filter(n=>n.payload.metadata.dialectic.state==='committed').length===2`);

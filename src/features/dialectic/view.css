@@ -187,3 +187,5 @@
 .dialectic-file-confirmation, .dialectic-file-failure { margin-top: 6px; padding: 10px; border: 1px solid #b98535; border-radius: 6px; background: #fff4d9; color: #463315; overflow-wrap: anywhere; }
 .dialectic-file-status p { margin: 6px 0; }
 .dialectic-file-status button { margin-right: 8px; }
+
+.dialectic-app .dialectic-add-conversation{display:inline-flex;align-items:center;justify-content:center;align-self:stretch;flex:none;min-width:36px}
