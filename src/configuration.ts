@@ -86,6 +86,8 @@ export type FeatureFlags = Readonly<{
   windowMaximize: boolean;
   /** Composite Document application; transient tabs share canonical content. */
   flint: boolean;
+  /** Scry slash commands for activating Flint and choosing a native Document. */
+  flintSlashCommands: boolean;
   /** Compact HTML shell, resizable panels and local editor-density preferences. */
   flintCompactShell: boolean;
   /** Vault-scoped list of the ten most recently opened Documents. */
@@ -270,6 +272,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   browserSaveDiagnostics: true,
   windowMaximize: true,
   flint: true,
+  flintSlashCommands: true,
   flintCompactShell: true,
   flintRecentDocuments: true,
   phosphor: true,

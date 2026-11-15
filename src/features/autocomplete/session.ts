@@ -16,10 +16,11 @@ export interface CompletionHost {
   passages?(query:string,strategy:'lexical'|'hybrid',signal:AbortSignal):Promise<{rows:CompletionCandidate[];status:string}>;
   navigatePassage?(row:CompletionCandidate,current:()=>boolean):Promise<void>;
   commands(query?: string): CompletionCandidate[];
+  commandArguments?(query:string): {key:string;query:string;load(signal:AbortSignal):Promise<CompletionCandidate[]>}|undefined;
   valid(source: CompletionSource): boolean;
   commit(source: CompletionSource, entity: CanonicalEntity, text: string): void;
   reference(source: CompletionSource, candidate: CompletionCandidate, text: string): Promise<void>;
-  command(source: CompletionSource, id: string): void;
+  command(source: CompletionSource, id: string, candidate:CompletionCandidate, current:()=>boolean): void|Promise<void>;
   dismiss(keepLiteral?: boolean): void|boolean;
 }
 /** One occurrence, one source bookmark, cancellable optional reads, no canonical state ownership. */
@@ -35,6 +36,8 @@ export class CompletionSession {
   private local: CompletionCandidate[];
   private historyKey?: string;
   private documentPool?: Promise<CompletionCandidate[]>;
+  private commandPools=new Map<string,Promise<CompletionCandidate[]>>();
+  private lifetime=new AbortController();
   constructor(readonly host: CompletionHost, source: CompletionSource, kind: CompletionKind, input: string) {
     this.source = source;
     const parsed = inputParts(kind, input);
@@ -53,15 +56,18 @@ export class CompletionSession {
   move(delta: number) { const rows=this.state.rows.filter(r=>!r.disabled),i=rows.findIndex(r=>r.id===this.state.selected); if(rows.length)this.select(rows[(i+delta+rows.length)%rows.length].id); }
   inventoryChanged() { this.local=this.host.documentEntities(); this.refresh(); }
   clearHistory() { if(this.historyKey)clearUsage(this.historyKey); this.refresh(); }
-  private publish(rows: CompletionCandidate[]) {
-    const parsed=this.parsed, scope=parsed.scope??this.state.scope, ranked=(this.state.kind==='block'?[...new Map(rows.map(r=>[r.id,r])).values()]:rank(rows,parsed.query,scope)).slice(0,100);
+  private publish(rows: CompletionCandidate[],query=this.parsed.query) {
+    const parsed=this.parsed, scope=parsed.scope??this.state.scope, ranked=(this.state.kind==='block'?[...new Map(rows.map(r=>[r.id,r])).values()]:rank(rows,query,scope)).slice(0,100);
     this.set({rows:ranked,selected:ranked.some(r=>r.id===this.state.selected&&!r.disabled)?this.state.selected:ranked.find(r=>!r.disabled)?.id??''});
   }
   suspend() { this.suspended=true;clearTimeout(this.timer);this.controller?.abort();++this.generation;this.set('busy',false); }
   refresh() {
     if(this.suspended||this.disposed)return;
     clearTimeout(this.timer); this.controller?.abort(); const generation=++this.generation;
-    if(this.state.kind==='command'){this.set({busy:false,error:'',selected:''});this.publish(this.host.commands(this.parsed.query));return;}
+    if(this.state.kind==='command'){
+      if(!this.host.commandArguments?.(this.parsed.query)){this.set({busy:false,error:'',selected:''});this.publish(this.host.commands(this.parsed.query));return;}
+      this.publish([]);
+    }
     if(this.state.kind==='block')this.publish([]);
     this.set({busy:true,error:'',retrievalStatus:''}); this.timer=setTimeout(()=>void this.resolve(generation),150);
   }
@@ -71,7 +77,15 @@ export class CompletionSession {
     try {
       const {query,scope:override}=this.parsed, scope=override??this.state.scope;
       const matches=(r: CompletionCandidate)=>!query||r.name.toLocaleLowerCase().includes(query.toLocaleLowerCase());
-      if(this.state.kind==='command') { this.publish(this.host.commands(query)); return; }
+      if(this.state.kind==='command') {
+        const args=this.host.commandArguments?.(query);
+        if(!args){this.publish(this.host.commands(query));return;}
+        let pool=this.commandPools.get(args.key);
+        if(!pool){pool=args.load(this.lifetime.signal);this.commandPools.set(args.key,pool);}
+        const rows=await pool;
+        if(current())this.publish(rows.filter(r=>!args.query||`${r.name} ${r.reason}`.toLocaleLowerCase().includes(args.query.toLocaleLowerCase())),args.query);
+        return;
+      }
       if(this.state.kind==='block') {
         if(!query||!this.host.passages){this.publish([]);return;}
         const lexical=await this.host.passages(query,'lexical',signal);if(!current())return;this.publish(lexical.rows);this.set('retrievalStatus',lexical.status);
@@ -101,7 +115,7 @@ export class CompletionSession {
     try {
       this.assertSource(source);
       if(this.state.kind==='block'){await this.host.navigatePassage?.(row,()=>this.alive&&generation===this.generation);if(this.alive)this.complete();return;}
-      if(this.state.kind==='command') { this.host.command(source,row.id); this.complete(); return; }
+      if(this.state.kind==='command') { const action=this.host.command(source,row.id,row,()=>this.alive&&generation===this.generation);if(action instanceof Promise)await action;if(this.alive)this.complete();return; }
       const label=replace||!this.parsed.mention?row.name:this.parsed.mention;
       if(this.state.kind==='document') { await this.host.reference(source,row,label); if(this.alive)this.complete(); return; }
       this.controller=new AbortController();
@@ -119,5 +133,5 @@ export class CompletionSession {
   fail(error: unknown) { if(this.alive)this.set({error:String(error),pending:false}); }
   complete() { this.set('phase','confirmed');this.close(); }
   close(keepLiteral=false) { if(this.disposed)return;if(this.host.dismiss(keepLiteral)===false)return;if(this.state.phase==='active')this.set('phase','cancelled');this.dispose(); }
-  dispose() { if(this.disposed)return;if(this.state.phase==='active')this.set('phase','cancelled'); this.disposed=true; ++this.generation; clearTimeout(this.timer); this.controller?.abort(); this.host.service?.dispose(); }
+  dispose() { if(this.disposed)return;if(this.state.phase==='active')this.set('phase','cancelled'); this.disposed=true; ++this.generation; clearTimeout(this.timer); this.controller?.abort(); this.lifetime.abort(); this.commandPools.clear(); this.host.service?.dispose(); }
 }

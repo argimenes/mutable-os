@@ -3,7 +3,7 @@ import {RegisteredApplicationView,originPresentationHost} from './application-pr
 import { documentApplicationPorts } from './document-application-ports';
 import { tabOrientation } from '../block-tree/tab-orientation';
 import { tabOrientationMenu } from '../runtime/tab-orientation';
-import {registerCompletionDocuments} from './completion-documents';
+import {registerCompletionDocuments,type FlintDocumentChoice} from './completion-documents';
 import { exportDocument } from '../runtime/export-document';
 import { CollectionDialog } from '../rendering/collection-dialog';
 import {createDocumentSave} from './document-save';
@@ -449,6 +449,8 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
           const revealed=await revealMatch(editor,{id:'flint-navigation',text:'',context:'',captures:[],ranges:[range],path:editor.blockQueries.ancestorPath(node.key).map(n=>n.key),breadcrumb:'',capabilities:{highlight:false,reveal:true,annotate:false,replace:false}},stillCurrent);
           await verify?.();
           if(!revealed||!stillCurrent())throw new Error('Passage is stale or cannot currently be revealed');
+          const windowId=editor.windowManager?.ownerForNode(node.key);
+          if(windowId)editor.windowManager!.lifecycle.reveal(windowId);
           editor.focus.request(node.key,{reason:'flint-navigation'});
           const mount=editor.mounts.get(node.key);
           if(range.coordinate==='cell'&&mount?.restoreInlineSelection){mount.restoreInlineSelection({anchor:range.start,head:range.end});editor.selections.setPrimary(node.key,node.contentKey,node.viewId,range.start,range.end);}
@@ -463,7 +465,48 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
       },accepts:key=>{const node=editor.node(key);return !!node&&[...liveViews.values()].some(view=>view.viewId===node.viewId);}}));
       createEffect(() => { const vault=selectedVault(); untrack(() => facts?.use(vault)); });
       const knowledge = native ? new VaultKnowledge(editor, native, knowledgeHost, undefined, facts) : undefined;
-      if(knowledge)onCleanup(registerCompletionDocuments(editor,{knowledge,accepts:key=>{const active=knowledgeHost.active();return !!active?.projection.node(key);}}));
+      onCleanup(registerCompletionDocuments(editor,{
+        knowledge,key:props.nodeKey,type:definition.type,vault:()=>selectedVault()?.root,
+        openVault:root=>vault?(root?vault.open(root):vault.retry!()):Promise.reject(Error('Native Document persistence is unavailable')),
+        accepts:key=>{const active=knowledgeHost.active();return !!active?.projection.node(key);},
+        documents:()=>{
+          guard();const v=selectedVault(),choices=new Map<string,FlintDocumentChoice>();
+          for(const doc of documents()){
+            const location=native?.location(doc.id);
+            if(location&&v&&!vaultContains(v.root,vaultPath(location)))continue;
+            choices.set(doc.id,{documentId:doc.id,title:doc.title,location,vault:v?.root,disabled:!doc.placement});
+          }
+          for(const doc of v?.listing().documents??[]){
+            const prior=choices.get(doc.resourceId);
+            const ambiguous=doc.state==='ambiguous'||!!prior?.location&&vaultPath(prior.location)!==vaultPath(doc.location);
+            choices.set(doc.resourceId,{documentId:doc.resourceId,title:prior?.title??doc.title??doc.location.filename,location:doc.location,vault:v!.root,disabled:ambiguous||prior?.disabled||['unavailable','pending'].includes(doc.state)});
+          }
+          return [...choices.values()];
+        },
+        async prepareDocument(choice,current){
+          const v=selectedVault();
+          const check=()=>{guard();if(!current()||selectedVault()!==v||choice.vault&&v?.root!==choice.vault)throw Error('Flint Document selection is stale');};
+          check();
+          if(!resolve(choice.documentId)?.placement){
+            if(!v||!choice.location)throw Error('The selected Document is no longer available');
+            await v.refresh();check();
+            const row=v.requireSelectedFile(choice.location),byteHash=row.baseline?.nativeHash;
+            if(row.resourceId!==choice.documentId||!byteHash)throw Error('The selected Document identity changed');
+            await native!.openVerified(choice.location,{resourceId:choice.documentId,byteHash},check,undefined,async()=>{
+              await v.refresh();check();
+              if(v.requireSelectedFile(choice.location!).resourceId!==choice.documentId)throw Error('The selected Document identity changed');
+            });
+            check();
+          }
+          if(!resolve(choice.documentId)?.placement)throw Error('The selected Document is unavailable or ambiguous');
+          return ()=>{guard();openDocument(choice.documentId,true);};
+        },
+        reveal:()=>{
+          guard();const windowId=editor.windowManager?.ownerForNode(props.nodeKey);
+          if(windowId)editor.windowManager!.lifecycle.reveal(windowId);
+          editor.focus.request(props.nodeKey,{reason:'flint-command'});
+        },
+      }));
       const entityList = new DocumentEntityList(entityAnnotations);
       const entityOrigin = createMemo(() => {
         viewRevision();

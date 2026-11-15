@@ -9,7 +9,8 @@ import type { ReactiveEditor } from '../../reactive-editor/editor';
 import type { CodexFeature } from '../../feature-api';
 import { keyboard, chord } from '../../feature-api';
 import { annotationCapabilities } from '../../application/annotation-capabilities';
-import { completionDocuments } from '../../application/completion-documents';
+import { activateCompletionPassage, completionDocuments, flintDocumentChoices, prepareFlintCommand, type FlintDocumentChoice } from '../../application/completion-documents';
+import {flintCommand} from './flint-command';
 import {graphemeBoundaries} from '../../input/graphemes';
 import {moveBoundary,nextWordLength,boundaryNavigator} from './brackets';
 import { invocation } from './model';
@@ -99,10 +100,17 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
      const native=nativeDocumentSession(editor);
      return {rows:result.results.filter((hit:any)=>{const evidence=native.knowledgeEvidence(hit.source.resourceId);return !evidence.location||!native.isDirty(hit.source.resourceId)&&evidence.byteHash===hit.source.sourceHash&&!evidence.pending;}).map((hit:any)=>({id:`${hit.source.resourceId}:${hit.source.spans[0]?.blockGuid}:${hit.source.spans[0]?.start}`,name:hit.text.slice(0,180),reason:`${strategy==='lexical'?'FTS5':'Semantic'} · ${hit.source.path} · ${hit.source.format&&hit.source.format!=='mutable-document'?'Open this legacy source manually to navigate':'saved passage'}`,disabled:!!hit.source.format&&hit.source.format!=='mutable-document',data:hit})),status:'Partial saved-source coverage; unsaved Documents remain outside this index. Indexing and permissions: Workspace → Index Cavern.'};
     }:undefined,
-    navigatePassage:async(row,current)=>completionDocuments(editor,source.nodeKey).activateRetrieval(row.data,current),
+    navigatePassage:async(row,current)=>activateCompletionPassage(editor,source.nodeKey,row.data,current),
     documentEntities:()=>[], // Entity inventory and search belong to LER.
     documents:async()=>{const pool=await completionDocuments(editor,source.nodeKey).completionTargets();return pool.sources.map(t=>({id:t.documentId,name:t.title,reason:`Document · ${t.location}`,data:t}));},
+    commandArguments:query=>{
+     if(!editor.features.flintSlashCommands||!editor.features.flint)return;
+     const parsed=flintCommand(query);if(parsed?.kind!=='document')return;
+     return {key:'flint.documents',query:parsed.query,load:async signal=>(await flintDocumentChoices(editor,source.nodeKey,signal)).map(doc=>({id:`flint.document:${doc.documentId}`,name:doc.title,reason:doc.disabled?'Document unavailable or ambiguous':`Open in Flint · ${doc.location?`${doc.location.folder==='.'?'':doc.location.folder+'/'}${doc.location.filename}`:'Unsaved Document · '+doc.documentId}`,disabled:doc.disabled,data:doc}))};
+    },
     commands:(query='')=>{
+     const flint=editor.features.flintSlashCommands&&editor.features.flint?flintCommand(query):undefined;
+     if(flint)return [{id:'flint.open',name:'flint open',reason:flint.kind==='open'?'Open or activate Flint · add --doc to choose a Document':'Use /flint open or /flint open --doc <Document name>',disabled:flint.kind!=='open'}];
      const tables=tableCommandCandidates(editor,source.nodeKey,query);
      const tabs=tabCommandCandidates(editor,source.nodeKey,query);
      if(editor.features.verticalTabs&&isTabCommandQuery(query))return tabs;
@@ -113,6 +121,7 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
      ...(editor.features.glossMode?[{id:'gloss.create',name:'gloss',reason:'Write a Document-local Gloss'}]:[]),
      {id:'entity',name:'entity',reason:'Resolve an Entity or create explicitly'},
      {id:'link',name:'link',reason:'Reference an available native Document'},
+     ...(editor.features.flintSlashCommands&&editor.features.flint?[{id:'flint.open',name:'flint open',reason:'Open or activate Flint · add --doc to choose a Document'}]:[]),
      ...(editor.features.semanticRetrieval?[{id:'search',name:'search',reason:'Scry: search saved passages, lexical first then semantic'}]:[]),
      {id:'entity.list.open',name:'backlinks',reason:'Open the current Document Entity references'},
      {id:'thesis.createProposition',name:'proposition',reason:'Open a Thesis draft'},
@@ -130,7 +139,18 @@ export function createAutocompleteFeature(editor: ReactiveEditor): CodexFeature 
      restore(s,s.start+[...label].length);
     },
     reference:async(s,c,label)=>{const k=completionDocuments(editor,s.nodeKey),token=k.selection(editor.textRanges.snapshot(s.nodeKey,s.start,s.end));await k.createReference(token,c.data as DocumentTarget,label,()=>session.alive&&valid(s));restore(s,s.start+[...label].length);},
-    command:(s,id)=>{
+    command:(s,id,row,current)=>{
+     if(editor.features.flintSlashCommands&&(id==='flint.open'||id.startsWith('flint.document:'))){
+      return (async()=>{
+       const show=await prepareFlintCommand(editor,s.nodeKey,()=>current()&&valid(s),id==='flint.open'?undefined:row.data as FlintDocumentChoice);
+       session.assertSource(s);
+       show(()=>{
+        if(!valid(s))throw Error('The command source changed');
+        if(s.inline)editor.commands.replaceInlineRange(s.nodeKey,s.start,s.end,'','Run Flint command');
+        session.complete();
+       });
+      })();
+     }
      if(id==='gloss.create'){
       if(!valid(s))throw Error('Stale Gloss source');
       const selection={anchor:s.start,head:s.end};
