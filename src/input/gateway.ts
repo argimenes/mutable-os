@@ -157,6 +157,7 @@ export class InputGateway {
   private onBeforeInput = (event: InputEvent) => {
     const resolved = this.mounts.resolveEvent(event);
     if (!resolved || resolved.handle.inputPolicy !== "standoff" || resolved.handle.composing) return;
+    if (resolved.handle.rangeInput?.beforeInput(event)) return;
     const selection = resolved.handle.captureInlineSelection?.();
     const node = this.node(resolved.nodeKey);
     if (!selection || !node) return;
@@ -190,10 +191,11 @@ export class InputGateway {
         if (itemStart === itemEnd && event.inputType === "deleteContentForward") {
           itemEnd = boundaries.find((boundary) => boundary > itemEnd) ?? node.inlineContent.length;
         }
+        const bounded=resolved.handle.normalizeInlineSelection?.({anchor:itemStart,head:itemEnd});
         return {
           item,
-          start: itemStart,
-          end: itemEnd,
+          start: bounded?.anchor??itemStart,
+          end: bounded?.head??itemEnd,
           text: event.inputType === "insertText" ? event.data ?? "" : "",
         };
       });
@@ -315,6 +317,7 @@ export class InputGateway {
     this.bindings.cancelChord();
     const resolved = this.mounts.resolveEvent(event);
     if (resolved && (resolved.handle.inputPolicy === "native-text" || resolved.handle.inputPolicy === "standoff")) {
+      resolved.handle.rangeInput?.composition(event,'start');
       if(!this.completion?.()?.composition?.(resolved.nodeKey,'start',event.data??''))this.completion?.()?.cancel();
       resolved.handle.composing = true;
       this.caretEvents?.setComposing?.(true);
@@ -326,6 +329,7 @@ export class InputGateway {
     this.caretEvents?.setComposing?.(false);
     if (!resolved) return;
     resolved.handle.composing = false;
+    if(resolved.handle.rangeInput?.composition(event,'end'))return;
     if(this.completion?.()?.composition?.(resolved.nodeKey,'end',event.data??''))return;
     if (resolved.handle.inputPolicy === "native-text" && event.target instanceof HTMLTextAreaElement) {
       this.recordNativeText(resolved.nodeKey, event.target);

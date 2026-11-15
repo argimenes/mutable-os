@@ -27,6 +27,15 @@ export interface MountHandle {
   finishProvisionalComposition?():void;
   /** Native textarea normalization back to authoritative source; called only on input. */
   authoredNativeText?(value: string): string;
+  /** Optional opt-in range policies; absent contracts delegate unchanged. */
+  rangeInput?: {
+    key(event: KeyboardEvent): boolean;
+    beforeInput(event: InputEvent): boolean;
+    composition(event: CompositionEvent, phase: 'start'|'end'): boolean;
+  };
+  normalizeInlineSelection?(selection:{anchor:number;head:number}):{anchor:number;head:number};
+  normalizeInlineBoundary?(index:number,bias:'left'|'right'|'nearest'):number;
+  projectInlineRange?(start:number,end:number): Array<{start:number;end:number}>;
   composing?: boolean;
 }
 

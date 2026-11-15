@@ -143,6 +143,7 @@ export type FeatureFlags = Readonly<{
   compactDocumentMode: boolean;
   compactEditorChrome: boolean;
   textSuperposition: boolean;
+  symbolicEntityAttributes: boolean;
   /** Direct DOM character cells, updated by one reactive effect per paragraph. */
   directDomCharacterCells: boolean;
   /** Native-layout, single-Cell static character surfaces. */
@@ -241,6 +242,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   compactDocumentMode: true,
   compactEditorChrome: true,
   textSuperposition: false,
+  symbolicEntityAttributes: true,
   directDomCharacterCells: true,
   inlineCharacterSurfaces: true,
   glossMode: true,

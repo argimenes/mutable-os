@@ -62,7 +62,9 @@ export class CrossBlockSelection {
     return siblings.slice(Math.min(ai, hi), Math.max(ai, hi) + 1).map(key => {
       const node = this.editor.node(key)!;
       if (node.viewType !== "standoff-editor-block" || !this.visible(key)) throw new Error("Selection cannot cross media, hidden Blocks or structural barriers");
-      return { nodeKey: key, contentKey: node.contentKey, start: key === start.occurrenceKey ? start.boundary.index : 0, end: key === end.occurrenceKey ? end.boundary.index : node.inlineContent.length };
+      const source={anchor:key === start.occurrenceKey ? start.boundary.index : 0,head:key === end.occurrenceKey ? end.boundary.index : node.inlineContent.length};
+      const bounded=this.editor.mounts.get(key)?.normalizeInlineSelection?.(source)??source;
+      return {nodeKey:key,contentKey:node.contentKey,start:bounded.anchor,end:bounded.head};
     });
   }
   resolve(anchor: ViewPosition, head: ViewPosition): TextSegment[] {

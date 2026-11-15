@@ -3,7 +3,7 @@ export {safeUrl} from './inline-values.mjs';
 import type { JsonObject } from '../block-tree/types';
 
 export type Reference = { kind: 'local'; object: 'block' | 'definition' | 'asset'; id: string }
-  | { kind: 'external'; object: 'block' | 'definition' | 'entity' | 'asset'; id: string; source: { cavernId?: string; resourceId?: string } }
+  | { kind: 'external'; object: 'block' | 'definition' | 'entity' | 'entity-attribute' | 'asset'; id: string; source: { cavernId?: string; resourceId?: string } }
   | { kind: 'url'; url: string };
 export interface Property {
   localId: string; type: string; startIndex: number; endIndex: number; isZeroWidth: boolean;
@@ -113,7 +113,7 @@ export function validateFragment(input: unknown): MutableFragment {
   for (const r of references) {
     assert(obj(r));
     if (r.kind === 'local') assert(['block', 'definition', 'asset'].includes(r.object) && ids.get(r.id) === r.object, 'Dangling clipboard reference.');
-    else if (r.kind === 'external') assert(['block', 'definition', 'entity', 'asset'].includes(r.object) && str(r.id) && obj(r.source) && Object.entries(r.source).every(([k, v]) => ['cavernId', 'resourceId'].includes(k) && str(v)));
+    else if (r.kind === 'external') assert(['block', 'definition', 'entity', 'entity-attribute', 'asset'].includes(r.object) && str(r.id) && obj(r.source) && Object.entries(r.source).every(([k, v]) => ['cavernId', 'resourceId'].includes(k) && str(v)));
     else assert(r.kind === 'url' && typeof r.url === 'string'); // Unsafe URLs are quarantined, never opened.
   }
   const placements = new Map(f.placements.map(p => [p.localId, p]));

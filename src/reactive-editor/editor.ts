@@ -1,3 +1,4 @@
+import { SymbolicAttributes } from "../runtime/symbolic-attributes";
 import { MarkdownInput } from '../runtime/markdown-input';
 import { GlossRelationshipController } from "../features/gloss/relationship-controller";
 import { GlossController } from "../features/gloss/controller";
@@ -134,6 +135,7 @@ export class ReactiveEditor {
   setAssetContext(read: () => AssetContext) { this.assetContext = read; }
   readAssetContext() { return this.assetContext(); }
   readonly interchange = new DocumentInterchange(this);
+  readonly symbolicAttributes = new SymbolicAttributes();
   readonly clipboard = new MutableClipboard(this);
   readonly crossText = new CrossBlockSelection(this);
   readonly linkedAnnotations = new LinkedAnnotations(this);

@@ -51,8 +51,12 @@ export class MeasurementService {
     const a=handle.inlineBoundary?.(start),b=handle.inlineBoundary?.(end);if(!a||!b)return [];
     const key=`${nodeKey}:${handle.generation}:${start}:${end}:${frame}`;
     if(this.rangeCache?.key===key)return this.rangeCache.rects;
-    const range=handle.root.ownerDocument.createRange();range.setStart(a.node,a.offset);range.setEnd(b.node,b.offset);
-    const rects=typeof range.getClientRects==='function'?[...range.getClientRects()].filter(r=>r.height>0):[];
+    const parts=handle.projectInlineRange?.(start,end)??[{start,end}];
+    const rects=parts.flatMap(part=>{
+      const from=handle.inlineBoundary!(part.start),to=handle.inlineBoundary!(part.end);
+      const range=handle.root.ownerDocument.createRange();range.setStart(from.node,from.offset);range.setEnd(to.node,to.offset);
+      return typeof range.getClientRects==='function'?[...range.getClientRects()].filter(r=>r.height>0):[];
+    });
     this.rangeCache={key,rects};return rects;
   }
   private rangeCache?:{key:string;rects:DOMRectReadOnly[]};

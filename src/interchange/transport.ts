@@ -12,9 +12,9 @@ const escape = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '
 function encode(s: string) { const bytes = new TextEncoder().encode(s); let binary = ''; for (const b of bytes) binary += String.fromCharCode(b); return btoa(binary); }
 function decode(s: string) { return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(s), c => c.charCodeAt(0))); }
 
-export function exportClipboard(fragment: MutableFragment): ClipboardRepresentations {
+export function exportClipboard(fragment: MutableFragment, displayText?: string): ClipboardRepresentations {
   validateFragment(fragment);
-  const text = fragmentText(fragment), json = JSON.stringify(fragment);
+  const text = displayText ?? fragmentText(fragment), json = JSON.stringify(fragment);
   // Native fidelity lives in the carrier; the visible projection remains useful outside Mutable.
   const representations = { 'text/plain': text, 'text/html': `<div data-mutable-fragment="${encode(json)}"><pre><span>${escape(text)}</span></pre></div>`, [NATIVE_MIME]: json };
   if (Object.values(representations).reduce((n, value) => n + new TextEncoder().encode(value).length, 0) > LIMITS.bytes) throw Error('Selection exceeds the clipboard transport limit. Copy a smaller selection; nothing was removed.');

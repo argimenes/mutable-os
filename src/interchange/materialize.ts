@@ -14,7 +14,7 @@ import type { ContentRecord, JsonObject, RepositoryState } from '../block-tree/t
 import { LIMITS, safeUrl, validateFragment, type InterchangeScope, type MutableFragment, type Reference } from './fragment';
 
 const passiveBlocks = new Set(['surface-block','side-block','resource-information-block','standoff-editor-block', 'plain-text-block', 'document-block', 'container-block', 'book-block', 'page-block', 'fixed-size-page-block', 'left-margin-block', 'right-margin-block', 'indented-list-block', 'table-block', 'table-row-block', 'table-cell-block', 'grid-block', 'grid-row-block', 'grid-cell-block', 'tab-row-block', 'tab-block', 'document-tab-row-block', 'document-tab-block']);
-const passiveProperties = new Set(['style/bold', 'style/italics', 'style/underline', 'style/strikethrough', 'style/strike', 'style/superscript', 'style/subscript', 'style/uppercase', 'style/highlight', 'style/highlighter', 'style/rectangle', 'style/rainbow', 'style/spiky', 'style/blur', 'style/glow', 'style/ghost', 'style/grayscale', 'style/sepia', 'style/invert', 'style/contrast-brightness', 'style/chromatic-aberration', 'style/motion-blur', 'style/grain', 'style/ink-bleed', 'style/turbulence', 'style/color', 'text/colour', 'text/background-colour', 'reference/url', 'codex/entity-reference', 'codex/block-reference']);
+const passiveProperties = new Set(['mutable/symbolic-reference', 'style/bold', 'style/italics', 'style/underline', 'style/strikethrough', 'style/strike', 'style/superscript', 'style/subscript', 'style/uppercase', 'style/highlight', 'style/highlighter', 'style/rectangle', 'style/rainbow', 'style/spiky', 'style/blur', 'style/glow', 'style/ghost', 'style/grayscale', 'style/sepia', 'style/invert', 'style/contrast-brightness', 'style/chromatic-aberration', 'style/motion-blur', 'style/grain', 'style/ink-bleed', 'style/turbulence', 'style/color', 'text/colour', 'text/background-colour', 'reference/url', 'codex/entity-reference', 'codex/block-reference']);
 const blockProperties = new Set(['block/alignment', 'block/alignment/left', 'block/alignment/right', 'block/alignment/center', 'block/font/size', 'block/font/size/h1', 'block/font/size/h2', 'block/font/size/h3', 'block/font/size/h4', 'block/font/size/half', 'block/font/size/three-quarters', 'block/indent', 'block/margin/top/20px', 'block/margin/top/40px']);
 export const opaque = (type: string, data: JsonObject, target?: Reference) => {
   const original = { type, data: clone(data), ...(target ? { target: clone(target) } : {}) };
@@ -45,11 +45,12 @@ export function materializeFragment(input: MutableFragment, scope: InterchangeSc
       if (target.object === 'definition') { annotationId = definitions.get(target.id); resolved = !!annotationId; }
       else if (target.object === 'block') { value = ids.get(target.id); resolved = !!value; }
     } else if (target?.kind === 'external') {
-      resolved = allowExternalEntities && sameScope(target) && target.object === 'entity' || localExternalBlock(target); value = target.id;
+      resolved = allowExternalEntities && sameScope(target) && (target.object === 'entity' || target.object === 'entity-attribute') || localExternalBlock(target); value = target.id;
     }
     // A forged raw value is not a scoped semantic target.
-    if (['codex/entity-reference', 'codex/block-reference', 'reference/url'].includes(type) && !target) resolved = false;
+    if (['mutable/symbolic-reference', 'codex/entity-reference', 'codex/block-reference', 'reference/url'].includes(type) && !target) resolved = false;
     if (target && !(target.kind === 'local' && target.object === 'definition')) {
+      if (type === 'mutable/symbolic-reference') resolved &&= target.kind === 'external' && target.object === 'entity-attribute';
       if (type === 'codex/entity-reference') resolved &&= target.kind === 'external' && target.object === 'entity';
       if (type === 'codex/block-reference') resolved &&= target.kind !== 'url' && target.object === 'block';
       if (type === 'reference/url') resolved &&= target.kind === 'url';

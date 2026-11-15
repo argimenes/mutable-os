@@ -22,6 +22,8 @@
 // BENCHMARK_LER=live|review opens LER with an isolated resolver. BENCHMARK_LER_INSIDE=1 types inside a linked span.
 // BENCHMARK_TAB_ORIENTATION=horizontal|vertical sets existing TabRows before measurement.
 // Native binding/listing responses are local stubs: no user vault is opened.
+// BENCHMARK_SYMBOLIC=off|none|range|adjacent qualifies the Stage 1 presentation contract.
+// BENCHMARK_SYMBOLIC_QUALIFY=1 additionally runs Chromium interaction/geometry checks.
 // Reports handler and queued-caret costs separately; headless animation-frame
 // timings are diagnostic, not an input-to-display latency guarantee.
 import {spawn} from 'node:child_process';
@@ -44,7 +46,7 @@ const vite=await createServer({plugins:[{
  import {materializeLocalWorkspace} from '/src/reactive-editor/workspace-manifest.ts';
  import '/src/index.css';
  import '/src/demo/workspace-demo.css';
- const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{glossGraphNavigation:${process.env.BENCHMARK_GLOSS_NAVIGATION!=='false'},glossArgumentExplorer:${process.env.BENCHMARK_GLOSS_ARGUMENT!=='false'},glossMermaidGraph:${process.env.BENCHMARK_GLOSS_MERMAID!=='false'},glossRelationshipAuthoring:${process.env.BENCHMARK_GLOSS_RELATIONSHIP_AUTHORING!=='false'},glossRelationships:${process.env.BENCHMARK_GLOSS_RELATIONSHIPS!=='false'},glossMode:${process.env.BENCHMARK_GLOSS!=='false'},scryProvisionalCells:${process.env.BENCHMARK_PROVISIONAL_SCRY!=='false'},autocompleteWorkstation:${process.env.BENCHMARK_AUTOCOMPLETE!=='false'},everydayWebResources:${process.env.BENCHMARK_EVERYDAY_WEB!=='false'},webResourceViewers:${process.env.BENCHMARK_WEB_RESOURCES!=='false'},deterministicAcademicResources:${process.env.BENCHMARK_DETERMINISTIC_ACADEMIC!=='false'},flintRecentDocuments:${process.env.BENCHMARK_FLINT_RECENTS!=='false'},webPublishing:${process.env.BENCHMARK_WEB_PUBLISHING!=='false'},applicationServices:${process.env.BENCHMARK_APPLICATION_SERVICES!=='false'},documentInterchange:${process.env.BENCHMARK_DOCUMENT_INTERCHANGE!=='false'},mutableClipboard:${process.env.BENCHMARK_MUTABLE_CLIPBOARD!=='false'},nativeDocumentPersistence:${!!process.env.BENCHMARK_VAULT_SIZE},nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,flintSceneChrome:true,annotationRangeEvents:${process.env.BENCHMARK_ANNOTATION_RANGE_EVENTS!=='false'},caretModes:${process.env.BENCHMARK_CARET_MODES!=='false'},standoffPropertyRendering:${process.env.BENCHMARK_STANDOFF_RENDERING!=='false'}}});
+ const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[]}),{features:{symbolicEntityAttributes:${process.env.BENCHMARK_SYMBOLIC!=='off'},glossGraphNavigation:${process.env.BENCHMARK_GLOSS_NAVIGATION!=='false'},glossArgumentExplorer:${process.env.BENCHMARK_GLOSS_ARGUMENT!=='false'},glossMermaidGraph:${process.env.BENCHMARK_GLOSS_MERMAID!=='false'},glossRelationshipAuthoring:${process.env.BENCHMARK_GLOSS_RELATIONSHIP_AUTHORING!=='false'},glossRelationships:${process.env.BENCHMARK_GLOSS_RELATIONSHIPS!=='false'},glossMode:${process.env.BENCHMARK_GLOSS!=='false'},scryProvisionalCells:${process.env.BENCHMARK_PROVISIONAL_SCRY!=='false'},autocompleteWorkstation:${process.env.BENCHMARK_AUTOCOMPLETE!=='false'},everydayWebResources:${process.env.BENCHMARK_EVERYDAY_WEB!=='false'},webResourceViewers:${process.env.BENCHMARK_WEB_RESOURCES!=='false'},deterministicAcademicResources:${process.env.BENCHMARK_DETERMINISTIC_ACADEMIC!=='false'},flintRecentDocuments:${process.env.BENCHMARK_FLINT_RECENTS!=='false'},webPublishing:${process.env.BENCHMARK_WEB_PUBLISHING!=='false'},applicationServices:${process.env.BENCHMARK_APPLICATION_SERVICES!=='false'},documentInterchange:${process.env.BENCHMARK_DOCUMENT_INTERCHANGE!=='false'},mutableClipboard:${process.env.BENCHMARK_MUTABLE_CLIPBOARD!=='false'},nativeDocumentPersistence:${!!process.env.BENCHMARK_VAULT_SIZE},nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false,flintSceneChrome:true,annotationRangeEvents:${process.env.BENCHMARK_ANNOTATION_RANGE_EVENTS!=='false'},caretModes:${process.env.BENCHMARK_CARET_MODES!=='false'},standoffPropertyRendering:${process.env.BENCHMARK_STANDOFF_RENDERING!=='false'}}});
  const editor=session.editor;
  const bank=editor.commands.insert({type:'workspace-object-bank-block',children:[]},{kind:'at',parentKey:session.projection.state.rootKey,index:0});
  const {admitNative}=await import('/src/persistence/native-resource.ts');
@@ -143,6 +145,12 @@ try{
   await evaluate('new Promise(r=>setTimeout(r,350))');
   await evaluate(`proof.lerReads=0;proof.lerSearches=0;proof.editor.focus.request(proof.text.key);proof.flow.focus();proof.mount.restoreInlineSelection({anchor:${process.env.BENCHMARK_LER_INSIDE==='1'?2:100},head:${process.env.BENCHMARK_LER_INSIDE==='1'?2:100}})`);
  }
+ if(['range','adjacent'].includes(process.env.BENCHMARK_SYMBOLIC))await evaluate(`(()=>{
+   const start=${process.env.BENCHMARK_SYMBOLIC==='adjacent'?87:20};
+   proof.editor.symbolicAttributes.set('11111111-1111-4111-8111-111111111111','L. Carroll');
+   proof.editor.commands.setPayloadField(proof.text.key,'standoffProperties',[...JSON.parse(JSON.stringify(proof.text.payload.standoffProperties??[])),{id:'benchmark-symbolic',type:'mutable/symbolic-reference',value:'11111111-1111-4111-8111-111111111111',start,end:start+12}]);
+   proof.mount.focus();proof.mount.restoreInlineSelection({anchor:100,head:100});
+ })()`);
  const screenshot=await send('Page.captureScreenshot',{format:'png'},sessionId);await writeFile(path.join(artifacts,'caret-mode.png'),Buffer.from(screenshot.data,'base64'));
  await send('Profiler.enable',{},sessionId);await send('Profiler.setSamplingInterval',{interval:200},sessionId);await send('Profiler.start',{},sessionId);
  if(process.env.BENCHMARK_PUBLICATION_LOAD==='1')serviceLoad=await (await import('./publication-typing-load.mjs')).startPublicationTypingLoad();
@@ -260,6 +268,7 @@ try{
    assert.equal(await evaluate('proof.editor.pointerSpotlight.active()'),false);
    console.log('Pointer spotlight scrolling, leave and toggle cleanup: passed');
  }
+ if(process.env.BENCHMARK_SYMBOLIC_QUALIFY==='1')await (await import('./qualify-symbolic-browser.mjs')).qualifySymbolic({send,evaluate,sessionId,artifacts});
  await evaluate('proof.dispose();proof.session.dispose()');
 }finally{await serviceLoad?.stop();socket?.close();chrome.kill();await vite.close();await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
 process.exit(0);

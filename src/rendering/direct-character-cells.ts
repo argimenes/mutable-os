@@ -12,6 +12,7 @@ export interface CharacterCellPresentation {
   classes?: string;
   hiddenSource?: boolean;
   image?: { asset?: ManagedAssetReference; src: string; alt: string; label: string; width?: number; height?: number };
+  symbolic?: { id: string; start: number; end: number; value?: string; style?: JSX.CSSProperties };
   alternative?: { id: string; end: number; cells: CharacterCellPresentation[] };
 }
 
@@ -19,6 +20,8 @@ type Entry = {
   element: HTMLSpanElement;
   kind: "text" | "image" | "alternative";
   text?: string;
+  symbolic?: boolean;
+  symbolicStyle?: JSX.CSSProperties;
   style?: JSX.CSSProperties;
   alternative?: DirectCharacterCells;
   assetKey?: string;
@@ -119,15 +122,36 @@ export class DirectCharacterCells {
         setAttribute(element, "data-superposition-id", cell.alternative.id);
         entry.alternative!.update(cell.alternative.cells);
       } else {
-        // An annotation-only update must not overwrite uncommitted browser/IME
-        // text. Reconcile it when the canonical cell sequence or text changes.
-        if (sequenceChanged || entry.text !== cell.text) {
-          const text = element.firstChild;
-          if (text?.nodeType === 3 && element.childNodes.length === 1) {
-            if (text.nodeValue !== cell.text) text.nodeValue = cell.text;
-          } else element.replaceChildren(document.createTextNode(cell.text));
-          entry.text = cell.text;
+        const symbolic = cell.symbolic;
+        if (symbolic) {
+          if (!entry.symbolic) {
+            const source = document.createElement('span'); source.dataset.symbolicSource = 'true';
+            source.hidden = true; source.setAttribute('aria-hidden','true');
+            source.appendChild(document.createTextNode(cell.text)); element.replaceChildren(source);
+          }
+          const source = element.firstChild!;
+          if (source.textContent !== cell.text) source.textContent = cell.text;
+          const first = cell.index === symbolic.start;
+          let display = element.querySelector<HTMLElement>('[data-symbolic-display]');
+          if (first) {
+            if (!display) { display=document.createElement('span'); display.dataset.symbolicDisplay=symbolic.id; display.contentEditable='false'; element.appendChild(display); }
+            if (display.textContent !== symbolic.value) display.textContent=symbolic.value ?? '';
+            if(entry.symbolicStyle!==symbolic.style){display.style.cssText='';for(const [name,value] of Object.entries(symbolic.style??{}))display.style.setProperty(name,String(value));entry.symbolicStyle=symbolic.style;}
+          } else display?.remove();
+          element.hidden=!first; element.contentEditable='false';
+          setAttribute(element,'data-symbolic-start',String(symbolic.start));
+          setAttribute(element,'data-symbolic-end',String(symbolic.end));
+        } else {
+          if(entry.symbolic){entry.symbolicStyle=undefined;element.removeAttribute('hidden');element.removeAttribute('contenteditable');element.removeAttribute('data-symbolic-start');element.removeAttribute('data-symbolic-end');}
+          // Keep native uncommitted DOM intact on annotation-only updates.
+          if (entry.symbolic || sequenceChanged || entry.text !== cell.text) {
+            const text = element.firstChild;
+            if (text?.nodeType === 3 && element.childNodes.length === 1) {
+              if (text.nodeValue !== cell.text) text.nodeValue = cell.text;
+            } else element.replaceChildren(document.createTextNode(cell.text));
+          }
         }
+        entry.symbolic=!!symbolic; entry.text=cell.text;
         setAttribute(element, "aria-hidden", cell.hiddenSource ? "true" : undefined);
         if (entry.style !== cell.style) {
           for (const name of Object.keys(entry.style ?? {})) if (!(name in (cell.style ?? {}))) element.style.removeProperty(name);

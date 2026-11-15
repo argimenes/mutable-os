@@ -1,3 +1,5 @@
+import { symbolicRanges, symbolicAt, symbolicBoundary, symbolicSelection, SYMBOLIC_ATTRIBUTE, type SymbolicRange } from '../runtime/symbolic-attributes';
+import { symbolicInput } from './symbolic-input';
 import {observeFontLayout} from './font-layout';
 import { CharacterSurfaceHost, type CharacterSurfaceRequest } from './character-surface-host';
 import { TaskControl, StandaloneTaskDisclosure } from './task-control';
@@ -35,6 +37,7 @@ function pointBoundary(root: HTMLElement, node: Node | null, offset: number): nu
     const childOffset = Math.max(0, Math.min(offset, root.childNodes.length));
     const previous = root.childNodes[childOffset - 1];
     if (previous instanceof HTMLElement) {
+      if(previous.dataset.symbolicEnd!==undefined)return Number(previous.dataset.symbolicEnd);
       const projectedEnd = Number(previous.dataset.superpositionEnd);
       if (Number.isInteger(projectedEnd)) return projectedEnd + 1;
       const inlineIndex = Number(previous.dataset.inlineIndex);
@@ -52,6 +55,7 @@ function pointBoundary(root: HTMLElement, node: Node | null, offset: number): nu
   const cell = element?.closest<HTMLElement>("[data-inline-index]");
   if (cell && root.contains(cell)) {
     const index = Number(cell.dataset.inlineIndex ?? 0);
+    if(cell.dataset.symbolicStart!==undefined)return offset>0?Number(cell.dataset.symbolicEnd):Number(cell.dataset.symbolicStart);
     const projectedEnd = Number(cell.dataset.superpositionEnd);
     if (Number.isInteger(projectedEnd)) return offset > 0 ? projectedEnd + 1 : index;
     if (cell.classList.contains("reactive-inline-image")) return index + (offset > 0 ? 1 : 0);
@@ -92,16 +96,23 @@ function rangeFragments(
   const startNode = startCell.firstChild ?? startCell;
   const endNode = endCell.firstChild ?? endCell;
   const range = document.createRange();
+  if(startCell.hasAttribute("data-symbolic-start")||endCell.hasAttribute("data-symbolic-start")){range.setStart(flow,start);range.setEnd(flow,endInclusive+1);}
+  else {
   range.setStart(startNode, 0);
   range.setEnd(
     endNode,
     endNode.nodeType === Node.TEXT_NODE ? endNode.textContent?.length ?? 0 : endNode.childNodes.length,
   );
+  }
   const surfaceRect = surface.getBoundingClientRect();
   const rects = typeof range.getClientRects === "function" ? [...range.getClientRects()] : [];
   const fragments = rects
     .filter((rect) => rect.width > 0 || rect.height > 0)
     .map((rect) => localFragment(rect, surfaceRect, surface, scale));
+  return mergeFragments(fragments);
+}
+
+function mergeFragments(fragments:VisualFragment[]):VisualFragment[]{
   return fragments.reduce<VisualFragment[]>((merged, fragment) => {
     const previous = merged.at(-1);
     const sameLine = previous && Math.abs(previous.y - fragment.y) < 2 && Math.abs(previous.height - fragment.height) < 2;
@@ -336,6 +347,30 @@ export function StandoffEditorView(props: BlockViewProps) {
   const annotations = createMemo(
     () => ((node()?.payload.standoffProperties as StandoffAnnotation[] | undefined) ?? []).map(property => editor.linkedAnnotations.resolve(property, node()?.contentKey) as StandoffAnnotation),
   );
+  const [symbolicComposing,setSymbolicComposing]=createSignal(false);
+  const emptySymbolic: SymbolicRange[]=[];
+  let heldSymbolic=emptySymbolic;
+  const symbolic = createMemo(() => {
+    if(symbolicComposing())return heldSymbolic;
+    return heldSymbolic=editor.features.symbolicEntityAttributes && annotations().some(p=>p.type===SYMBOLIC_ATTRIBUTE&&!p.isDeleted)
+      ? symbolicRanges(annotations(), node()?.inlineContent.length??0, id=>editor.symbolicAttributes.read(id)) : emptySymbolic;
+  });
+  const atomicSelection = (s:{anchor:number;head:number}) => symbolicSelection(symbolic(),s);
+  // Formatting covering the complete atom can be projected. Partial formatting
+  // remains on its source characters and is not invented for the substituted run.
+  const symbolicDisplays=createMemo(()=>new Map(symbolic().map(r=>[r.id,{
+    ...r, value:r.value??node()!.inlineContent.slice(r.start,r.end).map(k=>String(projection.state.nodes[k]?.payload.text??'')).join(''),
+    style:cellStyleAt(compileCellStyleRuns(annotations().filter(p=>hasActiveRange(p)&&p.start<=r.start&&p.end>=r.end-1)),r.start),
+  }])));
+  const projectRange=(start:number,end:number)=>{
+    const result:Array<{start:number;end:number}>=[];let cursor=start;
+    for(const r of symbolic()){
+      if(r.end<=start||r.start>=end)continue;
+      if(start<=r.start&&end>=r.end)continue;
+      if(cursor<r.start)result.push({start:cursor,end:r.start});cursor=Math.max(cursor,r.end);
+    }
+    if(cursor<end)result.push({start:cursor,end});return result;
+  };
   const identities = editor.features.standoffPropertyRendering ? editor.annotationIdentities.acquire(node()!.contentKey) : undefined;
   onCleanup(() => identities?.dispose());
   const annotationKey = (annotation: StandoffAnnotation, index: number) => identities?.keys()[index]
@@ -388,10 +423,11 @@ export function StandoffEditorView(props: BlockViewProps) {
     return JSON.stringify(set?.items.filter(item => item.anchor.boundary.index !== item.head.boundary.index)
       .map(item => [item.id,item.anchor.boundary.index,item.head.boundary.index,item.id === set.primaryId]) ?? []);
   });
-  const superpositions = createMemo(() => editor.features.textSuperposition ? textSuperpositions(node()) : []);
+  const conflictingSymbolic=(start:number,end:number)=>editor.features.symbolicEntityAttributes&&annotations().some(p=>p.type===SYMBOLIC_ATTRIBUTE&&hasActiveRange(p)&&p.start<=end&&p.end>=start);
+  const superpositions = createMemo(() => editor.features.textSuperposition ? textSuperpositions(node()).map(p=>conflictingSymbolic(p.start,p.end)?{...p,active:'source' as const}:p) : []);
   const showHideRanges = createMemo(() => annotations().map((annotation, index) => ({ annotation, id: annotation.id ?? index }))
     .filter(({ annotation }) => annotation.type === "style/show-hide" && hasActiveRange(annotation)));
-  const concealedRanges = createMemo(() => showHideRanges().filter(({ id }) => !editor.showHide.shows(props.nodeKey, id)));
+  const concealedRanges = createMemo(() => showHideRanges().filter(({ id,annotation }) => !editor.showHide.shows(props.nodeKey, id)&&!conflictingSymbolic(Number(annotation.start),Number(annotation.end))));
   const selectedShowHideRanges = createMemo(() => showHideRanges().filter(({ id }) => editor.showHide.shows(props.nodeKey, id) && editor.showHide.selectionActive(props.nodeKey, id)));
   const cellStyles = createMemo(() => compileCellStyleRuns(annotations()), undefined, {
     equals: (previous, next) => JSON.stringify(previous) === JSON.stringify(next),
@@ -428,13 +464,15 @@ export function StandoffEditorView(props: BlockViewProps) {
   const captureSelection = () => {
     const selection = document.getSelection();
     if (!selection || !selection.rangeCount || !flow.contains(selection.anchorNode) || !flow.contains(selection.focusNode)) return undefined;
-    return {
-      anchor: logical(pointBoundary(flow, selection.anchorNode, selection.anchorOffset)),
-      head: logical(pointBoundary(flow, selection.focusNode, selection.focusOffset)),
-    };
+    const raw={anchor:logical(pointBoundary(flow,selection.anchorNode,selection.anchorOffset)),head:logical(pointBoundary(flow,selection.focusNode,selection.focusOffset))};
+    const normalized=rangeInput.normalize(raw);
+    const inside=(node:Node|null)=>(node instanceof Element?node:node?.parentElement)?.closest('[data-symbolic-start]');
+    if(symbolic().length && !symbolicComposing() && (raw.anchor!==normalized.anchor||raw.head!==normalized.head||inside(selection.anchorNode)||inside(selection.focusNode)))restoreSelection(normalized);
+    return normalized;
   };
 
   const restoreSelection = (selection: { anchor: number; head: number }) => {
+    selection=atomicSelection(selection);
     const nativeSelection = document.getSelection();
     if (!nativeSelection) return;
     const anchor = restoreBoundary(flow, presented(selection.anchor));
@@ -453,11 +491,15 @@ export function StandoffEditorView(props: BlockViewProps) {
     }
   };
 
+  const rangeInput=symbolicInput(editor,props.nodeKey,()=>flow,symbolic,captureSelection,restoreSelection,setSymbolicComposing);
+  onCleanup(()=>rangeInput.dispose());
+
   const measure = () => {
     frame = 0;
-    if(disposed || !editor.visualEffects.alive() || activity && !activity().visible)return;
+    if(disposed || symbolicComposing() || !editor.visualEffects.alive() || activity && !activity().visible)return;
     characterHost?.measure();
     const scale = coordinates?.scale() ?? 1;
+    const surfaceRect = surface.getBoundingClientRect();
     const foreground: DecorationShape[] = [];
     const occupied: UnderlineLane[] = [];
     const highlighters: DecorationShape[] = [];
@@ -467,9 +509,14 @@ export function StandoffEditorView(props: BlockViewProps) {
       let fragments = fragmentCache.get(key);
       if (!fragments) {
         const d=draft();
-        fragmentCache.set(key, fragments = rangeFragments(flow, surface,
-          d?d.toPresentation(d.canonicalToDraft(start)):start,
-          d?d.toPresentation(d.canonicalToDraft(end+1,true))-1:end, scale));
+        if(symbolic().length&&!d){
+          fragments=mergeFragments(editor.measurements.retainedRangeRects(props.nodeKey,start,end+1,editor.repository.readState().contents[node()!.contentKey].revision,surfaceRect,scale)
+            .filter(r=>r.width>0).map(r=>localFragment(r,surfaceRect,surface,scale)));
+          fragmentCache.set(key,fragments);return fragments;
+        }
+        fragmentCache.set(key, fragments = projectRange(start,end+1).flatMap(part=>rangeFragments(flow, surface,
+          d?d.toPresentation(d.canonicalToDraft(part.start)):part.start,
+          d?d.toPresentation(d.canonicalToDraft(part.end,true))-1:part.end-1, scale)));
       }
       return fragments;
     };
@@ -505,7 +552,6 @@ export function StandoffEditorView(props: BlockViewProps) {
       });
     });
     const superpositionRegions: SuperpositionAnchor[] = [];
-    const surfaceRect = surface.getBoundingClientRect();
     for (const property of superpositions()) {
       if (property.visible === false) continue;
       const alternativeKey = node()?.ownedRelations[property.alternatives[0]];
@@ -574,7 +620,7 @@ export function StandoffEditorView(props: BlockViewProps) {
 
   let caretSurface: ReturnType<typeof editor.caretModes.mount> | undefined;
   const scheduleMeasure = () => {
-    if(disposed || !editor.visualEffects.alive())return;
+    if(disposed || symbolicComposing() || !editor.visualEffects.alive())return;
     untrack(() => editor.caretModes.invalidateLayout(props.nodeKey));
     if (frame) {
       if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
@@ -604,7 +650,7 @@ export function StandoffEditorView(props: BlockViewProps) {
         const nextKey=owner?.inlineContent[end],next=String(nextKey?projection.state.nodes[nextKey]?.payload.text??'':'');
         // A combining continuation is not a single-Cell grapheme.
         if(cell?.viewType!=='text-cell'||! /^[A-Z]$/.test(text)||/^[\p{Mark}\u200c\u200d\u202a-\u202e\u2066-\u2069]/u.test(next))continue;
-        if(concealedRanges().some(r=>hasActiveRange(r.annotation)&&r.annotation.start<=start&&r.annotation.end>=start)||superpositions().some(r=>r.active!=='source'&&r.start<=start&&r.end>=start))continue;
+        if(symbolicAt(symbolic(),start)||concealedRanges().some(r=>hasActiveRange(r.annotation)&&r.annotation.start<=start&&r.annotation.end>=start)||superpositions().some(r=>r.active!=='source'&&r.start<=start&&r.end>=start))continue;
         const element=flow.children[start] as HTMLElement|undefined;
         if(!element||element.dataset.inlineKey!==cellKey)continue;
         requests.push({identity:key,cell:element,text,renderer,params:binding.params()});
@@ -620,6 +666,10 @@ export function StandoffEditorView(props: BlockViewProps) {
       root,
       focusElement: flow,
       inputPolicy: "standoff",
+      rangeInput,
+      normalizeInlineSelection:atomicSelection,
+      normalizeInlineBoundary:(index,bias)=>symbolicBoundary(symbolic(),index,bias),
+      projectInlineRange:projectRange,
       focus: () => flow.focus({ preventScroll: true }),
       captureInlineSelection: captureSelection,
       restoreInlineSelection: restoreSelection,
@@ -641,6 +691,13 @@ export function StandoffEditorView(props: BlockViewProps) {
       },
       inlinePoint: (node, offset) => flow.contains(node) ? logical(pointBoundary(flow, node, offset)) : undefined,
       inlinePointAt: (x, y) => {
+        const hit=document.elementFromPoint?.(x,y)?.closest<HTMLElement>('[data-symbolic-display]');
+        if(hit&&flow.contains(hit)){
+          const host=hit.parentElement!,start=Number(host.dataset.symbolicStart),end=Number(host.dataset.symbolicEnd);
+          const rects=editor.measurements.retainedRangeRects(props.nodeKey,start,end,editor.repository.readState().contents[node()!.contentKey].revision,surface.getBoundingClientRect(),coordinates?.scale()??1);
+          const box=rects.find(r=>r.width>0&&y>=r.top&&y<=r.bottom)??rects.find(r=>r.width>0);
+          if(box)return x<(box.left+box.right)/2?start:end;
+        }
         // Browser caret hit tests can remain pinned to the active editing host
         // while dragging. Resolve against the actual paragraph under the pointer.
         let closest = 0, distance = Infinity;
@@ -649,18 +706,20 @@ export function StandoffEditorView(props: BlockViewProps) {
             const dy = Math.max(rect.top - y, 0, y - rect.bottom);
             const dx = Math.max(rect.left - x, 0, x - rect.right);
             const score = dy * dy * 10000 + dx * dx;
-            if (score < distance) { distance = score; closest = index + (x >= (rect.left + rect.right) / 2 ? 1 : 0); }
+            if (score < distance) { distance = score; closest = x >= (rect.left + rect.right) / 2 ? Number((cell as HTMLElement).dataset.symbolicEnd??index+1) : index; }
           }
         });
-        return logical(closest);
+        return symbolicBoundary(symbolic(),logical(closest));
       },
       inlineBoundary: index => {
         index=presented(index);
+        if(symbolic().length)return restoreBoundary(flow,index);
         const cell = flow.children[Math.min(index, flow.children.length - 1)];
         if (cell?.firstChild?.nodeType === Node.TEXT_NODE) return { node: cell.firstChild, offset: index < flow.children.length ? 0 : cell.firstChild.textContent!.length };
         return restoreBoundary(flow, index);
       },
-      captureText: () => draft()?.text() ?? (node()?.inlineContent ?? []).map((cellKey, index) => {
+      captureText: () => symbolicComposing() ? (node()?.inlineContent??[]).map(k=>String(projection.state.nodes[k]?.payload.text??'')).join('') : draft()?.text() ?? (node()?.inlineContent ?? []).map((cellKey, index) => {
+        if(symbolicAt(symbolic(),index))return String(projection.state.nodes[cellKey]?.payload.text??"");
         const projected = superpositions().some(property => property.active !== "source" && property.start <= index && property.end >= index);
         return projected
           ? String(projection.state.nodes[cellKey]?.payload.text ?? "")
@@ -673,7 +732,7 @@ export function StandoffEditorView(props: BlockViewProps) {
     }
     onCleanup(observeFontLayout(surface,()=>{editor.measurements.invalidateRanges(props.nodeKey);scheduleMeasure();}));
     if (typeof ResizeObserver !== "undefined") {
-      observer = new ResizeObserver(scheduleMeasure);
+      observer = new ResizeObserver(()=>{if(symbolic().length)editor.measurements.invalidateRanges(props.nodeKey);scheduleMeasure();});
       observer.observe(surface);
     }
     if (typeof IntersectionObserver !== "undefined") {
@@ -688,6 +747,13 @@ export function StandoffEditorView(props: BlockViewProps) {
         scheduleMeasure();
       });
     });
+  });
+
+  let hadSymbolic=false;
+  createEffect(()=>{
+    const displays=symbolicDisplays();if(symbolicComposing())return;
+    if(!displays.size&&!hadSymbolic)return;hadSymbolic=!!displays.size;
+    untrack(()=>{editor.measurements.invalidateRanges(props.nodeKey);editor.measurements.releaseCaret(props.nodeKey);scheduleMeasure();});
   });
 
   createEffect(() => {
@@ -721,6 +787,7 @@ export function StandoffEditorView(props: BlockViewProps) {
     characterHost?.dispose();
     caretSurface?.dispose();
     editor.measurements.releaseCaret(props.nodeKey);
+    if(hadSymbolic)editor.measurements.invalidateRanges(props.nodeKey);
     disposeMount?.();
     editor.annotationEvents.remove(props.nodeKey);
     observer?.disconnect();
@@ -754,7 +821,9 @@ export function StandoffEditorView(props: BlockViewProps) {
               const projected = () => superpositions().find(property =>
                 property.active !== "source" && sourceIndex() >= property.start && sourceIndex() <= property.end &&
                 !!node()?.ownedRelations[property.active]);
+              const atom=()=>symbolicDisplays().get(symbolicAt(symbolic(),sourceIndex())?.id??'');
               return (
+                <Show when={atom()} fallback={
                 <Show when={!projected() || sourceIndex() === projected()!.start} fallback={<span
                   class={["reactive-superposition-source-cell",classesAt(rendering.classes(),sourceIndex())].filter(Boolean).join(" ")}
                   data-inline-key={cellKey}
@@ -809,6 +878,11 @@ export function StandoffEditorView(props: BlockViewProps) {
                     classes={classesAt(rendering.classes(),sourceIndex())}
                   />}</Show>
                 </Show>
+                }>{r=><span data-inline-key={cellKey} data-inline-index={index()}
+                    data-symbolic-start={r().start} data-symbolic-end={r().end} contentEditable={false} hidden={sourceIndex()!==r().start}>
+                  <span data-symbolic-source="true" hidden aria-hidden="true">{String(cell()?.payload.text??'')}</span>
+                  <Show when={sourceIndex()===r().start}><span data-symbolic-display={r().id} contentEditable={false} style={r().style}>{r().value}</span></Show>
+                </span>}</Show>
               );
             }}
           </For>}
@@ -822,6 +896,8 @@ export function StandoffEditorView(props: BlockViewProps) {
         if (status === "ready") scheduleMeasure();
       }, (image, asset) => editor.clipboard.assets.bind(image, asset));
       createRenderEffect(() => {
+        if(symbolicComposing())return;
+        const symbols=symbolicDisplays();
         const owner = node();
         const styles = cellStyles();
         const classRuns = rendering.classes();
@@ -841,6 +917,8 @@ export function StandoffEditorView(props: BlockViewProps) {
         const presentation=(owner?.inlineContent ?? []).map((key, index): CharacterCellPresentation => {
           const cell = projection.state.nodes[key];
           const classes=classesAt(classRuns,index);
+          const atom=symbolicAt(symbolic(),index);
+          if(atom)return {key,index,text:String(cell?.payload.text??''),symbolic:symbols.get(atom.id)};
           const property = projected.find(property => index >= property.start && index <= property.end);
           if (property) return { key, index, classes, text: String(cell?.payload.text ?? ""),
             hiddenSource: index !== property.start,

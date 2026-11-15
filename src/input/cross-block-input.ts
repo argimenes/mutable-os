@@ -101,6 +101,10 @@ export class CrossBlockInput {
     const hit = this.editor.mounts.resolveElement(doc.elementFromPoint?.(x, y) ?? null);
     if (!hit?.handle.inlinePoint) return;
     const matchesHit = (point: ViewPosition | undefined) => point?.occurrenceKey === hit.nodeKey ? point : undefined;
+    if (doc.elementFromPoint?.(x,y)?.closest('[data-symbolic-display]')) {
+      const index=hit.handle.inlinePointAt?.(x,y);
+      if(index!==undefined)return this.editor.crossText.position(hit.nodeKey,index);
+    }
     const position = doc.caretPositionFromPoint?.(x, y);
     if (position) { const point = matchesHit(this.point(position.offsetNode, position.offset)); if (point) return point; }
     const range = doc.caretRangeFromPoint?.(x, y);
@@ -120,7 +124,8 @@ export class CrossBlockInput {
         const node = this.editor.node(anchor.occurrenceKey)!;
         const mount = this.editor.mounts.get(node.key);
         mount?.focus(); mount?.restoreInlineSelection?.({ anchor: anchor.boundary.index, head: head.boundary.index });
-        this.editor.selections.setPrimary(node.key, node.contentKey, node.viewId, anchor.boundary.index, head.boundary.index);
+        const bounded=mount?.captureInlineSelection?.()??{anchor:anchor.boundary.index,head:head.boundary.index};
+        this.editor.selections.setPrimary(node.key, node.contentKey, node.viewId, bounded.anchor, bounded.head);
         return;
       }
       if (!this.editor.crossText.enabled()) return;
@@ -268,7 +273,7 @@ export class CrossBlockInput {
       this.preferredX = undefined;
       const text = node.inlineContent.map(key => String(this.editor.node(key)?.payload.text ?? "\uFFFC")).join("");
       const boundaries = graphemeBoundaries(text), index = backwards ? boundaries.filter(i => i < head.boundary.index).at(-1) : boundaries.find(i => i > head.boundary.index);
-      if (index !== undefined) next = this.editor.crossText.position(node.key, index);
+      if (index !== undefined) { const adjusted=(this.editor.mounts.get(node.key)?.normalizeInlineBoundary?.(index,backwards?'left':'right')??index); next = this.editor.crossText.position(node.key, adjusted); }
     } else {
       const rect = this.rect(head);
       if (rect) {
@@ -329,6 +334,7 @@ export class CrossBlockInput {
     if (target !== this.input && target?.closest('input, textarea, select, [role=dialog], [role=menu], .document-style-bar, [data-block-selection-handle], [data-block-selection-inspector]')) return;
     const resolved = target === this.input && this.editor.crossText.range() ? { nodeKey: this.editor.crossText.range()!.anchor.occurrenceKey, handle: this.editor.mounts.get(this.editor.crossText.range()!.anchor.occurrenceKey)! } : this.editor.mounts.resolveEvent(event);
     if (!resolved || resolved.handle.inputPolicy !== "standoff" || resolved.handle.composing || event.isComposing || this.composing) return;
+    if (!this.editor.crossText.range() && resolved.handle.rangeInput?.key(event)) return;
     if (!this.editor.bindings.matches('text.selectAll',event)) this.emptySelectAll = undefined;
     if (this.editor.bindings.dispatch(event,['document-select-all'],id=>id==='text.selectAll' && (event.repeat || this.selectAll(resolved.nodeKey)))) return;
     if (!this.editor.crossText.enabled() && !this.editor.crossText.range() && !this.editor.selectionGestures.selecting("keyboard")) return;

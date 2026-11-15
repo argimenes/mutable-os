@@ -17,13 +17,14 @@ export function serializeSelection(state: RepositoryState, slices: Slice[], scop
   let serial = 0; const id = () => `f${++serial}`;
   const contentIds = new Map<string, string>(), placementIds = new Map<string, string>(), blockIds = new Map<string, string>(), definitionIds = new Map<string, string>();
   const pending: Array<{ reference: Reference; sourceId: string }> = [];
-  const external = (object: 'entity' | 'block', value: string): Reference => {
+  const external = (object: 'entity' | 'entity-attribute' | 'block', value: string): Reference => {
     const ref: Reference = { kind: 'external', object, id: value, source: { ...scope } };
     if (object === 'block') pending.push({ reference: ref, sourceId: value });
     return ref;
   };
   const target = (p: JsonObject): Reference | undefined => typeof p.value === 'string'
-    ? p.type === 'codex/entity-reference' ? external('entity', p.value)
+    ? p.type === 'mutable/symbolic-reference' ? external('entity-attribute', p.value)
+      : p.type === 'codex/entity-reference' ? external('entity', p.value)
       : p.type === 'codex/block-reference' ? external('block', p.value)
         : p.type === 'reference/url' ? { kind: 'url', url: p.value } : undefined : undefined;
   const property = (p: JsonObject, contentKey: string) => {

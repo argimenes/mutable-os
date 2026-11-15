@@ -1,3 +1,4 @@
+import { SymbolicAttributesDemo } from "./demo/symbolic-attributes-demo";
 import { For, createMemo, lazy, onCleanup, onMount } from "solid-js";
 import type { ExistingBlockDto } from "./block-tree/types";
 import { ReactiveEditor } from "./reactive-editor/editor";
@@ -156,6 +157,7 @@ export default function App(props: { configuration?: ReactiveEditorConfiguration
     return <Prototype />;
   }
   if (route === `${import.meta.env.BASE_URL}effects`) return <StandoffEffectsDemo />;
+  if (route === `${import.meta.env.BASE_URL}symbolic-attributes`) return <SymbolicAttributesDemo />;
   if (route === `${import.meta.env.BASE_URL}superposition`) return <TextSuperpositionDemo />;
   if (route === `${import.meta.env.BASE_URL}pilot`) return <PilotApp />;
   // Accepted application capability; hosts can still explicitly disable it.

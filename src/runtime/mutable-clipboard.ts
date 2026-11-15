@@ -1,3 +1,4 @@
+import { symbolicRanges, materialisedText } from './symbolic-attributes';
 import { markdownLiteralContext } from './markdown-input';
 import { resourceSurface } from '../interchange/resource-surface';
 import {webCandidate} from '../web-resources/registry';
@@ -177,6 +178,7 @@ export class MutableClipboard {
       : native ? [{ start: Math.min(native.anchor, native.head), end: Math.max(native.anchor, native.head) }]
         : set?.items.map(i => ({ start: Math.min(i.anchor.boundary.index, i.head.boundary.index), end: Math.max(i.anchor.boundary.index, i.head.boundary.index) }));
     if (!ranges?.length) return;
+    if(resolved.handle.normalizeInlineSelection)ranges=ranges.map(r=>{const s=resolved.handle.normalizeInlineSelection!({anchor:r.start,head:r.end});return {start:s.anchor,end:s.head};});
     ranges.sort((a, b) => a.start - b.start);
     ranges = ranges.filter((r, i) => !i || r.start !== ranges![i - 1].start || r.end !== ranges![i - 1].end);
     if (ranges.some((r, i) => i && r.start < ranges[i - 1].end)) throw Error('Clipboard selections cannot overlap.');
@@ -385,7 +387,21 @@ export class MutableClipboard {
   }
   private write(b: Bookmark, cut: boolean, event?: ClipboardEvent, cross = false) {
     const fragment = serializeSelection(this.editor.repository.readState(), b.slices, b.scope);
-    const representations = exportClipboard(fragment);
+    // Native MIME retains source and scoped identity. External text uses a frozen
+    // resolver snapshot, never DOM textContent or a network request during copy.
+    let display: string | undefined;
+    if(this.editor.features.symbolicEntityAttributes && b.kind==='text') {
+      const state=this.editor.repository.readState();let changed=false;
+      const parts=b.slices.map(slice=>{
+        const c=state.contents[state.placements[slice.placementKey].contentKey];
+        const ranges=symbolicRanges((c.payload.standoffProperties as any[])??[],c.inlineContent.length,id=>this.editor.symbolicAttributes.read(id));
+        changed ||= !!ranges.length;
+        const source=c.inlineContent.map(k=>String(state.contents[state.placements[k].contentKey].payload.text??'\uFFFC')).join('');
+        return materialisedText(source,ranges,slice.start??0,slice.end??c.inlineContent.length);
+      });
+      if(changed)display=parts.join('\n');
+    }
+    const representations = exportClipboard(fragment,display);
     if (canWriteAsync() && (!event || event.isTrusted)) {
       // Start the write within the activation callback; don't await a resolver first.
       this.asyncTask(async () => {

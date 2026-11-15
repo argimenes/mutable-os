@@ -888,6 +888,23 @@ export class TreeCommands {
     });
   }
 
+  /** Explicit Stage 1 conversion: one bounded canonical batch, preserving ordinary range mapping. */
+  replaceSymbolicRange(key: NodeKey, id: string, text: string): void {
+    const state = this.current(true), placement = this.placementKey(key, state);
+    const content = state.contents[state.placements[placement].contentKey];
+    const properties = content.payload.standoffProperties as Record<string, any>[];
+    const property = properties?.find(p => p.id === id && p.type === 'mutable/symbolic-reference' && !p.isDeleted);
+    if (!property) throw new TreeCommandError('Symbolic reference no longer exists');
+    const operations = this.inlineReplacementOperations(state, placement, property.start, property.end + 1, text);
+    for (const operation of operations) if (operation.kind === 'put-content' && operation.record.key === content.key) {
+      const mapped = operation.record.payload.standoffProperties as Record<string, any>[];
+      const keep = mapped.map((p, i) => ({p, origin:operation.annotationOrigins?.[i]})).filter(({p}) => p.id !== id);
+      operation.record.payload.standoffProperties = keep.map(({p}) => p);
+      operation.annotationOrigins = keep.map(({origin}) => origin ?? null);
+    }
+    this.publish('Convert symbolic reference to literal', operations, {commandId:'tree.symbolicToLiteral',subjects:[this.subject(state,placement)]});
+  }
+
   /** Shared native text planner; composed edits retain the same annotation mapping. */
   private inlineReplacementOperations(state: RepositoryState, key: PlacementKey, start: number, end: number, text: string): RepositoryOperation[] {
     const placement = state.placements[key];
