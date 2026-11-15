@@ -297,10 +297,12 @@ export class CanonicalRepository {
   private activeUndoGroup?: {record:(operations:RepositoryOperation[],inverse:RepositoryOperation[])=>void};
   /** Native edits publish normally; only their Undo record is accumulated. The
    * caller explicitly scopes each synchronous insertion, never unrelated edits. */
-  beginUndoGroup(label:string) {
+  /** Background receiving may allow history on disjoint records; the admission
+   * guard below still fences every record owned by this in-flight group. */
+  beginUndoGroup(label:string,options:{allowUnrelatedHistory?:boolean}={}) {
     const forward=new Map<string,RepositoryOperation>(),backward=new Map<string,RepositoryOperation>();
     let closed=false,running=false;
-    const release=this.suspendHistory();
+    const release=options.allowUnrelatedHistory?()=>{}:this.suspendHistory();
     const key=(op:RepositoryOperation)=>{
       if(op.kind==='record-batch'||op.kind==='set-root')throw Error('Grouped insertion requires bounded record operations');
       return (op.kind.includes('content')?'c:':'p:')+('record' in op?op.record.key:op.key);

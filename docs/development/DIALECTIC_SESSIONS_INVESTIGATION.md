@@ -1,5 +1,7 @@
 # Dialectic Document switching and multiple sessions
 
+Implementation follow-up, 15 November 2026: independent conversation runtimes and concurrent background responses are now implemented. See [the architecture and qualification report](DIALECTIC_MULTI_SESSION_QUALIFICATION.md) for the resulting behavior, lifecycle rules and validation. The investigation below records the earlier state and recommendations.
+
 Investigated 14 November 2026. Scope: fix the previous conversation remaining visible after Open, and assess multiple sessions using Flint's existing Document architecture. Independent background AI sessions are proposed here, not implemented by this change.
 
 ## Finding and fix

@@ -1,10 +1,11 @@
+import {preferencesMetadataOwner} from './dialectic-preferences-plan';
 import {sequenceMetadataOwner} from './dialectic-sequence-plan';
 import { tabOrientationRecordChange, tabMetadataRecordChange } from './tab-orientation';
 import {dialecticRangeRoot,dialecticRangePayloadOnly} from './dialectic-range-plan';
 import { inlineOwnerFor } from './inline-plan';
 import type { ContentRecord, Location, PlacementRecord, RepositoryOperation, RepositoryState } from './types';
 
-export interface StructuralChange { definitionChanges?:{owner:string;ids:string[]}; sequenceMetadataOwner?:string; rangePayloadOwners?:string[]; gloss?: import("./gloss-plan").GlossChange; tabOrientationOwner?: string; tabMetadata?: { owners: string[]; inlineOwner?: string }; membership?: { key:string; before?:string; after?:string }[]; contents: string[]; childrenOwners: string[]; inlineOwners: string[] }
+export interface StructuralChange { preferencesMetadataOwner?:string; definitionChanges?:{owner:string;ids:string[]}; sequenceMetadataOwner?:string; rangePayloadOwners?:string[]; gloss?: import("./gloss-plan").GlossChange; tabOrientationOwner?: string; tabMetadata?: { owners: string[]; inlineOwner?: string }; membership?: { key:string; before?:string; after?:string }[]; contents: string[]; childrenOwners: string[]; inlineOwners: string[] }
 export interface StructuralEvidence {
   locationOf(key: string): Location | undefined;
   referenceCount(key: string): number;
@@ -23,6 +24,8 @@ const edges = (c: ContentRecord, visit: (key: string, location: Location) => boo
  * ancestry without enumerating unrelated records or traversing unchanged text. */
 export function structuralChangeFor(state: RepositoryState, operations: RepositoryOperation[], evidence: StructuralEvidence): StructuralChange | undefined {
   if (!operations.length) return;
+  const preferencesOwner=preferencesMetadataOwner(state,operations);
+  if(preferencesOwner)return {preferencesMetadataOwner:preferencesOwner,contents:[preferencesOwner],childrenOwners:[],inlineOwners:[]};
   const sequenceOwner=sequenceMetadataOwner(state,operations);
   if(sequenceOwner)return {sequenceMetadataOwner:sequenceOwner,contents:[sequenceOwner],childrenOwners:[],inlineOwners:[]};
   const definitionIds:string[]=[];

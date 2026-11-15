@@ -1,3 +1,5 @@
+import {createConversationCoordinator} from './conversation-coordinator';
+import {conversationPreferences,type ConversationPreferences} from './preferences';
 import {imageGenerationLimits} from './image-generation-contract';
 import {createAttachments} from './attachments';
 import {attachments,attachmentProviderProblem,type Attachment} from './attachments-contract';
@@ -38,19 +40,29 @@ import {RANGE_ANCHOR,type RangeDefinition} from './anchors';
 import {DialecticReferences,type Resolution} from './references';
 const metadata=(n:BlockNode|undefined)=>(n?.payload.metadata??{}) as Record<string,any>;
 
-/** One controller per application owner; workspace views share these session choices. */
-export function createDialecticController(editor:ReactiveEditor,port:Accessor<DocumentApplicationPort|undefined>){
- const providers=new DialecticProviderSession(editor.features.dcpTestPhaseLogging,()=>editor.readAssetContext());
- const history=new ConversationHistory(editor);
- const [vocabularySelection,storeVocabulary]=createSignal<Readonly<VocabularySelection>>(conversationalSelection);
- const configureVocabulary=(input:VocabularySelection)=>{if(!editor.features.dcpVocabularySelection)throw Error('DCP vocabulary selection disabled');const next=copyVocabularySelection(input),ids=new Set(vocabularyDescriptors(editor).map(d=>d.id));for(const id of [...next.enable??[],...next.disable??[]])if(!ids.has(id))throw Error('Unknown DCP capability: '+id);if(next.disable?.includes('composition.paragraph'))throw Error('Paragraphs are required');storeVocabulary(next);};
- const [selectedAi,setSelectedAi]=createSignal<string>();
- const [providerMode,setProviderMode]=createSignal<'mock'|'live'>(editor.features.dialecticProviders&&editor.features.dialecticDcp?'live':'mock'),[providerReady,setProviderReady]=createSignal(false),[providerSettings,setProviderSettings]=createSignal({...providers.settings}),[providerNotice,setProviderNotice]=createSignal(''),[providerConfiguring,setProviderConfiguring]=createSignal(false);
- const configureProvider=async(settings:ProviderSettings,key?:string)=>{if(busy()||providerConfiguring())return;setProviderConfiguring(true);try{const ready=await providers.configure(settings,key);if(!alive)return;setProviderReady(ready);setProviderSettings({...providers.settings});setProviderNotice(ready?'Session provider ready.':'Enter a session key; no server environment key is configured.');if(ready)setProviderMode('live');}catch(e){if(alive){setProviderReady(providers.ready);setProviderNotice(String(e));}}finally{if(alive)setProviderConfiguring(false);}};
- const forgetProvider=async()=>{cancel();await providers.forget();setProviderReady(false);setProviderNotice('Session keys forgotten.');};
+export interface ConversationRuntimeOptions {
+ provider:DialecticProviderSession;
+ history:ConversationHistory;
+ preferences:ConversationPreferences;
+ defaults:{provider:ProviderSettings;vocabulary:VocabularySelection};
+ active():boolean;
+ forget():Promise<void>;
+}
+/** Native conversation operations. The coordinator supplies a stable Document port. */
+export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<DocumentApplicationPort|undefined>,options?:ConversationRuntimeOptions){
+ const providers=options?.provider??new DialecticProviderSession(editor.features.dcpTestPhaseLogging,()=>editor.readAssetContext());
+ const history=options?.history??new ConversationHistory(editor);
+ const [vocabularySelection,storeVocabulary]=createSignal<Readonly<VocabularySelection>>(options?.preferences.vocabulary??options?.defaults.vocabulary??conversationalSelection);
+ const configureVocabulary=(input:VocabularySelection)=>{if(busy())return;if(!editor.features.dcpVocabularySelection)throw Error('DCP vocabulary selection disabled');const next=copyVocabularySelection(input),ids=new Set(vocabularyDescriptors(editor).map(d=>d.id));for(const id of [...next.enable??[],...next.disable??[]])if(!ids.has(id))throw Error('Unknown DCP capability: '+id);if(next.disable?.includes('composition.paragraph'))throw Error('Paragraphs are required');storeVocabulary(next);writePreferences({vocabulary:next});};
+ const [selectedAi,storeSelectedAi]=createSignal<string|undefined>(options?.preferences.participantId);
+ const setSelectedAi=(id:string|undefined)=>{if(busy())return;storeSelectedAi(id);writePreferences({participantId:id});};
+ const [providerMode,setProviderMode]=createSignal<'mock'|'live'>(editor.features.dialecticProviders&&editor.features.dialecticDcp?'live':'mock'),[providerReady,setProviderReady]=createSignal(false),[providerSettings,setProviderSettings]=createSignal({...options?.preferences.provider??options?.defaults.provider??providers.settings}),[providerNotice,setProviderNotice]=createSignal(''),[providerConfiguring,setProviderConfiguring]=createSignal(false);
+ const configureProvider=async(settings:ProviderSettings,key?:string,persist=true)=>{if(busy()||providerConfiguring())return;setProviderConfiguring(true);try{const ready=await providers.configure(settings,key);if(!alive)return;setProviderReady(ready);setProviderSettings({...providers.settings});if(persist)writePreferences({provider:providers.settings});setProviderNotice(ready?'Session provider ready.':'Enter a session key; no server environment key is configured.');if(ready)setProviderMode('live');}catch(e){if(alive){setProviderReady(providers.ready);setProviderNotice(String(e));}}finally{if(alive)setProviderConfiguring(false);}};
+ const forgetProvider=async()=>{cancel();if(options)await options.forget();else await providers.forget();setProviderReady(false);setProviderNotice('Session keys forgotten.');};
  const [inspection,setInspection]=createSignal<ReplyTarget>(),[reply,setReply]=createSignal<ReplyTarget>();
  const [activityInspection,setActivityInspection]=createSignal<{id:string;category:ActivityCategory|'notices';coverage?:boolean}>();
  const [context,setContext]=createSignal<ReplyTarget[]>([]),[notice,setNotice]=createSignal(''),[busy,setBusy]=createSignal(false);
+ const [operationStatus,setOperationStatus]=createSignal<'idle'|'running'|'complete'|'error'|'cancelled'>('idle');
  const [trail,setTrail]=createSignal<ReplyTarget[]>([]),[cursor,setCursor]=createSignal(-1);
  const diagnostics={rowBuilds:0,contextNodes:0,submissions:0,contentsSynopsisReads:0};
  let alive=true,generation=0;
@@ -67,6 +79,17 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const session=()=>port()?.session(),root=()=>{const s=session();return s?.projection.node(s.rootKey);};
  const resourceId=()=>String(metadata(root()).documentId??root()?.payload.id??'');
  const valid=()=>isConversation(metadata(root()).dialectic);
+ const writePreferences=(patch:Partial<ConversationPreferences>)=>{
+  if(!options)return;const n=root();if(!n||!alive)return;
+  const m=structuredClone(unwrap(n.payload.metadata??{})) as any;
+  if(m.dialectic?.preferences?.version&&m.dialectic.preferences.version!==1)throw Error('Conversation preferences use a newer version.');
+  const preferences={...conversationPreferences(m.dialectic?.preferences),...patch,version:1};
+  editor.commands.boundedStructuralTransaction('Conversation preferences',()=>editor.commands.setPayloadField(n.key,'metadata',{...m,dialectic:{...m.dialectic,preferences}}));
+ };
+ const inheritPreferences=async()=>{if(busy()||!options)return;writePreferences({provider:undefined,vocabulary:undefined});storeVocabulary(options.defaults.vocabulary);await configureProvider(options.defaults.provider,undefined,false);};
+ // Metadata changes (including Undo) update preferences without network work.
+ if(options)createEffect(()=>{const value=(metadata(root()).dialectic as any)?.preferences,p=conversationPreferences(value),vocabulary=p.vocabulary??options.defaults.vocabulary,next=p.provider??options.defaults.provider,processing=busy();untrack(()=>{if(processing)return;storeSelectedAi(p.participantId);storeVocabulary(vocabulary);if(JSON.stringify(next)!==JSON.stringify(providerSettings())){setProviderSettings({...next});setProviderReady(false);}});});
+
  const submissionSave=createSubmissionSave(async(id,name)=>{
   const files=port()?.application.files;
   if(!files?.saveSubmitted)throw Error('Native Document saving is unavailable.');
@@ -142,10 +165,11 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  };
  const inspectedAnnotation=createMemo(()=>{const ref=annotationInspection();return ref?.resourceId===resourceId()?annotationDetails(ref):undefined;});
  const preview=editor.decorations.createCollection('dialectic:'+crypto.randomUUID());
- createEffect(()=>{if(!alive)return;const t=inspection(),r=resolveReference(t),a=inspectedAnnotation();const ranges=a?[{node:a.node,start:a.property.start,end:a.property.end+1}]:(r.segments??[]);preview.replace(ranges.map((s,i)=>({id:String(i),range:editor.textRanges.snapshot(s.node.key,s.start,s.end),renderers:[{id:'range',name:'svg-highlight',params:{color:'#f3cf7c'}}]})));});
+ createEffect(()=>{if(!alive)return;if(options&&!options.active()){preview.replace([]);return;}const t=inspection(),r=resolveReference(t),a=inspectedAnnotation();const ranges=a?[{node:a.node,start:a.property.start,end:a.property.end+1}]:(r.segments??[]);preview.replace(ranges.map((s,i)=>({id:String(i),range:editor.textRanges.snapshot(s.node.key,s.start,s.end),renderers:[{id:'range',name:'svg-highlight',params:{color:'#f3cf7c'}}]})));});
  const run=(action:()=>unknown)=>{try{setNotice('');return action();}catch(e){setNotice(String(e));}};
  let revealGeneration=0;
  const reveal=(t:ReplyTarget,focus=false)=>{
+  if(options&&!options.active())return;
   const revealTicket=++revealGeneration;
   if(['entity','argument-relation','entity-relation'].includes(t.kind))return;
   if(t.kind==='gloss'){editor.gloss.openDefinition(root()!.key,t.definitionId);return;}
@@ -187,9 +211,9 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const compose=()=>{sequences.leave(false);const d=draft();if(d)reveal(target(d.id),true);};
  const guard=()=>{
   if(!alive||!session()?.current()||!valid())throw Error('Open a Dialectic conversation first.');
-  editor.documentSessions?.presentations.checkInteraction(session()!);
+  if(!options||options.active())editor.documentSessions?.presentations.checkInteraction(session()!);
   const focused=editor.focus.state.focusedKey;
-  if(focused&&editor.mounts.get(focused)?.composing)throw Error('Finish composing text before submitting.');
+  if(focused&&session()?.projection.node(focused)&&editor.mounts.get(focused)?.composing)throw Error('Finish composing text before submitting.');
   const ordinals=committed().map(r=>r.data.ordinal);
   if(ordinals.some(n=>!Number.isSafeInteger(n)||Number(n)<=0)||new Set(ordinals).size!==ordinals.length)throw Error('Contribution chronology is invalid or duplicated. Restore the original contribution containers before submitting.');
  };
@@ -298,7 +322,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const glosses=()=>references()?.overlapping(resolveReference(inspection()).segments??[])??[];
  const createGloss=()=>run(()=>{const segments=resolveReference(inspection()).segments;if(segments?.length!==1)throw Error('Select one passage segment to create a Gloss.');const s=segments[0];void editor.commandRegistry.execute('gloss.create',{targetKey:s.node.key,args:{selection:{anchor:s.start,head:s.end}}});});
  const pinGloss=(id:string)=>pin({kind:'gloss',resourceId:resourceId(),definitionId:id});
- const cancel=()=>{nativeReceiving?.stop('Response cancelled');nativeReceiving=undefined;generation++;presentationTrace?.dispose();presentationTrace=undefined;requestAbort?.abort();if(previewTimer!==undefined)clearTimeout(previewTimer);previewTimer=undefined;setDcpPreview(previewText);setBusy(false);};
+ const cancel=()=>{if(busy())setOperationStatus('cancelled');nativeReceiving?.stop('Response cancelled');nativeReceiving=undefined;generation++;presentationTrace?.dispose();presentationTrace=undefined;requestAbort?.abort();if(previewTimer!==undefined)clearTimeout(previewTimer);previewTimer=undefined;setDcpPreview(previewText);setBusy(false);};
  const exchangeTarget=()=>reply()??(inspection()&&!['entity','argument-relation','entity-relation'].includes(inspection()!.kind)?inspection():undefined)??(frontier()?target(frontier()!.id):undefined);
  const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget,live?:LiveProvenance,lifecycle?:{commit():Promise<void>;cancel():Promise<void>})=>{
   if(busy())return;
@@ -310,7 +334,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    const selectedTargets=structuredClone(unwrap(context())),targets=[to,...selectedTargets.filter(t=>targetKey(t)!==targetKey(to))];
    for(const t of targets)if(!['gloss','entity','argument-relation','entity-relation'].includes(t.kind))requireCommittedTarget(t);
    const captured=capture(targets),source=session()!,exchangeId=crypto.randomUUID();
-   clearPreview();ticket=++generation;presentationTrace?.dispose();presentationTrace=undefined;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setResponseStatus('Preparing response…');setDcpPreview('Preparing structured exchange…');
+   clearPreview();ticket=++generation;presentationTrace?.dispose();presentationTrace=undefined;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setOperationStatus('running');setResponseStatus('Preparing response…');setDcpPreview('Preparing structured exchange…');
    sources=new DcpSources(editor,resourceId(),function*(fromOrdinal=1){const rows=committed();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((rows[mid].data.ordinal??0)<fromOrdinal)lo=mid+1;else hi=mid;}for(let i=lo;i<rows.length;i++)yield source.projection.node(rows[i].key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),deadlineMs,id=>references()!.argumentsFor(id),vocabularySelection(),references());
    for(const key of captured.revisions.keys())sources.fence(key);
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
@@ -322,7 +346,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    if(editor.features.dialecticAttachments){
     const chosen=new Map<string,Attachment>();
     for(const t of targets){let n=resolveReference(t).node;while(n){const data=contribution(metadata(n).dialectic);if(data){sources.fence(n.contentKey);for(const a of attachments(data.attachments))chosen.set(a.id,a);break;}n=source.projection.parentOf(n.key);}}
-    const selectedFiles=attachments([...chosen.values()]),problem=attachmentProviderProblem(providerSettings().provider,selectedFiles);if(problem)throw Error(problem);
+    const selectedFiles=attachments([...chosen.values()]),problem=attachmentProviderProblem(live?.settings.provider??providerSettings().provider,selectedFiles);if(problem)throw Error(problem);
     Object.assign(request,{attachments:selectedFiles});
    }
    if(editor.features.dialecticArtifacts&&editor.readAssetContext().session)Object.assign(request,{artifacts:1,...(editor.features.dialecticImageGeneration?{imageGeneration:1}:{})});
@@ -334,7 +358,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    if(live&&sources.xmlAuthoring&&editor.features.dcpXmlStreaming){
     const streamSources=sources,streamAuthority=sources.xmlAuthoring;
     const owner=resourceId(),documentRoot=root()!,draftRow=draft();if(!draftRow)throw Error('Conversation draft unavailable');
-    const id=crypto.randomUUID(),ordinal=nextOrdinal(),group=editor.repository.beginUndoGroup('AI contribution');
+    const id=crypto.randomUUID(),ordinal=nextOrdinal(),group=editor.repository.beginUndoGroup('AI contribution',{allowUnrelatedHistory:!!options});
     const annotationRefs:{blockId:string;propertyId:string}[]=[];
     let node:BlockNode|undefined,done=false,raw='',summary:{intent:string;discursiveReferences:ReplyTarget[]}={intent:'reply',discursiveReferences:[]};
     let synopsis:import('./model').Contribution['synopsis'];
@@ -346,7 +370,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     },apply:result=>{
      if(done||!alive||ticket!==generation)return;
      if(editor.features.semanticRetrieval)retrievalForeground();
-     const viewport=editor.mounts.get(draftRow.key)?.root.closest<HTMLElement>('.dialectic-canvas'),follow=viewport&&viewport.scrollHeight-viewport.scrollTop-viewport.clientHeight<180;
+     const viewport=editor.mounts.get(draftRow.key)?.root.closest<HTMLElement>('.dialectic-canvas'),follow=(!options||options.active())&&viewport&&viewport.scrollHeight-viewport.scrollTop-viewport.clientHeight<180;
      const apply=()=>editor.commands.boundedStructuralTransaction('Receive native DCP fragment',()=>{
       result.preparedResources.check();
       if(Object.keys(result.definitions).length)editor.commands.setPayloadField(documentRoot.key,'linkedAnnotations',{...structuredClone(unwrap(documentRoot.payload.linkedAnnotations??{})) as Record<string,unknown>,...result.definitions});
@@ -367,7 +391,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
     stream=createStream();
     const finish=(reason?:string)=>{
      if(done)return;done=true;stream.stop();
-     try{if(node){
+     try{if(node&&root()&&editor.repository.readState().contents[node.contentKey]){
       const data={...base,...(live?.attachments?.length?{attachments:attachments(live.attachments)}:{}),...(synopsis?{synopsis}:{}),state:'committed',discursiveReferences:summary.discursiveReferences,notices:[...stream.notices,...(reason?[{version:1,code:'incomplete-operation',severity:'warning',loss:true,detail:reason+'; completed native content retained.'+(stream.unresolved?` ${stream.unresolved} unresolved semantic operations were not applied.`:'')}]:[])],dcp:{version:1,profile:request.profile,request,tools:sources!.trail,response:raw||stream.received,xmlBindings:sources!.xmlAuthoring!.bindings(),identityMap:Object.fromEntries(stream.memory.memory?.aliases??[]),annotationRefs,intent:summary.intent,provider:live}};
       group.run(()=>editor.textProtection.receivingInsertion(node!.contentKey,()=>editor.commands.boundedStructuralTransaction('Finish native DCP response',()=>editor.commands.setPayloadField(node!.key,'metadata',{...structuredClone(unwrap(node!.payload.metadata??{})) as object,dialectic:JSON.parse(JSON.stringify(data))}))));
       diagnostics.submissions++;submissionSave.request(owner);
@@ -435,7 +459,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    localTimings.postAdmissionDiagnosticsMs=performance.now()-diagnosticsStarted;
    const acknowledgementStarted=performance.now();
    try{await lifecycle?.commit();}catch{setNotice('Contribution committed locally. Provider memory acknowledgement is pending; the next Ask will reconcile or rebuild from this Document.');}finally{localTimings.acknowledgementMs=performance.now()-acknowledgementStarted;}
-  }catch(e){if(live){live.failure??={message:String(e).slice(0,1000)};live.request??=requestForInspection;live.tools??=sources?.trail;}if(alive&&ticket===generation){setDcpPreview(previewText);setNotice(String(e));}else if(!ticket&&alive)setNotice(String(e));}finally{await lifecycle?.cancel();sources?.dispose();if(ticket===generation){if(live){setLastProviderExchange(structuredClone(unwrap(live)));presentationTrace?.panelPublished();if(editor.features.dcpTestPhaseLogging)await providers.diagnostic({kind:'exchange.outcome',documentId:live.resourceId,exchangeId:live.exchangeId,details:structuredClone(unwrap(live))}).catch(()=>{if(alive)setProviderNotice('DCP diagnostic logging failed.');});}setBusy(false);}}
+  }catch(e){if(live){live.failure??={message:String(e).slice(0,1000)};live.request??=requestForInspection;live.tools??=sources?.trail;}if(alive&&ticket===generation){setDcpPreview(previewText);setNotice(String(e));}else if(!ticket&&alive){setNotice(String(e));setOperationStatus('error');}}finally{await lifecycle?.cancel();sources?.dispose();if(ticket===generation){if(live){setLastProviderExchange(structuredClone(unwrap(live)));presentationTrace?.panelPublished();if(editor.features.dcpTestPhaseLogging)await providers.diagnostic({kind:'exchange.outcome',documentId:live.resourceId,exchangeId:live.exchangeId,details:structuredClone(unwrap(live))}).catch(()=>{if(alive)setProviderNotice('DCP diagnostic logging failed.');});}if(operationStatus()==='running')setOperationStatus(notice()?'error':'complete');setBusy(false);}}
  };
  const askMock=async(transport:DcpTransport=mockTransport,explicit?:ReplyTarget)=>{
   if(editor.features.dialecticDcp)return askDcp(transport,explicit);
@@ -447,7 +471,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    requireCommittedTarget(to);
    const targets=[to,...context().filter(t=>targetKey(t)!==targetKey(to))],captured=capture(targets),source=session(),requestId=crypto.randomUUID();
    for(const item of captured.manifest)item.origins=[...(targetKey(item.target)===targetKey(to)?['reply-target' as const]:[]),...(context().some(t=>targetKey(t)===targetKey(item.target))?['selected' as const]:[])];
-   ticket=++generation;setBusy(true);
+   ticket=++generation;setBusy(true);setOperationStatus('running');
    await new Promise<void>(resolve=>setTimeout(resolve,80));
    if(!alive||ticket!==generation)return;
    if(session()!==source)throw Error('The conversation changed; the mock response was discarded.');
@@ -457,9 +481,9 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
    editor.commands.structuralTransaction('Add mock response',()=>{persistRanges(targets);editor.commands.insert({id,type:'container-block',metadata:{dialectic:{version:1,kind:'contribution',state:'committed',author:'mock',participant:defaultParticipant(resourceId(),'ai'),ordinal,createdUtc:new Date().toISOString(),replies:[to],context:targets,requestId,replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}}}},children:mockComposition(captured.items)},{kind:'before',anchorKey:d.key});});
    for(const t of targets)if(t.kind==='range')pending.delete(t.anchorId);
    submissionSave.request(resourceId());diagnostics.submissions++;inspect(target(id));
-  }catch(e){if(alive)setNotice(String(e));}finally{if(ticket===generation)setBusy(false);}
+  }catch(e){if(alive)setNotice(String(e));}finally{if(ticket===generation){if(operationStatus()==='running')setOperationStatus(notice()?'error':'complete');setBusy(false);}}
  };
- const sequences=createSequenceController(editor,{root,resourceId,session,resolve,inspect,requireCommittedTarget,guard});
+ const sequences=createSequenceController(editor,{root,resourceId,session,resolve,inspect,requireCommittedTarget,guard,active:options?.active});
  const relationshipDetails=(t:ReplyTarget)=>{
   if(t.kind!=='argument-relation'&&t.kind!=='entity-relation')return undefined;
   const d=(root()?.payload.linkedAnnotations as any)?.[t.definitionId];if(!d||d.isDeleted)return undefined;
@@ -470,7 +494,7 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
  const entityDetails=(t:ReplyTarget)=>t.kind==='entity'&&t.entity.scope==='document'?(root()?.payload.linkedAnnotations as any)?.[t.entity.entityId]?.metadata?.scopedEntity?.entity:undefined;
  const aiParticipants=()=>{const initial={...defaultParticipant(resourceId(),'ai'),name:'AI participant'},entries=new Map([[initial.id,initial]]);for(const row of committed())if(row.data.author==='ai'&&row.data.participant?.kind==='ai')entries.set(row.data.participant.id,row.data.participant);return [...entries.values()];};
  const aiParticipant=()=>aiParticipants().find(p=>p.id===selectedAi())??aiParticipants()[0];
- const ask=async(explicit?:ReplyTarget)=>{if(providerConfiguring())return;if(providerMode()==='mock'||!editor.features.dialecticProviders||!editor.features.dialecticDcp)return askMock(mockTransport,explicit);if(!providerReady()){const doc=resourceId();await configureProvider(providerSettings());if(!alive||doc!==resourceId())return;if(!providerReady()){setNotice(providerNotice()||'Configure the AI provider in AI settings.');return;}}const participant=aiParticipant().id,doc=resourceId();const live=providers.transport(editor.features.dialecticProviderContinuity&&providerSettings().provider==='openai'?()=>{if(resourceId()!==doc)throw Error('Conversation changed');return history.build(doc,participant,committed().map(row=>session()!.projection.node(row.key)!.contentKey));}:undefined);return askDcp(live.run,explicit,live.details,live);};
+ const ask=async(explicit?:ReplyTarget)=>{if(providerConfiguring())return;if(providerMode()==='mock'||!editor.features.dialecticProviders||!editor.features.dialecticDcp)return askMock(mockTransport,explicit);if(!providerReady()){const doc=resourceId();await configureProvider(providerSettings(),undefined,false);if(!alive||doc!==resourceId())return;if(!providerReady()){setNotice(providerNotice()||'Configure the AI provider in AI settings.');setOperationStatus('error');return;}}const participant=aiParticipant().id,doc=resourceId();const live=providers.transport(editor.features.dialecticProviderContinuity&&providerSettings().provider==='openai'?()=>{if(resourceId()!==doc)throw Error('Conversation changed');return history.build(doc,participant,committed().map(row=>session()!.projection.node(row.key)!.contentKey));}:undefined);return askDcp(live.run,explicit,live.details,live);};
  const [resending,setResending]=createSignal(false);
  const resend=async(id:string)=>{
   if(busy()||providerConfiguring()||resending())return;
@@ -491,15 +515,24 @@ export function createDialecticController(editor:ReactiveEditor,port:Accessor<Do
   const document=resourceId(),projection=session()?.projection;
   const node=projection?.node(nodeKey),owner=projection&&imageContributionOwner(projection,nodeKey);
   if(!editor.features.dialecticSmallerImage||!node||node.viewType!=='image-block'||owner?.documentId!==document||(node.payload.metadata as any)?.url!==originalUrl)throw Error('Image is no longer available in this conversation.');
-  if(!providerReady())await configureProvider(providerSettings());
+  if(!providerReady())await configureProvider(providerSettings(),undefined,false);
   signal.throwIfAborted();if(!alive||resourceId()!==document)throw Error('Conversation changed.');
   const result=await providers.smallerImage({url:originalUrl,...(reason?{reason}:{}),description:String((node.payload.metadata as any)?.alt??'').slice(0,1024)},signal);
   signal.throwIfAborted();if(!alive||resourceId()!==document)throw Error('Conversation changed.');
   return result;
  };
- return {responseStatus,files,fileProblem,attachmentBlob,smallerImage,contentsRows,contentsActivity,contentsSynopsis,inspectContents,inspectEntityMention,titleNotice:titles.notice,titlePending:titles.pending,saveState,retrySave,pasting,activityInspection,inspectActivity,inspectActivityItem,contributionActivity,activityDiagnostics,vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
+ return {forgetConnection:async()=>{await providers.forget();setProviderReady(false);},operationStatus,inheritPreferences,responseStatus,files,fileProblem,attachmentBlob,smallerImage,contentsRows,contentsActivity,contentsSynopsis,inspectContents,inspectEntityMention,titleNotice:titles.notice,titlePending:titles.pending,saveState,retrySave,pasting,activityInspection,inspectActivity,inspectActivityItem,contributionActivity,activityDiagnostics,vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
   references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,aiParticipants,aiParticipant,setSelectedAi,historyDiagnostics:history.diagnostics,
-  dispose(){files.dispose();titles.dispose();submissionSave.dispose();sequences.dispose();alive=false;cancel();providers.dispose();history.dispose();choices.clear();pending.clear();preview.dispose();for(const entry of activities.values())entry.dispose();activities.clear();},capture,
+  dispose(){if(!alive)return;files.dispose();titles.dispose();submissionSave.dispose();sequences.dispose();alive=false;cancel();providers.dispose();if(!options)history.dispose();choices.clear();pending.clear();preview.dispose();for(const entry of activities.values())entry.dispose();activities.clear();},capture,
  };
 }
-export type DialecticController=ReturnType<typeof createDialecticController>;
+export interface ConversationControls {
+ status(id:string):string;
+ runtime(id:string):ReturnType<typeof createConversationRuntime>|undefined;
+ useAsDefaults():void;
+}
+export type DialecticController=ReturnType<typeof createConversationRuntime>&{conversations?:ConversationControls};
+
+export function createDialecticController(editor:ReactiveEditor,port:Accessor<DocumentApplicationPort|undefined>):DialecticController {
+ return editor.features.dialecticMultiSession?createConversationCoordinator(editor,port,createConversationRuntime):createConversationRuntime(editor,port);
+}

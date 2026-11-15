@@ -136,3 +136,24 @@ it('accepts failed-image recovery without introducing it into provider conversat
  expect(result.status).toBe(200);const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(body.instructions).toContain('image failed to load');expect(body.conversation).toBeUndefined();expect(body.store).toBe(false);expect(body.tools).toEqual([]);
  expect((await f.call('/utility/smaller-image',{url:'https://example.org/broken.jpg',description:'Lady with an Ermine',reason:'arbitrary-command'})).status).toBe(400);expect(fetcher).toHaveBeenCalledTimes(1);
 });
+it('isolates concurrent child sessions while sharing credentials and immutable exchange settings',async()=>{
+ const signals:AbortSignal[]=[];
+ const fetcher=vi.fn<typeof fetch>().mockImplementation(async(_url,options)=>{signals.push(options!.signal!);return sse(streamFixture('openai',JSON.stringify(plainContribution('exchange'))));});
+ const f=await fixture(fetcher);await f.call('/settings',{settings:defaultProviderSettings,key:'shared-fixture-key'});
+ const child=async()=>{const response=await f.call('/session',undefined,{'x-dialectic-parent':f.token});expect(response.status).toBe(200);return (await response.json()).token;};
+ const a=await child(),b=await child(),headers=(token:string)=>({'x-dialectic-session':token});
+ await f.call('/settings',{settings:{...defaultProviderSettings,model:'model-a'}},headers(a));await f.call('/settings',{settings:{...defaultProviderSettings,model:'model-b'}},headers(b));
+ const ae=await(await f.call('/exchange',{request:req},headers(a))).json(),be=await(await f.call('/exchange',{request:req},headers(b))).json();expect(ae.id).toBeTruthy();expect(be.id).toBeTruthy();expect(ae.settings.model).toBe('model-a');expect(be.settings.model).toBe('model-b');
+ expect((await f.call('/settings',{settings:{...defaultProviderSettings,model:'changed'}},headers(a))).status).toBe(400);
+ expect((await f.call('/exchange/'+ae.id+'/turn',{round:0},headers(b))).status).toBe(410);
+ await f.call('/exchange/'+ae.id,undefined,headers(a),'DELETE');const response=await f.call('/exchange/'+be.id+'/turn',{round:0},headers(b));expect(await response.text()).toContain('"type":"result"');expect(fetcher).toHaveBeenCalledOnce();expect(fetcher.mock.calls[0][1]?.headers).toMatchObject({authorization:'Bearer shared-fixture-key'});
+ await f.call('/session',undefined,headers(a),'DELETE');expect((await f.call('/settings',{settings:defaultProviderSettings},headers(b))).status).toBe(400); // B still owns its exchange.
+ await f.call('/session',undefined,{},'DELETE');expect(signals[0].aborted).toBe(true);expect((await f.call('/settings',{settings:defaultProviderSettings},headers(b))).status).toBe(401);
+});
+it('rejects unknown or nested credential parents and bounds child sessions',async()=>{
+ const f=await fixture(vi.fn());expect((await f.call('/session',undefined,{'x-dialectic-parent':'unknown'})).status).toBe(401);
+ const child=(await(await f.call('/session',undefined,{'x-dialectic-parent':f.token})).json()).token;
+ expect((await f.call('/session',undefined,{'x-dialectic-parent':child})).status).toBe(401);
+ for(let i=0;i<30;i++)expect((await f.call('/session',undefined,{'x-dialectic-parent':f.token})).status).toBe(200);
+ expect((await f.call('/session',undefined,{'x-dialectic-parent':f.token})).status).toBe(429);
+});

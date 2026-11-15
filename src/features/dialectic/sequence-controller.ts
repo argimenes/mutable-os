@@ -8,12 +8,14 @@ import {newGroup,sequenceId,validSequence,type Sequence,type CompositionRef} fro
 import type {ReplyTarget} from './model';
 import type {PassiveMemberState} from '../../rendering/passive-composition';
 interface Host {
+ active?():boolean;
  root():BlockNode|undefined;resourceId():string;session():RetainedDocumentSession|undefined;
  resolve(t:ReplyTarget):BlockNode|undefined;inspect(t:ReplyTarget):void;
  requireCommittedTarget(t:ReplyTarget):void;guard():void;
 }
 interface Session {draft?:Sequence;presenting?:string;groups:Record<string,string>;revealed:Record<string,boolean>}
 export function createSequenceController(editor:ReactiveEditor,host:Host){
+ let alive=true;
  const stores=new Map<string,ReturnType<typeof createSignal<Session>>>(),members=new Map<string,Map<string,PassiveMemberState>>();
  const store=()=>{const id=host.resourceId();let s=stores.get(id);if(!s){s=createSignal<Session>({groups:{},revealed:{}});stores.set(id,s);}return s;};
  const state=()=>store()[0](),update=(fn:(s:Session)=>Session)=>store()[1](fn);
@@ -23,7 +25,7 @@ export function createSequenceController(editor:ReactiveEditor,host:Host){
  const draft=()=>state().draft,presenting=()=>state().presenting;
  const sequence=()=>saved().find(s=>s.id===presenting());
  const group=()=>{const s=sequence();return s?.groups.find(g=>g.id===state().groups[s.id])??s?.groups[0];};
- const leave=(restore=true)=>{const session=host.session();update(s=>({...s,presenting:undefined}));if(restore&&session)queueMicrotask(()=>{if(host.session()===session&&!presenting())editor.documentSessions?.presentations.restorePosition(session,true);});};
+ const leave=(restore=true)=>{const session=host.session();update(s=>({...s,presenting:undefined}));if(restore&&session)queueMicrotask(()=>{if(alive&&host.active?.()!==false&&host.session()===session&&!presenting())editor.documentSessions?.presentations.restorePosition(session,true);});};
  const create=()=>{host.guard();leave(false);update(s=>({...s,draft:{version:1,id:sequenceId(),title:'New Sequence',groups:[newGroup()]}}));};
  const edit=(id:string)=>{host.guard();leave(false);const found=saved().find(s=>s.id===id);if(found)update(s=>({...s,draft:structuredClone(unwrap(found))}));};
  const duplicate=(id:string)=>{edit(id);const original=draft();if(!original)return;const next=structuredClone(unwrap(original));next.id=sequenceId();next.title=(next.title+' (copy)').slice(0,200);
@@ -52,7 +54,7 @@ export function createSequenceController(editor:ReactiveEditor,host:Host){
  const visible=(id:string)=>group()?.presentation?.reveal!=='in-order'||!!state().revealed[id]||group()?.members[0]?.id===id;
  const reveal=(all=false)=>{const g=group();if(!g)return;const targets=all?g.members:g.members.filter(m=>!visible(m.id)).slice(0,1);update(s=>({...s,revealed:{...s.revealed,...Object.fromEntries(targets.map(m=>[m.id,true]))}}));};
  const reset=()=>{const ids=new Set(group()?.members.map(m=>m.id));update(s=>({...s,revealed:Object.fromEntries(Object.entries(s.revealed).filter(([id])=>!ids.has(id)))}));};
- const openSource=(t:CompositionRef)=>{leave(false);const session=host.session();queueMicrotask(()=>{if(host.session()!==session)return;host.inspect(t);const node=host.resolve(t);if(node)void revealPositionMarker(editor,{id:'sequence-source',anchor:{kind:'block',nodeKey:node.key}});});};
+ const openSource=(t:CompositionRef)=>{leave(false);const session=host.session();queueMicrotask(()=>{if(!alive||host.active?.()===false||host.session()!==session)return;host.inspect(t);const node=host.resolve(t);if(node)void revealPositionMarker(editor,{id:'sequence-source',anchor:{kind:'block',nodeKey:node.key}});});};
  const memberState=(id:string)=>{const resource=host.resourceId();let map=members.get(resource);if(!map){map=new Map();members.set(resource,map);}let value=map.get(id);if(!value){value={children:{}};map.set(id,value);}return value;};
  return {saved,unsupported,draft,presenting,sequence,group,create,edit,duplicate,change,save,remove,add,present,leave,chooseGroup,visible,reveal,reset,openSource,memberState,
   show:(id:string)=>update(s=>({...s,revealed:{...s.revealed,[id]:true}})),
@@ -60,6 +62,6 @@ export function createSequenceController(editor:ReactiveEditor,host:Host){
   cancel:()=>update(s=>({...s,draft:undefined})),
   moveGroup:(id:string,delta:number)=>change(d=>{const i=d.groups.findIndex(g=>g.id===id),j=i+delta;if(i>=0&&j>=0&&j<d.groups.length)[d.groups[i],d.groups[j]]=[d.groups[j],d.groups[i]];}),
   moveMember:(g:string,id:string,delta:number)=>change(d=>{const a=d.groups.find(x=>x.id===g)?.members;if(!a)return;const i=a.findIndex(m=>m.id===id),j=i+delta;if(i>=0&&j>=0&&j<a.length)[a[i],a[j]]=[a[j],a[i]];}),
-  dispose:()=>{stores.clear();members.clear();},
+  dispose:()=>{alive=false;stores.clear();members.clear();},
  };
 }

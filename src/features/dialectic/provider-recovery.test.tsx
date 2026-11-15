@@ -8,7 +8,7 @@ import {defaultProviderSettings,providerSettings} from './dcp/provider-contract'
 const clean:(()=>void)[]=[];afterEach(()=>{clean.splice(0).forEach(f=>f());vi.unstubAllGlobals();localStorage.clear();});
 it('accepts 16000 and makes unapplied settings distinct from the active budget',()=>{
  const [active]=createSignal({...defaultProviderSettings,maxOutputTokens:2048}),configure=vi.fn();
- const c:any={providerSettings:active,editor:{features:{}},busy:()=>false,providerConfiguring:()=>false,aiParticipants:()=>[],providerNotice:()=>'',configureProvider:configure,forgetProvider:vi.fn()};
+ const c:any={resourceId:()=>'fixture',providerSettings:active,editor:{features:{}},busy:()=>false,providerConfiguring:()=>false,aiParticipants:()=>[],providerNotice:()=>'',configureProvider:configure,forgetProvider:vi.fn()};
  const host=document.createElement('div');document.body.append(host);clean.push(render(()=> <ProviderSettingsView c={c}/>,host),()=>host.remove());
  const input=host.querySelector<HTMLInputElement>('[aria-label="Maximum output tokens"]')!;input.value='16000';input.dispatchEvent(new Event('input',{bubbles:true}));
  expect(input.checkValidity()).toBe(true);expect(host.querySelector('summary')!.textContent).toContain('2,048');expect(host.textContent).toContain('not applied yet');
@@ -21,4 +21,17 @@ it('retains only accepted nonsecret preferences across reload without restoring 
  const saved=JSON.stringify({...localStorage});expect(saved).not.toContain('key-secret');expect(saved).not.toContain('session-secret');
  const next=new DialecticProviderSession();clean.push(()=>next.dispose());expect(next.settings.maxOutputTokens).toBe(16000);expect(next.ready).toBe(false);
  vi.mocked(fetch).mockResolvedValueOnce(Response.json({error:'Rejected settings'},{status:400}));await expect(first.configure({...defaultProviderSettings,maxOutputTokens:1024})).rejects.toThrow('Rejected settings');expect(first.settings.maxOutputTokens).toBe(16000);
+});
+it('can explicitly reconnect a child after the shared credential connection expires',async()=>{
+ let roots=0,children=0;
+ vi.stubGlobal('fetch',vi.fn(async(url:any,init:any)=>{
+  if(String(url).endsWith('/session')){
+   if(init.method==='DELETE')return Response.json({ok:true});
+   if(init.headers['x-dialectic-parent']){children++;return children===1?Response.json({error:'Provider connection expired.'},{status:401}):Response.json({token:'child'});}
+   return Response.json({token:'root-'+(++roots)});
+  }
+  return Response.json({settings:JSON.parse(init.body).settings,ready:true});
+ }));
+ const parent=new DialecticProviderSession(),child=new DialecticProviderSession(false,()=>({}),parent);clean.push(()=>child.dispose(),()=>parent.dispose());
+ await expect(child.configure(defaultProviderSettings)).rejects.toThrow('expired');await expect(child.configure(defaultProviderSettings,'new-key-fixture')).resolves.toBe(true);expect(roots).toBe(2);expect(children).toBe(2);
 });

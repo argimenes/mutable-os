@@ -91,7 +91,7 @@ export class NativeDocumentSession {
       // Canonical owner generations also cover placement-only changes and
       // foreign-provenance invalidation, which content membership alone misses.
       const affectedResource = (id:string) => change.resourceProvenanceChanged || !change.resourceIds || change.resourceIds.includes(id);
-      const oriented = change.structural?.tabOrientationOwner ?? change.structural?.sequenceMetadataOwner;
+      const oriented = change.structural?.tabOrientationOwner ?? change.structural?.sequenceMetadataOwner ?? change.structural?.preferencesMetadataOwner;
       const tabMetadata = change.structural?.tabMetadata;
       const membership = change.structural?.membership;
       const gloss = change.structural?.gloss;

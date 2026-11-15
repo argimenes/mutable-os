@@ -13,10 +13,10 @@ export class DialecticProviderSession {
  private token='';private pending?:Promise<void>;private disposed=false;
  settings:ProviderSettings={...defaultProviderSettings};ready=false;
  private pagehide=()=>{void this.forget();};
- constructor(readonly testLogging=false,private assetContext:()=>AssetContext=()=>({})){try{const saved=localStorage.getItem(preferencesKey);if(saved)this.settings=providerSettings(JSON.parse(saved));}catch{}window.addEventListener('pagehide',this.pagehide);}
+ constructor(readonly testLogging=false,private assetContext:()=>AssetContext=()=>({}),private parent?:DialecticProviderSession){try{const saved=localStorage.getItem(preferencesKey);if(saved)this.settings=providerSettings(JSON.parse(saved));}catch{}window.addEventListener('pagehide',this.pagehide);}
  private async connect(){
   if(this.disposed)throw Error('Provider session closed.');if(this.token)return;
-  if(!this.pending)this.pending=(async()=>{const r=await fetch('/api/dialectic/session',{method:'POST',signal:AbortSignal.timeout(10000),headers:{'x-mutable-dialectic':'1'}});const data=await r.json();if(!r.ok)throw Error(data.error??'Local provider broker unavailable.');this.token=data.token;if(this.disposed){await this.forget();throw Error('Provider session closed.');}})().finally(()=>{this.pending=undefined;});
+  if(!this.pending)this.pending=(async()=>{if(this.parent)await this.parent.connect();const r=await fetch('/api/dialectic/session',{method:'POST',signal:AbortSignal.timeout(10000),headers:{'x-mutable-dialectic':'1',...(this.parent?{'x-dialectic-parent':this.parent.token}:{})}});const data=await r.json();if(!r.ok){if(r.status===401&&this.parent){this.parent.token='';this.parent.ready=false;}throw Error(data.error??'Local provider broker unavailable.');}this.token=data.token;if(this.disposed){await this.forget();throw Error('Provider session closed.');}})().finally(()=>{this.pending=undefined;});
   await this.pending;
  }
  private async call(path:string,body?:unknown,signal?:AbortSignal,method='POST'){
@@ -44,7 +44,7 @@ export class DialecticProviderSession {
   const data=await(await this.call('/utility/smaller-image',input,signal)).json();
   return {url:smallerImageOutput({url:data.url}),receipt:data.receipt};
  }
- async configure(settings:ProviderSettings,key?:string){const response=await this.call('/settings',{settings,...(key?{key}:{})});const data=await response.json();this.settings=providerSettings(data.settings);this.ready=data.ready;try{localStorage.setItem(preferencesKey,JSON.stringify(this.settings));}catch{}return this.ready;}
+ async configure(settings:ProviderSettings,key?:string){const response=await this.call('/settings',{settings,...(key?{key}:{})});const data=await response.json();this.settings=providerSettings(data.settings);this.ready=data.ready;try{if(!this.parent)localStorage.setItem(preferencesKey,JSON.stringify(this.settings));}catch{}return this.ready;}
  private async closeExchange(id:string){if(!this.token)return;await fetch('/api/dialectic/exchange/'+id,{method:'DELETE',signal:AbortSignal.timeout(2000),headers:{'x-mutable-dialectic':'1','x-dialectic-session':this.token},keepalive:true}).catch(()=>undefined);}
  async forget(){const token=this.token;this.token='';this.ready=false;if(token)await fetch('/api/dialectic/session',{method:'DELETE',headers:{'x-mutable-dialectic':'1','x-dialectic-session':token},keepalive:true}).catch(()=>undefined);}
  dispose(){window.removeEventListener('pagehide',this.pagehide);this.disposed=true;void this.forget();}

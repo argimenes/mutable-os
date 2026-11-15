@@ -19,6 +19,8 @@ export type FeatureFlags = Readonly<{
   dialecticConversationUpdates: boolean;
   /** Optional contribution-boundary saves, independent of conversation chrome. */
   dialecticAutosave: boolean;
+  /** Independent native conversations and background responses. */
+  dialecticMultiSession: boolean;
   dialecticAttachments: boolean;
   dialecticArtifacts: boolean;
   dialecticImageGeneration: boolean;
@@ -229,6 +231,7 @@ export type FeatureFlags = Readonly<{
 export const featureFlags: FeatureFlags = Object.freeze({
   dialecticConversationUpdates: true,
   dialecticAutosave: false,
+  dialecticMultiSession: true,
   dialecticAttachments: true,
   dialecticArtifacts: true,
   dialecticImageGeneration: true,

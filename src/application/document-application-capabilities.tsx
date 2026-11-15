@@ -179,6 +179,9 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
       };
       const tabKeys = createMemo(() => { navigationRevision(); return [...visibleTabs(),...navigation.tabs.keys()]; });
       const tabButtons = new Map<string, HTMLButtonElement>();
+      const [tabActivity,setTabActivity]=createSignal<((id:string)=>string)>();
+      let conversationCloseGuard:((ids:readonly string[],signal?:AbortSignal,keys?:readonly string[])=>boolean|Promise<boolean>)|undefined;
+      const documentTabs=createMemo(()=>tabKeys().map(key=>({key,documentId:tabId(key)})));
       const pendingTabCloses = new Map<string, AbortController>();
       const [tabCloseError, setTabCloseError] = createSignal("");
       const cancelTabCloses = () => { for (const controller of pendingTabCloses.values()) controller.abort(); pendingTabCloses.clear(); };
@@ -201,7 +204,9 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
             if (node && editor.viewVisibility.isClosed(node.placementKey)) closeTab(key, true, keys, active && generation === tabSelectionGeneration, focusCurrent?.() !== false);
           };
           try {
-            const result = editor.closeView(key, controller.signal);
+            const allowed=conversationCloseGuard?.([tabId(key)??''],controller.signal,[key])??true;
+            const perform=(ok:boolean)=>{if(ok&&!controller.signal.aborted)return editor.closeView(key,controller.signal);};
+            const result=allowed instanceof Promise?allowed.then(perform):perform(allowed);
             if (result instanceof Promise) void result.then(finish).catch(error => {
               if (mounted && !controller.signal.aborted) setTabCloseError(String(error));
             }).finally(() => { if (pendingTabCloses.get(key) === controller) pendingTabCloses.delete(key); });
@@ -241,7 +246,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
         return <div class="flint-document-tab" role="presentation" data-active={activeTab() === key} data-native-context-menu
           onContextMenu={event => openTabMenu(key, event)}
           onKeyDown={event => { if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) openTabMenu(key, event); }}>
-          <button ref={button => tabButtons.set(key, button)} type="button" role="tab" aria-selected={activeTab()===key} onClick={()=>chooseTab(key)}>{title()}<Show when={detachedTab(key)}><span class="flint-document-tab__detached" aria-label="Detached window" title="Select to activate its standalone window">↗</span></Show><Show when={native?.isDirty(tabId(key) ?? '')}><span class="flint-document-tab__dirty" role="img" aria-label="Unsaved changes" title="Unsaved changes" /></Show></button>
+          <button ref={button => tabButtons.set(key, button)} type="button" role="tab" aria-selected={activeTab()===key} onClick={()=>chooseTab(key)}>{title()}<Show when={tabActivity()?.(tabId(key)??'')}>{status=><span class="document-tab-activity" role="status" aria-label={status()} title={status()}> · {status()}</span>}</Show><Show when={detachedTab(key)}><span class="flint-document-tab__detached" aria-label="Detached window" title="Select to activate its standalone window">↗</span></Show><Show when={native?.isDirty(tabId(key) ?? '')}><span class="flint-document-tab__dirty" role="img" aria-label="Unsaved changes" title="Unsaved changes" /></Show></button>
           <Show when={detachment}><button type="button" aria-label={`Document actions: ${title()}`} onPointerDown={e=>e.preventDefault()} onClick={event=>openTabMenu(key,event)}>⋯</button></Show>
           <button type="button" class="flint-document-tab__close" aria-label={`Close Document: ${title()}`} title={`Close ${title()}`} onClick={event => { event.stopPropagation(); closeTab(key); }}>×</button>
         </div>;
@@ -574,11 +579,15 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
           key:props.nodeKey,applicationId:definition.applicationId??definition.type,application,windowId:()=>editor.windowManager?.ownerForNode(props.nodeKey),
           desktop:()=> <Dynamic component={definition.view} initialView={initialView} application={application}/>,
           tabs:()=>tabKeys().map(key=>({key,documentId:tabId(key),title:resolve(tabId(key)??'')?.title??'Unavailable Document',dirty:!!native?.isDirty(tabId(key)??'')})),
+          documentTabs,closeTab,
+          setTabActivity:(value:(id:string)=>string)=>{setTabActivity(()=>value);return ()=>setTabActivity(undefined);},
+          setCloseGuard:(value:(ids:readonly string[],signal?:AbortSignal,keys?:readonly string[])=>boolean|Promise<boolean>)=>{conversationCloseGuard=value;return ()=>{if(conversationCloseGuard===value)conversationCloseGuard=undefined;};},
           activeTab,selectTab:chooseTab,presented:setExternalPresentation,
           session:()=>{retainedSessions?.transfers.observe();return retainedSessions?.sessions().find(s=>s.host.ownerKey===props.nodeKey&&s.host.slotKey===activeTab());},
           prompt:()=>documentSaver?.prompt(),
           saveAs:documentSaver?()=>documentSaver.save(requireId(),undefined,true):undefined,
       };
+      onMount(()=>{const id=presentationPort.windowId();if(id&&editor.windowManager)onCleanup(editor.windowManager.lifecycle.guard(id,signal=>conversationCloseGuard?.(documentTabs().map(t=>t.documentId??''),signal,documentTabs().map(t=>t.key))??true));});
       if(presentationKey || (editor.features.textualWorkspace && retainedSessions))onMount(()=>onCleanup(documentApplicationPorts(editor).register(presentationPort)));
       return <>{documentSaver && <documentSaver.Dialogs/>}<Show when={publication()}>{p=><PublicationDialog editor={editor} initial={p().initial} close={()=>setPublication(undefined)}/>}</Show><Show when={collectionMode()}>{mode=><CollectionDialog editor={editor} vault={selectedVault()?.root??'.'} current={()=>mounted&&scope.active()} mode={mode()} close={()=>setCollectionMode(undefined)}/>}</Show><Show when={choosingVault()}><DocumentBrowser mode="directory" initialLocation={{folder:selectedVault()?.root??'.',filename:''}} busy={chooserBusy()} error={chooserError()} onClose={()=>setChoosingVault(false)} onChoose={async location=>{setChooserBusy(true);setChooserError('');try{await vault!.open(location.folder);if(mounted)setChoosingVault(false);return true;}catch(e){if(mounted)setChooserError(String(e));return false;}finally{if(mounted)setChooserBusy(false);}}}/></Show><div ref={root} tabIndex={-1} data-block-type={definition.type} data-runtime-key={props.nodeKey}>
         <Show when={presentationKey} fallback={<Dynamic component={definition.view} initialView={initialView} application={application} />}>{key=><RegisteredApplicationView editor={editor} application={key()} instance={presentationPort} workspace="desktop" host={originPresentationHost}/>}</Show>

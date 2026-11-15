@@ -216,7 +216,8 @@ export function DialecticTextual(props:{controller:DialecticController;port:Docu
   onCleanup(restore);queueMicrotask(()=>editor.documentSessions?.presentations.restorePosition(s,true));
  });});
  return <div ref={root} class="dialectic-textual" data-mwm-window={props.port.windowId()} inert={!props.active()} style={{'--tw-prose-width':`${Math.max(20,host.grid().columns-58)}ch`}}>
-  <Chrome c={c} textual actions={<For each={props.port.tabs()}>{t=><button onClick={()=>props.port.selectTab(t.key)}>{t.title}{t.dirty?' *':''}</button>}</For>}>
+  <Chrome c={c} textual>
+   <div class="reactive-tabs__labels" role="tablist" aria-label="Conversations"><For each={props.port.tabs()}>{t=><div role="presentation" class="flint-document-tab"><button role="tab" aria-selected={props.port.activeTab()===t.key} onClick={()=>props.port.selectTab(t.key)}>{t.title}<Show when={t.dirty}><span aria-label="Unsaved changes"> *</span></Show><Show when={c.conversations?.status(t.documentId??'')}>{s=><span role="status"> · {s()}</span>}</Show></button><button aria-label={`Close Document: ${t.title}`} onClick={()=>props.port.closeTab?.(t.key)}>×</button></div>}</For></div>
    <div ref={viewport} class="dialectic-canvas tw-flint-editor"><div ref={slot} class="tw-flint-slot"/><div ref={surface}/></div>
   </Chrome><Show when={props.port.prompt()} keyed>{prompt=><TextualSavePrompt prompt={prompt} grid={host.grid()}/>}</Show>
  </div>;

@@ -1440,7 +1440,7 @@ it('rejects Stage 3C foreign, archived or malformed source captures without I/O 
 
 const vocabularyFixture=(vocabulary=true)=>setup(true,true,true,true,true,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,vocabulary);
 it('rejects independently disabled semantic operations and Entity mentions without committing partial work',async()=>{
- const f=await vocabularyFixture(),c=f.c!,e=f.editor;f.type!('Semantic permissions');c.submit();const revision=e.repository.state.revision;
+ const f=await vocabularyFixture(),c=f.c!,e=f.editor;f.type!('Semantic permissions');c.submit();let revision=e.repository.state.revision;
  const entity={id:'new:e1',name:'Entity',typename:'Concept',description:'',aliases:[]};
  for(const [capability,field,value]of [
   ['semantic.entity','entities',[entity]],['semantic.argument','arguments',[{id:'new:arg1',anchor:'new:s1'}]],
@@ -1451,10 +1451,10 @@ it('rejects independently disabled semantic operations and Entity mentions witho
   ['source.classification','interpretations',[{id:'new:m1',target:'new:r1',type:'style/bold',ref:null,attributes:[]}]],
   ['reference.reply','replyTargets',['src:unissued:c1']]
  ] as const){
-  c.configureVocabulary({profile:'all-qualified',disable:[capability]});
+  c.configureVocabulary({profile:'all-qualified',disable:[capability]});revision=e.repository.state.revision;
   await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),[field]:value}));expect(c.notice()).toContain(capability);expect(e.repository.state.revision).toBe(revision);
  }
- c.configureVocabulary({profile:'all-qualified',disable:['standoff:mutable/entity-reference']});
+ c.configureVocabulary({profile:'all-qualified',disable:['standoff:mutable/entity-reference']});revision=e.repository.state.revision;
  for(const mode of ['inline','range','source'])await c.askMock(async(req,sources)=>{
   const response:any={...dcpResponse(req.exchange),entities:[entity],composition:[{id:'new:b1',kind:'paragraph',markup:mode==='inline'?'<annotation type="mutable/entity-reference" ref="new:e1">Mention</annotation>':'<boundary id="new:pos1"/>Mention<boundary id="new:pos2"/>',ranges:mode==='range'?[{id:'new:s1',type:'mutable/entity-reference',from:'new:pos1',to:'new:pos2',ref:'new:e1',attributes:[]}]:[]}]};
   if(mode==='source'){const parent=await sources.source(req.primaryReply),text=await sources.source(parent.children[0]);response.anchors=[{id:'new:r1',source:text.handle,revision:text.revision,selector:{exact:'Semantic',prefix:'',suffix:''}}];response.interpretations=[{id:'new:m1',target:'new:r1',type:'mutable/entity-reference',ref:'new:e1',attributes:[]}];}
@@ -1467,12 +1467,12 @@ it('supports reduced-profile mock exchanges and the legacy selection-disabled pa
  await d.askMock(async(req,sources)=>{expect(req.vocabulary).toBeUndefined();expect(sources.vocabulary).toBeUndefined();return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'timer',durationSeconds:5,size:null}]});});expect(d.notice()).toBe('');
 });
 it('enforces vocabulary selection recursively and rejects disabled configuration before any commit',async()=>{
- const f=await vocabularyFixture(),c=f.c!,e=f.editor;f.type!('Vocabulary request');c.submit();c.configureVocabulary({profile:'core'});const revision=e.repository.state.revision;
+ const f=await vocabularyFixture(),c=f.c!,e=f.editor;f.type!('Vocabulary request');c.submit();c.configureVocabulary({profile:'core'});let revision=e.repository.state.revision;
  const p={id:'new:b1',kind:'paragraph',markup:'Text',ranges:[]},timer={id:'new:b2',kind:'timer',durationSeconds:30,size:null};
  for(const composition of [[timer],[{id:'new:b3',kind:'group',children:[timer]}],[{id:'new:b4',kind:'list',style:'bullet',configuration:null,items:[[timer]]}],[{...p,textStyle:{alignment:'center',indent:null,size:null}}],[{...p,margins:{left:[timer],right:[]}}],[{id:'new:b5',kind:'list',style:'task',configuration:null,items:[[p]]}],[{id:'new:b5',kind:'list',style:'ordered',configuration:{start:1,reversed:false,items:[{value:null,checked:true}]},items:[[p]]}],[{id:'new:b6',kind:'table',configuration:{headers:[[true]]},rows:[[[p]]]}]]){
   await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition}));expect(c.notice()).toMatch(/disabled/);expect(e.repository.state.revision).toBe(revision);
  }
- c.configureVocabulary({profile:'general',disable:['composition.surface']});
+ c.configureVocabulary({profile:'general',disable:['composition.surface']});revision=e.repository.state.revision;
  for(const composition of [[{id:'new:b7',kind:'tabs',orientation:'horizontal',tabs:[{label:'T',content:[{id:'new:b8',kind:'surface',front:[p],back:[{...p,id:'new:b9'}]}]}]}],[{id:'new:b7',kind:'sticky-note',size:null,content:[timer]}]]){await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition}));expect(c.notice()).toMatch(/disabled/);expect(e.repository.state.revision).toBe(revision);}
  await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b10',kind:'tabs',orientation:'horizontal',tabs:[{label:'T',content:[p]}]}]}));expect(c.notice()).toBe('');
 });
@@ -1484,7 +1484,7 @@ it('rejects disabled standoff properties through inline, ranges and source inter
 });
 it('keeps an immutable vocabulary snapshot during settings changes and does not let response flags grant authority',async()=>{
  const f=await vocabularyFixture(),c=f.c!,e=f.editor;f.type!('Settings');c.submit();c.configureVocabulary({profile:'general'});
- await c.askMock(async(req,sources)=>{expect(req.vocabulary).toBe(sources.vocabulary);expect(Object.isFrozen(req.vocabulary.capabilities)).toBe(true);c.configureVocabulary({profile:'core'});expect(sources.capabilities!.describe({ids:['composition.surface']}).items[0].authorable).toBe(true);return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'surface',front:[{id:'new:b2',kind:'paragraph',markup:'Front',ranges:[]}],back:[{id:'new:b3',kind:'paragraph',markup:'Back',ranges:[]}]}]});});expect(c.notice()).toBe('');const revision=e.repository.state.revision;
+ await c.askMock(async(req,sources)=>{expect(req.vocabulary).toBe(sources.vocabulary);expect(Object.isFrozen(req.vocabulary.capabilities)).toBe(true);c.configureVocabulary({profile:'core'});expect(sources.capabilities!.describe({ids:['composition.surface']}).items[0].authorable).toBe(true);return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'surface',front:[{id:'new:b2',kind:'paragraph',markup:'Front',ranges:[]}],back:[{id:'new:b3',kind:'paragraph',markup:'Back',ranges:[]}]}]});});expect(c.notice()).toBe('');expect(c.vocabularySelection().profile).toBe('general');c.configureVocabulary({profile:'core'});const revision=e.repository.state.revision;
  await c.askMock(async req=>{expect(req.vocabulary.profile).toBe('core');c.configureVocabulary({profile:'all-qualified'});return JSON.stringify({...dcpResponse(req.exchange),composition:[{id:'new:b1',kind:'timer',durationSeconds:1,size:null}]});});expect(c.notice()).toMatch(/disabled/);expect(e.repository.state.revision).toBe(revision);
  await c.askMock(async req=>JSON.stringify({...dcpResponse(req.exchange),vocabulary:{profile:'all-qualified'}}));expect(c.notice()).toMatch(/Invalid DCP object fields/);expect(e.repository.state.revision).toBe(revision);
  const snapshot=vi.spyOn(e.repository,'snapshot'),build=vi.spyOn(c.session()!.projection as any,'build'),reads={...c.dcpDiagnostics},calls=vi.mocked(fetch).mock.calls.length;f.type!('Local typing');expect(c.dcpDiagnostics).toEqual(reads);expect(snapshot).not.toHaveBeenCalled();expect(build).not.toHaveBeenCalled();expect(fetch).toHaveBeenCalledTimes(calls);
@@ -1504,8 +1504,8 @@ it('permits existing Entity mentions and formal relationships without permission
 it('selects retained PDF binding independently of general Surface authoring and preserves atomic rollback',async()=>{
  const f=await pdfFixture(),c=f.c!,e=f.editor;c.configureVocabulary({profile:'core',enable:['media.retained-pdf']});
  await c.askMock(async(req,sources)=>{expect(req.vocabulary.kinds).not.toContain('surface');return JSON.stringify({...dcpResponse(req.exchange),composition:[pdfNode(await f.read(sources))]});});expect(c.notice()).toBe('');expect(f.verify).toHaveBeenCalledTimes(1);expect(Object.values(e.repository.readState().contents).some(n=>n.viewType==='resource-information-block')).toBe(true);
- c.configureVocabulary({profile:'core'});f.verify.mockClear();const before=nativeText(captureNative(e.repository.readState(),c.resourceId()));await c.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[pdfNode(await f.read(sources))]}));expect(c.notice()).toMatch(/disabled/);expect(f.verify).not.toHaveBeenCalled();expect(nativeText(captureNative(e.repository.readState(),c.resourceId()))).toBe(before);
- c.configureVocabulary({profile:'core',enable:['media.retained-pdf']});const insert=e.commands.insertFragment.bind(e.commands);vi.spyOn(e.commands,'insertFragment').mockImplementation((...args)=>{insert(...args);throw Error('Vocabulary rollback');});
+ c.configureVocabulary({profile:'core'});f.verify.mockClear();let before=nativeText(captureNative(e.repository.readState(),c.resourceId()));await c.askMock(async(req,sources)=>JSON.stringify({...dcpResponse(req.exchange),composition:[pdfNode(await f.read(sources))]}));expect(c.notice()).toMatch(/disabled/);expect(f.verify).not.toHaveBeenCalled();expect(nativeText(captureNative(e.repository.readState(),c.resourceId()))).toBe(before);
+ c.configureVocabulary({profile:'core',enable:['media.retained-pdf']});before=nativeText(captureNative(e.repository.readState(),c.resourceId()));const insert=e.commands.insertFragment.bind(e.commands);vi.spyOn(e.commands,'insertFragment').mockImplementation((...args)=>{insert(...args);throw Error('Vocabulary rollback');});
  await c.askMock(async(req,sources)=>{const pdf=await f.read(sources),parent=await sources.source(sources.issue(c.target(f.sourceId))),text=await sources.source(parent.children[0]);return JSON.stringify({...dcpResponse(req.exchange),composition:[pdfNode(pdf)],anchors:[{id:'new:r1',source:text.handle,revision:text.revision,selector:{exact:'green patina',prefix:'',suffix:''}}],interpretations:[{id:'new:m1',target:'new:r1',type:'style/highlight',ref:null,attributes:[]}]});});expect(c.notice()).toContain('Vocabulary rollback');expect(nativeText(captureNative(e.repository.readState(),c.resourceId()))).toBe(before);
 });
 

@@ -1,3 +1,4 @@
+import {copyVocabularySelection} from './vocabulary-contract';
 import type {ReactiveEditor} from '../../../reactive-editor/editor';
 import {capabilityCatalogue} from './capabilities';
 import {entityMentionSemantic} from './markup';
@@ -12,12 +13,7 @@ const general=[...core,...['style/underline','style/strikethrough','dialectic/cl
 const research=[...general,'composition.pages','composition.source','semantic.entity','semantic.argument','semantic.argument-relation','semantic.entity-relation','media.image','media.retained-pdf','standoff:mutable/entity-reference'];
 export const conversationalSelection:Readonly<VocabularySelection>=Object.freeze({profile:'general'});
 export const allQualifiedSelection:Readonly<VocabularySelection>=Object.freeze({profile:'all-qualified'});
-export function copyVocabularySelection(input:VocabularySelection):Readonly<VocabularySelection>{
- if(!input||!['all-qualified','core','general','research'].includes(input.profile)||Object.keys(input).some(k=>!['profile','enable','disable'].includes(k)))throw Error('Invalid DCP vocabulary selection');
- const list=(values:readonly string[]|undefined)=>{if(values===undefined)return [];if(!Array.isArray(values)||values.length>128||values.some(v=>typeof v!=='string'||!v||v.length>128)||new Set(values).size!==values.length)throw Error('Invalid DCP capability overrides');return Object.freeze([...values]);};
- const enable=list(input.enable),disable=list(input.disable);if(enable.some(id=>disable.includes(id)))throw Error('Conflicting DCP capability overrides');
- return Object.freeze({profile:input.profile,enable,disable});
-}
+export {copyVocabularySelection} from './vocabulary-contract';
 export function vocabularyDescriptors(editor:ReactiveEditor):readonly VocabularyDescriptor[]{
  const current=new Map(capabilityCatalogue(editor).selectable.map(d=>[d.id,d]));
  // Enumerate qualified selection IDs even when their current native/stage gate

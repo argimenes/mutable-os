@@ -15,7 +15,7 @@ import {parseConversationTitle,titleLimits} from '../../src/features/dialectic/t
 import {liveLimits,providerSettings,type Provider,type ProviderCall,type ProviderSettings} from '../../src/features/dialectic/dcp/provider-contract.js';
 
 const loopback=(host:string)=>['localhost','127.0.0.1','[::1]','::1','::ffff:127.0.0.1'].includes(host);
-interface Session {utility?:AbortController;diagnosticId:string;origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
+interface Session {parent?:string;utility?:AbortController;diagnosticId:string;origin:string;settings?:ProviderSettings;keys:Partial<Record<Provider,string>>;expires:number;created:number;exchanges:Map<string,Exchange>}
 interface Exchange {imageKey?:string;attachmentContext?:AttachmentContext;artifacts?:Map<string,{attachment?:Attachment;error?:string}>;state:ProviderConversation;key:string;abort:AbortController;timer:ReturnType<typeof setTimeout>;busy:boolean;round:number;calls:number;pending:ProviderCall[];repaired:boolean;recoverSources?:boolean;final:boolean;manifest?:ContinuityManifest;receipt?:ContinuityReceipt;acknowledged?:boolean}
 /** Local-only credential broker. No credential persistence, SQL, CORS or remote deployment mode. Optional diagnostics redact credentials. */
 export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof fetch;environment?:Record<string,string|undefined>;currentCavern?:()=>CavernScope|undefined;continuity?:boolean;testLogging?:boolean;logRoot?:string}={}){
@@ -23,7 +23,7 @@ export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof
  const testLog=new DcpTestLog(()=>options.logRoot??options.currentCavern?.()?.path??process.cwd(),options.testLogging===true),fetcher=testLog.fetch(options.fetcher??fetch);
  const continuity=options.currentCavern&&options.continuity!==false?new OpenAIConversations(options.currentCavern,fetcher):undefined;
  const release=(s:Session,id:string)=>{const e=s.exchanges.get(id);if(e){void testLog.write('exchange.closed',{exchangeId:e.state.exchangeId,final:e.final,repaired:e.repaired,acknowledged:e.acknowledged??false}).catch(()=>undefined);e.abort.abort();clearTimeout(e.timer);s.exchanges.delete(id);if(e.manifest&&e.receipt&&!e.acknowledged)void continuity?.abandon(e.manifest,e.key,e.receipt.exchangeId).catch(()=>undefined);}};
- const forget=(token:string,s:Session)=>{s.utility?.abort();for(const id of s.exchanges.keys())release(s,id);s.keys={};sessions.delete(token);};
+ const forget=(token:string,s:Session)=>{for(const [childToken,child] of sessions)if(child.parent===token)forget(childToken,child);s.utility?.abort();for(const id of s.exchanges.keys())release(s,id);if(!s.parent)for(const provider of Object.keys(s.keys) as Provider[])delete s.keys[provider];sessions.delete(token);};
  const sweep=setInterval(()=>{const now=Date.now();for(const [token,s]of sessions)if(s.expires<now||s.created+8*3600000<now)forget(token,s);},60000);sweep.unref();
  router.use((req,res,next)=>{
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
@@ -34,12 +34,15 @@ export function createDialecticBroker(options:AttachmentOptions&{fetcher?:typeof
  router.use(express.json({limit:'2mb'}));
  router.post('/session',(req,res)=>{
   if(sessions.size>=32){res.status(429).json({error:'Too many local provider sessions.'});return;}
-  const token=randomBytes(32).toString('hex');sessions.set(token,{diagnosticId:randomBytes(16).toString('hex'),origin:String(req.headers.origin),keys:{},expires:Date.now()+1800000,created:Date.now(),exchanges:new Map()});res.json({token});
+  const parentToken=req.headers['x-dialectic-parent'],parent=typeof parentToken==='string'?sessions.get(parentToken):undefined;
+  if(parentToken&&(!parent||parent.parent||parent.origin!==req.headers.origin||parent.expires<Date.now()||parent.created+8*3600000<Date.now())){res.status(401).json({error:'Provider connection expired.'});return;}
+  if(parent)parent.expires=Date.now()+1800000;
+  const token=randomBytes(32).toString('hex');sessions.set(token,{...(parent?{parent:String(parentToken)}:{}),diagnosticId:randomBytes(16).toString('hex'),origin:String(req.headers.origin),keys:parent?.keys??{},expires:Date.now()+1800000,created:Date.now(),exchanges:new Map()});res.json({token});
  });
  router.use((req,res,next)=>{
   const token=String(req.headers['x-dialectic-session']??''),s=sessions.get(token);
   if(!s||s.origin!==req.headers.origin||s.expires<Date.now()||s.created+8*3600000<Date.now()){if(s)forget(token,s);res.status(401).json({error:'Provider session expired. Reopen AI settings and enter the key again.'});return;}
-  s.expires=Date.now()+1800000;res.locals.session=s;
+  s.expires=Date.now()+1800000;if(s.parent){const parent=sessions.get(s.parent);if(!parent){res.status(401).json({error:'Provider connection closed.'});return;}parent.expires=s.expires;}res.locals.session=s;
   const context={secrets:[token,...Object.values(s.keys)],sessionId:s.diagnosticId,documentId:req.body?.continuity?.manifest?.documentId??req.body?.manifest?.documentId??req.body?.documentId,exchangeId:req.body?.request?.exchange??req.body?.exchangeId};
   testLog.context.run(context,()=>{
    const json=res.json.bind(res);res.json=(body:any)=>{void testLog.write('broker.response',{path:req.path,body}).catch(()=>console.error('DCP diagnostic log write failed'));return json(body);};
