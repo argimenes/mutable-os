@@ -14,14 +14,14 @@ export function semanticGraph(nodes:SemanticGraphNode[],edges:SemanticGraphEdge[
  return {source:lines.join('\n'),navigation,identities,truncated:included.length<nodes.length||shown.length<edges.length};
 }
 export function SemanticGraph(props:{nodes:SemanticGraphNode[];edges:SemanticGraphEdge[];active:boolean;selected?:string;select:(id:string)=>void}){
- let host!:HTMLDivElement;const [status,setStatus]=createSignal(''),[zoom,setZoom]=createSignal(1),[control,setControl]=createSignal<{selectNode:(id?:string)=>void}>();
+ let host!:HTMLDivElement;const [status,setStatus]=createSignal(''),[control,setControl]=createSignal<Awaited<ReturnType<typeof diagramFrame>>>();
  const graph=createMemo(()=>semanticGraph(props.nodes,props.edges));
  createEffect(()=>control()?.selectNode(Object.keys(graph().identities).find(token=>graph().identities[token]===props.selected)));
  onMount(()=>createEffect(()=>{if(!props.active)return;const g=graph(),abort=new AbortController();let dispose:Awaited<ReturnType<typeof diagramFrame>>|undefined;
   setStatus(g.truncated?'Showing up to 60 objects and 120 relationships. Use search to narrow the graph.':'');
-  if(props.nodes.length)void diagramFrame(host,g.source,abort.signal,error=>{if(!abort.signal.aborted&&error)setStatus(error);},{fit:true,title:'Interactive semantic relationship diagram',numericLabelEntities:true,navigation:{nodes:g.navigation,onSelect:token=>{if(!abort.signal.aborted&&props.active)props.select(g.identities[token]);}}}).then(d=>{dispose=d;if(abort.signal.aborted)d();else setControl(()=>d);}).catch(e=>{if(!abort.signal.aborted)setStatus(String(e));});
+  if(props.nodes.length)void diagramFrame(host,g.source,abort.signal,error=>{if(!abort.signal.aborted&&error)setStatus(error);},{fit:true,panZoom:true,title:'Interactive semantic relationship diagram',numericLabelEntities:true,navigation:{nodes:g.navigation,onSelect:token=>{if(!abort.signal.aborted&&props.active)props.select(g.identities[token]);}}}).then(d=>{dispose=d;if(abort.signal.aborted)d();else setControl(()=>d);}).catch(e=>{if(!abort.signal.aborted)setStatus(String(e));});
   else host.replaceChildren();
   onCleanup(()=>{abort.abort();dispose?.();setControl(undefined);});
  }));
- return <div class="semantics-graph"><p role="status">{status()}</p><div class="semantics-graph-scroll"><div ref={host} style={{width:`${zoom()*100}%`,height:`${zoom()*100}%`}}/></div><div class="semantics-zoom"><button aria-label="Zoom graph in" onClick={()=>setZoom(v=>Math.min(3,v+.25))}>+</button><button aria-label="Zoom graph out" onClick={()=>setZoom(v=>Math.max(1,v-.25))}>−</button><button onClick={()=>setZoom(1)}>Reset</button></div></div>;
+ return <div class="semantics-graph"><p role="status">{status()}</p><div class="semantics-graph-scroll"><div ref={host} class="semantics-graph-host"/></div><div class="semantics-zoom"><button aria-label="Zoom graph in" onClick={()=>control()?.viewport('in')}>+</button><button aria-label="Zoom graph out" onClick={()=>control()?.viewport('out')}>−</button><button onClick={()=>control()?.viewport('reset')}>Reset</button></div></div>;
 }

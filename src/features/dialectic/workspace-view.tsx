@@ -16,7 +16,7 @@ export function ConversationWorkspacePanels(props:{c:DialecticController}){
  onMount(()=>createEffect(()=>{const key=c.resourceId()+':'+c.activeWorkspaceTab().id;previous=key;cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{panel.scrollTop=positions.get(key)??0;});}));onCleanup(()=>cancelAnimationFrame(frame));
  const kind=()=>c.activeWorkspaceTab().type;
  return <div data-cross-text-controls ref={panel} class="conversation-workspace-panels" onScroll={()=>positions.set(previous,panel.scrollTop)} hidden={kind()==='conversation'}>
- <div hidden={kind()!=='semantics'}><SemanticsWorkspace c={c} active={kind()==='semantics'}/></div>
+ <div class="conversation-semantics-panel" hidden={kind()!=='semantics'}><SemanticsWorkspace c={c} active={kind()==='semantics'}/></div>
  <For each={['media','attachments'] as const}>{type=>{const [visited,setVisited]=createSignal(false);createEffect(()=>{if(kind()===type)setVisited(true);});return <Show when={visited()}><div hidden={kind()!==type}><FilesWorkspace c={c} kind={type}/></div></Show>;}}</For>
  </div>;
 }
