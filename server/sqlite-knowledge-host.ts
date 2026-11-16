@@ -299,12 +299,13 @@ export class SqliteKnowledgeHost {
   }
   async semantics(body:any,signal?:AbortSignal){
     const e=this.semanticEntry(body),request=body.request;
+    if(String(request?.op).startsWith('identity-')&&!featureFlags.pipelineManager)throw Error('Pipeline Manager is disabled');
     if(request?.op==='resolve-evidence')return this.resolveEvidence(body,signal);
-    const mutation=['create','add','update','remove','batch','rename','alias-add','alias-update','alias-remove','relationship-create','relationship-update'].includes(request?.op);
+    const mutation=['identity-commit','create','add','update','remove','batch','rename','alias-add','alias-update','alias-remove','relationship-create','relationship-update'].includes(request?.op);
     if(mutation&&this.options.readOnly)throw Error('Canonical semantic storage is read-only');
     signal?.throwIfAborted();
     try{
-      const result=request?.recordType==='Entity'||request?.recordType==='Relationship'?
+      const result=!String(request?.op).startsWith('identity-')&&(request?.recordType==='Entity'||request?.recordType==='Relationship')?
         await e.client.entities(entityCommand(request),signal):await e.client.semantics(request,signal);
       return {...result,session:this.session,vaultGuid:e.vaultGuid};
     }finally{if(mutation)this.enqueue(e,false);}

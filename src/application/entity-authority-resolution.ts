@@ -32,6 +32,15 @@ export function createEntityAuthorityResolution(editor:ReactiveEditor,owner:()=>
   try{
    const entity=definition.metadata.scopedEntity.entity,qid=entity.attributes?.enrichment?.externalIds?.find((v:any)=>v.namespace==='wikidata')?.value??entity.attributes?.authorityMetadata?.id;
    let vault='.';try{vault=await service.historyScope?.()??'.';}catch{abort.signal.throwIfAborted();}
+   const manual=definition.metadata.scopedEntity.identityAssociation;
+   if(manual?.method==='user-confirmed'){
+    const vaultId=await service.scopeIdentity?.(abort.signal);
+    if(vaultId!==manual.vaultId)throw Error('The reviewed identity belongs to another Cavern');
+    const canonical=await service.get(manual.entityId,abort.signal);
+    if(!current())return;
+    if(!canonical||canonical.deletedUtc)throw Error('The reviewed authentic Entity is unavailable');
+    put(id,{status:'linked',canonical,message:'Identity explicitly confirmed in Mutable.'});return;
+   }
    const association=entity.attributes?.canonicalAssociation;
    // A previously corroborated local identity can reuse its live mapping offline.
    // A changed local identity, Vault, deleted target or retargeted mapping is reverified.
