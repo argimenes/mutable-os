@@ -42,7 +42,7 @@ export class SqliteKnowledgeHost {
       const root=await this.store.resolve(vault);
       for(const other of this.entries.keys())if(other!==root&&(inside(other,root)||inside(root,other)))throw Error('Overlapping SQLite vault already open');
       let e=this.entries.get(root);
-      // Establishing persistence is policy-neutral. Reuse a warm context without
+      // Policy-neutral persistence/canonical access reuses a warm context without
       // asking it to replace an application's explicitly selected extraction policy.
       const normalized=normalizePolicy(establishment&&e?e.policy:policy),key=policyKey(normalized);
       if(e&&e.policyKey!==key)throw Error('SQLite vault extraction policy differs; no automatic profile replacement');
@@ -288,9 +288,10 @@ export class SqliteKnowledgeHost {
     this.enqueue(e,full);await this.flush();return this.status(token);
   }
   /** Selected-vault semantic authoring capability, independent of a Document UI source. */
-  async openSemantics(vault:string,policy=normalizePolicy()){
+  async openSemantics(vault:string,policy?:ReturnType<typeof normalizePolicy>){
     if(this.options.semanticServicesEnabled===false)throw Error('Semantic services are disabled');
-    const opened=await this.acquireContext(vault,policy);this.semanticLeases.add(opened.lease);return opened;
+    // Omission requests canonical access, not replacement of a Document's profile.
+    const opened=await this.acquireContext(vault,normalizePolicy(policy),policy===undefined);this.semanticLeases.add(opened.lease);return opened;
   }
   private semanticEntry(body:any){
     if(this.options.semanticServicesEnabled===false)throw Error('Semantic services are disabled');
