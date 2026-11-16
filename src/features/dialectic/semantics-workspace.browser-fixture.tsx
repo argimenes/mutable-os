@@ -6,6 +6,10 @@ import {materializeLocalWorkspace} from '../../reactive-editor/workspace-manifes
 import {documentApplicationPorts} from '../../application/document-application-ports';
 import {ScopedEntities} from '../../application/scoped-entities';
 import {enrichEntityDefinition} from '../../feature-api/entity-enrichment';
+import {createSignal} from 'solid-js';
+import {SemanticGraph} from './semantic-graph';
+import {semanticThumbnail} from './semantic-thumbnail';
+import type {ReactiveEditor} from '../../reactive-editor/editor';
 import '../../index.css';import '../../demo/workspace-demo.css';
 /** In-memory visual fixture: no file saves, authority requests or canonical writes. */
 export async function semanticsWorkspaceFixture(){
@@ -30,4 +34,17 @@ export async function semanticsWorkspaceFixture(){
  tab('Semantics').click();await Promise.resolve();const entityButton=[...host.querySelectorAll<HTMLButtonElement>('.semantics-list-item')].find(b=>b.textContent?.includes('Leonardo da Vinci'))!;entityButton?.click();
  (globalThis as any).semanticsFixture={editor,session,host,port,tab,dispose:()=>{scoped.dispose();stop();session.dispose();host.remove();}};
  return {entities:entities.length,relationships:3,arguments:1,claims:1,resourceId};
+}
+
+/** Deterministic managed-image binding: exercises the real thumbnail queue, raster and sandbox. */
+export function semanticGraphThumbnailFixture(){
+ const host=document.body.appendChild(document.createElement('div'));host.style.cssText='position:fixed;inset:0;z-index:100000;background:white';
+ const canvas=document.createElement('canvas');canvas.width=240;canvas.height=160;const context=canvas.getContext('2d')!;context.fillStyle='#38776c';context.fillRect(0,0,240,160);context.fillStyle='#f2d68f';context.beginPath();context.arc(120,80,55,0,Math.PI*2);context.fill();const url=canvas.toDataURL();
+ const asset={kind:'managed' as const,cavernId:'fixture',assetId:'sha256:'+'a'.repeat(64)},diagnostics={binds:0,releases:0};
+ const editor={features:{managedAssetClipboard:true},readAssetContext:()=>({cavernId:'fixture',session:'fixture'}),assets:{bind:(image:HTMLImageElement)=>{diagnostics.binds++;const timer=setTimeout(()=>image.src=url,10);return()=>{clearTimeout(timer);diagnostics.releases++;};}}} as unknown as ReactiveEditor;
+ const [thumbnails,setThumbnails]=createSignal({}),[selected,setSelected]=createSignal('');
+ const nodes=[{id:'canonical',label:'Canonical Entity'},{id:'missing',label:'No image'}];
+ const stop=render(()=><div class="semantics-workspace"><SemanticGraph editor={editor} portraits nodes={nodes} edges={[]} active selected={selected()} select={setSelected} thumbnails={thumbnails()}/></div>,host);
+ const update=()=>setThumbnails({canonical:semanticThumbnail({}, {status:'linked',canonical:{id:'canonical',name:'Canonical Entity',revision:1,aliases:[],imageRef:asset}})});
+ (globalThis as any).semanticThumbnailFixture={host,update,clear:()=>setThumbnails({}),selected,diagnostics,dispose:()=>{stop();host.remove();}};
 }

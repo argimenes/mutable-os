@@ -1,5 +1,6 @@
 /** Semantic resolver contract. No persistence rows, SQL or editor access. */
 export interface CanonicalEntity {
+  imageRef?: import('../interchange/managed-asset').ManagedAssetReference | null;
   deletedUtc?: string | null;
   displayName?: string; id:string; name:string; revision:number; typename?:string|null; description?:string|null; attributes?:unknown; aliases:Array<{id:string;name:string;origin:string;revision:number}> }
 export type EntityStream = 'all'|'name'|'alias'|'mention';

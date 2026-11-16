@@ -50,5 +50,24 @@ assert.equal(await evaluate("(()=>{const f=window.semanticsFixture,w=f.host.quer
 shot=await send('Page.captureScreenshot',{format:'png'},sessionId);await writeFile(out+'/workspace-expanded.png',Buffer.from(shot.data,'base64'));
 await evaluate("window.semanticsFixture.host.querySelector('.semantics-expand').click()");
 console.log('narrow graph remains reachable and expands within the tab',narrow);
+const priorTargets=new Set((await send('Target.getTargets')).targetInfos.map(t=>t.targetId));
+await evaluate("(async()=>{const f=await import('/src/features/dialectic/semantics-workspace.browser-fixture.tsx');f.semanticGraphThumbnailFixture();for(let i=0;i<100&&!window.semanticThumbnailFixture.host.querySelector('iframe')?.dataset.rendered;i++)await new Promise(r=>setTimeout(r,100));window.semanticThumbnailFixture.frame=window.semanticThumbnailFixture.host.querySelector('iframe');})()");
+const thumbnailTarget=(await send('Target.getTargets')).targetInfos.find(t=>t.type==='iframe'&&!priorTargets.has(t.targetId));assert.ok(thumbnailTarget);
+const thumbnailSession=(await send('Target.attachToTarget',{targetId:thumbnailTarget.targetId,flatten:true})).sessionId;
+const thumbnailEvaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true},thumbnailSession);if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+assert.equal(await thumbnailEvaluate("document.querySelectorAll('[data-semantic-portrait]').length"),2);
+await evaluate("window.semanticThumbnailFixture.host.querySelector('[aria-label=\"Zoom graph in\"]').click()");await pause();
+const thumbnailCamera=await thumbnailEvaluate("document.querySelector('svg').getAttribute('viewBox')");
+await evaluate("window.semanticThumbnailFixture.update()");
+const portrait=await thumbnailEvaluate("(async()=>{for(let i=0;i<100&&!document.querySelector('[data-semantic-portrait=G0]>g[visibility=hidden]');i++)await new Promise(r=>setTimeout(r,50));const image=document.querySelector('[data-semantic-portrait=G0] image');return {loaded:!!document.querySelector('[data-semantic-portrait=G0]>g[visibility=hidden]'),url:image?.getAttribute('href'),width:image?.getAttribute('width'),fallback:document.querySelector('[data-semantic-portrait=G1]>g')?.hasAttribute('visibility')};})()");
+assert.equal(portrait.loaded,true);assert.match(portrait.url,/^data:image\/png;base64,/);assert.equal(portrait.width,'48');assert.equal(portrait.fallback,false);
+assert.equal(await thumbnailEvaluate("document.querySelector('svg').getAttribute('viewBox')"),thumbnailCamera,'late thumbnail preserves camera');
+await thumbnailEvaluate("document.querySelector('[data-semantic-portrait=G0] image').dispatchEvent(new MouseEvent('click',{bubbles:true}))");await pause();assert.equal(await evaluate('window.semanticThumbnailFixture.selected()'),'canonical');
+await evaluate("(()=>{const f=window.semanticThumbnailFixture;for(let i=0;i<12;i++)f.update();})()");await pause();
+assert.deepEqual(await evaluate("(()=>{const f=window.semanticThumbnailFixture;return {binds:f.diagnostics.binds,sameFrame:f.frame===f.host.querySelector('iframe')};})()"),{binds:1,sameFrame:true},'unchanged thumbnails do not reload images or rebuild the graph');
+shot=await send('Page.captureScreenshot',{format:'png'},sessionId);await writeFile(out+'/graph-canonical-thumbnail.png',Buffer.from(shot.data,'base64'));
+await evaluate('window.semanticThumbnailFixture.clear()');await pause();assert.equal(await thumbnailEvaluate("document.querySelectorAll('image').length"),0);assert.equal(await evaluate('window.semanticThumbnailFixture.diagnostics.releases'),1);
+await evaluate('window.semanticThumbnailFixture.dispose()');console.log('canonical thumbnail loads, selects, retains camera, deduplicates updates and releases its asset');
+
 
 }finally{socket?.close();chrome.kill('SIGTERM');await new Promise(r=>chrome.once('exit',r));await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});}

@@ -5,6 +5,7 @@ import {argumentDefinition,argumentRelation} from './arguments';
 import {SemanticGraph,type SemanticGraphEdge} from './semantic-graph';
 import type {ReplyTarget} from './model';
 import {participantLabel} from './model';
+import {semanticThumbnail} from './semantic-thumbnail';
 export function SemanticsWorkspace(props:{c:DialecticController;active:boolean}){
  let detailPanel!:HTMLElement;
  const [expanded,setExpanded]=createSignal(false);
@@ -37,6 +38,7 @@ export function SemanticsWorkspace(props:{c:DialecticController;active:boolean})
  const currentSource=()=>chosen()?.definition&&argumentDefinition(chosen()!.definition)?c.resolveReference(argumentTarget(chosen()!.id)):undefined;
  const provenance=()=>chosen()?.definition?.metadata?.scopedEntity?.provenance??chosen()?.definition?.metadata?.dialecticArgument?.provenance;
  const authorityStates=c.authorityResolution.states;
+ const graphThumbnails=createMemo(()=>Object.fromEntries(filtered().slice(0,60).map(item=>[item.id,semanticThumbnail(item.definition?.metadata?.scopedEntity?.entity,authorityStates()[item.id])])));
  const thumbnail=(item:ReturnType<typeof items>[number])=>item.definition?.metadata?.scopedEntity?.entity.attributes?.enrichment?.thumbnail?.url??authorityStates()[item.id]?.record?.thumbnail?.url;
  const significantDates=(item:ReturnType<typeof items>[number])=>(item.definition?.metadata?.scopedEntity?.entity.attributes?.enrichment?.dates??[]).map((d:any)=>`${d.type}: ${d.expression??[d.startYear,d.startMonth,d.startDay].filter(v=>v!=null).join('-')}`).join(' · ');
  const argumentLinks=(id:string)=>argRelations().filter(d=>[d.metadata.dialecticArgumentRelation.from.argumentId,d.metadata.dialecticArgumentRelation.to.argumentId].includes(id)).map(d=>d.metadata.dialecticArgumentRelation.relation).join(', ');
@@ -59,6 +61,6 @@ export function SemanticsWorkspace(props:{c:DialecticController;active:boolean})
  </>}
  </Show><details><summary>Authorship and enrichment history</summary><pre>{JSON.stringify({provenance:provenance(),enrichment:attrs().assertions,conflicts:attrs().conflicts},null,2)}</pre></details>
  </Show></section>
- <section class="semantics-diagram" aria-label="Semantic graph"><nav><button aria-pressed={graphView()} onClick={()=>set({graph:true})}>{section()==='entities'?'Graph':'Diagram'}</button><button aria-pressed={!graphView()} onClick={()=>{setExpanded(false);set({graph:false});}}>Relationships</button><Show when={graphView()}><button class="semantics-expand" aria-label={expanded()?'Restore graph view':'Expand graph to fill Semantics tab'} aria-pressed={expanded()} onClick={()=>setExpanded(v=>!v)}>{expanded()?'Restore view':'Full screen'}</button></Show></nav><Show when={graphView()} fallback={<For each={section()==='entities'?relations():argRelations()}>{d=><button class="semantics-relation" onClick={()=>choose(d.id)}>{relationshipText(d)}</button>}</For>}><SemanticGraph selected={selected()} active={props.active} nodes={graphNodes()} edges={graphEdges()} select={graphSelect}/></Show></section>
+ <section class="semantics-diagram" aria-label="Semantic graph"><nav><button aria-pressed={graphView()} onClick={()=>set({graph:true})}>{section()==='entities'?'Graph':'Diagram'}</button><button aria-pressed={!graphView()} onClick={()=>{setExpanded(false);set({graph:false});}}>Relationships</button><Show when={graphView()}><button class="semantics-expand" aria-label={expanded()?'Restore graph view':'Expand graph to fill Semantics tab'} aria-pressed={expanded()} onClick={()=>setExpanded(v=>!v)}>{expanded()?'Restore view':'Full screen'}</button></Show></nav><Show when={graphView()} fallback={<For each={section()==='entities'?relations():argRelations()}>{d=><button class="semantics-relation" onClick={()=>choose(d.id)}>{relationshipText(d)}</button>}</For>}><SemanticGraph editor={c.editor} portraits={section()==='entities'} thumbnails={graphThumbnails()} selected={selected()} active={props.active} nodes={graphNodes()} edges={graphEdges()} select={graphSelect}/></Show></section>
  </div></section>;
 }
