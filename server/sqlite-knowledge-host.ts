@@ -26,7 +26,7 @@ export class SqliteKnowledgeHost {
   readonly metrics={sweeps:0,cancellations:0,foregroundWaitMs:0,maxForegroundWaitMs:0};
   private semanticLeases=new Set<string>();
   private readers=new Map<string,{opening:Promise<any>;identity:string;active:number;timer?:ReturnType<typeof setTimeout>}>();
-  constructor(private options:{root:string;readOnly?:boolean;entitiesEnabled?:boolean;semanticServicesEnabled?:boolean;thesisEnabled?:boolean;cardexEnabled?:boolean;verifyCardexImage?:(reference:any)=>Promise<void>;store?:any;open?:typeof openSqliteFoundation;indexer?:typeof createSavedIndexer;debounceMs?:number;leaseMs?:number}) {
+  constructor(private options:{root:string;readOnly?:boolean;entitiesEnabled?:boolean;semanticServicesEnabled?:boolean;pipelineManagerEnabled?:boolean;thesisEnabled?:boolean;cardexEnabled?:boolean;verifyCardexImage?:(reference:any)=>Promise<void>;store?:any;open?:typeof openSqliteFoundation;indexer?:typeof createSavedIndexer;debounceMs?:number;leaseMs?:number}) {
     this.store=options.store??new NativeVaultStore({root:options.root,readOnly:!!options.readOnly});
   }
   private serialize<T>(action:()=>Promise<T>):Promise<T> {
@@ -299,7 +299,7 @@ export class SqliteKnowledgeHost {
   }
   async semantics(body:any,signal?:AbortSignal){
     const e=this.semanticEntry(body),request=body.request;
-    if(String(request?.op).startsWith('identity-')&&!featureFlags.pipelineManager)throw Error('Pipeline Manager is disabled');
+    if(String(request?.op).startsWith('identity-')&&(!featureFlags.pipelineManager||this.options.pipelineManagerEnabled===false))throw Error('Pipeline Manager is disabled');
     if(request?.op==='resolve-evidence')return this.resolveEvidence(body,signal);
     const mutation=['identity-commit','create','add','update','remove','batch','rename','alias-add','alias-update','alias-remove','relationship-create','relationship-update'].includes(request?.op);
     if(mutation&&this.options.readOnly)throw Error('Canonical semantic storage is read-only');

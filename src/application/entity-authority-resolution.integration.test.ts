@@ -11,8 +11,8 @@ import type {AuthorityRecord,EntityService} from '../feature-api/entities';
 vi.mock('../features/autocomplete/authorities',()=>({authorityDetails:vi.fn(),searchAuthority:vi.fn()}));
 const clean:(()=>void)[]=[];afterEach(()=>{clean.splice(0).reverse().forEach(f=>f());vi.resetAllMocks();});
 const record:AuthorityRecord={provider:'wikidata',id:'Q762',name:'Leonardo da Vinci',description:'Italian Renaissance artist and engineer',aliases:['Leonardo'],url:'https://www.wikidata.org/wiki/Q762',retrievedAt:'2026-11-16T00:00:00Z',typeIds:['Q5'],classifications:['human','artist']};
-function fixture(){
- const resourceId=crypto.randomUUID(),editor=new ReactiveEditor({id:resourceId,type:'document-block',children:[]},{features:{nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});registerApplicationViews(editor);clean.push(()=>editor.dispose());
+function fixture(authorityCache=true){
+ const resourceId=crypto.randomUUID(),editor=new ReactiveEditor({id:resourceId,type:'document-block',children:[]},{features:{authorityCache,nativeKnowledge:false,sqliteKnowledge:false,flintProbe:false}});registerApplicationViews(editor);clean.push(()=>editor.dispose());
  const view=editor.createView('authority-test'),root=view.node(view.state.rootKey)!,scoped=new ScopedEntities(editor,root.key,resourceId);clean.push(()=>scoped.dispose());
  const definition=scoped.prepare({name:record.name,typename:'Person',description:record.description,aliases:[]},{actor:'ai',participantId:'agent'});scoped.commit({[definition.id]:definition},'Introduce local Entity');
  const canonical={id:crypto.randomUUID(),name:record.name,revision:1,aliases:[]},service={historyScope:vi.fn(async()=>'/vault'),scopeIdentity:vi.fn(async()=>'vault-id'),authorityLookup:vi.fn(async()=>canonical),create:vi.fn(),dispose:vi.fn()};
@@ -38,4 +38,15 @@ it('rejects late metadata after a local edit or suspended admission',async()=>{
  const resolving=f.resolver.resolve(f.current());await vi.waitFor(()=>expect(finish).toBeTypeOf('function'));
  const edited=structuredClone(f.current());edited.metadata.scopedEntity.entity.description='A changed identity';f.scoped.commit({[edited.id]:edited},'Edit identity');const revision=f.editor.repository.state.revision;finish(record);await resolving;expect(f.editor.repository.state.revision).toBe(revision);expect(f.service.authorityLookup).not.toHaveBeenCalled();
  const pending=f.resolver.resolve(f.current());await Promise.resolve();f.suspend();finish(record);await pending;expect(f.editor.repository.state.revision).toBe(revision);
+});
+it('resolves a user-confirmed identity without external authorities or persistent mutations',async()=>{
+ const f=fixture(),get=vi.fn(async()=>({id:'authentic',name:'Reviewed identity',revision:0,aliases:[]}));Object.assign(f.service,{get});
+ const next=structuredClone(f.current());next.metadata.scopedEntity.identityAssociation={version:1,method:'user-confirmed',vaultId:'vault-id',entityId:'authentic'};f.scoped.commit({[next.id]:next});
+ const revision=f.editor.repository.state.revision;await f.resolver.resolve(f.current());expect(f.resolver.states()[next.id]).toMatchObject({status:'linked',canonical:{id:'authentic'}});expect(searchAuthority).not.toHaveBeenCalled();expect(authorityDetails).not.toHaveBeenCalled();expect(f.editor.repository.state.revision).toBe(revision);expect(f.current().id).toBe(f.definition.id);
+ f.service.scopeIdentity.mockResolvedValue('other-vault');await f.resolver.resolve(f.current());expect(f.resolver.states()[next.id].status).toBe('unavailable');
+});
+it('manual association works with authority lookup disabled and Undo clears the displayed mapping',async()=>{
+ const f=fixture(false);Object.assign(f.service,{get:vi.fn(async()=>({id:'authentic',name:'Reviewed',revision:0,aliases:[]}))});
+ const next=structuredClone(f.current());next.metadata.scopedEntity.identityAssociation={version:1,method:'user-confirmed',vaultId:'vault-id',entityId:'authentic'};f.scoped.commit({[next.id]:next});await f.resolver.resolve(f.current());expect(f.resolver.states()[next.id].status).toBe('linked');
+ f.editor.repository.undo();f.resolver.observe([f.current()]);await vi.waitFor(()=>expect(f.resolver.states()[next.id].status).toBe('unresolved'));expect(searchAuthority).not.toHaveBeenCalled();expect(authorityDetails).not.toHaveBeenCalled();
 });

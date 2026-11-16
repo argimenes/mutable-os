@@ -25,9 +25,10 @@ export function createEntityAuthorityResolution(editor:ReactiveEditor,owner:()=>
  const put=(id:string,state:EntityAuthorityState)=>setStates(v=>({...v,[id]:state}));
  onCleanup(()=>{alive=false;pending.forEach(c=>c.abort());});
  const resolve=async(definition:any)=>{
-  const key=owner(),id=definition.id,resource=resourceId();if(!key||!editor.features.authorityCache||!canApply()){seen.delete(id);return;}
-  pending.get(id)?.abort();const abort=new AbortController();pending.set(id,abort);const scoped=new ScopedEntities(editor,key,resource),service=entityService(editor,key),snapshot=JSON.stringify(definition.metadata.scopedEntity.entity);
-  const current=()=>alive&&!abort.signal.aborted&&canApply()&&owner()===key&&resourceId()===resource&&JSON.stringify(scoped.registry()[id]?.metadata?.scopedEntity?.entity)===snapshot;
+  const key=owner(),id=definition.id,resource=resourceId();if(!key||!canApply()){seen.delete(id);return;}
+  if(!editor.features.authorityCache&&!definition.metadata?.scopedEntity?.identityAssociation){pending.get(id)?.abort();pending.delete(id);put(id,{status:'unresolved',message:'No reviewed authentic identity.'});return;}
+  pending.get(id)?.abort();const abort=new AbortController();pending.set(id,abort);const scoped=new ScopedEntities(editor,key,resource),service=entityService(editor,key),snapshot=JSON.stringify([definition.metadata.scopedEntity.entity,definition.metadata.scopedEntity.identityAssociation]);
+  const current=()=>alive&&!abort.signal.aborted&&canApply()&&owner()===key&&resourceId()===resource&&JSON.stringify([scoped.registry()[id]?.metadata?.scopedEntity?.entity,scoped.registry()[id]?.metadata?.scopedEntity?.identityAssociation])===snapshot;
   put(id,{status:'pending'});
   try{
    const entity=definition.metadata.scopedEntity.entity,qid=entity.attributes?.enrichment?.externalIds?.find((v:any)=>v.namespace==='wikidata')?.value??entity.attributes?.authorityMetadata?.id;
@@ -84,7 +85,7 @@ export function createEntityAuthorityResolution(editor:ReactiveEditor,owner:()=>
  const observe=(definitions:any[])=>untrack(()=>{
   const live=new Set(definitions.map(d=>d.id));for(const [id,abort]of pending)if(!live.has(id)){abort.abort();pending.delete(id);}for(const id of seen.keys())if(!live.has(id))seen.delete(id);
   for(const d of definitions){if(!localEntity(d))continue;const e=d.metadata.scopedEntity.entity;if(!e.name||!e.typename)continue;
-   const signature=identitySignature(e);if(seen.get(d.id)===signature)continue;seen.set(d.id,signature);const copy=structuredClone(unwrap(d));tail=tail.then(()=>{if(alive&&seen.get(d.id)===signature)return resolve(copy);}).catch(()=>{});
+   const signature=JSON.stringify([identitySignature(e),d.metadata.scopedEntity.identityAssociation]);if(seen.get(d.id)===signature)continue;seen.set(d.id,signature);const copy=structuredClone(unwrap(d));tail=tail.then(()=>{if(alive&&seen.get(d.id)===signature)return resolve(copy);}).catch(()=>{});
   }
  });
  return {states,observe,suspend:()=>{for(const [id,a]of pending){a.abort();seen.delete(id);}pending.clear();},resolve:(definition:any)=>resolve(structuredClone(unwrap(definition)))};

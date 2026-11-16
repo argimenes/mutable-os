@@ -49,3 +49,16 @@ it('feature disabling/read-only leases reject writes and expired capabilities ca
  const writer=new SqliteKnowledgeHost({root:f.root,debounceMs:60000}),opened=await writer.openSemantics('.');await writer.release(opened.lease);await writer.close();
  const reader=new SqliteKnowledgeHost({root:f.root,readOnly:true});cleanups.push(()=>reader.close());const lease=await reader.openSemantics('.');await expect(reader.semantics({lease:lease.lease,vaultGuid:lease.vaultGuid,request:{recordType:'DataSet',op:'create',guid:uuid(),operationId:uuid()}})).rejects.toThrow(/read-only/);await reader.release(lease.lease);await expect(reader.semantics({lease:lease.lease,vaultGuid:lease.vaultGuid,request:{op:'current'}})).rejects.toThrow(/capability/);
 });
+it('identity resolution crosses HTTP and worker boundaries with atomic associations and recoverable receipts',async()=>{
+ const f=await fixture(),s=await openSemanticServices({vault:'.'});cleanups.push(()=>s.dispose());
+ const {identityResolutionService}=await import('../src/features/pipelines/identity-service');const api=identityResolutionService(s);
+ const source={resourceId:uuid(),entityId:uuid(),revision:0,name:'Leonardo',typename:'Person',description:'Document description',aliases:['Leo'],enrichment:{subtypes:['Artist'],dates:[{type:'birth',startYear:1452,precision:'year'}]},provenance:{actor:'ai'}};
+ const p=await api.preview(source);expect(p.entity).toBeNull();expect(p.association).toBeNull();
+ const request={op:'identity-commit' as const,operationId:uuid(),associationId:uuid(),source,sourceFingerprint:p.sourceFingerprint,targetId:uuid(),expectedTargetRevision:null,expectedAssociationRevision:null,aliasSignature:p.aliasSignature,choices:{name:'import' as const,description:'import' as const,aliases:'merge' as const,typename:'import' as const,subtypes:'merge' as const,dates:'merge' as const,externalIds:'merge' as const},confirmation:true as const};
+ const receipt=await api.commit(request);expect(receipt.entity.id).not.toBe(source.entityId);expect((receipt.entity.attributes as any)?.enrichment.dates[0].startYear).toBe(1452);expect(receipt.association.sourceEntityGuid).toBe(source.entityId);
+ const recovered=await api.outcome(request.operationId);expect(recovered.status).toBe('committed');expect(recovered.result?.entity.id).toBe(receipt.entity.id);expect((await api.commit(request)).entity.id).toBe(receipt.entity.id);
+ const subsequent=await api.preview(source);expect(subsequent.association?.guid).toBe(receipt.association.guid);expect(subsequent.entity?.id).toBe(receipt.entity.id);
+ await s.dispose();await f.host.close();
+ const reader=new SqliteKnowledgeHost({root:f.root,readOnly:true});cleanups.push(()=>reader.close());const lease=await reader.openSemantics('.');await expect(reader.semantics({lease:lease.lease,vaultGuid:lease.vaultGuid,request})).rejects.toThrow(/read-only/);await reader.release(lease.lease);await reader.close();
+ const disabled=new SqliteKnowledgeHost({root:f.root,pipelineManagerEnabled:false});cleanups.push(()=>disabled.close());const off=await disabled.openSemantics('.');await expect(disabled.semantics({lease:off.lease,vaultGuid:off.vaultGuid,request:{op:'identity-preview',source}})).rejects.toThrow(/disabled/);await disabled.release(off.lease);
+});

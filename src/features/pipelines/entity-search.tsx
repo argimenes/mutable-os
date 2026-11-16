@@ -8,9 +8,9 @@ export interface SearchOutput{entity:VaultEntityReference}
 export function createEntitySearchPipe(reader:EntitySearchReader,vaultId:string):PipeDefinition<SearchInput,SearchOutput,EntitySearchController>{return {id:'entity-search-select',title:'Scry',create:(input,context)=>new EntitySearchController(input,reader,vaultId,context.changed)};}
 export class EntitySearchController implements PipeController<SearchInput,SearchOutput>{
  private queryState=createSignal('');readonly query=this.queryState[0];private streamState=createSignal<EntityResolutionQuery['stream']>('all');readonly stream=this.streamState[0];private matchState=createSignal<EntityResolutionQuery['match']>('partial');readonly match=this.matchState[0];
- private results=createSignal<EntityResolution>();readonly result=this.results[0];private selection=createSignal<CanonicalEntity>();readonly selected=this.selection[0];private loading=createSignal(false);private failure=createSignal('');readonly error=this.failure[0];private inspectAbort?:AbortController;private initial:string;
- readonly status=():InteractionState=>this.loading[0]()?'busy':this.error()?'error':this.selected()?'ready':'idle';
- readonly actions=()=>[{id:'select',label:'Use Selected Identity',enabled:!!this.selected()&&!this.loading[0](),primary:true},{id:'none',label:'No Matching Identity',enabled:!this.loading[0]()}];
+ private results=createSignal<EntityResolution>();readonly result=this.results[0];private selection=createSignal<CanonicalEntity>();readonly selected=this.selection[0];private loading=createSignal(false);private inspecting=createSignal(false);private failure=createSignal('');readonly error=this.failure[0];private inspectAbort?:AbortController;private initial:string;
+ readonly status=():InteractionState=>(this.loading[0]()||this.inspecting[0]())?'busy':this.error()?'error':this.selected()?'ready':'idle';
+ readonly actions=()=>[{id:'select',label:'Use Selected Identity',enabled:!!this.selected()&&this.status()!=='busy',primary:true},{id:'none',label:'No Matching Identity',enabled:this.status()!=='busy'}];
  constructor(input:Readonly<SearchInput>,private reader:EntitySearchReader,private vaultId:string,private changed:()=>void){
   this.initial=input.query;this.queryState[1](input.query);
   createEffect(()=>{const query={query:this.query(),stream:this.stream(),match:this.match(),scope:'vault' as const};const abort=new AbortController();this.loading[1](true);this.failure[1]('');this.results[1](undefined);
@@ -21,8 +21,8 @@ export class EntitySearchController implements PipeController<SearchInput,Search
  input(query:string){this.clear();this.queryState[1](query);}
  setStream(value:EntityResolutionQuery['stream']){this.clear();this.streamState[1](value);}
  setMatch(value:EntityResolutionQuery['match']){this.clear();this.matchState[1](value);}
- private clear(){this.inspectAbort?.abort();this.selection[1](undefined);this.failure[1]('');this.changed();}
- async select(id:string){this.clear();const abort=this.inspectAbort=new AbortController();this.loading[1](true);try{this.result()?.current();const entity=await inspectEntity(this.reader,id,abort.signal);if(!abort.signal.aborted)this.selection[1](entity);}catch(e){if(!abort.signal.aborted)this.failure[1](String(e));}finally{if(this.inspectAbort===abort)this.loading[1](false);}}
+ private clear(){this.inspectAbort?.abort();this.inspecting[1](false);this.selection[1](undefined);this.failure[1]('');this.changed();}
+ async select(id:string){this.clear();const abort=this.inspectAbort=new AbortController();this.inspecting[1](true);try{this.result()?.current();const entity=await inspectEntity(this.reader,id,abort.signal);if(!abort.signal.aborted)this.selection[1](entity);}catch(e){if(!abort.signal.aborted)this.failure[1](String(e));}finally{if(this.inspectAbort===abort)this.inspecting[1](false);}}
  update(input:Readonly<SearchInput>){if(input.query!==this.initial){this.initial=input.query;this.input(input.query);}}
  async execute(action:string,signal:AbortSignal){if(action==='none')return {outcome:'no-match'};const selected=this.selected();if(!selected)throw Error('Select an Entity');const entity=await inspectEntity(this.reader,selected.id,signal);if(entity.revision!==selected.revision)throw Error('Selected Entity changed. Select it again.');return {outcome:'selected',values:{entity:{vaultId:this.vaultId,entityId:entity.id,revision:entity.revision}}};}
  dispose(){this.inspectAbort?.abort();}

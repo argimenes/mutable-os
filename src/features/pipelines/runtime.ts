@@ -36,7 +36,7 @@ export class PipelineRun{
  private tick=createSignal(0);private activeState=createSignal('');private finalState=createSignal<'running'|'completed'|'cancelled'>('running');
  readonly active=this.activeState[0];readonly state=this.finalState[0];
  constructor(definition:PipelineDefinition,initial:readonly {key:DataKey<any>;value:unknown}[]){
-  this.definition=Object.freeze({...definition,pipes:Object.freeze(definition.pipes.map(p=>Object.freeze({...p,requires:Object.freeze({...p.requires}),produces:Object.freeze({...p.produces})}))),connectors:Object.freeze(definition.connectors.map(c=>Object.freeze({...c})))});
+  this.definition=Object.freeze({...definition,pipes:Object.freeze(definition.pipes.map(p=>Object.freeze({...p,pipe:Object.freeze({...p.pipe,optional:p.pipe.optional?Object.freeze([...p.pipe.optional]):undefined}),requires:Object.freeze({...p.requires}),produces:Object.freeze({...p.produces})}))),connectors:Object.freeze(definition.connectors.map(c=>Object.freeze({...c})))});
   if(!definition.id||!Number.isSafeInteger(definition.version)||definition.version<1||!definition.pipes.length||definition.pipes.length>32)throw Error('Invalid Pipeline definition');
   const register=(key:DataKey<any>)=>{if(!key.id||this.keys.has(key.id)&&this.keys.get(key.id)!==key)throw Error('Conflicting Pipeline data key');this.keys.set(key.id,key);};
   for(const spec of this.definition.pipes){if(this.slots.has(spec.id))throw Error('Duplicate Pipe occurrence');this.slots.set(spec.id,{spec,generation:0,complete:false,stale:false,error:'',busy:false});for(const key of Object.values(spec.requires))register(key);for(const key of Object.values(spec.produces)){register(key);if(this.producers.has(key.id))throw Error('Competing Pipeline output producers');this.producers.set(key.id,spec.id);}}
@@ -50,9 +50,9 @@ export class PipelineRun{
  }
  private changed(){this.tick[1](n=>n+1);}
  private inputs(slot:Slot){const value:Record<string,unknown>={};for(const [name,key]of Object.entries(slot.spec.requires)){const entry=this.entries.get(key.id);if(!entry&&!slot.spec.pipe.optional?.includes(name))throw Error(`Missing required value: ${key.id}`);value[name]=entry?.value;}return Object.freeze(value);}
- private ensure(id:string){const slot=this.slots.get(id)!;if(slot.controller)return;const inputs=this.inputs(slot);createRoot(dispose=>{slot.dispose=dispose;slot.controller=slot.spec.pipe.create(inputs,{changed:()=>this.invalidate(id)});});}
+ private ensure(id:string){const slot=this.slots.get(id)!;if(slot.controller)return;const inputs=this.inputs(slot);createRoot(dispose=>{slot.dispose=dispose;try{slot.controller=slot.spec.pipe.create(inputs,{changed:()=>this.invalidate(id)});}catch(e){dispose();throw e;}});}
  controller<C>(id:string):C|undefined{this.tick[0]();return this.slots.get(id)?.controller as C|undefined;}
- info(id:string){this.tick[0]();const s=this.slots.get(id)!;return {status:s.busy?'busy' as const:s.error?'error' as const:s.controller?.status()??'idle',error:s.error||s.controller?.error?.()||'',complete:s.complete,stale:s.stale,mounted:!!s.controller};}
+ info(id:string){this.tick[0]();const s=this.slots.get(id)!;return {executing:s.busy,status:s.busy?'busy' as const:s.error?'error' as const:s.controller?.status()??'idle',error:s.error||s.controller?.error?.()||'',complete:s.complete,stale:s.stale,mounted:!!s.controller};}
  actions(id=this.active()){this.tick[0]();const slot=this.slots.get(id);return slot?.stale?[]:slot?.controller?.actions()??[];}
  value<T>(key:DataKey<T>):Readonly<T>|undefined{this.tick[0]();if(this.keys.get(key.id)!==key)throw Error('Foreign data key');return this.entries.get(key.id)?.value as T|undefined;}
  provenance(key:DataKey<any>){this.tick[0]();const e=this.entries.get(key.id);return e?{version:e.version,producer:e.producer,dependencies:e.dependencies}:undefined;}
@@ -65,8 +65,9 @@ export class PipelineRun{
   for(const id of ids){const s=this.slots.get(id)!;s.generation++;s.abort?.abort();s.abort=undefined;s.busy=false;s.stale=!!s.controller;s.complete=false;s.outcome=undefined;s.error='';for(const key of Object.values(s.spec.produces))this.entries.delete(key.id);}
   this.changed();
  }
- invalidate(id:string){if(this.ended)return;this.revoke(new Set([id]));this.slots.get(id)!.stale=false;this.changed();}
- setInput<T>(key:DataKey<T>,value:T){if(this.ended)throw Error('Pipeline ended');if(this.producers.get(key.id)!=='input'||this.keys.get(key.id)!==key)throw Error('Input is not owned by the caller');const copy=snapshot(key.parse(value));if(JSON.stringify(this.entries.get(key.id)?.value)===JSON.stringify(copy))return;
+ private assertInputsMutable(){for(const slot of this.slots.values()){const reason=slot.controller?.guard?.();if(reason)throw Error(reason);}}
+ invalidate(id:string){if(this.ended)return;this.assertInputsMutable();this.revoke(new Set([id]));this.slots.get(id)!.stale=false;this.changed();}
+ setInput<T>(key:DataKey<T>,value:T){if(this.ended)throw Error('Pipeline ended');this.assertInputsMutable();if(this.producers.get(key.id)!=='input'||this.keys.get(key.id)!==key)throw Error('Input is not owned by the caller');const copy=snapshot(key.parse(value));if(JSON.stringify(this.entries.get(key.id)?.value)===JSON.stringify(copy))return;
   this.entries.set(key.id,{value:copy,version:++this.version,producer:'input',dependencies:{}});this.revoke(new Set([...this.slots.values()].filter(s=>Object.values(s.spec.requires).some(k=>k.id===key.id)).map(s=>s.spec.id)));this.changed();
  }
  navigate(id:string){if(this.ended)return false;const reason=this.guard();if(reason)return false;const slot=this.slots.get(id);if(!slot||!this.path().some(p=>p.id===id))return false;

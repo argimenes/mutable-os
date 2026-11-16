@@ -36,18 +36,18 @@ export function resolveDocumentEntity(db,ledger,request,check=()=>{}){
   if(!old||choices.description==='import')descriptionDocument={type:'document-block',children:[{type:'standoff-editor-block',text:source.description}]};
   else if(choices.description==='both'&&source.description&&source.description!==old.description){descriptionDocument=descriptionDocument?JSON.parse(JSON.stringify(descriptionDocument)):{type:'document-block',children:[{type:'standoff-editor-block',text:old.description??''}]};descriptionDocument.children.push({type:'standoff-editor-block',text:source.description});}
   const aliases=(old?.aliases??[]).map(a=>({...a}));
-  if(!old||choices.aliases==='merge')for(const name of source.aliases){if(!aliases.some(a=>a.name.normalize('NFKC').toLowerCase()===name.normalize('NFKC').toLowerCase()))aliases.push({id:randomUUID(),name,origin:'imported'});}
+  if(!old||choices.aliases==='merge')for(const alias of [...source.aliases,source.name,...(old?[old.name]:[])]){if(alias.normalize('NFKC').toLowerCase()!==name.normalize('NFKC').toLowerCase()&&!aliases.some(a=>a.name.normalize('NFKC').toLowerCase()===alias.normalize('NFKC').toLowerCase()))aliases.push({id:randomUUID(),name:alias,origin:'imported'});}
   const card={...base,op:'save',id:request.targetId,expected:old?.revision??null,name,nameStrata:old&&name===old.name?old.nameStrata:null,descriptionDocument,imageRef:old?.imageRef??null,aliases,aliasBaseline:(old?.aliases??[]).map(a=>({id:a.id,revision:a.revision}))};
   const cardChanged=!old||name!==old.name||JSON.stringify(descriptionDocument)!==JSON.stringify(old.descriptionDocument)||aliases.length!==old.aliases.length;
   if(cardChanged)canonicalCardex(db,nested,card,check);
   const current=entity(db,request.targetId,check),attributes=old?.attributes==null?{}:decodeAuthoredValue(old.attributes);
-  if(!attributes||typeof attributes!=='object'||Array.isArray(attributes))throw Error('Canonical attributes are not a supported object; keep this record unchanged');
   const next=structuredClone(attributes);
-  if(!old||choices.enrichment==='merge'){
+  if(!old||['subtypes','dates','externalIds'].some(k=>choices[k]==='merge')){
+   if(!next||typeof next!=='object'||Array.isArray(next))throw Error('Canonical attributes need separate review; keep the enrichment fields');
    const prior=next.enrichment??{};if(!prior||typeof prior!=='object'||Array.isArray(prior))throw Error('Canonical enrichment needs separate review');
-   next.enrichment={...prior};for(const field of ['subtypes','dates','externalIds']){const values=prior[field]??[];if(!Array.isArray(values))throw Error('Canonical enrichment needs separate review');const merged=[...values];for(const v of source.enrichment[field]??[])if(!merged.some(x=>JSON.stringify(x)===JSON.stringify(v)))merged.push(v);if(merged.length>64)throw Error('Enrichment limit exceeded');next.enrichment[field]=merged;}
+   next.enrichment={...prior};for(const field of ['subtypes','dates','externalIds']){if(old&&choices[field]==='keep')continue;const values=prior[field]??[];if(!Array.isArray(values))throw Error('Canonical enrichment needs separate review');const merged=[...values];for(const v of source.enrichment[field]??[])if(!merged.some(x=>JSON.stringify(x)===JSON.stringify(v)))merged.push(v);if(merged.length>64)throw Error('Enrichment limit exceeded');next.enrichment[field]=merged;}
   }
-  const typename=!old||choices.typename==='import'?source.typename:current.typename;
+  const typename=!old||choices.typename==='import'?(source.typename||null):current.typename;
   if(typename!==current.typename||JSON.stringify(next)!==JSON.stringify(attributes))canonicalEntities(db,{...base,op:'update',id:request.targetId,expected:current.revision,typename,attributes:encodeAuthoredValue(next)},check,nested);
   const id=link?.guid??request.associationId;guid(id);
   ctx.change('DocumentEntityAssociation',id,()=>{

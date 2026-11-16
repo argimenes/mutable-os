@@ -1,12 +1,12 @@
 # Mutable OS Pipeline Manager Architectural Qualification
 
-16 November 2026 · Proposed architecture awaiting acceptance · Branch `dialectic-app`, inspected at `93067fd`
+16 November 2026 · Architecture accepted by the user · Branch `dialectic-app`, originally inspected at `93067fd`
 
 The proposed Pipeline Manager is viable. The recommended design uses a typed, run-scoped Data Bag, declarative Connectors, and a horizontal carousel hosted by the existing window infrastructure. The main work is extracting a read-only Scry selection component and introducing a safe reconciliation operation. Existing window and service frameworks remain responsible for their established functions.
 
 The first consumer is Dialectic's Entity Identity Resolution workflow. In this workflow, an **authentic Entity** means a persistent Mutable Entity identity; external-authority verification is not required.
 
-This is the first deliverable requested by the feature brief. Substantial implementation follows acceptance of this qualification and resolution of the decisions below. The qualification is based on source inspection; implementation and automated qualification have not begun.
+This qualification records the accepted architecture. The user subsequently authorized all five implementation phases, clarified retained Pipe interaction state and bounded reconciliation, and required Manager-owned status, actions and footers. See [the implementation report](PIPELINE_MANAGER_IMPLEMENTATION.md) for the implemented contracts, qualification results and remaining limits.
 
 ## Recommended architecture
 
@@ -181,9 +181,9 @@ The feature should use a default-enabled `pipelineManager` flag. Existing featur
 
 Defer arbitrary graph editing, connector scripts, parallel execution, durable run restoration, external-authority acquisition and automatic promotion of ambiguous Claims. Unsupported semantic conversions remain explicit in comparison/import previews rather than being silently attempted or omitted.
 
-## Decisions awaiting acceptance
+## Accepted decisions
 
-Acceptance is requested for the architectural qualification as a whole, particularly:
+The user accepted the architectural qualification as a whole, including:
 
 - One managed carousel host with retained window-like Pipe panels.
 - A typed run-scoped Data Bag with local input/output bindings and declarative routes.
@@ -191,4 +191,4 @@ Acceptance is requested for the architectural qualification as a whole, particul
 - Separate canonical identity creation while retaining document identity and references.
 - Explicit deferral of unsupported semantic conversions, with visible eligibility and dependency information.
 
-The feature brief's implementation gate remains in effect: “After the architectural qualification is accepted, implement the agreed solution.” Saving this document does not constitute acceptance or implementation authorization.
+The user explicitly satisfied the brief’s implementation gate and authorized the phased implementation. Navigation must retain valid queries, selections, scroll and local drafts; unsupported Claim and Relationship conversions must remain visible without blocking the supported Entity workflow; the Manager owns navigation and action rendering/execution.
