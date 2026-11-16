@@ -14,6 +14,7 @@ export class XmlFragments {
  private stack:XmlElement[]=[];
  private parser=new SaxesParser({xmlns:false,fragment:true});
  private tag='';private quote='';private closed=false;private failed=false;private bytes=0;private high='';
+ get byteLength(){return this.bytes;}
  constructor(private emit:(element:XmlElement)=>void=()=>{}){
   this.parser.on('error',()=>xmlFailure());
   this.parser.on('doctype',()=>xmlFailure());

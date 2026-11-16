@@ -2,6 +2,7 @@ import {XmlFragments,type XmlElement} from './xml-fragments';
 import {xmlBlockLowerer,xmlDefinition,xmlDefinitionNames,xmlSymbolKind,assertXmlReferenceKind,xmlResponseElements,xmlSynopsis,type XmlAuthority} from './xml-authoring';
 import {nativePreparationSession,semanticPreparationCheckpoint,prepare} from './exchange';
 import {DcpValidationError} from './diagnostics';
+import {compositionLimits} from './limits';
 import type {ContributionNotice} from '../model';
 import type {DcpSources} from './sources';
 import type {ReactiveEditor} from '../../../reactive-editor/editor';
@@ -13,7 +14,7 @@ export type NativePrepared=Awaited<ReturnType<typeof prepare>>;
  * DTOs, parallel repository, whole-prefix reparsing or replacement rendering. */
 export class NativeXmlStream {
  readonly memory=nativePreparationSession();
- readonly parser:XmlFragments;
+ parser:XmlFragments;
  readonly metrics={fragments:0,blocks:0,preparations:0};
  private symbols=new Map<string,{id:string;kind:string}>();
  private allocated=new WeakMap<XmlElement,string>();
@@ -34,38 +35,66 @@ export class NativeXmlStream {
  private final?:{intent:string;discursiveReferences:import('../model').ReplyTarget[]};
  private consumed=0;
  private buffer='';
+ private completed:string[]=[];
+ private completedBytes=0;
+ private completedCharacters=0;
+ private completedElements=0;
+ private sealed=false;
+ private intent='reply';
+ private replies=new Set<string>();
  constructor(private options:{editor:ReactiveEditor;sources:DcpSources;authority:XmlAuthority;exchange:string;owner:string;participant:string;apply:(result:NativePrepared)=>void;onSynopsis?:(text:string)=>void}){
-  this.parser=new XmlFragments(e=>{this.metrics.fragments++;this.pending=this.pending.then(async()=>{if(this.closed||this.error)return;try{await this.element(e);}catch(error){this.error=error;}});});
+  this.parser=this.createParser();
  }
+ private createParser(){return new XmlFragments(e=>{this.metrics.fragments++;this.pending=this.pending.then(async()=>{if(this.closed||this.error)return;try{await this.element(e);}catch(error){this.error=error;}});});}
  get started(){return this.metrics.blocks>0||!!this.memory.memory&&Object.keys(this.memory.memory.definitions).length>0;}
  write(value:string){
   if(this.closed)return;
   // The transport supplies cumulative text; parse only the new suffix.
   if(value.length<this.consumed){this.error=Error('Provider replaced an active native response');return;}
   this.buffer=value;const delta=value.slice(this.consumed);this.consumed=value.length;
-  if(this.error||this.syntaxError)return;try{this.parser.write(delta);}catch(error){this.syntaxError=error;}
+  if(this.error||this.syntaxError||this.sealed)return;
+  try{
+   if(this.completedCharacters+value.length>compositionLimits.responseBytes)throw Error('Native response budget exceeded across tool rounds');
+   this.parser.write(delta);
+   if(this.completedBytes+this.parser.byteLength>compositionLimits.responseBytes||this.completedElements+this.parser.diagnostics.elements>4096)throw Error('Native response budget exceeded across tool rounds');
+  }catch(error){this.syntaxError=error;}
+ }
+ private sealRound(){
+  if(this.sealed)return;
+  if(this.error||this.syntaxError)throw new NativeStreamError(this.error??this.syntaxError);
+  // Tool-only rounds may be empty. Nonempty rounds must close their own XML;
+  // a later provider turn cannot repair an unfinished element around a tool call.
+  if(this.buffer.trim()){
+   try{const {root}=xmlResponseElements(this.parser.finish());if(root.attrs.intent)this.intent=root.attrs.intent;for(const reply of root.attrs.reply?.split(/\s+/)??[])this.replies.add(reply);}
+   catch(error){this.syntaxError=error;throw new NativeStreamError(error);}
+  }
+  this.sealed=true;
+ }
+ /** Tool continuation retains native identities, pending semantics and cumulative budgets. */
+ continueRound(value:string){
+  if(this.closed||this.final)throw new NativeStreamError('Native response is already complete');
+  this.write(value);this.sealRound();
+  this.completed.push(this.buffer);this.completedBytes+=this.parser.byteLength+1;this.completedCharacters+=this.buffer.length+1;this.completedElements+=this.parser.diagnostics.elements;
+  this.buffer='';this.consumed=0;this.sealed=false;this.parser=this.createParser();
  }
  async finish(value:string){
   if(this.final)return this.final;
   this.write(value);await this.pending;
-  if(!this.error&&!this.syntaxError)try{this.parser.finish();}catch(error){this.syntaxError=error;}
+  this.sealRound();
   await this.pending;
   if(this.error||this.syntaxError)throw new NativeStreamError(this.error??this.syntaxError);
   // Keep valid content and report unresolved semantic dependencies locally.
   for(const item of this.waiting)this.warn(item.name,`Target or dependency "${item.attrs.target??item.attrs.ref??item.attrs.id??''}" could not be resolved.`);
   for(const item of this.mentions)this.warn('Entity mention',`Reference "${item.ref}" could not be resolved.`);
   this.waiting=[];this.mentions=[];
-  try{xmlResponseElements(this.parser.roots);}catch(error){throw new NativeStreamError(error);}
   if(!this.metrics.blocks)throw new NativeStreamError('No complete native Blocks were received.');
-  const root=this.parser.roots[0];
-  const reply=root?.name==='response'?root.attrs.reply?.split(/\s+/)??[]:[];
-  const out=this.response();out.intent=root?.name==='response'?root.attrs.intent??'reply':'reply';out.replyTargets=reply.map(name=>this.ref(name));
+  const out=this.response();out.intent=this.intent;out.replyTargets=[...this.replies].map(name=>this.ref(name));
   const {editor,sources,exchange,owner,participant}=this.options;
   const result=await prepare(JSON.stringify(out),exchange,owner,editor.visualEffects,sources,editor.features.scopedSemantics,'ai',participant,1,editor.features.dcpProactiveSemanticAuthoring?1:undefined,true,this.memory);
   return this.final={intent:result.intent,discursiveReferences:result.discursiveReferences};
  }
  stop(){this.closed=true;}
- get received(){return this.buffer;}
+ get received(){return [...this.completed,this.buffer].join('\n');}
  get unresolved(){return this.waiting.length+this.mentions.length;}
  private fresh(kind:string){return `new:${kind}${this.counts[kind]=(this.counts[kind]??0)+1}`;}
  private id=(e:XmlElement)=>{const id=this.allocated.get(e);if(!id)throw Error('Unknown fragment identity');return id;};

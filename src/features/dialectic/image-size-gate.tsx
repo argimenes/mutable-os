@@ -32,7 +32,7 @@ export function loadReplacementImage(url:string,signal:AbortSignal):Promise<void
  });
 }
 /** URL-specific work only; no scans, snapshots or text-edit subscriptions. */
-export function ImageSizeGate(props:{editor:ReactiveEditor;projection:BlockTreeProjection;nodeKey:string;source:Accessor<string>;enabled:boolean;children:(source:Accessor<string>)=>JSX.Element}){
+export function ImageSizeGate(props:{editor:ReactiveEditor;projection:BlockTreeProjection;nodeKey:string;source:Accessor<string>;enabled:boolean;automaticRepair?:boolean;children:(source:Accessor<string>)=>JSX.Element}){
  const [state,setState]=createSignal<'checking'|'blocked'|'failed'|'allowed'>('checking'),[bytes,setBytes]=createSignal<number>(),[busy,setBusy]=createSignal(false),[failure,setFailure]=createSignal('');
  let autoQueued=false,element!:HTMLDivElement,currentKey='',alive=true,operation:AbortController|undefined,requested:{key:string;url:string;at:string;bytes?:number}|undefined;
  const ownerData=()=>contribution((imageContributionOwner(props.projection,props.nodeKey)?.row.payload.metadata as any)?.dialectic);
@@ -102,7 +102,7 @@ export function ImageSizeGate(props:{editor:ReactiveEditor;projection:BlockTreeP
   setState('failed');
   // One automatic attempt per image, retained across remounts and native saves.
   // Explicit retries remain available without a recursive paid request loop.
-  if(outcome==='failed'&&!automaticAttempts.get(props.editor)?.has(keyFor(props.source()))&&!imageNotice()?.imageLoad?.automaticRepairAttempted&&props.editor.features.dialecticSmallerImage&&!busy()&&!autoQueued){
+  if(props.automaticRepair!==false&&outcome==='failed'&&!automaticAttempts.get(props.editor)?.has(keyFor(props.source()))&&!imageNotice()?.imageLoad?.automaticRepairAttempted&&props.editor.features.dialecticSmallerImage&&!busy()&&!autoQueued){
    autoQueued=true;queueMicrotask(()=>{autoQueued=false;if(alive&&state()==='failed'&&!imageNotice()?.imageLoad?.automaticRepairAttempted)void fetchSmaller(true);});
   }
  }));

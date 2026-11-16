@@ -26,6 +26,27 @@ async function fixture(entities:Record<string,{name:string;typename:string}>={})
  }});cleanup.push(()=>stream.stop());
  return {...f,sources,authority,stream,aliases,definitions,text:()=>contribution!.children.map(k=>f.refs.text(f.view.node(k)!.contentKey)),run:async(xml:string,step=71)=>{for(let i=0;i<xml.length;i+=step)stream.write(xml.slice(0,i+step));await stream.finish(xml);}};
 }
+it('retains forward semantic references and native identities across empty, wrapped and rootless tool rounds',async()=>{
+ const f=await fixture(),snapshots=vi.spyOn(f.editor.repository,'snapshot'),fetches=vi.spyOn(globalThis,'fetch');
+ f.stream.continueRound('');
+ const intro='<response><p id="intro"><e ref="person">Leonardo</e> will appear in the PDF.</p></response>';
+ f.stream.write(intro);await vi.waitFor(()=>expect(f.stream.metrics.blocks).toBe(1));
+ const first=f.view.node(f.root.children.at(-1)!)!.children[0];
+ f.stream.continueRound(intro);f.stream.continueRound('');
+ await f.run('<entity id="person" name="Leonardo" type="Person"/><gloss target="intro" whole="true" kind="scope">Report introduction.</gloss><p>Your PDF is ready.</p>');
+ expect(f.text()).toEqual(['Leonardo will appear in the PDF.','Your PDF is ready.']);expect(f.view.node(f.root.children.at(-1)!)!.children[0]).toBe(first);
+ expect(f.view.node(first)!.payload.standoffProperties).toEqual(expect.arrayContaining([expect.objectContaining({type:'mutable/entity-reference'}),expect.objectContaining({type:'mutable/gloss'})]));
+ expect(f.stream.notices).toEqual([]);expect(f.stream.unresolved).toBe(0);expect(f.stream.received).toContain(intro);
+ expect(snapshots).not.toHaveBeenCalled();expect(fetches).not.toHaveBeenCalled();
+});
+it('rejects unfinished XML at a tool boundary while retaining already admitted native content',async()=>{
+ const f=await fixture(),raw='<p>Retained introduction.</p><p>unfinished';f.stream.write(raw);await vi.waitFor(()=>expect(f.stream.metrics.blocks).toBe(1));
+ expect(()=>f.stream.continueRound(raw)).toThrow();expect(f.text()).toEqual(['Retained introduction.']);
+});
+it('enforces the response byte budget cumulatively across tool rounds',async()=>{
+ const f=await fixture(),first='<p>First.</p><!--'+'x'.repeat(140000)+'-->',second='<p>Second.</p><!--'+'x'.repeat(140000)+'-->';
+ f.stream.continueRound(first);await expect(f.stream.finish(second)).rejects.toThrow('budget exceeded across tool rounds');
+});
 it('replays the actual Michelangelo response with fresh identities and admits all 30 relationships after the line break',async()=>{
  const entities=JSON.parse(readFileSync('src/features/dialectic/dcp/fixtures/michelangelo-entities.json','utf8')),f=await fixture(entities),raw=readFileSync('src/features/dialectic/dcp/fixtures/michelangelo-relationships.xml','utf8'),xml=raw.replace(/@e[a-z0-9_]+/g,a=>f.aliases[a]);
  const snapshots=vi.spyOn(f.editor.repository,'snapshot'),fetches=vi.spyOn(globalThis,'fetch');await f.run(xml);

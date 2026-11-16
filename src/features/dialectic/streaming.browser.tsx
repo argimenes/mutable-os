@@ -12,7 +12,7 @@ const wait=async(check:()=>boolean)=>{for(let i=0;i<800;i++){if(check())return;a
 const paint=()=>new Promise<void>(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r())));
 const check=(value:unknown,message:string)=>{if(!value)throw Error(message);};
 const pause=()=>new Promise<void>(resolve=>(window as any).proof.release=resolve);
-const proof:any={events:[],snapshots:0,commits:0,scans:0,mode:'complete',phase:0};(window as any).proof=proof;
+const proof:any={events:[],snapshots:0,commits:0,scans:0,openGroups:0,mode:'complete',phase:0};(window as any).proof=proof;
 const mark=(kind:string)=>proof.events.push({kind,at:performance.now()});
 const chunks=[
  '<synopsis>Comprehensibility and Computing Capability</synopsis><p id="first"><span id="opening"><e ref="concept">Comprehensibility</e> makes a machine open to investigation. <b>Capability</b> alone does not establish <i>understanding</i>.</span></p>',
@@ -30,6 +30,7 @@ DialecticProviderSession.prototype.transport=function(){return {
    // Deliberately split tags, attributes, escapes and semantic definitions.
    for(let j=0;j<part.length;j+=7){if(signal.aborted)throw Error('Cancelled');raw+=part.slice(j,j+7);chunk(raw,'text');}
    mark('fragment-'+i);proof.phase=i+1;await pause();if(signal.aborted)throw Error('Cancelled');
+   if(proof.mode==='complete'&&i===0){chunk(raw,'continue');raw='';}
    if(proof.mode==='invalid'){raw+='<p>unfinished';chunk(raw,'text');break;}
    if(proof.mode==='repair'&&i===0){
     chunk('Repairing','status');chunk('','start');raw='<p>Corrected response.</p>';chunk(raw,'text');await paint();break;
@@ -50,6 +51,8 @@ const text=()=>port.session()!.projection.node(draft().children[0])!;
 const button=(label:string)=>host.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!;
 const streaming=()=>host.querySelector<HTMLElement>('.dialectic-stream:not([hidden])');
 const viewport=()=>host.querySelector<HTMLElement>('.dialectic-canvas')!;
+// Retained conversation runtimes allow unrelated history while the response group is open.
+const originalGroup=editor.repository.beginUndoGroup.bind(editor.repository);editor.repository.beginUndoGroup=(...args)=>{const group=originalGroup(...args);if(args[0]==='AI contribution'){proof.openGroups++;const finish=group.finish;let closed=false;group.finish=()=>{if(!closed){closed=true;proof.openGroups--;}finish();};}return group;};
 const originalSnapshot=editor.repository.snapshot.bind(editor.repository);editor.repository.snapshot=(...args)=>{proof.snapshots++;return originalSnapshot(...args);};
 editor.repository.subscribeChanges(()=>proof.commits++);
 const objectValues=Object.values;Object.values=((value:any)=>{if(value===editor.repository.state.contents||value===editor.repository.state.placements)proof.scans++;return objectValues(value);}) as typeof Object.values;
@@ -63,7 +66,7 @@ proof.run=async()=>{
  check((receiving()!.payload.metadata as any).dialectic.synopsis.text==='Comprehensibility and Computing Capability','early synopsis stored on receiving contribution');
  button('Expand Contributions').click();await paint();check(host.querySelector('.dialectic-contribution-list')!.textContent!.includes('Comprehensibility and Computing Capability'),'receiving entry updates immediately');
  const first=receiving()!,firstKey=first.children[0],mount=editor.mounts.get(firstKey)!.root,firstId=port.session()!.projection.node(firstKey)!.payload.id;
- check(mount.textContent!.includes('Comprehensibility'),'first actual native Block is readable');check(mount.querySelector('[contenteditable=true]')===null,'receiving content is read-only');check(!editor.repository.canUndo(),'open response has no partial Undo');
+ check(mount.textContent!.includes('Comprehensibility'),'first actual native Block is readable');check(mount.querySelector('[contenteditable=true]')===null,'receiving content is read-only');check(proof.openGroups===1,'native response Undo group remains open');
  proof.providerRelease=proof.release;proof.firstScreenshot=true;await new Promise<void>(resolve=>proof.continueScreenshot=resolve);
  const snapshots=proof.snapshots,scans=proof.scans;
  editor.commands.replaceInlineRange(text().key,0,0,'Draft typing retained.');
@@ -73,14 +76,14 @@ proof.run=async()=>{
  proof.release();await wait(()=>proof.phase===3);await wait(()=>receiving()!.children.length===2);await paint();
  check(editor.mounts.get(firstKey)!.root===mount,'late Blocks do not remount earlier Blocks');
  proof.release();await wait(()=>!receiving());await wait(()=>!!button('Submit contribution'));await paint();mark('final-native-display');
- const complete=committed().at(-1)!;check((complete.payload.metadata as any).dialectic.synopsis.text==='Capability Does Not Guarantee Understanding','last valid synopsis wins');check(complete.children[0]===firstKey&&editor.mounts.get(firstKey)!.root===mount,'final commit preserves exact native mount and identity');check(complete.children.length===2,'no duplicate Blocks');
+ const complete=committed().at(-1)!;check(proof.openGroups===0,'completion closes the response Undo group');check((complete.payload.metadata as any).dialectic.synopsis.text==='Capability Does Not Guarantee Understanding','last valid synopsis wins');check(complete.children[0]===firstKey&&editor.mounts.get(firstKey)!.root===mount,'final commit preserves exact native mount and identity');check(complete.children.length===2,'no duplicate Blocks');
  check(proof.snapshots===snapshots&&proof.scans===scans,'no full snapshots or full repository map enumerations during native streaming');
  const owner=String(root().payload.id),saved=captureNative(editor.repository.readState(),owner);check(new TextDecoder().decode(nativeBytes(decodeNative(nativeBytes(saved))))===new TextDecoder().decode(nativeBytes(saved)),'native persistence round trip');
  const count=committed().length;editor.repository.undo();check(committed().length===count-1,'one Undo removes whole response');check(String(text().payload.text).includes('Draft typing retained')||text().inlineContent.length>0,'interleaved draft typing remains');editor.repository.redo();check(committed().length===count,'one Redo restores whole response');
  proof.completeEvents=[...proof.events];
  await begin();const interrupted=receiving()!,interruptedKey=interrupted.children[0];button('Cancel response').click();await wait(()=>!receiving());await paint();
  check((port.session()!.projection.node(interrupted.key)!.payload.metadata as any).dialectic.synopsis.text==='Comprehensibility and Computing Capability','synopsis survives cancellation');check(!!editor.mounts.get(interruptedKey),'cancel retains completed native Block');check((port.session()!.projection.node(interrupted.key)!.payload.metadata as any).dialectic.notices?.length,'interruption is recorded');const afterCancel=committed().length;editor.repository.undo();check(committed().length===afterCancel-1,'cancelled response is one Undoable operation');proof.release();
- proof.result={passed:true,earlySynopsis:true,lastValidSynopsis:true,cancelledSynopsis:true,events:proof.completeEvents,firstNativeBlockId:firstId,sameNativeMountThroughCompletion:true,lateNativeEntityAndGloss:true,oneUndoAndRedo:true,interleavedTyping:true,cancellationRetainsNativeBlock:true,cancellationOneUndo:true,persistence:true,streamingWork:{snapshots:proof.snapshots-snapshots,fullMapScans:proof.scans-scans}};
+ proof.result={passed:true,earlySynopsis:true,lastValidSynopsis:true,cancelledSynopsis:true,events:proof.completeEvents,firstNativeBlockId:firstId,sameNativeMountThroughCompletion:true,toolContinuationRetainsNativeBlock:true,lateNativeEntityAndGloss:true,oneUndoAndRedo:true,interleavedTyping:true,cancellationRetainsNativeBlock:true,cancellationOneUndo:true,persistence:true,streamingWork:{snapshots:proof.snapshots-snapshots,fullMapScans:proof.scans-scans}};
  return proof.result;
 };
 proof.ready=true;

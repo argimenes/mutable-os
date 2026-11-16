@@ -24,6 +24,50 @@ async function setup(enabled=true,streaming=true,imageGeneration=true){
  const text=()=>port.session()!.projection.node(c.resolve(c.target(c.draft()!.id))!.children[0])!;
  return {workspace,editor,host,port,c,text};
 }
+it.each(['fragments','wrapped'])('continues native %s after a streamed preamble and PDF tool round',async framing=>{
+ const {c,editor,text,port}=await setup(),output={...file('research.pdf'),origin:'agent' as const,mediaType:'application/pdf'};
+ editor.commands.replaceInlineRange(text().key,0,0,'Compile the research into a PDF.');
+ vi.spyOn(DialecticProviderSession.prototype,'configure').mockImplementation(async function(this:DialecticProviderSession,settings){this.settings=settings;this.ready=true;return true;});
+ const xml=(value:string)=>framing==='wrapped'?`<response>${value}</response>`:value;
+ const first=xml('<p id="intro">I will compile the research.</p>'),last=xml('<p id="done">Your PDF is ready.</p>');
+ const receipt={provider:'openai',model:'fixture',startedUtc:'',completedUtc:'',usage:null,stop:'completed',cost:{status:'unknown'}};
+ let firstKey='',mount:Element|undefined,artifactCalls=0;
+ const snapshots=vi.spyOn(editor.repository,'snapshot'),save=vi.spyOn(port.application.files!,'saveSubmitted');
+ const values=Object.values;let scans=0;vi.spyOn(Object,'values').mockImplementation((v:any)=>{if(v===editor.repository.state.contents||v===editor.repository.state.placements)scans++;return values(v);});
+ vi.mocked(fetch).mockImplementation(async(url:any,init:any)=>{
+  if(String(url).endsWith('/session'))return Response.json({token:'fixture'});
+  if(String(url).endsWith('/exchange'))return Response.json({id:'fixture-exchange',settings:c.providerSettings()});
+  if(String(url).endsWith('/artifact')){artifactCalls++;return Response.json({attachment:output});}
+  if(String(url).endsWith('/turn')){
+   const round=JSON.parse(init.body).round;
+   return new Response(new ReadableStream({async start(controller){
+    const send=(value:unknown)=>controller.enqueue(new TextEncoder().encode(JSON.stringify(value)+'\n'));
+    send({type:'delta',text:round===0?first:last});
+    if(round===0){await vi.waitFor(()=>expect(c.rows().find((r:any)=>r.data.state==='receiving')).toBeTruthy());const row=c.rows().find((r:any)=>r.data.state==='receiving')!;firstKey=c.resolve(c.target(row.id))!.children[0];mount=editor.mounts.get(firstKey)?.root;}
+    send({type:'result',text:round===0?first:last,calls:round===0?[{id:'pdf',tool:'create_attachment',arguments:{filename:'research.pdf',format:'pdf',content:'Research'}}]:[],receipt});controller.close();
+   }}));
+  }
+  return Response.json({});
+ });
+ await c.submitAndAsk();
+ expect(c.notice()).toBe('');expect(artifactCalls).toBe(1);expect(c.committed()).toHaveLength(2);
+ const row=c.committed()[1],node=c.resolve(c.target(row.id))!;expect(node.children).toHaveLength(2);expect(node.children[0]).toBe(firstKey);expect(editor.mounts.get(firstKey)?.root).toBe(mount);
+ expect(row.data.attachments).toEqual([output]);expect(row.data.dcp!.response).toContain(first);expect(row.data.dcp!.response).toContain(last);expect(row.data.notices).toEqual([]);
+ expect(snapshots).not.toHaveBeenCalled();expect(scans).toBe(0);expect(save).not.toHaveBeenCalled();
+ editor.repository.undo();expect(c.committed()).toHaveLength(1);editor.repository.redo();expect(c.committed()[1].data.attachments).toEqual([output]);
+ expect(JSON.stringify(decodeNative(nativeBytes(captureNative(editor.repository.readState(),c.resourceId()))))).toContain(output.asset.assetId);
+});
+it('still rejects a genuine replacement after native insertion and retains the undoable original',async()=>{
+ const {c,editor,text}=await setup();editor.commands.replaceInlineRange(text().key,0,0,'Create a report.');
+ vi.spyOn(DialecticProviderSession.prototype,'configure').mockImplementation(async function(this:DialecticProviderSession,settings){this.settings=settings;this.ready=true;return true;});
+ vi.spyOn(DialecticProviderSession.prototype,'transport').mockImplementation(function(this:DialecticProviderSession){return {
+  details:{version:1,adapterVersion:'4c-1',settings:this.settings,attempts:[],cost:{status:'unknown'}},commit:async()=>{},cancel:async()=>{},
+  run:async(_request,_sources,chunk)=>{chunk('','start');chunk('<p>Original received paragraph.</p>','text');await vi.waitFor(()=>expect(c.rows().some(row=>row.data.state==='receiving')).toBe(true));chunk('','start');return '<p>Replacement must not be inserted.</p>';}
+ };});
+ await c.submitAndAsk();expect(c.notice()).toContain('cannot be replaced after insertion');expect(c.committed()).toHaveLength(2);
+ expect(c.committed()[1].data.dcp!.response).toContain('Original received paragraph');expect(c.committed()[1].data.dcp!.response).not.toContain('Replacement must not');
+ editor.repository.undo();expect(c.committed()).toHaveLength(1);
+});
 it('attaches with bounded canonical work, supports Undo/Redo and native persistence, and never saves automatically',async()=>{
  const {editor,c,port}=await setup(),a=file(),upload=vi.spyOn(DialecticProviderSession.prototype,'uploadAttachment').mockResolvedValue(a),save=vi.spyOn(port.application.files!,'save'),saveSubmitted=vi.spyOn(port.application.files!,'saveSubmitted');
  const snapshot=vi.spyOn(editor.repository,'snapshot'),values=Object.values;let scans=0;

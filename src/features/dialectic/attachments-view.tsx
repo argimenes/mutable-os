@@ -4,6 +4,7 @@ import {attachmentAccept,attachmentSize,type Attachment} from './attachments-con
 import type {PdfViewer} from '../../pdf/viewer';
 // Preview only mounted, visible generated images; serialize automatic reads.
 let imagePreviewQueue=Promise.resolve();
+export function queueImagePreview(load:()=>Promise<void>){imagePreviewQueue=imagePreviewQueue.catch(()=>{}).then(load);}
 
 export function AttachFiles(props:{c:DialecticController}){
  let input!:HTMLInputElement;const c=props.c;
@@ -52,7 +53,7 @@ function AttachmentCard(props:{c:DialecticController;file:Attachment;draft:boole
  };
  onMount(()=>{
   if(props.file.origin!=='agent'||!props.file.mediaType.startsWith('image/'))return;
-  const show=()=>{imagePreviewQueue=imagePreviewQueue.then(async()=>{if(alive&&!preview()&&!busy())await open(false);});};
+  const show=()=>{queueImagePreview(async()=>{if(alive&&!preview()&&!busy())await open(false);});};
   if(typeof IntersectionObserver==='undefined'){show();return;}
   const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();show();}},{rootMargin:'100px'});
   observer.observe(card);onCleanup(()=>observer.disconnect());

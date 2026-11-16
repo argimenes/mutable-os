@@ -123,7 +123,7 @@ export class DialecticReferences {
    const definitions=[...this.semanticDefinitions.keys()].map(id=>registry[id]).filter(d=>d&&!d.isDeleted);
    const properties:Array<{blockId:string;propertyId:string;type:string;excerpt?:string;entity?:import('../../feature-api/scoped-entities').ScopedEntityReference;contributionId?:string;annotationId?:string}>=[];
    for(const entry of this.entries.values())for(const p of entry.activity.values())if(p.active&&(p.entity||p.type.startsWith('dialectic/'))){const claim=p.type==='dialectic/claim'?(entry.record.payload.standoffProperties as any[]).find(v=>v.id===p.id):undefined;properties.push({blockId:String(entry.record.payload.id),propertyId:p.id,type:p.type,...claim?{excerpt:this.text(entry.record.key,claim.start,Math.min(claim.end+1,claim.start+160))}:{},entity:p.entity,contributionId:entry.contentsOwner,annotationId:p.annotationId});}
-   const media=[...this.entries.values()].filter(e=>['image-block','video-block','audio-block','youtube-video-block'].includes(e.record.viewType)).map(e=>({blockId:String(e.record.payload.id),type:e.record.viewType,metadata:e.record.payload.metadata as Record<string,any>}));
+   const media=[...this.entries.values()].filter(e=>['image-block','video-block','audio-block','youtube-video-block'].includes(e.record.viewType)).map(e=>({blockId:String(e.record.payload.id),type:e.record.viewType,contributionId:e.contentsOwner,asset:e.record.payload.asset,filename:e.record.payload.filename,metadata:e.record.payload.metadata as Record<string,any>}));
    return {definitions,properties,media};
   });
  }
@@ -135,7 +135,7 @@ export class DialecticReferences {
  private update(key:string,definitionIds?:string[],previousRecord?:ContentRecord){
   const old=this.entries.get(key),c=this.editor.repository.readState().contents[key];if(!c||!this.belongs(key)){this.remove(key);return;}
   this.diagnostics.recordUpdates++;
-  if(this.editor.features.dialecticSemanticsWorkspace&&['image-block','video-block','audio-block','youtube-video-block'].includes(c.viewType)&&(!old||old.record.viewType!==c.viewType||JSON.stringify((previousRecord??old.record).payload.metadata)!==JSON.stringify(c.payload.metadata)))this.stamp('workspace').bump();
+  if(this.editor.features.dialecticSemanticsWorkspace&&['image-block','video-block','audio-block','youtube-video-block'].includes(c.viewType)&&(!old||old.record.viewType!==c.viewType||JSON.stringify([(previousRecord??old.record).payload.metadata,(previousRecord??old.record).payload.asset,(previousRecord??old.record).payload.filename])!==JSON.stringify([c.payload.metadata,c.payload.asset,c.payload.filename])))this.stamp('workspace').bump();
   const edges=this.edgeMap(c),ids=new Set<string>(),activity=new Map<string,ActivityProperty>(),semantic=new Map<string,ReplyTarget>();let committed:boolean|undefined;
   if(c.inlineKind==='standoff'){this.diagnostics.propertyReads++;for(const p of (c.payload.standoffProperties??[]) as any[]){
    if(this.editor.features.dcpSemanticWorkspace&&!p.isDeleted&&!p.externalDefinition){

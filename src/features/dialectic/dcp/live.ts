@@ -66,8 +66,9 @@ export class DialecticProviderSession {
      if(preflight.plan.recovery)chunk('Rebuilding provider memory from native conversation history…','status');
     }
     const response=await this.call('/exchange',{request,...(continuity?{continuity}:{})},signal),start=await response.json();id=start.id;details.settings=start.settings;details.system=start.system;details.continuity=start.continuity;if(signal.aborted)throw Error('DCP cancelled');
+    const nativeStreaming=request.dialect==='xml/1'&&request.xmlFragments===true;
     while(round<liveLimits.rounds){
-     chunk('','start');
+     if(!nativeStreaming||round===0||next.repair)chunk('','start');
      sources.check();const response=await this.call('/exchange/'+id+'/turn',next,signal);if(!response.body)throw Error('Missing broker stream.');
      const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',wire=0,preview='',turn:ProviderTurn|undefined;
      try{while(true){const {done,value}=await reader.read();if(done)break;wire+=value.byteLength;if(wire>2*liveLimits.wireBytes)throw Error('Broker stream budget exceeded.');buffer+=decoder.decode(value,{stream:true});let end:number;
@@ -77,6 +78,7 @@ export class DialecticProviderSession {
      const attempt:LiveProvenance['attempts'][number]={receipt:turn.receipt,toolCalls:turn.calls,toolResultIds:[]};details.attempts.push(attempt);round++;
      if(turn.attachments)details.attachments=attachments(turn.attachments);
      if(turn.calls.length){
+      if(nativeStreaming)chunk(turn.text,'continue');
       calls+=turn.calls.length;if(calls>liveLimits.calls||repair&&(!recoverSources||turn.calls.some(c=>!sourceRecoveryTools.some(tool=>tool===c.tool))))throw Error('DCP tool budget exceeded.');const results=[];
       for(const [i,call]of turn.calls.entries()){sources.check();const toolId=`provider-${round}-${i}`;if(call.tool==='create_attachment'||call.tool==='generate_image'){if(call.tool==='generate_image')chunk('Generating image…','status');const value=await(await this.call('/exchange/'+id+'/artifact',{callId:call.id},signal)).json();if(value.attachment)details.attachments=attachments([...(details.attachments??[]),value.attachment]);(attempt.artifactResults??=[]).push({id:call.id,tool:call.tool,status:value.attachment?'complete':'failed',...(value.attachment?{filename:value.attachment.name}:{error:String(value.error??'Artifact returned no attachment').slice(0,1000)})});attempt.toolResultIds.push(toolId);results.push({id:call.id,result:{status:value.attachment?'complete':'failed'}});continue;}const nativeResult=await sources.tool({...call,arguments:sources.xmlAuthoring?sources.xmlAuthoring.toolArguments(call.tool,call.arguments):call.arguments,id:toolId}),result=sources.xmlAuthoring?(call.tool==='describe_capabilities'?sources.xmlAuthoring.describe(nativeResult):sources.xmlAuthoring.project(nativeResult)):nativeResult;attempt.toolResultIds.push(toolId);results.push({id:call.id,result});}
       next={round,results};continue;
