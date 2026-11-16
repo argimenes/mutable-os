@@ -137,7 +137,7 @@ export function capabilityCatalogue(editor:Pick<ReactiveEditor,'registry'|'featu
    if((compoundAuthoring||widgetAuthoring||managedImageAuthoring||externalMediaAuthoring||retainedPdfAuthoring)&&name==='Node'){
     externalDefinitions.Node={source:'negotiated-composition-schema',description:'Child composition at the current depth uses the provider schema (recursive or bounded expansion). Discover individual child parameters by these existing capability IDs.',capabilities:projected.filter(a=>(a.id.startsWith('composition.')||a.id.startsWith('widget.')||a.id.startsWith('media.'))&&a.schema&&a.id!=='composition.tasks'&&permits(selection,a.id)).map(a=>a.id)};return;
    }
-   if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);
+   if(name in defs)return;defs[name]=definitions[name];walk(definitions[name]);if(name==='LocalEntity'&&definitions.EnrichedLocalEntity)add('EnrichedLocalEntity');
   };
   const walk=(value:any)=>{if(!value||typeof value!=='object')return;if(value.$ref)add(value.$ref.replace('#/$defs/',''));for(const child of Object.values(value))walk(child);};
   names.forEach(add);return {$defs:defs,...(Object.keys(externalDefinitions).length?{externalDefinitions}:{})};

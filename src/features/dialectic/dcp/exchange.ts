@@ -93,7 +93,7 @@ export function semanticPreparationCheckpoint(session:NativePreparationSession){
   restoreSemantic();session.nodes=nodes;session.characters=characters;session.passages=[];
  };
 }
-export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id,emptyFields?:1,proactiveSemantics?:1,neutralPassages=false,stream?:NativePreparationSession){
+export async function prepare(raw:string,exchangeId:string,resourceId:string,registry:VisualEffectRegistry,sources:DcpSources,semantics=false,actor:'mock'|'ai'='mock',participantId=defaultParticipant(resourceId,'ai').id,emptyFields?:1,proactiveSemantics?:1,neutralPassages=false,stream?:NativePreparationSession,semanticsOnly=false){
  checkProactiveSemantics(proactiveSemantics);
  const vocabulary=sources.vocabulary;
  const nativeAuthoring=sources.editor?.features.dcpNativeAuthoringStage1===true;
@@ -223,7 +223,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
  };
  // Host-prepared descendants include native named ownership (e.g. margins).
  const ownedChildren=(n:ExistingBlockDto):ExistingBlockDto[]=>[...n.children??[],...Object.values(n.relation??{}).filter((v:any)=>v&&typeof v==='object'&&typeof v.type==='string') as ExistingBlockDto[]];
- const composition=list(response.composition,limits.roots);if(!composition.length&&!stream)throw Error('Empty contribution');const children=composition.map((n,i)=>{path='$.composition['+i+']';return build(n);});
+ const composition=list(response.composition,limits.roots);if(semanticsOnly&&composition.length)throw Error('Semantic refresh cannot create content Blocks');if(!composition.length&&!stream&&!semanticsOnly)throw Error('Empty contribution');const children=composition.map((n,i)=>{path='$.composition['+i+']';return build(n);});
  for(const passage of stream?.passages??[]){
   const block=generatedText.get(passage.block),from=stream!.boundaries.get(passage.from),to=stream!.boundaries.get(passage.to);
   if(!block||!from||!to||from.block!==passage.block||to.block!==passage.block||from.offset>=to.offset)throw Error('Invalid native passage boundaries');

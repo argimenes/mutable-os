@@ -57,8 +57,8 @@ it('derives parameter definitions from the negotiated schema, with resolvable sh
  const {catalogue}=fixture();
  const result=catalogue.describe({ids:['composition.table','composition.group','source.anchor','semantic.gloss']});
  expect(result.status).toBe('complete');expect(result.omittedIds).toEqual([]);
- expect(result.parameters.$defs.Table).toBe(responseSchema.$defs.Table);
- expect(result.parameters.$defs.Gloss).toBe(responseSchema.$defs.Gloss);
+ expect(result.parameters.$defs.Table).toEqual(responseSchema.$defs.Table);
+ expect(result.parameters.$defs.Gloss).toEqual(responseSchema.$defs.Gloss);
  expect(result.items.find(i=>i.id==='composition.table')?.constraints).toMatchObject({maxRows:compositionLimits.tableRows,maxColumns:compositionLimits.tableColumns});
  const walk=(value:any)=>{if(!value||typeof value!=='object')return;if(value.$ref)expect(result.parameters.$defs[value.$ref.replace('#/$defs/','')]).toBeDefined();Object.values(value).forEach(walk);};
  walk(result.parameters);

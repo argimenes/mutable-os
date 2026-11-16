@@ -48,7 +48,7 @@ export class XmlFragments {
     if(this.tag.startsWith('<!--')){if(this.tag.endsWith('-->')){ready+=this.tag;this.tag='';}continue;}
     if(this.quote){if(ch===this.quote)this.quote='';else if(/[\r\n\t]/.test(ch))xmlFailure();continue;}
     if(ch==='"'||ch==="'"){this.quote=ch;continue;}
-    if(ch==='>'){ready+=this.tag;this.tag='';}
+    if(ch==='>'){ready+=/^<br\s*\/?>$/i.test(this.tag)?'<br/>':this.tag;this.tag='';}
    }
    this.parser.write(ready);
   }catch(e){this.failed=true;throw e;}

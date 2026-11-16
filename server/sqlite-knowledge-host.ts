@@ -1,3 +1,4 @@
+import {SharedAuthorityCache} from './authority-cache';
 /** Vault worker lifetime, verified saved reads and source-scoped canonical Entity requests. */
 import { verifyDocumentSource, verifyEntityListingSource } from './recognized-source.mjs';
 import { RecognizedDocumentStore } from './recognized-document-store.mjs';
@@ -34,7 +35,7 @@ export class SqliteKnowledgeHost {
   async acquire(vault:string,policy=normalizePolicy()) {
     return this.acquireContext(vault,policy);
   }
-  private async acquireContext(vault:string,policy:ReturnType<typeof normalizePolicy>,establishment=false) {
+  private async acquireContext(vault:string,policy:ReturnType<typeof normalizePolicy>,establishment=false,cacheOnly=false) {
     return this.serialize(async()=>{
       if(this.closed)throw Error('SQLite knowledge host closed');
       if(this.leases.size>=64)throw Error('SQLite lease budget exceeded');
@@ -47,15 +48,16 @@ export class SqliteKnowledgeHost {
       if(e&&e.policyKey!==key)throw Error('SQLite vault extraction policy differs; no automatic profile replacement');
       if(!e){
         if(this.entries.size>=8)throw Error('SQLite vault budget exceeded');
-        e={root,vault,policy:normalized,policyKey:key,users:0,epoch:0,coverage:unknown('Current saved scope has not been verified'),pending:false,full:false};
+        e={cacheOnly,root,vault,policy:normalized,policyKey:key,users:0,epoch:0,coverage:unknown('Current saved scope has not been verified'),pending:false,full:false};
         // Failed/missing/corrupt/read-only databases remain unavailable, never repaired by replacement.
         try{e.client=await (this.options.open??openSqliteFoundation)({vault:root,initialize:!this.options.readOnly,readOnly:!!this.options.readOnly,semanticServicesEnabled:this.options.semanticServicesEnabled!==false,thesisEnabled:this.options.thesisEnabled!==false});
           e.vaultGuid=(await e.client.inspect()).mutable.vaultGuid;
           e.index=(this.options.indexer??createSavedIndexer)(e.client,{root:this.options.root,vault,store:this.store,policy:normalized,protect:this.protect});
         }catch(error){await e.client?.close().catch(()=>{});e.client=undefined;throw error;}
         this.entries.set(root,e);
-        if(e.client&&!this.options.readOnly)this.enqueue(e,false);
+        if(e.client&&!this.options.readOnly&&!cacheOnly)this.enqueue(e,false);
       }
+      if(e.cacheOnly&&!cacheOnly){e.cacheOnly=false;if(!this.options.readOnly)this.enqueue(e,false);}
       const lease=randomUUID(),l={entry:e,timer:undefined};e.users++;this.leases.set(lease,l);this.renew(lease,l);
       return {lease,...this.snapshot(e)};
     });
@@ -196,6 +198,15 @@ export class SqliteKnowledgeHost {
       if(!dispatched&&body.request?.op==='create')throw Object.assign(new Error(String(error)),{entityCreationOutcome:'not-created'});
       throw error;
     }
+  }
+  private authorityServices=new Map<string,SharedAuthorityCache>();
+  private authority(vault:string,url:unknown,refresh=false){if(typeof vault!=='string'||!featureFlags.authorityCache)throw Error('Authority cache unavailable');let service=this.authorityServices.get(vault);if(!service){if(this.authorityServices.size>=32)this.authorityServices.delete(this.authorityServices.keys().next().value!);service=new SharedAuthorityCache(request=>this.cache({vault,request}));this.authorityServices.set(vault,service);}return service.get(url,refresh);}
+  async cache(body:any,signal?:AbortSignal){
+    if(this.closed||!featureFlags.authorityCache)throw Error('Shared cache disabled');
+    if(typeof body.vault!=='string')throw Error('Select a cache Vault');
+    if(this.options.readOnly&&body.request?.op!=='get')throw Error('Cache is read-only');
+    const opened=await this.acquireContext(body.vault,normalizePolicy(body.policy),true,true);
+    try{signal?.throwIfAborted();return await this.entry(opened.lease).client!.cache(body.request,signal);}finally{await this.release(opened.lease);}
   }
   async cardex(body:any,signal?:AbortSignal){
     if(this.closed||this.options.cardexEnabled===false||this.options.entitiesEnabled===false)throw Error('Cardex is unavailable');
@@ -341,6 +352,8 @@ export class SqliteKnowledgeHost {
     this.savedScopes??=new SqliteSavedScopes(this);router.use('/facts',this.savedScopes.router());
     for(const [name,action]of Object.entries({
       'semantic-open':(b:any,_s?:AbortSignal)=>this.openSemantics(b.vault,b.policy),
+      cache:(b:any,s?:AbortSignal)=>{if(b.request?.op!=='get'&&String(b.request?.key).startsWith('authority-'))throw Error('Authority cache entries are service-owned');return this.cache(b,s);},
+      authority:(b:any)=>{if(!featureFlags.authorityCache)throw Error('Authority cache disabled');return this.authority(b.vault??'.',b.url,b.refresh===true);},
       cardex:(b:any,s?:AbortSignal)=>this.cardex(b,s),
       propositions:(b:any,s?:AbortSignal)=>this.propositions(b,s),
       semantics:(b:any,s?:AbortSignal)=>this.semantics(b,s),

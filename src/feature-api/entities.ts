@@ -7,7 +7,7 @@ export interface EntityResolutionQuery {query:string;stream:EntityStream;match:'
 export interface EntityEvidence {kind:string;text:string;resourceId?:string;mentionId?:string;ranges?:readonly {blockId:string;start:number;end:number}[]}
 export interface EntityCandidate {id:string;name:string;evidence:EntityEvidence[];localMentions?:number}
 export interface EntityResolution {candidates:EntityCandidate[];complete:boolean;diagnostics:string[];current():void}
-export interface AuthorityRecord { provider:'wikidata'|'gnd'; id:string; name:string; description:string; aliases:string[]; url:string; retrievedAt:string; wikidata?:string; revision?:number }
+export interface AuthorityRecord { typeIds?:string[];classifications?:string[];dates?:import('./entity-enrichment').EntityDate[];thumbnail?:{url:string;source?:string;attribution?:string;license?:string;licenseUrl?:string};cache?:{vault?:string;key:string;stale:boolean;fetchedAt:string}; provider:'wikidata'|'gnd'; id:string; name:string; description:string; aliases:string[]; url:string; retrievedAt:string; wikidata?:string; revision?:number }
 export interface EntityService {
  historyScope?():Promise<string>;
  /** Durable Vault identity for scope-qualified references; not a filesystem location. */

@@ -29,7 +29,7 @@ export class XmlContext implements XmlAuthority {
  describe(result:any):any{return {dialect:xmlDialect,status:result.status,omittedIds:result.omittedIds,limits:result.limits,...(result.items?{items:result.items.map((i:any)=>({id:i.id,purpose:i.purpose,authorable:!!xmlCapabilities[i.id]&&i.authorable===true,constraints:i.constraints,...(xmlCapabilities[i.id]?{syntax:xmlCapabilities[i.id]}:{reason:'No qualified XML route in this increment.'})}))}:{status:'unavailable',reason:'No qualified XML description'} )};}
  toolArguments(tool:string,args:Record<string,unknown>){const out={...args};if(tool==='read_source'){this.sources.check();out.handle=this.aliases.get(String(args.handle))??'unissued-xml-alias';}if(tool==='list_text_blocks'&&typeof args.contributionId==='string'){const t=this.sources.target(this.resolve(args.contributionId));if(t.kind!=='contribution')throw new DcpValidationError(safeDiagnostic({code:'source-identity'}));out.contributionId=t.blockId;}return out;}
  bindings(){return Object.fromEntries(this.aliases);}
- lower(text:string){this.sources.check();this.synopsis=undefined;return lowerXml(text,this.exchange,this,value=>this.synopsis=value);}
+ lower(text:string,semanticsOnly=false){this.sources.check();this.synopsis=undefined;return lowerXml(text,this.exchange,this,value=>this.synopsis=value,undefined,semanticsOnly);}
 }
 export const xmlCapabilities:Record<string,string>={
  'composition.paragraph':'<p>Inline content</p>', 'composition.heading':'<h1> through <h6>; native heading levels.',
@@ -41,7 +41,7 @@ export const xmlCapabilities:Record<string,string>={
  'composition.code':'<code language="typescript">const x = 1;</code>; XML-escape literal code; annotations are forbidden inside code.',
  'source.anchor':'<passage id="p" target="@b1" quote="exact text" prefix="" suffix=""/> in definitions. Complete source required. Neutral generated <span id="p">text</span>. Overlaps: inline <boundary id="a"/> and <boundary id="b"/>, then <range id="p" block="localBlockId" from="a" to="b"/> in definitions. Boundaries must be in that TextBlock.',
  'source.classification':'<classify target="passage" kind="claim|question|speculation|suggestion|objection|qualification"/>; also Block target with quote/context or whole="true".',
- 'semantic.entity':'<entity id="e" name="Name" type="Person"><description>Optional</description><alias>Optional alias</alias></entity>; every new Entity needs an explicit mention.',
+ 'semantic.entity':'Optional metadata: ref="@existing" enriches an existing identity; subtypes, wikidata, gnd, thumbnail and typed date children are supported. Add known descriptions to distinguish identities. <entity id="e" name="Name" type="Person"><description>Optional</description><alias>Optional alias</alias></entity>; every new Entity needs an explicit mention.',
  'semantic.entity-relation':'<relation kind="entity" type="employed-by" from="e" to="@e1"/>; native scope and ownership apply. No qualified/confidence attributes.',
  'semantic.argument':'<argument id="a" target="passage"/>; Argument identity is separate from its passage.',
  'semantic.argument-relation':'<relation kind="argument" type="supports" from="a" to="@a1"/>; admitted native relation kinds and owned Argument endpoints required.',

@@ -93,6 +93,19 @@ it.each([[true,true],[false,true],[true,false],[false,false]])('carries files an
  editor.repository.undo();expect(c.committed()).toHaveLength(1);editor.repository.redo();expect(c.committed().at(-1)!.data.attachments).toEqual([output]);
  await c.resend(c.committed()[0].id);expect(c.notice()).toBe('');expect(requests[1].attachments[0].asset).toEqual(input.asset);expect(requests[1].attachments[0].id).not.toBe(input.id);
 });
+it.each([true,false])('persists exact artifact failures with streaming=%s and preserves them through Undo/Redo',async(streaming)=>{
+ const {c,editor,text,port}=await setup(true,streaming),error='OpenAI image generation failed (HTTP 400, moderation_blocked).';
+ editor.commands.replaceInlineRange(text().key,0,0,'Show historical portraits');
+ const save=vi.spyOn(port.application.files!,'save'),saveSubmitted=vi.spyOn(port.application.files!,'saveSubmitted');
+ vi.spyOn(DialecticProviderSession.prototype,'configure').mockImplementation(async function(this:DialecticProviderSession,settings){this.settings=settings;this.ready=true;return true;});
+ vi.spyOn(DialecticProviderSession.prototype,'transport').mockImplementation(function(this:DialecticProviderSession){
+  const details:import('./dcp/provider-contract').LiveProvenance={version:1,adapterVersion:'4c-1',settings:this.settings,attempts:[{receipt:{provider:'openai',model:'fixture',startedUtc:'',completedUtc:'',usage:null,stop:'completed',cost:{status:'unknown'}},toolCalls:[],toolResultIds:['image'],artifactResults:[{id:'image',tool:'generate_image',status:'failed',error}]}],cost:{status:'unknown'}};
+  return {details,run:async(request,_sources,_chunk,_signal,validate)=>{expect(request.authorityLookup).toBe(1);const response='<response><p>The image could not be produced.</p></response>';await validate?.(response);return response;},commit:async()=>{},cancel:async()=>{}};
+ });
+ await c.submitAndAsk();expect(c.notice()).toBe('');expect(c.committed().at(-1)!.data.notices?.[0].detail).toContain(error);
+ editor.repository.undo();expect(c.committed()).toHaveLength(1);editor.repository.redo();expect(c.committed().at(-1)!.data.notices?.[0].detail).toContain(error);
+ const saved=decodeNative(nativeBytes(captureNative(editor.repository.readState(),c.resourceId())));expect(JSON.stringify(saved)).toContain(error);expect(save).not.toHaveBeenCalled();expect(saveSubmitted).not.toHaveBeenCalled();
+});
 it('hides attachment controls and rejects attachment mutations when disabled',async()=>{
  const {c,host}=await setup(false),upload=vi.spyOn(DialecticProviderSession.prototype,'uploadAttachment');expect(host.querySelector('[aria-label="Choose attachments"]')).toBeNull();await c.files.attach([new File(['test'],'x.txt')]);expect(c.notice()).toContain('disabled');expect(upload).not.toHaveBeenCalled();
  expect(()=>attachments([file(),file(),...Array.from({length:7},()=>file())])).toThrow();

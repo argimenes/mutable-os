@@ -35,3 +35,19 @@ it('can explicitly reconnect a child after the shared credential connection expi
  const parent=new DialecticProviderSession(),child=new DialecticProviderSession(false,()=>({}),parent);clean.push(()=>child.dispose(),()=>parent.dispose());
  await expect(child.configure(defaultProviderSettings)).rejects.toThrow('expired');await expect(child.configure(defaultProviderSettings,'new-key-fixture')).resolves.toBe(true);expect(roots).toBe(2);expect(children).toBe(2);
 });
+
+it('retains exact artifact failures in native-ready provenance and warning notices',async()=>{
+ const {artifactFailureNotices}=await import('./dcp/provider-contract');let turn=0;
+ const receipt={provider:'openai',model:'fixture',usage:null,stop:'completed',cost:{status:'unknown'}},error='OpenAI image generation failed (HTTP 400, moderation_blocked). Please revise the request or try again.';
+ vi.stubGlobal('fetch',vi.fn(async(url:any,init:any)=>{
+  if(String(url).endsWith('/session'))return Response.json({token:'fixture'});
+  if(String(url).endsWith('/settings'))return Response.json({settings:defaultProviderSettings,ready:true});
+  if(String(url).endsWith('/exchange'))return Response.json({id:'fixture-exchange',settings:defaultProviderSettings});
+  if(String(url).endsWith('/artifact'))return Response.json({error});
+  if(String(url).endsWith('/turn'))return new Response(JSON.stringify({type:'result',receipt,calls:turn++===0?[{id:'image',tool:'generate_image',arguments:{}}]:[],text:'<p>No image was produced.</p>'})+'\n');
+  return Response.json({});
+ }));
+ const provider=new DialecticProviderSession();clean.push(()=>provider.dispose());await provider.configure(defaultProviderSettings,'fixture-key');const transport=provider.transport();
+ await transport.run({exchange:'fixture'} as any,{owner:'document',check(){}} as any,()=>{},new AbortController().signal);
+ expect(transport.details.attempts[0].artifactResults).toEqual([{id:'image',tool:'generate_image',status:'failed',error}]);expect(artifactFailureNotices(transport.details)[0].detail).toContain('HTTP 400, moderation_blocked');expect(JSON.stringify(transport.details)).not.toContain('fixture-key');
+});

@@ -26,8 +26,9 @@ export class NativeXmlStream {
  private error?:unknown;
  private warnings:string[]=[];
  private warningCount=0;
- get notices():ContributionNotice[]{return this.warningCount?[{version:1,code:'incomplete-operation',severity:'warning',loss:true,detail:`${this.warningCount} semantic operation${this.warningCount===1?' was':'s were'} skipped. ${this.warnings.join(' ')}${this.warningCount>this.warnings.length?' Further details are in the received XML.':''}`}]:[];}
- private warn(label:string,error:unknown){this.options.sources.check();this.warningCount++;const detail=error instanceof DcpValidationError&&error.diagnostic.code==='xml'?'Unsupported attributes or semantic structure.':error instanceof Error?error.message:String(error);if(this.warnings.length<6)this.warnings.push(`${label}: ${detail}`.slice(0,240));}
+ private contentWarningCount=0;
+ get notices():ContributionNotice[]{const count=this.warningCount+this.contentWarningCount;return count?[{version:1,code:'incomplete-operation',severity:'warning',loss:true,detail:[this.warningCount?`${this.warningCount} semantic operation${this.warningCount===1?' was':'s were'} skipped.`:'',this.contentWarningCount?`${this.contentWarningCount} content fragment${this.contentWarningCount===1?' was':'s were'} adjusted or skipped.`:'',this.warnings.join(' '),count>this.warnings.length?'Further details are in the received XML.':''].filter(Boolean).join(' ')}]:[];}
+ private warn(label:string,error:unknown,content=false){this.options.sources.check();if(content)this.contentWarningCount++;else this.warningCount++;const detail=error instanceof DcpValidationError&&error.diagnostic.code==='xml'?'Unsupported attributes or structure.':error instanceof Error?error.message:String(error);if(this.warnings.length<6)this.warnings.push(`${label}: ${detail}`.slice(0,240));}
  private syntaxError?:unknown;
  private closed=false;
  private final?:{intent:string;discursiveReferences:import('../model').ReplyTarget[]};
@@ -73,6 +74,10 @@ export class NativeXmlStream {
   else if(e.attrs.id)throw Error('Unsupported XML identity');
   for(const child of e.children)if(typeof child!=='string')this.allocate(child);
  }
+ private discardFragment(e:XmlElement){
+  const id=this.allocated.get(e);if(id){this.shapes.delete(id);if(e.attrs.id&&this.symbols.get(e.attrs.id)?.id===id)this.symbols.delete(e.attrs.id);this.allocated.delete(e);}
+  for(const child of e.children)if(typeof child!=='string')this.discardFragment(child);
+ }
  private ref=(name:string,kinds?:string[])=>{
   if(name.startsWith('@'))return this.options.authority.resolve(name);
   const symbol=this.symbols.get(name);if(!symbol)throw new PendingReference();assertXmlReferenceKind(name,symbol.kind,kinds);
@@ -95,10 +100,15 @@ export class NativeXmlStream {
  }
  private async element(e:XmlElement){
   if(e.name==='synopsis'){const text=xmlSynopsis(e);if(text)this.options.onSynopsis?.(text);else this.warn('Synopsis','Expected plain text, no attributes, and at most 160 characters.');return;}
-  try{this.allocate(e);}catch(error){if(!xmlDefinitionNames.has(e.name))throw error;this.warn(e.name,error);return;}
+  try{this.allocate(e);}catch(error){this.discardFragment(e);this.warn(e.name,error,!xmlDefinitionNames.has(e.name));return;}
   if(xmlDefinitionNames.has(e.name))this.waiting.push(e);
   else {
-   const out=this.response();out.composition=[xmlBlockLowerer(this.id,this.ref,this.shapes,(inline,target)=>{this.mentions.push({id:this.fresh('m'),target,ref:inline.attrs.ref});})(e)];
+   const out=this.response(),mentionCount=this.mentions.length;
+   // Lowering is local preparation. A rejected fragment must not stop later
+   // fragments or leave passage/mention identities pointing at absent content.
+   try{out.composition=[xmlBlockLowerer(this.id,this.ref,this.shapes,(inline,target)=>{this.mentions.push({id:this.fresh('m'),target,ref:inline.attrs.ref});},name=>this.warn(`<${name}>`,'Unsupported inline formatting; its text was retained.',true))(e)];}
+   catch(error){this.mentions.length=mentionCount;this.discardFragment(e);this.warn(e.name,error,true);return;}
+   // Canonical admission, lifecycle failures and budget failures remain fatal.
    await this.admit(out);
   }
   // Retry only the bounded exchange-local semantic queue after a new fragment.
@@ -113,7 +123,7 @@ export class NativeXmlStream {
       const entity=this.id(item);this.definition(item,out);
       for(const mention of this.mentions){if(mention.ref!==item.attrs.id)continue;let reference:string;try{reference=this.ref(mention.ref,['e']);}catch(error){if(error instanceof PendingReference)continue;throw error;}if(this.available(mention.target)&&reference===entity){out.interpretations.push({id:mention.id,target:mention.target,type:'mutable/entity-reference',ref:entity,attributes:[]});matched.push(mention);}}
       for(const other of this.waiting)if(other.name==='mention'&&other.attrs.ref===item.attrs.id&&!this.discarded.has(other)){try{this.definition(other,out,entity);matchedElements.push(other);}catch(error){if(!(error instanceof PendingReference)){this.warn(other.name,error);this.discarded.add(other);matchedElements.push(other);}}}
-      if(!out.interpretations.length)continue; // Preserve mandatory Entity grounding.
+      if(!out.interpretations.length&&!item.attrs.ref)continue; // New identities require grounding; existing identities can be enriched.
      }else if(item.name==='range'){
       // Validate its normal XML shape, then use the native passage/anchor path.
       this.definition(item,out);this.memory.passages=[{id:this.id(item),block:this.ref(item.attrs.block,['b']),from:this.ref(item.attrs.from,['pos']),to:this.ref(item.attrs.to,['pos'])}];

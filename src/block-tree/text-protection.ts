@@ -7,6 +7,11 @@ const equal=(a:unknown,b:unknown)=>a===b||JSON.stringify(a)===JSON.stringify(b);
 /** Canonical base-content protection; annotations remain ordinary native edits.
  * Applications contribute root predicates, never mutation implementations. */
 export class NativeTextProtection {
+ private transientInputs=new WeakSet<Element>();
+ /** Host-owned form fields inside protected Blocks are local UI. Canonical
+  * protection still applies to every attempted Document mutation. */
+ allowTransientInput(element:Element){this.transientInputs.add(element);return()=>this.transientInputs.delete(element);}
+ isTransientInput(target:EventTarget|null){return target instanceof Element&&this.transientInputs.has(target);}
  private receiving=new Set<string>();
  /** Host-scoped append/finalisation of a receiving contribution. Existing
   * submitted contributions never qualify for this temporary authoring scope. */
@@ -77,7 +82,7 @@ export class NativeTextProtection {
      // Host-observed contribution notices are provenance, like annotations;
      // updating them does not grant permission to rewrite authored content.
      if(this.roots.has(c.key)&&(payload.metadata as any)?.dialectic?.kind==='contribution'){
-      const metadata=payload.metadata as any,{notices,...dialectic}=metadata.dialectic;
+      const metadata=payload.metadata as any,{notices,semanticRefreshes,...dialectic}=metadata.dialectic;
       payload.metadata={...metadata,dialectic};
      }
      // Selected tabs and media load status are presentation, not authored text.

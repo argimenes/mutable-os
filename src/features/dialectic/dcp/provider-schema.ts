@@ -1,3 +1,5 @@
+import {enrichedEntitySchema} from './enrichment-schema';
+import {featureFlags} from '../../../configuration';
 import {checkEmptyFieldsVersion,emptySemanticFields} from './empty-fields';
 import {projectVocabulary} from './vocabulary-schema';
 import type {VocabularySnapshot} from './vocabulary-contract';
@@ -22,7 +24,7 @@ for(const [name,kind]of Object.entries(declarationKinds))Object.assign((response
 
 /** Transport projection of shared native operations. The baseline remains unchanged. */
 export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot,semanticWorkspace=false):any {
- if(!nativeAuthoring)return projectVocabulary(semanticTargetSchema(structuredClone(responseSchema),semanticWorkspace),vocabulary);
+ if(!nativeAuthoring)return projectVocabulary(semanticTargetSchema(featureFlags.dcpEntityEnrichment?enrichedEntitySchema(structuredClone(responseSchema)):structuredClone(responseSchema),semanticWorkspace),vocabulary);
  const schema:any=structuredClone(responseSchema),d=schema.$defs;
  d.Heading={...structuredClone(d.Paragraph),properties:{...d.Paragraph.properties,kind:{type:'string',enum:['heading']},level:headingOperation.parameters.level},required:[...d.Paragraph.required,'level']};
  d.Grid=structuredClone(d.Table);d.Grid.properties.kind={type:'string',enum:['grid']};
@@ -82,7 +84,7 @@ export function authoringSchema(nativeAuthoring=false,textAuthoring=false,layout
   d.RetainedPdf={type:'object',properties:{id:d.Paragraph.properties.id,kind:{type:'string',enum:['retained-pdf']},source:{type:'string'},revision:{type:'string'}},required:['id','kind','source','revision'],additionalProperties:false};
   d.Node.anyOf.push({$ref:'#/$defs/RetainedPdf'});
  }
- return projectVocabulary(semanticTargetSchema(schema,semanticWorkspace),vocabulary);
+ return projectVocabulary(semanticTargetSchema(featureFlags.dcpEntityEnrichment?enrichedEntitySchema(schema):schema,semanticWorkspace),vocabulary);
 }
 /** Anthropic rejects recursive JSON schemas; expand the same bounded contract. */
 export function schemaFor(provider:'openai'|'anthropic',nativeAuthoring=false,textAuthoring=false,layoutAuthoring=false,compoundAuthoring=false,widgetAuthoring=false,managedImageAuthoring=false,externalMediaAuthoring=false,retainedPdfAuthoring=false,vocabulary?:VocabularySnapshot,semanticWorkspace=false,emptyFields?:1):any {

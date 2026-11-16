@@ -1,3 +1,4 @@
+import {enrichEntityDefinition} from '../../../feature-api/entity-enrichment';
 import {DcpValidationError,safeDiagnostic} from './diagnostics';
 import {requireCapability,requireStandoff} from './vocabulary-contract';
 import type {GeneratedIdentityKind} from './identities';
@@ -14,8 +15,13 @@ export function semanticPreparation(sources:DcpSources,resourceId:string,definit
  const record=(t:ReplyTarget)=>{const id=t.argumentId??t.entity?.entityId??t.anchorId??t.definitionId;return id&&definitions[id]||sources.definition(t);};
  const created:string[]=[],mentioned=new Set<string>();
  const vaultReferences=new Map<string,ScopedEntityReference>();
- const entities=(items:any[])=>{if(items.length)requireCapability(sources.vocabulary,'semantic.entity');for(const input of list(items,64)){
-  keys(input,['id','name','typename','description','aliases']);claim(input.id,'e');const d=sources.entities.prepare(input,provenance);definitions[d.id]=d;created.push(d.id);
+ const entities=(items:any[])=>{if(items.length)requireCapability(sources.vocabulary,'semantic.entity');for(const value of list(items,64)){const input={description:'',aliases:[],...value};
+  keys({...input,ref:input.ref??null,enrichment:input.enrichment??null},['id','name','typename','description','aliases','ref','enrichment']);claim(input.id,'e');
+  if((input.ref||input.enrichment)&&!sources.editor.features.dcpEntityEnrichment)throw Error('Entity enrichment disabled');
+  let d:any=sources.entities.prepare(input,provenance);
+  if(input.ref){const existing=target(input.ref);if(existing.kind!=='entity'||existing.entity.scope!=='document'||existing.entity.resourceId!==resourceId)throw Error('Enrichment requires a current owned Document Entity handle');d=record(existing);if(!localEntity(d)||d.isDeleted||d.metadata.scopedEntity.entity.deletedUtc)throw Error('Entity unavailable');d=enrichEntityDefinition(d,input,provenance);}
+  else {created.push(d.id);if(input.enrichment)d=enrichEntityDefinition(d,input,provenance);}
+  definitions[d.id]=d;
   aliases.set(input.id,{kind:'entity',resourceId,entity:{scope:'document',resourceId,entityId:d.id}});
  }};
  const entityRef=(handle:string):ScopedEntityReference=>{const t=target(handle);if(t.kind!=='entity')throw Error('Expected a scoped Entity handle');if(t.entity.scope==='document'&&(t.entity.resourceId!==resourceId||(!localEntity(record(t))||record(t).isDeleted||record(t).metadata.scopedEntity.entity.deletedUtc)))throw Error('Unavailable owned Entity');if(t.entity.scope==='vault'){if(vaultReferences.size>=32)throw Error('Vault reference budget');vaultReferences.set(JSON.stringify(t.entity),t.entity);}return t.entity;};

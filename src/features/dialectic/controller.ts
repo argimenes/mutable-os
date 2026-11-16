@@ -1,5 +1,8 @@
+import {reconcileSemanticRefresh} from './dcp/semantic-refresh';
+import {createEntityAuthorityResolution} from '../../application/entity-authority-resolution';
 import {createConversationCoordinator} from './conversation-coordinator';
 import {conversationPreferences,type ConversationPreferences} from './preferences';
+import {defaultWorkspaceTabs,workspaceTabs,type ConversationWorkspaceTabs} from './workspace-tabs';
 import {imageGenerationLimits} from './image-generation-contract';
 import {createAttachments} from './attachments';
 import {attachments,attachmentProviderProblem,type Attachment} from './attachments-contract';
@@ -23,7 +26,7 @@ import {composePreparedLeaves} from '../../block-tree/prepared-leaves';
 import {compositionLimits} from './dcp/limits';
 import {DialecticProviderSession} from './dcp/live';
 import {ConversationHistory} from './continuity';
-import {liveLimits,type ProviderSettings,type LiveProvenance} from './dcp/provider-contract';
+import {artifactFailureNotices,liveLimits,type ProviderSettings,type LiveProvenance} from './dcp/provider-contract';
 import {DcpSources} from './dcp/sources';
 import {request as dcpRequest,prepare as prepareDcp,mockTransport,receive,type DcpTransport} from './dcp/exchange';
 import {createSequenceController} from './sequence-controller';
@@ -79,13 +82,19 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
  const session=()=>port()?.session(),root=()=>{const s=session();return s?.projection.node(s.rootKey);};
  const resourceId=()=>String(metadata(root()).documentId??root()?.payload.id??'');
  const valid=()=>isConversation(metadata(root()).dialectic);
- const writePreferences=(patch:Partial<ConversationPreferences>)=>{
-  if(!options)return;const n=root();if(!n||!alive)return;
+ const writePreferences=(patch:Partial<ConversationPreferences>,explicit=false)=>{
+  if(!options&&!explicit)return;const n=root();if(!n||!alive)return;
   const m=structuredClone(unwrap(n.payload.metadata??{})) as any;
   if(m.dialectic?.preferences?.version&&m.dialectic.preferences.version!==1)throw Error('Conversation preferences use a newer version.');
   const preferences={...conversationPreferences(m.dialectic?.preferences),...patch,version:1};
   editor.commands.boundedStructuralTransaction('Conversation preferences',()=>editor.commands.setPayloadField(n.key,'metadata',{...m,dialectic:{...m.dialectic,preferences}}));
  };
+ const workspaceConfiguration=createMemo(()=>conversationPreferences(metadata(root()).dialectic?.preferences).workspace??defaultWorkspaceTabs());
+ const [workspaceSelection,setWorkspaceSelection]=createSignal('conversation');
+ const [workspaceUi,setWorkspaceUi]=createSignal({section:'entities',search:'',sort:'name',selected:'',detail:'details',graph:true});
+ const activeWorkspaceTab=()=>workspaceConfiguration().tabs.find(t=>t.id===workspaceSelection())??workspaceConfiguration().tabs[0];
+ const configureWorkspace=(value:ConversationWorkspaceTabs)=>{const next=workspaceTabs(value);if(!next)throw Error('Invalid conversation workspace tabs');writePreferences({workspace:next},true);};
+ const showConversation=()=>setWorkspaceSelection(workspaceConfiguration().tabs.find(t=>t.type==='conversation')!.id);
  const inheritPreferences=async()=>{if(busy()||!options)return;writePreferences({provider:undefined,vocabulary:undefined});storeVocabulary(options.defaults.vocabulary);await configureProvider(options.defaults.provider,undefined,false);};
  // Metadata changes (including Undo) update preferences without network work.
  if(options)createEffect(()=>{const value=(metadata(root()).dialectic as any)?.preferences,p=conversationPreferences(value),vocabulary=p.vocabulary??options.defaults.vocabulary,next=p.provider??options.defaults.provider,processing=busy();untrack(()=>{if(processing)return;storeSelectedAi(p.participantId);storeVocabulary(vocabulary);if(JSON.stringify(next)!==JSON.stringify(providerSettings())){setProviderSettings({...next});setProviderReady(false);}});});
@@ -132,6 +141,9 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
  };
  const references=createMemo(()=>{const s=session();if(!s)return;return untrack(()=>{const index=new DialecticReferences(editor,s.projection,s.rootKey);onCleanup(()=>index.dispose());return index;});});
  const activityDiagnostics={candidates:0,resolutions:0};
+ const semanticInventory=createMemo(()=>references()?.workspaceInventory()??{definitions:[],properties:[],media:[]});
+ const authorityResolution=createEntityAuthorityResolution(editor,()=>root()?.key,resourceId,()=>!busy());
+ if(editor.features.authorityCache)createEffect(()=>{if(busy()){authorityResolution.suspend();return;}authorityResolution.observe(semanticInventory().definitions);});
  const activities=new Map<string,{summary:Accessor<ActivitySummary>;dispose:()=>void}>();
  const contributionActivity=(id:string)=>{
   let entry=activities.get(id);if(!entry){entry=createRoot(dispose=>{const data=createMemo(()=>editor.features.dialecticContributionActivity?rowLookup().get(id)?.data:undefined);return {dispose,summary:createContributionActivity(data,references,activityDiagnostics)};});activities.set(id,entry);}return entry.summary;
@@ -183,7 +195,7 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
  const inspect=(t:ReplyTarget,record=true,shouldReveal=true)=>{
   t=structuredClone(unwrap(t));
   setActivityInspection(undefined);setAnnotationInspection(undefined);setInspection(t);if(record)batch(()=>{const next=trail().slice(0,cursor()+1);if(targetKey(next.at(-1)??t)!==targetKey(t)||!next.length)next.push(t);setTrail(next);setCursor(next.length-1);});
-  if(shouldReveal)reveal(t);
+  if(shouldReveal){if(!['entity','argument-relation','entity-relation','gloss'].includes(t.kind))showConversation();reveal(t);}
  };
  // Inspect only the clicked occurrence and its local properties. No search,
  // Document scan, canonical transaction or focus/reveal is needed for Entities.
@@ -197,18 +209,19 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
   inspect({kind:'entity',resourceId:resourceId(),entity:property.metadata.entityReference});return true;
  };
  const inspectAnnotation=(ref:{blockId:string;propertyId:string})=>run(()=>{inspect(target(ref.blockId,'block'));setAnnotationInspection({...ref,resourceId:resourceId()});if(!annotationDetails(ref))setNotice('This annotation is unavailable; its authored reference is retained.');});
- const inspectActivity=(id:string,category:ActivityCategory|'notices')=>run(()=>{inspect(target(id));setActivityInspection({id,category});});
+ const openSemantics=(category:string,items:ActivityItem[])=>{if(!editor.features.dialecticSemanticsWorkspace||!['entities','arguments','relationships'].includes(category))return false;let tab=workspaceConfiguration().tabs.find(t=>t.type==='semantics');if(!tab){tab={id:crypto.randomUUID(),title:'Semantics',type:'semantics'};configureWorkspace({version:1,tabs:[...workspaceConfiguration().tabs,tab]});}const t=items.find(i=>i.category===category&&i.active)?.target;setWorkspaceUi(v=>({...v,section:category==='arguments'||t?.kind==='argument-relation'?'arguments':'entities',selected:t?.entity?.entityId??t?.argumentId??t?.definitionId??'',search:''}));setWorkspaceSelection(tab.id);setActivityInspection(undefined);return true;};
+ const inspectActivity=(id:string,category:ActivityCategory|'notices')=>run(()=>{if(openSemantics(category,contributionActivity(id)().items))return;inspect(target(id));setActivityInspection({id,category});});
  const contentsActivity=(id:string):ActivitySummary=>{
   const items:ActivityItem[]=(references()?.contentsTargets(id)??[]).map(t=>({key:targetKey(t),category:t.kind==='entity'?'entities':t.kind==='argument'?'arguments':t.kind==='gloss'?'glosses':'relationships',label:t.kind==='entity'?'Entity':t.kind==='argument'?'Argument':t.kind==='gloss'?'Gloss':'Relationship',target:t,active:true}));
   const counts={references:0,annotations:0,formatting:0,glosses:0,arguments:0,entities:0,relationships:0,unavailable:0};for(const item of items)counts[item.category]++;
   return {items,counts,notices:[],limited:false};
  };
- const inspectContents=(id:string,category:ActivityCategory)=>run(()=>{inspect(target(id));setActivityInspection({id,category,coverage:true});});
+ const inspectContents=(id:string,category:ActivityCategory)=>run(()=>{if(openSemantics(category,contentsActivity(id).items))return;inspect(target(id));setActivityInspection({id,category,coverage:true});});
  const contentsSynopsis=(id:string)=>{diagnostics.contentsSynopsisReads++;const row=rowLookup().get(id),s=row?.data.synopsis;return s?.version===1&&typeof s.text==='string'&&s.text.trim()?s.text:references()?.contentsExcerpt(id)|| (row?.data.state==='receiving'?'Receiving response…':row?.data.author==='human'?'Human contribution':'Contribution');};
  const inspectActivityItem=(item:ActivityItem)=>run(()=>{const selected=activityInspection();if(item.target)inspect(item.target);else if(item.annotation)inspectAnnotation(item.annotation);setActivityInspection(selected);});
  const navigate=(delta:number)=>{const i=cursor()+delta;if(i>=0&&i<trail().length){setCursor(i);inspect(trail()[i],false);}};
- const present=()=>{sequences.leave(false);const row=frontier()??draft();if(row)inspect(target(row.id));};
- const compose=()=>{sequences.leave(false);const d=draft();if(d)reveal(target(d.id),true);};
+ const present=()=>{showConversation();sequences.leave(false);const row=frontier()??draft();if(row)inspect(target(row.id));};
+ const compose=()=>{showConversation();sequences.leave(false);const d=draft();if(d)reveal(target(d.id),true);};
  const guard=()=>{
   if(!alive||!session()?.current()||!valid())throw Error('Open a Dialectic conversation first.');
   if(!options||options.active())editor.documentSessions?.presentations.checkInteraction(session()!);
@@ -322,26 +335,27 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
  const glosses=()=>references()?.overlapping(resolveReference(inspection()).segments??[])??[];
  const createGloss=()=>run(()=>{const segments=resolveReference(inspection()).segments;if(segments?.length!==1)throw Error('Select one passage segment to create a Gloss.');const s=segments[0];void editor.commandRegistry.execute('gloss.create',{targetKey:s.node.key,args:{selection:{anchor:s.start,head:s.end}}});});
  const pinGloss=(id:string)=>pin({kind:'gloss',resourceId:resourceId(),definitionId:id});
- const cancel=()=>{if(busy())setOperationStatus('cancelled');nativeReceiving?.stop('Response cancelled');nativeReceiving=undefined;generation++;presentationTrace?.dispose();presentationTrace=undefined;requestAbort?.abort();if(previewTimer!==undefined)clearTimeout(previewTimer);previewTimer=undefined;setDcpPreview(previewText);setBusy(false);};
+ const cancel=()=>{const refresh=semanticRefreshState();if(refresh?.status==='running')setSemanticRefreshState({...refresh,status:'error',message:'Semantic refresh cancelled.'});if(busy())setOperationStatus('cancelled');nativeReceiving?.stop('Response cancelled');nativeReceiving=undefined;generation++;presentationTrace?.dispose();presentationTrace=undefined;requestAbort?.abort();if(previewTimer!==undefined)clearTimeout(previewTimer);previewTimer=undefined;setDcpPreview(previewText);setBusy(false);};
  const exchangeTarget=()=>reply()??(inspection()&&!['entity','argument-relation','entity-relation'].includes(inspection()!.kind)?inspection():undefined)??(frontier()?target(frontier()!.id):undefined);
- const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget,live?:LiveProvenance,lifecycle?:{commit():Promise<void>;cancel():Promise<void>})=>{
+ const askDcp=async(transport:DcpTransport,explicit?:ReplyTarget,live?:LiveProvenance,lifecycle?:{commit():Promise<void>;cancel():Promise<void>},refresh?:{id:string;comment:string})=>{
   if(busy())return;
   const deadlineMs=live?(editor.features.dialecticImageGeneration&&editor.features.dialecticArtifacts&&editor.readAssetContext().session?imageGenerationLimits.deadlineMs:liveLimits.deadlineMs):30000;
   const participant={...aiParticipant()};let ticket=0,sources:DcpSources|undefined,requestForInspection:unknown;
   try{
    setNotice('');clearPreview();guard();const to=explicit??exchangeTarget();
    if(!to)throw Error('Submit a contribution or select a reply target first.');requireCommittedTarget(to);
-   const selectedTargets=structuredClone(unwrap(context())),targets=[to,...selectedTargets.filter(t=>targetKey(t)!==targetKey(to))];
+   const selectedTargets=refresh?[]:structuredClone(unwrap(context())),targets=[to,...selectedTargets.filter(t=>targetKey(t)!==targetKey(to))];
    for(const t of targets)if(!['gloss','entity','argument-relation','entity-relation'].includes(t.kind))requireCommittedTarget(t);
-   const captured=capture(targets),source=session()!,exchangeId=crypto.randomUUID();
+   const captured=refresh?{items:[] as MockContext[],revisions:new Map<string,number>(),manifest:[] as ConsumedContext['items']}:capture(targets),source=session()!,exchangeId=crypto.randomUUID();
    clearPreview();ticket=++generation;presentationTrace?.dispose();presentationTrace=undefined;requestAbort=new AbortController();setLastProviderExchange(undefined);setBusy(true);setOperationStatus('running');setResponseStatus('Preparing response…');setDcpPreview('Preparing structured exchange…');
    sources=new DcpSources(editor,resourceId(),function*(fromOrdinal=1){const rows=committed();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((rows[mid].data.ordinal??0)<fromOrdinal)lo=mid+1;else hi=mid;}for(let i=lo;i<rows.length;i++)yield source.projection.node(rows[i].key)!;},key=>source.projection.node(key),key=>source.projection.parentOf(key),t=>resolveReference(t),requestAbort.signal,id=>references()!.relationsFor(id),deadlineMs,id=>references()!.argumentsFor(id),vocabularySelection(),references());
    for(const key of captured.revisions.keys())sources.fence(key);
+   if(refresh)sources.fence(root()!.contentKey);
    const primary=sources.issue(to),selected=selectedTargets.map(t=>sources!.issue(t));
-   const structuralContext=await sources.manifest([primary,...selected],editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics?64000-8192:64000);
+   const structuralContext=await sources.manifest([primary,...selected],editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics?64000-8192:64000,refresh?24000:12000);
    if(!alive||ticket!==generation||session()!==source)return;sources.check();
    const request=dcpRequest(exchangeId,primary,selected,captured.items.map(item=>({handle:sources!.issue(item.target),plainTextExcerpt:item.text})),editor.visualEffects,editor.features.scopedSemantics,sources.capabilities,editor.features.dcpNativeAuthoringStage1,editor.features.dcpNativeAuthoringStage2Text,editor.features.dcpNativeAuthoringStage2Layouts,editor.features.dcpNativeAuthoringStage2Compounds,editor.features.dcpNativeAuthoringStage2Widgets,managedImagesEnabled(editor),editor.features.dcpNativeAuthoringStage3ExternalMedia,retainedPdfsEnabled(editor),sources.vocabulary);
-   const proactiveSemantics=editor.features.dcpProactiveSemanticAuthoring?1 as const:undefined;
+   const proactiveSemantics=refresh||editor.features.dcpProactiveSemanticAuthoring?1 as const:undefined;
    Object.assign(request.authoring,{emptySemanticFields:emptySemanticFieldsVersion,...(proactiveSemantics?{proactiveSemantics}: {})});
    if(editor.features.dialecticAttachments){
     const chosen=new Map<string,Attachment>();
@@ -349,13 +363,15 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
     const selectedFiles=attachments([...chosen.values()]),problem=attachmentProviderProblem(live?.settings.provider??providerSettings().provider,selectedFiles);if(problem)throw Error(problem);
     Object.assign(request,{attachments:selectedFiles});
    }
-   if(editor.features.dialecticArtifacts&&editor.readAssetContext().session)Object.assign(request,{artifacts:1,...(editor.features.dialecticImageGeneration?{imageGeneration:1}:{})});
-   requestForInspection=request;Object.assign(request,{structuralContext,task:{action:'respond',focus:primary,participantRequest:structuralContext.sources[0]?.sourceAuthor==='human'?{handle:primary,text:captured.items[0].text}:null}});
+   if(editor.features.authorityCache)Object.assign(request,{authorityLookup:1});
+   if(!refresh&&editor.features.dialecticArtifacts&&editor.readAssetContext().session)Object.assign(request,{artifacts:1,...(editor.features.dialecticImageGeneration?{imageGeneration:1}:{})});
+   requestForInspection=request;Object.assign(request,{structuralContext,task:{action:refresh?'refresh-semantics':'respond',focus:primary,participantRequest:!refresh&&structuralContext.sources[0]?.sourceAuthor==='human'?{handle:primary,text:captured.items[0].text}:null}});
    if(editor.features.dcpSemanticWorkspace&&editor.features.scopedSemantics){enableSemanticWorkspace(request);Object.assign(request,{semanticWorkspace:await semanticWorkspace(sources,participant.id,structuralContext.sources.map((s:any)=>s.target).filter(Boolean))});}
    if(!alive||ticket!==generation||session()!==source)return;sources.check();
+   if(refresh)Object.assign(request,{semanticRefresh:{contributionId:refresh.id,comment:refresh.comment}});
    if(live){request.cadence=live.settings.cadence;request.protocolKey={...request.protocolKey,version:request.protocolKey.version+'-c1'};}
-   if(live&&editor.features.dcpXmlAuthoring){sources.xmlAuthoring=new XmlContext(sources,exchangeId);Object.assign(request,{dialect:xmlDialect,xmlFragments:editor.features.dcpXmlStreaming,...(editor.features.dialecticSemanticContents?{synopsisAuthoring:1}:{}),xmlContext:sources.xmlAuthoring.request(request)});}
-   if(live&&sources.xmlAuthoring&&editor.features.dcpXmlStreaming){
+   if(live&&editor.features.dcpXmlAuthoring){sources.xmlAuthoring=new XmlContext(sources,exchangeId);Object.assign(request,{dialect:xmlDialect,xmlFragments:!refresh&&editor.features.dcpXmlStreaming,...(!refresh&&editor.features.dialecticSemanticContents?{synopsisAuthoring:1}:{}),xmlContext:{...sources.xmlAuthoring.request(request),...(refresh?{semanticRefresh:{comment:refresh.comment}}:{})}});}
+   if(!refresh&&live&&sources.xmlAuthoring&&editor.features.dcpXmlStreaming){
     const streamSources=sources,streamAuthority=sources.xmlAuthoring;
     const owner=resourceId(),documentRoot=root()!,draftRow=draft();if(!draftRow)throw Error('Conversation draft unavailable');
     const id=crypto.randomUUID(),ordinal=nextOrdinal(),group=editor.repository.beginUndoGroup('AI contribution',{allowUnrelatedHistory:!!options});
@@ -392,7 +408,7 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
     const finish=(reason?:string)=>{
      if(done)return;done=true;stream.stop();
      try{if(node&&root()&&editor.repository.readState().contents[node.contentKey]){
-      const data={...base,...(live?.attachments?.length?{attachments:attachments(live.attachments)}:{}),...(synopsis?{synopsis}:{}),state:'committed',discursiveReferences:summary.discursiveReferences,notices:[...stream.notices,...(reason?[{version:1,code:'incomplete-operation',severity:'warning',loss:true,detail:reason+'; completed native content retained.'+(stream.unresolved?` ${stream.unresolved} unresolved semantic operations were not applied.`:'')}]:[])],dcp:{version:1,profile:request.profile,request,tools:sources!.trail,response:raw||stream.received,xmlBindings:sources!.xmlAuthoring!.bindings(),identityMap:Object.fromEntries(stream.memory.memory?.aliases??[]),annotationRefs,intent:summary.intent,provider:live}};
+      const data={...base,...(live?.attachments?.length?{attachments:attachments(live.attachments)}:{}),...(synopsis?{synopsis}:{}),state:'committed',discursiveReferences:summary.discursiveReferences,notices:[...stream.notices,...artifactFailureNotices(live),...(reason?[{version:1,code:'incomplete-operation',severity:'warning',loss:true,detail:reason+'; completed native content retained.'+(stream.unresolved?` ${stream.unresolved} unresolved semantic operations were not applied.`:'')}]:[])],dcp:{version:1,profile:request.profile,request,tools:sources!.trail,response:raw||stream.received,xmlBindings:sources!.xmlAuthoring!.bindings(),identityMap:Object.fromEntries(stream.memory.memory?.aliases??[]),annotationRefs,intent:summary.intent,provider:live}};
       group.run(()=>editor.textProtection.receivingInsertion(node!.contentKey,()=>editor.commands.boundedStructuralTransaction('Finish native DCP response',()=>editor.commands.setPayloadField(node!.key,'metadata',{...structuredClone(unwrap(node!.payload.metadata??{})) as object,dialectic:JSON.parse(JSON.stringify(data))}))));
       diagnostics.submissions++;submissionSave.request(owner);
      }}finally{group.finish();if(nativeReceiving?.stop===finish)nativeReceiving=undefined;}
@@ -407,18 +423,34 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
    let prepared:Awaited<ReturnType<typeof prepareDcp>>|undefined;
    const localTimings:NonNullable<LiveProvenance['localTimings']>={validationAttempts:0,lowerMs:0,prepareMs:0};
    if(live)live.localTimings=localTimings;
+   let refreshSummary='';
    const validate=async(raw:string)=>{
     sources!.check();localTimings.validationAttempts++;let started=performance.now(),input:string;
-    try{input=sources!.xmlAuthoring?JSON.stringify(sources!.xmlAuthoring.lower(raw)):raw;}finally{localTimings.lowerMs+=performance.now()-started;}
+    try{input=sources!.xmlAuthoring?JSON.stringify(sources!.xmlAuthoring.lower(raw,!!refresh)):raw;}finally{localTimings.lowerMs+=performance.now()-started;}
     started=performance.now();
-    try{prepared=await prepareDcp(input,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock',participant.id,emptySemanticFieldsVersion,proactiveSemantics,!!sources!.xmlAuthoring);}finally{localTimings.prepareMs+=performance.now()-started;}
+    try{prepared=await prepareDcp(input,exchangeId,resourceId(),editor.visualEffects,sources!,editor.features.scopedSemantics,live?'ai':'mock',participant.id,emptySemanticFieldsVersion,proactiveSemantics,!!sources!.xmlAuthoring,undefined,!!refresh);if(refresh)refreshSummary=reconcileSemanticRefresh(prepared,sources!,refresh.id,unwrap(root()!.payload.linkedAnnotations??{}) as Record<string,any>).summary;}finally{localTimings.prepareMs+=performance.now()-started;}
    };
-   if(live)await logNative(resourceId(),committed().map(row=>source.projection.node(row.key)!.contentKey),'exchange.native-context');
+   if(live&&!refresh)await logNative(resourceId(),committed().map(row=>source.projection.node(row.key)!.contentKey),'exchange.native-context');
    const raw=await receive(transport,request,sources,(value,event)=>{if(alive&&ticket===generation){updateResponseStatus(value,event);streamPreview(value,ticket);}},requestAbort,live?validate:undefined,deadlineMs);
    if(!alive||ticket!==generation)return;
    if(session()!==source)throw Error('Conversation changed; DCP response discarded');guard();sources.check();
    if(!prepared)await validate(raw);const result=prepared!,d=draft();if(!d)throw Error('Restore the draft before adding a response');
    if(!alive||ticket!==generation||session()!==source)return;guard();sources.check();
+   if(refresh){
+    const row=rowLookup().get(refresh.id),node=row&&source.projection.node(row.key);if(!node||row?.data.state!=='committed')throw Error('Contribution unavailable');
+    const summary=refreshSummary+(structuralContext.status==='truncated'?' · Source context was partial; additional passages may need another refresh.':'');
+    const identities=Object.fromEntries(Object.entries(result.aliases).filter(([,t])=>{const id=t.entity?.entityId??t.argumentId??t.definitionId;const d=id&&result.definitions[id],p=d&&(d.metadata?.dcp??d.metadata?.scopedEntity?.provenance??d.metadata?.dialecticArgument?.provenance??d.metadata?.dialecticArgumentRelation?.provenance??d.metadata?.scopedEntityRelation?.provenance);return p?.exchangeId===exchangeId;}));
+    const record={version:1 as const,exchangeId,comment:refresh.comment,createdUtc:new Date().toISOString(),participantId:participant.id,summary,identityMap:identities,annotationRefs:result.annotationRefs,request,response:raw,tools:sources.trail,...(live?{provider:live}:{})};
+    editor.commands.boundedStructuralTransaction('Refresh contribution semantics',()=>{
+     result.preparedResources.check();
+     if(Object.keys(result.definitions).length)editor.commands.setPayloadField(root()!.key,'linkedAnnotations',{...structuredClone(unwrap(root()!.payload.linkedAnnotations??{})) as Record<string,unknown>,...result.definitions});
+     for(const [key,added]of result.annotations){const n=source.projection.node(key)!;editor.commands.setPayloadField(key,'standoffProperties',[...structuredClone(unwrap(n.payload.standoffProperties??[])) as any[],...added]);}
+     const m=structuredClone(unwrap(node.payload.metadata??{})) as any;
+     editor.commands.setPayloadField(node.key,'metadata',{...m,dialectic:{...m.dialectic,semanticRefreshes:[...(m.dialectic.semanticRefreshes??[]),JSON.parse(JSON.stringify(record))]}});
+    });
+    setSemanticRefreshState({id:refresh.id,status:'complete',message:summary});clearPreview();
+    try{await lifecycle?.commit();}catch{setNotice('Semantics updated locally; provider acknowledgement failed.');}return;
+   }
    for(const t of targets)if(t.kind==='range'){
     const p=pending.get(t.anchorId);if(!p)continue;editor.textRanges.validate([p.range],'cell');result.definitions[t.anchorId]=p.definition;
     let properties=result.annotations.get(p.range.nodeKey);if(!properties)result.annotations.set(p.range.nodeKey,properties=[]);
@@ -426,7 +458,7 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
    }
    for(const item of captured.manifest)item.origins=[...(targetKey(item.target)===targetKey(to)?['reply-target' as const]:[]),...(selectedTargets.some(t=>targetKey(t)===targetKey(item.target))?['selected' as const]:[])];
    const repaired=editor.features.dialecticContributionActivity?repairedNotice(live):undefined;
-   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={...(live?.attachments?.length?{attachments:attachments(live.attachments)}:{}),version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...participant,name:live?participant.name:'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,...(repaired?{notices:[repaired]}:{}),
+   const id=crypto.randomUUID(),ordinal=nextOrdinal(),data={...(live?.attachments?.length?{attachments:attachments(live.attachments)}:{}),version:1,kind:'contribution',state:'committed',author:live?'ai':'mock',participant:{...participant,name:live?participant.name:'Mock assistant'},ordinal,createdUtc:new Date().toISOString(),replies:[to],discursiveReferences:result.discursiveReferences,context:targets,requestId:exchangeId,...((repaired||artifactFailureNotices(live).length)?{notices:[...(repaired?[repaired]:[]),...artifactFailureNotices(live)]}:{}),
     ...(editor.features.dialecticSemanticContents&&sources.xmlAuthoring?.synopsis?{synopsis:{version:1,text:sources.xmlAuthoring.synopsis,author:'ai',participantId:participant.id,exchangeId}}:{}),
     replyExcerpts:to.kind==='range'||to.kind==='argument'?[{target:to,text:captured.items[0].text}]:[],consumedContext:{version:1,items:captured.manifest,limits:{characters:6000,blocks:512}},
     dcp:{version:1,profile:request.profile,request,tools:sources.trail,response:raw,...(sources.xmlAuthoring?{xmlBindings:sources.xmlAuthoring.bindings()}:{}),identityMap:result.aliases,annotationRefs:result.annotationRefs,intent:result.intent,...(live?{provider:live}:{})}};
@@ -495,6 +527,27 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
  const aiParticipants=()=>{const initial={...defaultParticipant(resourceId(),'ai'),name:'AI participant'},entries=new Map([[initial.id,initial]]);for(const row of committed())if(row.data.author==='ai'&&row.data.participant?.kind==='ai')entries.set(row.data.participant.id,row.data.participant);return [...entries.values()];};
  const aiParticipant=()=>aiParticipants().find(p=>p.id===selectedAi())??aiParticipants()[0];
  const ask=async(explicit?:ReplyTarget)=>{if(providerConfiguring())return;if(providerMode()==='mock'||!editor.features.dialecticProviders||!editor.features.dialecticDcp)return askMock(mockTransport,explicit);if(!providerReady()){const doc=resourceId();await configureProvider(providerSettings(),undefined,false);if(!alive||doc!==resourceId())return;if(!providerReady()){setNotice(providerNotice()||'Configure the AI provider in AI settings.');setOperationStatus('error');return;}}const participant=aiParticipant().id,doc=resourceId();const live=providers.transport(editor.features.dialecticProviderContinuity&&providerSettings().provider==='openai'?()=>{if(resourceId()!==doc)throw Error('Conversation changed');return history.build(doc,participant,committed().map(row=>session()!.projection.node(row.key)!.contentKey));}:undefined);return askDcp(live.run,explicit,live.details,live);};
+ const [semanticRefreshState,setSemanticRefreshState]=createSignal<{id:string;status:'running'|'complete'|'error';message:string}>();
+ const refreshSemantics=async(id:string,comment='',transport?:DcpTransport)=>{
+  if(busy()||providerConfiguring()||resending()||semanticRefreshState()?.status==='running')return;
+  setSemanticRefreshState({id,status:'running',message:'Refreshing semantics…'});
+  try{
+   guard();if(!editor.features.dialecticSemanticRefresh||!editor.features.dialecticDcp||!editor.features.scopedSemantics||!editor.features.dcpSemanticWorkspace)throw Error('Semantic refresh is disabled.');
+   if(comment.length>4000)throw Error('Keep additional instructions below 4,000 characters.');
+   const row=rowLookup().get(id);if(!row||row.data.state!=='committed')throw Error('Choose a committed Contribution.');
+   if((row.data.semanticRefreshes?.length??0)>=32)throw Error('This Contribution has reached its 32 refresh history limit.');
+   const refresh={id,comment:comment.trim()},before=generation,documentId=resourceId();
+   if(transport)await askDcp(transport,target(id),undefined,undefined,refresh);
+   else {
+    if(!editor.features.dialecticProviders||providerMode()==='mock')throw Error('Connect an AI provider to refresh semantics.');
+    if(!providerReady())await configureProvider(providerSettings(),undefined,false);
+    guard();if(!alive||generation!==before||resourceId()!==documentId)throw Error('Semantic refresh cancelled.');if(!providerReady())throw Error(providerNotice()||'Configure the AI provider in AI settings.');
+    // An isolated exchange does not add a fictitious conversational turn to retained history.
+    const live=providers.transport();await askDcp(live.run,target(id),live.details,live,refresh);
+   }
+   if(semanticRefreshState()?.status==='running')setSemanticRefreshState({id,status:'error',message:notice()||(operationStatus()==='cancelled'?'Semantic refresh cancelled.':'Semantic refresh did not complete.')});
+  }catch(error){if(alive)setSemanticRefreshState({id,status:'error',message:error instanceof Error?error.message:String(error)});}
+ };
  const [resending,setResending]=createSignal(false);
  const resend=async(id:string)=>{
   if(busy()||providerConfiguring()||resending())return;
@@ -521,7 +574,7 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
   signal.throwIfAborted();if(!alive||resourceId()!==document)throw Error('Conversation changed.');
   return result;
  };
- return {forgetConnection:async()=>{await providers.forget();setProviderReady(false);},operationStatus,inheritPreferences,responseStatus,files,fileProblem,attachmentBlob,smallerImage,contentsRows,contentsActivity,contentsSynopsis,inspectContents,inspectEntityMention,titleNotice:titles.notice,titlePending:titles.pending,saveState,retrySave,pasting,activityInspection,inspectActivity,inspectActivityItem,contributionActivity,activityDiagnostics,vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
+ return {refreshSemantics,semanticRefreshState,workspaceUi,setWorkspaceUi,workspaceConfiguration,activeWorkspaceTab,setWorkspaceSelection,configureWorkspace,showConversation,semanticInventory,authorityResolution,forgetConnection:async()=>{await providers.forget();setProviderReady(false);},operationStatus,inheritPreferences,responseStatus,files,fileProblem,attachmentBlob,smallerImage,contentsRows,contentsActivity,contentsSynopsis,inspectContents,inspectEntityMention,titleNotice:titles.notice,titlePending:titles.pending,saveState,retrySave,pasting,activityInspection,inspectActivity,inspectActivityItem,contributionActivity,activityDiagnostics,vocabularySelection,configureVocabulary,vocabularyDescriptors:()=>vocabularyDescriptors(editor),resend,resending,annotationDetails,inspectedAnnotation,inspectAnnotation,lastProviderExchange,ask,providerMode,setProviderMode,providerReady,providerSettings,providerNotice,providerConfiguring,configureProvider,forgetProvider,exchangeTarget,relationshipDetails,entityDetails,submitAndAsk,sequences,editor,port,session,root,resourceId,valid,rows,committed,frontier,draft,diagnostics,inspection,reply,context,notice,busy,trail,cursor,label,target,resolve,run,inspect,navigate,present,compose,pin,unpin,setReply:(t:ReplyTarget|undefined)=>setReply(t&&structuredClone(unwrap(t))),focusBlock,submit,askMock,cancel,argumentRelations:(id:string)=>references()?.relationsFor(id)??[],
   references,resolveReference,selectRange,reattach,glosses,createGloss,pinGloss,dcpPreview,dcpDiagnostics,aiParticipants,aiParticipant,setSelectedAi,historyDiagnostics:history.diagnostics,
   dispose(){if(!alive)return;files.dispose();titles.dispose();submissionSave.dispose();sequences.dispose();alive=false;cancel();providers.dispose();if(!options)history.dispose();choices.clear();pending.clear();preview.dispose();for(const entry of activities.values())entry.dispose();activities.clear();},capture,
  };

@@ -181,6 +181,7 @@ export class ReactiveEditor {
     this.repository = new CanonicalRepository(this.features.reversibleBlocks ? upgradeLegacySurfaces(decoded.state) : decoded.state);
     this.textProtection = new NativeTextProtection(this.repository);
     const protectedInput=(event:Event)=>{
+      if(this.textProtection.isTransientInput(event.target))return;
       const resolved=this.mounts.resolveEvent(event);if(!resolved||this.canEditText(resolved.nodeKey))return;
       if(event instanceof KeyboardEvent){
         // Native button activation has the same authority as a pointer click.

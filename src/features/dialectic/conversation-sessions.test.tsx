@@ -126,3 +126,14 @@ it('closing an application window preserves a response owned by a Document still
  await f.editor.closeView(f.port.windowId()!);expect(jobs.get(id)!.signal.aborted).toBe(false);jobs.get(id)!.finish('<response><p>Completed after closing the original window.</p></response>');await pending;
  const root=other.session()!.projection.node(other.session()!.rootKey)!;expect(root.children.map(k=>other.session()!.projection.node(k)!).filter(n=>(n.payload.metadata as any)?.dialectic?.state==='committed')).toHaveLength(2);
 });
+
+it('retains the editor, per-conversation semantic selection and native sub-tab configuration without typing work',async()=>{
+ const f=await setup(),a=f.c.resourceId(),runtime=f.c.conversations!.runtime(a)!,draft=f.c.draft()!,node=f.c.resolve(f.c.target(draft.id))!,text=f.port.session()!.projection.node(node.children[0])!,mount=f.editor.mounts.get(text.key),revision=f.editor.repository.state.revision;
+ const source=f.host.querySelector('.dialectic-canvas [role="tabpanel"]');
+ runtime.setWorkspaceSelection('semantics');runtime.setWorkspaceUi(v=>({...v,search:'Leonardo'}));await Promise.resolve();expect(f.host.querySelector('.semantics-workspace')).toBeTruthy();expect(f.editor.mounts.get(text.key)).toBe(mount);expect(f.editor.repository.state.revision).toBe(revision);
+ runtime.setWorkspaceSelection('conversation');await Promise.resolve();expect(f.host.querySelector('.dialectic-canvas [role="tabpanel"]')).toBe(source);expect(f.editor.mounts.get(text.key)).toBe(mount);
+ const snapshot=vi.spyOn(f.editor.repository,'snapshot'),inventory=runtime.references()!.diagnostics.workspaceBuilds,network=vi.mocked(fetch).mock.calls.length;
+ for(let i=0;i<6;i++)f.type('x');expect(snapshot).not.toHaveBeenCalled();expect(runtime.references()!.diagnostics.workspaceBuilds).toBe(inventory);expect(vi.mocked(fetch).mock.calls.length).toBe(network);
+ const tabs=runtime.workspaceConfiguration();runtime.configureWorkspace({version:1,tabs:[...tabs.tabs,{id:'people',title:'People',type:'semantics'}]});const saved=nativeBytes(captureNative(f.editor.repository.readState(),a));expect(new TextDecoder().decode(saved)).toContain('People');expect(nativeBytes(decodeNative(saved))).toEqual(saved);f.editor.repository.undo();expect(runtime.workspaceConfiguration().tabs).toHaveLength(4);f.editor.repository.redo();expect(runtime.workspaceConfiguration().tabs).toHaveLength(5);
+ f.next();expect(f.c.workspaceUi().search).toBe('');f.port.application.openDocument(a);expect(f.c.workspaceUi().search).toBe('Leonardo');expect(f.c.workspaceConfiguration().tabs.at(-1)!.title).toBe('People');
+});

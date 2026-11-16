@@ -1,3 +1,5 @@
+import {lookupAuthority} from './authority-lookup';
+import {entityService} from '../../../application/entity-service';
 import {retrievalRequest} from '../../../application/retrieval-client';
 import {nativeDocumentSession} from '../../../persistence/native-session';
 import type {XmlContext} from './xml-context';
@@ -123,8 +125,8 @@ export class DcpSources {
   return {...base,status:omitted||properties.length>128?'truncated':supported?'complete':'unavailable',nativeType:n.viewType,text,children,annotations,semanticReferences:semanticReferences.slice(0,32),omissions:[...(!supported?['native view needs a DCP adapter']:[]),...(omitted?['children beyond budget or ownership']:[]),...(properties.length>128?['annotations beyond budget']:[]),...(objects?['inline objects: nontext placeholders; exact selectors unavailable']:[]),...(properties.some(p=>p.value||p.metadata?.unknownSemantic)?['additional annotation values/attributes are not exported by this profile']:[])],hasInlineObjects:objects};
  }
  /** Prepared once on explicit Ask. Never subscribed to typing or whole-history enumeration. */
- async manifest(handles:string[],byteBudget=64000){
-  const limits={sources:64,characters:12000,bytes:Math.max(0,Math.min(64000,byteBudget)),depth:12};
+ async manifest(handles:string[],byteBudget=64000,characterBudget=12000){
+  const limits={sources:64,characters:Math.max(0,Math.min(24000,characterBudget)),bytes:Math.max(0,Math.min(64000,byteBudget)),depth:12};
   const queue=handles.map(handle=>({handle,depth:0})),seen=new Set<string>(),items:any[]=[];
   let characters=0,bytes=0,truncated=false;
   while(queue.length&&items.length<limits.sources){
@@ -147,8 +149,13 @@ export class DcpSources {
  private record(call:any,result:any){const size=JSON.stringify(result).length;if((this.bytes+=size)>48000)throw Error('DCP retrieval result budget exceeded');this.trail.push({call,result});return result;}
  async tool(call:any){
   keys(call,['id','tool','arguments']);if(typeof call.id!=='string'||call.id.length>128||this.callIds.has(call.id))throw Error('Invalid/duplicate tool call');this.callIds.add(call.id);
-  keys(call.arguments,call.tool==='search_entities'?['query','scope','limit',...(Object.hasOwn(call.arguments,'cursor')?['cursor']:[])]:call.tool==='describe_capabilities'?['ids']:call.tool==='read_source'?['handle']:call.tool==='list_text_blocks'?['cursor','limit','contributionId','participantId','fromOrdinal']:['query','limit']);
+  keys(call.arguments,call.tool==='lookup_authority'?['queries','limit']:call.tool==='search_entities'?['query','scope','limit',...(Object.hasOwn(call.arguments,'cursor')?['cursor']:[])]:call.tool==='describe_capabilities'?['ids']:call.tool==='read_source'?['handle']:call.tool==='list_text_blocks'?['cursor','limit','contributionId','participantId','fromOrdinal']:['query','limit']);
   this.check();if(++this.calls>6)throw Error('DCP tool-call budget exceeded');
+  if(call.tool==='lookup_authority'){
+   if(!this.editor.features.authorityCache)throw Error('Authority lookup disabled');
+   const service=entityService(this.editor,this.entities.ownerKey);let vault='.';
+   try{try{vault=await service.historyScope?.()??'.';}catch{this.check();}this.check();return this.record(call,await lookupAuthority(call.arguments,this.signal,vault,()=>this.check()));}finally{service.dispose();}
+  }
   if(call.tool==='search_entities')return this.record(call,await this.searchEntities(call.arguments));
   if(call.tool==='describe_capabilities'){if(!this.capabilities)throw Error('Unavailable DCP tool');return this.record(call,this.capabilities.describe(call.arguments));}
   if(call.tool==='list_text_blocks'){this.diagnostics.inventories++;return this.record(call,(this.inventory??=new DcpInventory(this)).list(call.arguments));}
@@ -227,7 +234,7 @@ export class DcpSources {
   if(t.kind!=='entity')throw Error('Expected scoped Entity');
   if(t.entity.scope==='document')this.fence(this.entities.root.contentKey);
   const e=await this.readEntity(t.entity);if(!e)return;
-  return {handle:this.issue(t),identity:structuredClone(unwrap(t.entity)),revision:e.revision,name:e.name,typename:e.typename??null,description:(e.description??'').slice(0,240),aliases:e.aliases.slice(0,8).map((a:{name:string})=>a.name),omissions:[...((e.description?.length??0)>240?['description']:[]),...(e.aliases.length>8?['aliases']:[])]};
+  return {handle:this.issue(t),identity:structuredClone(unwrap(t.entity)),revision:e.revision,name:e.name,typename:e.typename??null,description:(e.description??'').slice(0,240),aliases:e.aliases.slice(0,8).map((a:{name:string})=>a.name),...(this.editor.features.dcpEntityEnrichment?{authority:(e.attributes as any)?.authorityMetadata?{...(e.attributes as any).authorityMetadata,canonical:(e.attributes as any)?.canonicalAssociation?{scope:'vault',vaultId:(e.attributes as any).canonicalAssociation.vaultId,entityId:(e.attributes as any).canonicalAssociation.entityId,status:'recorded association; discover and verify before canonical use'}:undefined}:undefined,enrichment:((e.attributes as any)?.enrichment?{subtypes:(e.attributes as any).enrichment.subtypes,dates:(e.attributes as any).enrichment.dates,externalIds:(e.attributes as any).enrichment.externalIds}:undefined)}:{}),omissions:[...((e.description?.length??0)>240?['description']:[]),...(e.aliases.length>8?['aliases']:[])]};
  }
  async exact(handle:string,revision:string,selector:{exact:string;prefix:string;suffix:string}){
   const source=await this.source(handle),target=this.target(handle),n=this.resolve(target).node;

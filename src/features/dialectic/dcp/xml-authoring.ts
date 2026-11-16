@@ -1,3 +1,4 @@
+import {compactEntityDate} from '../../../feature-api/entity-enrichment';
 import {parseXmlFragments,xmlElements,xmlFailure,type XmlElement} from './xml-fragments';
 
 export const xmlDialect='xml/1' as const;
@@ -33,10 +34,10 @@ export function xmlResponseElements(parsed:XmlElement[]){
 }
 
 /** Lower intentions to existing DCP input. This never generates native DTOs. */
-export function lowerXml(text:string,exchange:string,authority:XmlAuthority,onSynopsis?:(text:string)=>void){
+export function lowerXml(text:string,exchange:string,authority:XmlAuthority,onSynopsis?:(text:string)=>void,onUnsupportedInline?:(name:string)=>void,semanticsOnly=false){
  const {root,rows,definitions,synopses}=xmlResponseElements(parseXmlFragments(text));
  for(const e of synopses){const value=xmlSynopsis(e);if(value)onSynopsis?.(value);}
- if(!rows.length)fail();
+ if(semanticsOnly?rows.length>0:!rows.length)fail();
  const defs:Element={name:'definitions',attrs:{},children:definitions};
  const symbols=new Map<string,{id:string;kind:string}>(),allocated=new WeakMap<Element,string>(),counts:Record<string,number>={};
  const kind=xmlSymbolKind;
@@ -46,7 +47,7 @@ export function lowerXml(text:string,exchange:string,authority:XmlAuthority,onSy
  const ref=(name:string,kinds?:string[])=>{if(typeof name!=='string')fail();if(name.startsWith('@'))return authority.resolve(name);const s=symbols.get(name);if(!s)fail();assertXmlReferenceKind(name,s!.kind,kinds);return s!.id;};
  const output:any={protocol:'dcp/1.0',kind:'contribution',exchange,intent:root.attrs.intent??'reply',replyTargets:root.attrs.reply?root.attrs.reply.split(/\s+/).map(r=>ref(r)):[],composition:[],anchors:[],entities:[],interpretations:[],arguments:[],glosses:[],relations:[],suggestions:[],promotionRecommendations:[]};
  const blocks=new Map<string,any>();
- const block=xmlBlockLowerer(id,ref,blocks);
+ const block=xmlBlockLowerer(id,ref,blocks,undefined,onUnsupportedInline);
  output.composition=rows.map(block);
  for(const e of elements(defs))xmlDefinition(e,{id,ref,authority,blocks,output});
  return output;
@@ -54,12 +55,16 @@ export function lowerXml(text:string,exchange:string,authority:XmlAuthority,onSy
 
 export const xmlDefinitionNames=new Set(['entity','passage','mention','classify','argument','gloss','relation','range']);
 /** Shared syntax/shape lowering for complete and incremental native preparation. */
-export function xmlBlockLowerer(id:(e:Element)=>string,ref:(name:string,kinds?:string[])=>string,blocks=new Map<string,any>(),deferEntity?:(e:Element,span:string)=>void){
+export function xmlBlockLowerer(id:(e:Element)=>string,ref:(name:string,kinds?:string[])=>string,blocks=new Map<string,any>(),deferEntity?:(e:Element,span:string)=>void,onUnsupportedInline?:(name:string)=>void){
  const inline=(items:(Element|string)[]):string=>items.map(e=>{if(typeof e==='string')return xmlEscape(e);
   if(e.name==='boundary'){attrs(e,['id'],['id']);empty(e);return `<boundary id="${id(e)}"/>`;}
-  if(!['b','i','e','span','mark'].includes(e.name))fail();attrs(e,['id',...(e.name==='e'?['ref']:e.name==='mark'?['kind']:[])],e.name==='span'?['id']:e.name==='e'?['ref']:e.name==='mark'?['kind']:[]);
+  if(e.name==='br'){attrs(e,[]);empty(e);return '&#10;';}
+  if(['script','style','iframe','object','embed'].includes(e.name))fail();
+  const tagName=e.name==='strong'?'b':e.name==='em'?'i':e.name;
+  if(!['b','i','e','span','mark'].includes(tagName)){onUnsupportedInline?.(e.name);return inline(e.children);}
+  attrs(e,['id',...(e.name==='e'?['ref']:e.name==='mark'?['kind']:[])],e.name==='span'?['id']:e.name==='e'?['ref']:e.name==='mark'?['kind']:[]);
   if(e.name==='e'&&deferEntity){deferEntity(e,id(e));return `<span id="${id(e)}">${inline(e.children)}</span>`;}
-  if(e.name==='mark'&&!classify.includes(e.attrs.kind))fail();const tag=e.name==='mark'?'annotation':e.name;
+  if(e.name==='mark'&&!classify.includes(e.attrs.kind))fail();const tag=e.name==='mark'?'annotation':tagName;
   return `<${tag}${e.attrs.id?` id="${id(e)}"`:''}${e.name==='e'?` ref="${ref(e.attrs.ref,['e'])}"`:e.name==='mark'?` type="dialectic/${e.attrs.kind}"`:''}>${inline(e.children)}</${tag}>`;
  }).join('');
  const block=(e:Element):any=>{const a=e.attrs;let result:any;
@@ -82,7 +87,14 @@ export function xmlDefinition(e:Element,{id,ref,authority,blocks,output}:{id:(e:
   return a.whole?{block,revision,whole:true}:{block,revision,quote:a.quote,prefix:a.prefix??'',suffix:a.suffix??''};};
  const targetAttrs=['target','quote','prefix','suffix','whole'];
  const a=e.attrs;
-  if(e.name==='entity'){attrs(e,['id','name','type'],['id','name','type']);const children=elements(e);if(children.some(c=>!['description','alias'].includes(c.name))||children.filter(c=>c.name==='description').length>1)fail();children.forEach(c=>attrs(c,[]));output.entities.push({id:id(e),name:a.name,typename:a.type,description:children.find(c=>c.name==='description')?textOnly(children.find(c=>c.name==='description')!):'',aliases:children.filter(c=>c.name==='alias').map(textOnly)});}
+  if(e.name==='entity'){
+   attrs(e,['id','name','type','ref','subtypes','wikidata','gnd','thumbnail'],['id','name','type']);const children=elements(e);
+   if(children.some(c=>!['description','alias','date'].includes(c.name))||children.filter(c=>c.name==='description').length>1)fail();
+   children.forEach(c=>attrs(c,c.name==='date'?['type','value','end','precision','approximation','certainty','qualifier','expression','extentKind','normalizationProfile']:[],c.name==='date'?['type','value']:[]));
+   const dates=children.filter(c=>c.name==='date').map(c=>{empty(c);return compactEntityDate(c.attrs);});
+   const enrichment={subtypes:a.subtypes?a.subtypes.split(',').map(s=>s.trim()).filter(Boolean):[],dates,externalIds:[...a.wikidata?[{namespace:'wikidata',value:a.wikidata}]:[],...a.gnd?[{namespace:'gnd',value:a.gnd}]:[]],...a.thumbnail?{thumbnail:{url:a.thumbnail}}:{}};
+   output.entities.push({id:id(e),name:a.name,typename:a.type,description:children.find(c=>c.name==='description')?textOnly(children.find(c=>c.name==='description')!):'',aliases:children.filter(c=>c.name==='alias').map(textOnly),...a.ref?{ref:ref(a.ref,['e'])}:{},...dates.length||a.subtypes||a.wikidata||a.gnd||a.thumbnail?{enrichment}:{}});
+  }
   else if(e.name==='passage'){attrs(e,['id','target','quote','prefix','suffix'],['id','target','quote']);empty(e);if(!a.target.startsWith('@'))fail();output.anchors.push({id:id(e),source:authority.resolve(a.target),revision:authority.revision(a.target),selector:{exact:a.quote,prefix:a.prefix??'',suffix:a.suffix??''}});}
   else if(e.name==='mention'||e.name==='classify'){attrs(e,['id',...targetAttrs,e.name==='mention'?'ref':'kind'],['target',e.name==='mention'?'ref':'kind']);empty(e);if(e.name==='classify'&&!classify.includes(a.kind))fail();output.interpretations.push({id:id(e),target:target(e),type:e.name==='mention'?'mutable/entity-reference':'dialectic/'+a.kind,ref:e.name==='mention'?ref(a.ref,['e']):null,attributes:[]});}
   else if(e.name==='argument'){attrs(e,['id',...targetAttrs],['id','target']);empty(e);output.arguments.push({id:id(e),anchor:target(e)});}
@@ -92,4 +104,4 @@ export function xmlDefinition(e:Element,{id,ref,authority,blocks,output}:{id:(e:
   else fail();
 }
 
-export const xmlSymbolKind=(e:XmlElement):string|undefined=>/^(p|h[1-6]|ul|ol|table|grid|group|code|image)$/.test(e.name)?'b':/^(span|mark|b|i|e|range)$/.test(e.name)?'s':({boundary:'pos',entity:'e',passage:'r',mention:'m',classify:'m',argument:'arg',gloss:'g',relation:'rel'} as Record<string,string>)[e.name];
+export const xmlSymbolKind=(e:XmlElement):string|undefined=>/^(p|h[1-6]|ul|ol|table|grid|group|code|image)$/.test(e.name)?'b':/^(span|mark|b|i|strong|em|e|range)$/.test(e.name)?'s':({boundary:'pos',entity:'e',passage:'r',mention:'m',classify:'m',argument:'arg',gloss:'g',relation:'rel'} as Record<string,string>)[e.name];

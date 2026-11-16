@@ -282,3 +282,17 @@ it.each(['openai','anthropic'] as const)('advertises image generation and curren
  const turn=await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher),wire=JSON.parse(String(fetcher.mock.calls[0][1]?.body));
  expect(wire.tools.some((t:any)=>t.name==='generate_image')).toBe(true);expect(wire.instructions??wire.system).toContain('Current image-generation capability');expect(turn.calls[0].tool).toBe('generate_image');
 });
+
+it.each(['openai','anthropic'] as Provider[])('%s exposes authority image sourcing only when negotiated, including retained turns',async provider=>{
+ const fetcher=vi.fn<typeof fetch>().mockImplementation(async()=>sse(streamFixture(provider,'<p>Portraits.</p>'))),state=conversation({...defaultProviderSettings,provider},{...request,authorityLookup:1});
+ expect(state.system).toContain('existing historical portraits');state.contractInitialised=true;await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);
+ const body=JSON.parse(String(fetcher.mock.calls[0][1]?.body));expect(body.tools.some((t:any)=>t.name==='lookup_authority')).toBe(true);expect(body.instructions??body.system).toContain('existing historical portraits');
+ const disabled=conversation({...defaultProviderSettings,provider},request);await providerTurn(disabled,'fixture',new AbortController().signal,()=>{},fetcher);expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body)).tools.some((t:any)=>t.name==='lookup_authority')).toBe(false);
+});
+
+it.each(['openai','anthropic'] as Provider[])('%s sends semantic refresh instructions and the optional comment without generation tools',async provider=>{
+ const semanticRefresh={comment:'Extract more claims and patronage relationships'},state=conversation({...defaultProviderSettings,provider},{...request,dialect:'xml/1',xmlFragments:false,semanticRefresh,authorityLookup:1,semanticWorkspaceAuthoring:1,xmlContext:{dialect:'xml/1',exchange:request.exchange,focus:'@current',semanticRefresh,sources:[]}});
+ const fetcher=vi.fn<typeof fetch>().mockResolvedValue(sse(streamFixture(provider,'<response><definitions/></response>')));
+ await providerTurn(state,'fixture',new AbortController().signal,()=>{},fetcher);const wire=JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+ expect(wire.instructions??wire.system).toContain('SEMANTIC REFRESH');expect(wire.instructions??wire.system).toContain('NO paragraphs');expect(JSON.stringify(wire.input??wire.messages)).toContain(semanticRefresh.comment);expect(wire.tools.some((t:any)=>t.name==='lookup_authority')).toBe(true);expect(wire.tools.some((t:any)=>['generate_image','create_attachment'].includes(t.name))).toBe(false);
+});

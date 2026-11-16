@@ -33,15 +33,16 @@ export function createContributionActivity(data:Accessor<Contribution|undefined>
   const row=data();if(!row||row.state!=='committed')return undefined;
   // Notices can arrive after submission. Track their fields before unwrapping
   // immutable authoring provenance; reconciliation retains the row identity.
+  const refreshes=row.semanticRefreshes?.map(r=>({...r}))??[];
   const recordedNotices=Array.isArray(row.notices)?row.notices.map(n=>({...n})):[];
   const d=unwrap(row),replies=d.replies.filter(target),discursive=Array.isArray(d.discursiveReferences)?d.discursiveReferences:[],allRefs=d.author==='human'?[...replies,...discursive]:discursive.filter(t=>target(t)&&!replies.some(primary=>targetKey(primary)===targetKey(t)));
-  const recordedAnnotations=Array.isArray(d.dcp?.annotationRefs)?d.dcp.annotationRefs:[];
+  const recordedAnnotations=[...(Array.isArray(d.dcp?.annotationRefs)?d.dcp.annotationRefs:[]),...refreshes.flatMap(r=>r.annotationRefs)];
   const refs=allRefs.slice(0,activityLimits.references).filter(target),annotations=recordedAnnotations.slice(0,activityLimits.annotations).filter(r=>r&&typeof r.blockId==='string'&&typeof r.propertyId==='string');
   const identities:ReplyTarget[]=[];let identityCount=0;
-  for(const alias in (d.dcp?.identityMap as any)??{}){if(++identityCount>activityLimits.identities)break;const t=(d.dcp!.identityMap as any)[alias];if(target(t)&&createdCategory(t))identities.push(t);}
+  for(const map of [d.dcp?.identityMap??{},...refreshes.map(r=>r.identityMap)])for(const t of Object.values(map) as any[]){if(++identityCount>activityLimits.identities)break;if(target(t)&&createdCategory(t))identities.push(t);}
   const notices=recordedNotices.slice(0,activityLimits.notices).filter(n=>n?.version===1&&noticeCodes.has(n.code)&&['info','warning'].includes(n.severity)&&typeof n.loss==='boolean'&&typeof n.detail==='string').map(n=>({...n,detail:n.detail.slice(0,2048),...(n.target&&!target(n.target)?{target:undefined}:{})}));
   const repaired=repairedNotice(d.dcp?.provider);if(repaired&&!notices.some(n=>n.code==='validation-repaired'))notices.push(repaired);
-  return {refs,annotations,identities,notices,exchange:d.requestId??(d.dcp?.request as any)?.exchange,limited:!!d.dcp&&(!Array.isArray(d.dcp.annotationRefs)||!d.dcp.identityMap)||allRefs.length>activityLimits.references||recordedAnnotations.length>activityLimits.annotations||identityCount>activityLimits.identities||recordedNotices.length>activityLimits.notices};
+  return {refs,annotations,identities,notices,exchanges:[d.requestId??(d.dcp?.request as any)?.exchange,...refreshes.map(r=>r.exchangeId)],limited:!!d.dcp&&(!Array.isArray(d.dcp.annotationRefs)||!d.dcp.identityMap)||allRefs.length>activityLimits.references||recordedAnnotations.length>activityLimits.annotations||identityCount>activityLimits.identities||recordedNotices.length>activityLimits.notices};
  });
  return createMemo<ActivitySummary>(()=>{
   diagnostics.resolutions++;
@@ -49,7 +50,7 @@ export function createContributionActivity(data:Accessor<Contribution|undefined>
   if(!c||!index)return {items,counts,notices:[],limited:false};
   const seen=new Map<string,number>(),created=new Set<string>(),glossSources=new Map<string,{blockId:string;propertyId:string}[]>();
   const add=(item:ActivityItem)=>{const old=seen.get(item.key);if(old!==undefined){if(items[old].active||!item.active)return;counts.unavailable--;items[old]=item;}else{seen.set(item.key,items.length);items.push(item);}counts[item.active?item.category:'unavailable']++;};
-  const attributable=(p:any)=>typeof c.exchange==='string'&&!!c.exchange&&p?.exchangeId===c.exchange&&p?.sourceResourceId===index.resourceId;
+  const attributable=(p:any)=>typeof p?.exchangeId==='string'&&c.exchanges.includes(p.exchangeId)&&p?.sourceResourceId===index.resourceId;
   const properties=c.annotations.map(ref=>({ref,property:index.activityProperty(ref)}));
   for(const {ref,property:p}of properties)if(p?.type===GLOSS&&p.annotationId&&p.active&&attributable(p)){const refs=glossSources.get(p.annotationId)??[];refs.push(ref);glossSources.set(p.annotationId,refs);}
   for(const t of c.identities){

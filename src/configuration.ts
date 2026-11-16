@@ -17,6 +17,10 @@
 export type FeatureFlags = Readonly<{
   /** Dialectic conversational chrome and progress feedback. */
   dialecticConversationUpdates: boolean;
+  dialecticSemanticsWorkspace: boolean;
+  dialecticSemanticRefresh: boolean;
+  dcpEntityEnrichment: boolean;
+  authorityCache: boolean;
   /** Optional contribution-boundary saves, independent of conversation chrome. */
   dialecticAutosave: boolean;
   /** Independent native conversations and background responses. */
@@ -232,6 +236,10 @@ export type FeatureFlags = Readonly<{
 
 export const featureFlags: FeatureFlags = Object.freeze({
   dialecticConversationUpdates: true,
+  dialecticSemanticsWorkspace: true,
+  dialecticSemanticRefresh: true,
+  dcpEntityEnrichment: true,
+  authorityCache: true,
   dialecticAutosave: false,
   dialecticMultiSession: true,
   dialecticAttachments: true,
