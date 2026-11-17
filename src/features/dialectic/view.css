@@ -71,8 +71,8 @@
 
 /* Conversation chrome: native composition and host ownership remain unchanged. */
 .dialectic-chat{background:#fff;color:#242424;--dialectic-accent:#171717;font:14px/1.55 system-ui,sans-serif}
-.dialectic-chat button{border-color:transparent;border-radius:9px;background:transparent}
-.dialectic-chat button:hover{background:#ececec}.dialectic-chat button:focus-visible{outline-color:#777}
+.dialectic-chat button{border-color:#938e9e;border-radius:7px;background:#f8f7fa}
+.dialectic-chat button:hover:not(:disabled){background:#eeebf3;border-color:#6f657d}.dialectic-chat button:active:not(:disabled){background:#e1dbea}.dialectic-chat button:focus-visible{outline:2px solid #65459b;outline-offset:2px}
 .dialectic-chat .dialectic-bar{background:#fafafa;border-color:#eee;padding:12px 20px;min-height:56px;box-sizing:border-box}
 .dialectic-chat .dialectic-bar strong{font:600 19px system-ui,sans-serif;letter-spacing:-.4px}
 .dialectic-chat .dialectic-subtitle{display:none}

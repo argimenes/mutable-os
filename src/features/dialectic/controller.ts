@@ -143,7 +143,9 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
  const activityDiagnostics={candidates:0,resolutions:0};
  const semanticInventory=createMemo(()=>references()?.workspaceInventory()??{definitions:[],properties:[],media:[]});
  const authorityResolution=createEntityAuthorityResolution(editor,()=>root()?.key,resourceId,()=>!busy());
- if(editor.features.authorityCache)createEffect(()=>{if(busy()){authorityResolution.suspend();return;}authorityResolution.observe(semanticInventory().definitions);});
+ // Reviewed database links also need verification when external authority lookup is off.
+ // The resolver skips external requests in that mode; semantic membership is independent of typing.
+ createEffect(()=>{if(busy()){authorityResolution.suspend();return;}authorityResolution.observe(semanticInventory().definitions);});
  const activities=new Map<string,{summary:Accessor<ActivitySummary>;dispose:()=>void}>();
  const contributionActivity=(id:string)=>{
   let entry=activities.get(id);if(!entry){entry=createRoot(dispose=>{const data=createMemo(()=>editor.features.dialecticContributionActivity?rowLookup().get(id)?.data:undefined);return {dispose,summary:createContributionActivity(data,references,activityDiagnostics)};});activities.set(id,entry);}return entry.summary;

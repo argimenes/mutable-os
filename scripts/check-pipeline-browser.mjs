@@ -54,6 +54,29 @@ try{
  await writeFile(path.join(directory,'reconciliation.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
  await click('Confirm Reconciliation');await waitFor("!!window.identityFixture.button('Done')");await click('Done');
  const association=await evaluate("(()=>{const f=window.identityFixture,r=f.port.session().projection.node(f.port.session().rootKey);return {...Object.values(r.payload.linkedAnnotations).find(d=>d.metadata?.scopedEntity?.entity.name==='Leonardo da Vinci').metadata.scopedEntity.identityAssociation};})()");assert.equal(association.entityId,fixture.canonicalId);
+ // Bologna regression: no selected text, refine SQL search, review imports, and link the source identity.
+ await evaluate("window.getSelection().removeAllRanges();[...document.querySelectorAll('.semantics-list-item')].find(b=>b.querySelector('strong')?.textContent==='Bologna').click()");
+ assert.equal(await evaluate("!!window.identityFixture.button('Review authority identity…')"),false);
+ await writeFile(path.join(directory,'bologna-details.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
+ await click('Resolve Entity Identity…');
+ await waitFor("document.querySelectorAll('.pipeline-pipe:not([hidden])').length===3");
+ assert.equal(await evaluate("!!document.querySelector('[aria-label=\"Link Entity Reference\"]')"),false);
+ await evaluate("(()=>{const i=document.querySelector('[aria-label=\"Search authentic Entities\"]');i.value='Bolog';i.dispatchEvent(new Event('input',{bubbles:true}));i.value='Bologna';i.dispatchEvent(new Event('input',{bubbles:true}));const m=document.querySelector('[aria-label=\"Match mode\"]');m.value='exact';m.dispatchEvent(new Event('change',{bubbles:true}));})()");
+ await waitFor("document.querySelector('.pipeline-search-results button')?.textContent.includes('Bologna')");
+ await writeFile(path.join(directory,'bologna-search.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
+ await clickElement("document.querySelector('.pipeline-search-results button')");await click('Use Selected Identity');await click('Same Identity');
+ await waitFor("!!window.identityFixture.button('Confirm Reconciliation')&&!window.identityFixture.button('Confirm Reconciliation').disabled");
+ await evaluate("(()=>{for(const [field,value] of [['Description','import'],['Classifications','merge'],['External identifiers','merge']]){const s=[...document.querySelectorAll('.pipeline-pipe-active label')].find(l=>l.textContent.startsWith(field)).querySelector('select');s.value=value;s.dispatchEvent(new Event('change',{bubbles:true}));}})()");
+ await click('Confirm Reconciliation');await click('Done');
+ const bologna=await evaluate("(async()=>{const f=window.identityFixture,r=f.port.session().projection.node(f.port.session().rootKey),d=Object.values(r.payload.linkedAnnotations).find(d=>d.metadata?.scopedEntity?.entity.name==='Bologna'),result=await f.services.execute({recordType:'Entity',op:'get',id:f.bolognaId,operationId:crypto.randomUUID()});return JSON.parse(JSON.stringify({source:d.metadata.scopedEntity.entity,association:d.metadata.scopedEntity.identityAssociation,canonical:result.entity}));})()");
+ assert.equal(bologna.association.entityId,bologna.canonical.id);assert.equal(bologna.canonical.description,bologna.source.description);
+ await waitFor("document.querySelector('.semantics-identity-status')?.textContent.includes('Linked to database Entity')");
+ assert.equal(await evaluate("document.querySelector('.semantics-identity-name')?.textContent"),'Bologna',await evaluate("document.querySelector('.semantics-identity-status')?.textContent"));
+ assert.equal(await evaluate("document.querySelector('.semantics-identity-status')?.textContent.includes(window.identityFixture.bolognaId)"),true);
+ assert.equal(await evaluate("!!window.identityFixture.button('Open linked Entity')&&!!window.identityFixture.button('Review linked identity…')"),true);
+ assert.equal(await evaluate("document.querySelector('.semantics-list-item[aria-pressed=true] .semantics-identity-badge')?.textContent"),'Linked to database');
+ await writeFile(path.join(directory,'bologna-linked.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
+ assert.ok(bologna.canonical.aliases.some(a=>a.name==='Bononia'));assert.deepEqual(bologna.canonical.attributes.enrichment.subtypes,['City']);assert.deepEqual(bologna.canonical.attributes.enrichment.externalIds,[{namespace:'wikidata',value:'Q1891'}]);
  // The alternate route creates a new canonical Entity, retaining its local source.
  await evaluate("[...document.querySelectorAll('.semantics-list-item')].find(b=>b.textContent.includes('Beatrice')).click()");await click('Resolve Entity Identity…');await click('No Matching Identity');await waitFor("!!window.identityFixture.button('Confirm Import')&&!window.identityFixture.button('Confirm Import').disabled");
  assert.equal(await evaluate("document.querySelectorAll('.pipeline-pipe:not([hidden])').length"),2);
@@ -66,5 +89,5 @@ try{
  await click('Confirm Import');await waitFor("!!window.identityFixture.button('Done')");await click('Done');
  const imported=await evaluate("(()=>{const f=window.identityFixture,r=f.port.session().projection.node(f.port.session().rootKey),d=Object.values(r.payload.linkedAnnotations).find(d=>d.metadata?.scopedEntity?.entity.name.includes('Beatrice'));return {localId:d.id,entityId:d.metadata.scopedEntity.identityAssociation.entityId};})()");assert.notEqual(imported.entityId,imported.localId);
  await evaluate('window.identityFixture.dispose()');
- console.log(JSON.stringify({matched:true,imported,layout,retainedDOM:true,retainedScroll:true,managedHost:true,physicalPointerActions:true,narrowViewport:true,directory},null,2));
+ console.log(JSON.stringify({matched:true,bolognaLinkedWithMetadata:true,imported,layout,retainedDOM:true,retainedScroll:true,managedHost:true,physicalPointerActions:true,narrowViewport:true,directory},null,2));
 }finally{socket?.close();browser?.kill('SIGTERM');await server?.close();await knowledge.close();await rm(vault,{recursive:true,force:true});await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
