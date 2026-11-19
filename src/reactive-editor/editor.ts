@@ -44,6 +44,8 @@ import { createViewId } from "../block-tree/ids";
 import { OccurrenceIndex } from "../block-tree/occurrences";
 import { BlockTreeProjection } from "../block-tree/projection";
 import { BlockRegistry, CommandRegistry } from "../block-tree/registry";
+import { BlockPropertyDefinitionIndex } from "../properties/block-property-definitions";
+import { StandoffPropertyDefinitionIndex } from "../properties/standoff-property-definitions";
 import { CanonicalRepository } from "../block-tree/repository";
 import type { ExistingBlockDto, NodeKey, PlacementKey, ViewId } from "../block-tree/types";
 import { InputGateway } from "../input/gateway";
@@ -117,6 +119,9 @@ export class ReactiveEditor {
   readonly occurrences = new OccurrenceIndex();
   readonly commands: TreeCommands;
   readonly registry = new BlockRegistry();
+  /** Partial declaration indexes; historical property support does not require membership. */
+  readonly blockPropertyTypes = new BlockPropertyDefinitionIndex();
+  readonly standoffPropertyTypes = new StandoffPropertyDefinitionIndex();
   readonly commandRegistry = new CommandRegistry();
   readonly featureHost = new FeatureHost();
   readonly featureActions = new FeatureActions();
@@ -540,6 +545,8 @@ export class ReactiveEditor {
     this.decorations.dispose();
     this.persistence.dispose();
     this.featureHost.dispose();
+    this.blockPropertyTypes.dispose();
+    this.standoffPropertyTypes.dispose();
     this.disposeFindInput?.();
     this.stickyNotes.dispose();
     this.concertina.dispose();
