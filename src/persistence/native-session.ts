@@ -146,7 +146,9 @@ export class NativeDocumentSession {
   location(id?: string) { this.storageChanged[0](); const b = id && (this.bindings.get(id)??this.compatibleSources.get(id)); return b ? { ...b.location } : undefined; }
   compatibleSource(id:string){const source=this.compatibleSources.get(id);return source?Object.freeze({...source,location:Object.freeze({...source.location})}):undefined;}
   trackCandidate(id: string) {
-    captureNative(this.editor.repository.snapshot(),id);
+    // Capture is synchronous and copies its owned resource. Cloning the entire
+    // workspace first adds no isolation, and includes unrelated open Documents.
+    captureNative(this.editor.repository.readState(),id);
     markNativeBinding(this.editor.repository,id);this.candidates.add(id);this.markDirty(id,true);this.touch();
   }
   isCandidate(id: string) { this.changed[0]();return this.candidates.has(id); }

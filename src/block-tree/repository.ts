@@ -13,7 +13,7 @@ import { UndoStorage, type StoredHistoryEntry } from "./undo-storage";
 import { isOwnedResourceTarget, validateResourceRegistrations, resourceOwnership } from "./resource-registration";
 import { ReferenceBookkeeping } from "./reference-bookkeeping";
 import { ResourceBoundaryBookkeeping, preservesResourceOwnership, type BoundaryValidation, type CanonicalResourceBoundaryToken, type CanonicalResourceBoundaryResult, type CooperativeBoundaryOptions } from "./resource-boundary";
-import { resourceSource } from "./resource-identity";
+import { findResource, resourceSource } from "./resource-identity";
 import { validateTarget } from "./external-reference";
 import { createCommitId } from "./ids";
 import { BlockIdentityIndex, PlacementIdentityIndex, type PlacementIdentityDelta } from "./identity";
@@ -330,6 +330,10 @@ export class CanonicalRepository {
   hasSemanticPlacements(): boolean { return this.placementIdentity.enabled; }
 
   get hasValidStructuralEvidence(): boolean { return !!this.boundary && !this.boundary.validation.error; }
+  /** Read-only identity lookup, reusing the existing boundary index. */
+  findDocumentResource(id: string): ContentRecord | undefined {
+    return this.boundary ? this.boundary.findDocument(this.readState(), id) : findResource(this.readState(), { scope: 'document', resourceId: id });
+  }
   ownedPlacementKeys(key: string): Iterable<string> { return this.references.ownedKeys(key); }
 
   contentReferenceCount(key: ContentKey): number { return this.references.get(key) ?? 0; }

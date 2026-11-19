@@ -26,9 +26,22 @@ const fragment = convertTeiFragment(xml); // roots + owned definitions + diagnos
 
 Defaults: 64 MiB input/decoded UTF-8 bytes, 5,000,000 source-content Cells, 1,000,000 XML elements, depth 128, 100,000 Blocks, 500,000 annotation records, 500,000 reference tokens, 100 diagnostic examples, 120 seconds of worker preparation. All values are configurable positive safe integers. The full-document file batch permits 1–20 files with an aggregate ceiling of four TEI byte budgets (at least the existing 40 MiB ordinary-file budget). Non-TEI file limits are unchanged.
 
-A small fixed document/Page/tab/notice reserve is outside source-content budgets. Partial conversion sets `metadata.tei.truncated`, includes aggregated diagnostics and places **INCOMPLETE IMPORT** visibly before the reading tabs. Byte-limit failures admit nothing. Resource ceilings are not performance promises: the existing Cell representation can use substantial transient memory during native capture/admission. A 300,100-Cell native persistence test is included; a 5-million-Cell rendered document is not qualified.
+A small fixed document/Page/tab/notice reserve is outside source-content budgets. Partial conversion sets `metadata.tei.truncated`, includes aggregated diagnostics and places **INCOMPLETE IMPORT** visibly before the reading tabs. Byte-limit failures admit nothing. Resource ceilings are not performance promises: the existing Cell representation can use substantial transient memory during native admission and rendering. A 300,100-Cell native persistence test is included; a 5-million-Cell rendered document is not qualified.
 
 The pure converter uses no DOM, network, AI or live editor. Its internally generated candidate uses native admission, bypassing external clipboard materialisation without changing that allowlist. Fragment insertion UI is intentionally absent: callers must adopt the returned Document-owned definitions explicitly. XML-root targets have no fabricated Document target in fragment results.
+
+The worker completes semantic conversion and producer/range validation, then writes
+compact native text atoms with the existing authored-value encoding. It does not
+construct disposable live Cells merely to serialize them back to text. The
+ordinary native decoder, ownership checks and repository validator still run
+before atomic admission; native Save and the persistence schema are unchanged.
+The compact writer is deliberately restricted to this producer's six existing
+Block implementations. Future producer expansions must qualify its encoding too.
+
+Optional profiling (`profile: true` on a `tei-document` request) returns stage
+measurements and allocation counts outside the native bytes. No profiling or
+import work subscribes to ordinary typing. For the production browser benchmark,
+see [the performance harness](../../../scripts/tei-performance/README.md).
 
 ## Recovery and limits of fidelity
 

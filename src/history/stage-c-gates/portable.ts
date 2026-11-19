@@ -112,7 +112,9 @@ export function validateNativeTextSpan(text: unknown): asserts text is string {
   requireValue(typeof text === "string" && text.length, "invalid text span");
 }
 
-export function decodeGateDocument(document: GateDocument, profile: "legacy" | "native" = "legacy"): DeepReadonly<ResourceSnapshot> {
+export function decodeGateDocument(document: GateDocument, profile: "legacy" | "native" = "legacy", timings?: Record<string, number>): DeepReadonly<ResourceSnapshot> {
+  let last = timings ? performance.now() : 0;
+  const stage = (name: string) => { if (timings) { const now = performance.now(); timings[name] = now - last; last = now; } };
   assertPortableJson(document);
   const value = (data: JsonObject): JsonObject => {
     const result = profile === "native" ? decodeAuthoredValue(data) : clone(data);
@@ -163,6 +165,10 @@ export function decodeGateDocument(document: GateDocument, profile: "legacy" | "
   }
   const state: ResourceSnapshot = { format: "codex-resource-gate", version: document.version, resourceId: document.resourceId,
     rootPlacementKey: edge(document.root), revision: 0, contents, placements };
+  stage('canonicalConstruction');
   validateResource(state);
-  return freeze(state);
+  stage('canonicalGraphValidation');
+  const result = freeze(state);
+  stage('canonicalFreeze');
+  return result;
 }

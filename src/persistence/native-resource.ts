@@ -163,9 +163,12 @@ export function parseNativeEnvelope(bytes: Uint8Array): NativeDocument {
   return value;
 }
 
-export function decodeNative(bytes: Uint8Array): DeepReadonly<ResourceSnapshot> {
+export function decodeNative(bytes: Uint8Array, timings?: Record<string, number>): DeepReadonly<ResourceSnapshot> {
+  let last = timings ? performance.now() : 0;
   const value = parseNativeEnvelope(bytes), doc = value.document;
-  let resource = decodeGateDocument(doc, value.valueEncoding ? "native" : "legacy");
+  if (timings) { timings.nativeWireParsing = performance.now() - last; }
+  let resource = decodeGateDocument(doc, value.valueEncoding ? "native" : "legacy", timings);
+  if (timings) last = performance.now();
   const root = resource.placements[resource.rootPlacementKey]; check(root.target.kind === "local", "external root");
   const rootContent = resource.contents[root.target.contentKey];
   check(identity(rootContent) === value.resourceId, "root identity disagrees with resource identity");
@@ -179,6 +182,7 @@ export function decodeNative(bytes: Uint8Array): DeepReadonly<ResourceSnapshot> 
     resource = freeze({ ...resource, contents });
   }
   validateNativeOwnership(resource, root.target.contentKey);
+  if (timings) timings.nativeOwnershipValidation = performance.now() - last;
   return resource;
 }
 
@@ -223,15 +227,19 @@ function validateNativeOwnership(resource: DeepReadonly<ResourceSnapshot>, rootK
 
 /** Admission into an EXISTING repository/object bank, never a new editor or DTO.
  * Detached decode + collision/ownership checks precede the one atomic commit. */
-export function admitNative(repository: CanonicalRepository, bytes: Uint8Array, bankContentKey: string) {
-  const {placementKey,reused}=admitNativeWithResource(repository,bytes,bankContentKey);
+export function admitNative(repository: CanonicalRepository, bytes: Uint8Array, bankContentKey: string, timings?: Record<string, number>) {
+  const {placementKey,reused}=admitNativeWithResource(repository,bytes,bankContentKey,undefined,timings);
   return {placementKey,reused};
 }
 /** Admission result also exposes the immutable validated source and exact membership. */
-export function admitNativeWithResource(repository: CanonicalRepository, bytes: Uint8Array, bankContentKey: string, expectedResourceId?: string) {
-  const resource = decodeNative(bytes);
+export function admitNativeWithResource(repository: CanonicalRepository, bytes: Uint8Array, bankContentKey: string, expectedResourceId?: string, timings?: Record<string, number>) {
+  let last = timings ? performance.now() : 0;
+  const stage = (name: string) => { if (timings) { const now = performance.now(); timings[name] = now - last; last = now; } };
+  const resource = decodeNative(bytes, timings);
+  stage('nativeDecodeAndValidation');
   check(expectedResourceId === undefined || resource.resourceId === expectedResourceId, 'Open response identity mismatch');
   const incoming = resourceToRepository(resource), before = repository.readState();
+  stage('canonicalStaging');
   const bank = before.contents[bankContentKey];
   check(bank?.viewType === "workspace-object-bank-block", "native admission requires the existing object bank");
   const existing = Object.values(before.contents).filter(c => c.viewType === "document-block" && identity(c) === resource.resourceId);
@@ -265,11 +273,11 @@ export function admitNativeWithResource(repository: CanonicalRepository, bytes: 
     const { externalReference: _external, ...record } = p;
     bindings.push({ ...record, contentKey: target.key, resolvedReference: clone(external) });
   }
+  stage('identityAndBindings');
   repository.commit("B1 admit native Document", [
-    ...Object.values(incoming.contents).map(record => ({ kind: "put-content" as const, record })),
-    ...Object.values(incoming.placements).map(record => ({ kind: "put-placement" as const, record })),
-    ...bindings.map(record => ({ kind: "put-placement" as const, record })),
-    { kind: "put-content", record: updatedBank },
+    { kind: "record-batch", contents: { ...incoming.contents, [bank.key]: updatedBank },
+      placements: { ...incoming.placements, ...Object.fromEntries(bindings.map(record => [record.key, record])) } },
   ]);
+  stage('repositoryCommit');
   return { placementKey: incoming.rootPlacementKey, reused: false, resource, members: Object.keys(incoming.contents) };
 }

@@ -19,14 +19,19 @@ const refs = new Set(['ref', 'target', 'corresp', 'who', 'ana', 'wit', 'facs', '
 const knownAttributes = new Set(['xml:id', 'xml:lang', 'xml:space', 'xml:base', 'type', 'subtype', 'n', 'rend', 'rendition', 'when', 'from', 'to', 'notBefore', 'notAfter', 'calendar', 'reason', 'cert', 'place', 'break', 'unit', 'quantity', ...refs]);
 
 /** Ordinary deterministic software. All mutable state is private to this import. */
-export function convertTei(source: string | Uint8Array, options: Partial<TeiLimits> = {}, filename = 'TEI document') {
-  return compileTei(source, options, filename, false);
+export function convertTei(source: string | Uint8Array, options: Partial<TeiLimits> = {}, filename = 'TEI document', timings?: Record<string, number>) {
+  return compileTei(source, options, filename, false, timings);
 }
-function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, filename: string, fragmentOperation: boolean) {
+function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, filename: string, fragmentOperation: boolean, timings?: Record<string, number>) {
+  let last = timings ? performance.now() : 0;
+  const stage = (name: string) => { if (timings) { const now = performance.now(); timings[name] = now - last; last = now; } };
   validateTeiDeclarations();
   const limits = teiLimits(options), diagnostics = new Diagnostics(limits.diagnosticExamples);
   if (source instanceof Uint8Array && source.byteLength > limits.bytes) throw Error(`TEI input exceeds the configured ${limits.bytes}-byte limit. Nothing was imported.`);
-  const parsed = parseTei(typeof source === 'string' ? source : decodeTei(source, diagnostics), limits, diagnostics);
+  const decoded = typeof source === 'string' ? source : decodeTei(source, diagnostics);
+  stage('xmlDecode');
+  const parsed = parseTei(decoded, limits, diagnostics);
+  stage('xmlParse');
   const references = new References(limits.references, diagnostics), definitions: Record<string, JsonObject> = {};
   const headers: Block[] = [], content: Block[] = [], allText: Block[] = [];
   const lengths = new WeakMap<Block, number>(), spans = new WeakMap<Block, Map<string, JsonObject>>();
@@ -218,6 +223,7 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
   if (parsed.root.parts.some(p => typeof p !== 'string' && !p.uri)) diagnostics.add('unnamespaced-tei', 'Unnamespaced elements were interpreted using TEI names.');
   try { content.push(...flow(parsed.root.parts, initial)); }
   catch (error) { if (!(error instanceof TeiBudget)) throw error; truncated = true; diagnostics.add('truncated', `INCOMPLETE IMPORT: ${error.message}.`); }
+  stage('semanticTraversalAndDtoConstruction');
   const reachable = new Set<string>([documentId]);
   const visitReachable = (b: Block) => { reachable.add(b.id); b.children?.forEach(visitReachable); };
   [...content, ...headers].forEach(visitReachable);
@@ -232,13 +238,16 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
       propertyBudget(); b.standoffProperties!.push({ id: id(), type: 'mutable/gloss', annotationId: target, start: p.start, end: p.end });
     }
   }
+  stage('referenceResolution');
   // Fixed, small assembly/notice reserve is outside source-content budgets.
   const fixed = (type: string, extra: Partial<Block> = {}): Block => ({ id: id(), type, ...extra });
   if (!content.length) content.push(fixed('standoff-editor-block', { text: '' }));
   const roots = headers.length ? [fixed('tab-row-block', { children: [fixed('tab-block', { metadata: { name: 'Text', active: true }, children: content }), fixed('tab-block', { metadata: { name: 'Metadata', active: false }, children: headers })] })] : content;
   if (truncated) roots.unshift(fixed('standoff-editor-block', { text: incompleteMessage, blockProperties: [{ id: id(), type: 'block/font/size', value: 'h2' }] }));
   const document: Block = fixed('document-block', { id: documentId, metadata: { documentId, title: title || filename.replace(/\.(tei|xml)$/i, ''), tei: { version: 1, ...(sourceId ? { sourceId } : {}), ...(sourceMetadata ? { source: sourceMetadata } : {}), header, truncated } }, linkedAnnotations: definitions, children: [fixed('page-block', { children: roots })] });
+  stage('assembly');
   validateTeiDocument(document);
+  stage('teiValidation');
   return { document, diagnostics: diagnostics.list(), truncated, stats: { cells, blocks, properties }, fragment: { roots, definitions } };
 }
 

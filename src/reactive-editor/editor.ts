@@ -563,6 +563,7 @@ export class ReactiveEditor {
     this.blockModes.dispose();
     this.blockPropertyTypes.dispose();
     this.standoffPropertyTypes.dispose();
+    this.linkedAnnotations.dispose();
     this.disposeFindInput?.();
     this.stickyNotes.dispose();
     this.concertina.dispose();
