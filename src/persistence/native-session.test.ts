@@ -166,3 +166,17 @@ it('marks Initialis authoring dirty without saving, and persists full settings o
  expect(property.metadata.renderer).toBe('initialis');expect(Object.keys(property.metadata.settings)).toHaveLength(156);expect(property.metadata.settings).not.toHaveProperty('text');
  expect((await fs.readdir(f.root)).filter(name=>name.endsWith('.md'))).toEqual(['import.md']);
 });
+
+it('saves a TEI import only on explicit native Save and reopens its semantic document without changing the XML',async()=>{
+ const f=await host(),{editor,service}=f.make(),{Blob}=await import('node:buffer');
+ const xml='<TEI><teiHeader><titleStmt><title>Imported letter</title></titleStmt></teiHeader><text><body><p><persName ref="#missing">Mary</persName><del> old</del></p></body></text></TEI>';
+ await fs.writeFile(path.join(f.root,'letter.tei'),xml);const opened:string[]=[];
+ await editor.interchange.importNew([{name:'letter.tei',blob:new Blob([xml]) as unknown as globalThis.Blob}],{current:()=>true,open:id=>opened.push(id)});
+ expect(opened).toHaveLength(1);const id=opened[0];expect(service.isCandidate(id)).toBe(true);expect(service.isDirty(id)).toBe(true);
+ expect(await fs.readFile(path.join(f.root,'letter.tei'),'utf8')).toBe(xml);await expect(fs.stat(path.join(f.root,'letter.ink'))).rejects.toThrow();
+ expect(await service.save(id,{folder:'.',filename:'letter.ink'})).toMatchObject({phase:'saved',dirty:false});
+ expect(await fs.readFile(path.join(f.root,'letter.tei'),'utf8')).toBe(xml);
+ const other=f.make();expect(await other.service.open({folder:'.',filename:'letter.ink'})).toBe(id);
+ const resource=captureNative(other.editor.repository.readState(),id);expect(Object.values(resource.contents).filter(c=>c.viewType==='page-block')).toHaveLength(1);
+ const saved=nativeText(resource);expect(saved).toContain('tei/editorial');expect(saved).toContain('unresolved');expect(saved).not.toContain('opaque-property');
+});

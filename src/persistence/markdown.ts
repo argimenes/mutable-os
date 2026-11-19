@@ -67,7 +67,7 @@ export function importMarkdown(source: string, targets: readonly LinkTarget[] = 
     children.push(block);
   }
   const id = crypto.randomUUID();
-  const document: ExistingBlockDto = { id, type: "document-block", metadata: { documentId: id }, children };
+  const document: ExistingBlockDto = { id, type: "document-block", metadata: { documentId: id }, children: [{ id: crypto.randomUUID(), type: "page-block", children }] };
   return { document, diagnostics };
 }
 export function admitMarkdown(repository: CanonicalRepository, bank: string, source: string, targets: readonly LinkTarget[] = []) {
@@ -130,7 +130,7 @@ export function exportMarkdown(resource: DeepReadonly<ResourceSnapshot>, targets
     seen.add(c.key);
     const children = () => c.children.map(visit).filter(Boolean).join("\n\n");
     let text = "";
-    if (c.viewType === "document-block") text = children();
+    if (c.viewType === "document-block" || c.viewType === "page-block") text = children();
     else if (c.viewType === "standoff-editor-block") {
       const bp = Array.isArray(c.payload.blockProperties) ? c.payload.blockProperties.filter(p => !p.isDeleted) : [];
       const h1 = bp.some(p => p.type === "block/font/size" && p.value === "h1" || p.type === "block/font/size/h1");

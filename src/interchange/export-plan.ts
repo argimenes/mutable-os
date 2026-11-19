@@ -132,7 +132,7 @@ export function exportFragment(input:MutableFragment,format:ExportFormat,title='
   else if(['table-cell-block','grid-cell-block'].includes(b.type)){
    const cell=meta.htmlTableCell??{},tag=cell.header?'th':'td';if(cell.colSpan>1||cell.rowSpan>1)warn('table-spans','Merged table layout was previously flattened; span metadata is not reapplied.');
    result=format==='html'?`<${tag}>${children()}</${tag}>`:children();
-  }else if(['document-block','container-block','checkbox-block','book-block','side-block'].includes(b.type))result=format==='html'?`<div id="${escapeHtml(b.localId)}">${children()}</div>`:children();
+  }else if(['document-block','page-block','container-block','checkbox-block','book-block','side-block'].includes(b.type))result=format==='html'?`<div id="${escapeHtml(b.localId)}">${children()}</div>`:children();
   else {warn('block-fallback',`Presentation of ${b.type} is flattened or represented by a label.`);const label=`[${b.type}]`;result=(format==='html'?`<p id="${escapeHtml(b.localId)}">${escapeHtml(label)}</p>`:format==='markdown'?md(label):label)+(b.inline?inline(b):'')+children();}
   for(const [name,relation]of Object.entries(b.relations)){warn('relation-layout',`Related ${name} content is exported after its owner.`);result+=(format==='html'?`<aside><p>${escapeHtml(name)}</p>${visit(relation)}</aside>`:`\n\n[${format==='markdown'?md(name):name}]\n${visit(relation)}`);}
   const checked=b.type==='checkbox-block'?b.data.checked===true:typeof b.data.checked==='boolean'?b.data.checked:undefined;

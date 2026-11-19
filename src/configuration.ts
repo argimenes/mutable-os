@@ -1,3 +1,4 @@
+import type { TeiLimits } from './interchange/tei/model';
 /**
  * Application feature switches.
  *
@@ -99,6 +100,7 @@ export type FeatureFlags = Readonly<{
   flintSpatialGraph: boolean;
   /** Per-resource native/Markdown persistence through the managed server store. */
   nativeDocumentPersistence: boolean;
+  teiImport: boolean;
   /** Persistent Library listings with background filesystem reconciliation. */
   vaultDiscoveryCache: boolean;
   /** Accepted loaded-resource provider; false retains the legacy rollback. */
@@ -217,6 +219,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   presentationProbe: false,
   flintSpatialGraph: true,
   nativeDocumentPersistence: true,
+  teiImport: true,
   vaultDiscoveryCache: true,
   nativeKnowledge: true,
   nativeKnowledgeSaved: false,
@@ -263,6 +266,8 @@ export const featureFlags: FeatureFlags = Object.freeze({
 
 export type ReactiveEditorConfiguration = {
   features?: Partial<FeatureFlags>;
+  /** Explicit import budgets; unrelated to clipboard and typing. */
+  teiImportLimits?: Partial<TeiLimits>;
 };
 
 export function resolveFeatureFlags(configuration: ReactiveEditorConfiguration = {}): FeatureFlags {

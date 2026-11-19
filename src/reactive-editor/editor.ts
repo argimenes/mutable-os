@@ -1,3 +1,4 @@
+import { teiLimits, type TeiLimits } from '../interchange/tei/model';
 import { MarkdownInput } from '../runtime/markdown-input';
 import { GlossRelationshipController } from "../features/gloss/relationship-controller";
 import { GlossController } from "../features/gloss/controller";
@@ -122,6 +123,7 @@ export class ReactiveEditor {
   readonly registry = new BlockRegistry();
   /** Partial declaration indexes; historical property support does not require membership. */
   readonly blockPropertyTypes = new BlockPropertyDefinitionIndex();
+  readonly teiImportLimits: Readonly<TeiLimits>;
   readonly blockModes = new BlockModeRegistry();
   readonly standoffPropertyTypes = new StandoffPropertyDefinitionIndex();
   readonly commandRegistry = new CommandRegistry();
@@ -173,6 +175,7 @@ export class ReactiveEditor {
 
   constructor(dto: ExistingBlockDto | LoadedWorkspace, configuration: ReactiveEditorConfiguration = {}) {
     this.features = resolveFeatureFlags(configuration);
+    this.teiImportLimits = teiLimits(configuration.teiImportLimits);
     this.markdownInput = new MarkdownInput(this);
     this.commandRegistry.register({ id: 'markdown.toggleInput', label: 'Toggle Markdown Input Transformation', canExecute: () => true, execute: () => this.markdownInput.toggle() });
     registerInputActions(this.bindings);
