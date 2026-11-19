@@ -13,6 +13,8 @@ export type JsonObject = Record<string, unknown>;
 export interface ExistingBlockDto extends JsonObject {
   id?: string;
   type?: string;
+  /** Optional authored semantic identity; implementation remains in type. */
+  mode?: string;
   children?: ExistingBlockDto[] | null;
   relation?: Record<string, unknown> | null;
 }

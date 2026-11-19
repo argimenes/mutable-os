@@ -1,4 +1,5 @@
 import { StructuralDraft } from "./structural-draft";
+import { hasBlockMode, modeContinuationError, modeJoinError } from './mode-editing';
 import { isAutomaticListMetadata, type AutomaticListMetadata } from "./list-wrap-plan";
 import { diffRecordBatch } from "./record-batch";
 import { conversionSource } from '../interchange/conversion';
@@ -439,6 +440,7 @@ export class TreeCommands {
   replaceSourceWithFragment(fragment: BlockFragment, key: NodeKey | PlacementKey): PlacementKey[] {
     const state = this.current();
     const pk = this.placementKey(key, state), p = state.placements[pk], c = state.contents[p.contentKey];
+    if (hasBlockMode(c.payload)) throw new TreeCommandError('Conversion would remove this Block Mode; clear it explicitly first');
     if (p.kind !== "owned" || p.externalReference || p.resolvedReference || p.resourceRegistration ||
       c.children.length || c.inlineContent.length || Object.keys(c.ownedRelations).length || Object.keys(c.opaqueRelations).length ||
       Object.values(state.placements).filter(edge => edge.contentKey === c.key).length !== 1) {
@@ -686,6 +688,10 @@ export class TreeCommands {
   }
 
   unwrap(key: NodeKey | PlacementKey): void {
+    const current = this.current();
+    if (hasBlockMode(current.contents[current.placements[this.placementKey(key, current)].contentKey].payload)) {
+      throw new TreeCommandError('Unwrapping would remove this Block Mode; clear it explicitly first');
+    }
     const state = this.state();
     const placementKey = this.placementKey(key, state);
     const unwrapped = state.placements[placementKey];
@@ -724,6 +730,11 @@ export class TreeCommands {
     dto: ExistingBlockDto,
     childPolicy: "preserve" | "replace",
   ): PlacementKey {
+    const current = this.current();
+    const previous = current.contents[current.placements[this.placementKey(key, current)].contentKey];
+    if (hasBlockMode(previous.payload) && (dto.mode !== previous.payload.mode || dto.type !== previous.payload.type)) {
+      throw new TreeCommandError('Replacement would reinterpret this Block Mode; clear it explicitly first');
+    }
     const state = this.state();
     const placementKey = this.placementKey(key, state);
     if (placementKey === state.rootPlacementKey) {
@@ -861,13 +872,15 @@ export class TreeCommands {
     const placement = state.placements[this.placementKey(key, state)];
     const content = state.contents[placement.contentKey];
     if (Object.is(content.payload[field], value)) return;
+    const payload = { ...clone(content.payload), [field]: clone(value) };
+    if (field === 'mode' && value === undefined) delete payload.mode;
     this.publish(label, [
       {
         kind: "put-content",
         ...(field === "standoffProperties" && annotationOrigins ? { annotationOrigins } : {}),
         record: {
           ...clone(content),
-          payload: { ...clone(content.payload), [field]: clone(value) },
+          payload,
           revision: content.revision + 1,
         },
       },
@@ -1121,6 +1134,8 @@ export class TreeCommands {
     const state = this.current();
     const placementKey = this.placementKey(key, state);
     const content = state.contents[state.placements[placementKey].contentKey];
+    const modeError = modeContinuationError(content.payload);
+    if (modeError) throw new TreeCommandError(modeError);
     if (content.inlineKind !== "standoff") throw new TreeCommandError("Expected a Standoff paragraph");
     const location = this.pending ? deriveLocations(state).get(placementKey) : this.repository.locationOf(placementKey);
     if (!location || location.slot.kind !== "children") throw new TreeCommandError("A Standoff relation/root needs an explicit insertion policy");
@@ -1144,6 +1159,8 @@ export class TreeCommands {
     const placementKey = this.placementKey(key, state);
     const placement = state.placements[placementKey];
     const content = state.contents[placement.contentKey];
+    const modeError = modeContinuationError(content.payload);
+    if (modeError) throw new TreeCommandError(modeError);
     if (content.inlineKind !== "standoff") {
       throw new TreeCommandError("Only Standoff content can be split");
     }
@@ -1226,6 +1243,12 @@ export class TreeCommands {
     leftKey: NodeKey | PlacementKey,
     rightKey: NodeKey | PlacementKey,
   ): number {
+    const current = this.current();
+    const modeError = modeJoinError(
+      current.contents[current.placements[this.placementKey(leftKey, current)].contentKey].payload,
+      current.contents[current.placements[this.placementKey(rightKey, current)].contentKey].payload,
+    );
+    if (modeError) throw new TreeCommandError(modeError);
     const state = this.state();
     const leftPlacementKey = this.placementKey(leftKey, state);
     const rightPlacementKey = this.placementKey(rightKey, state);
@@ -1391,6 +1414,10 @@ export class TreeCommands {
     const current = state.contents[currentPlacement.contentKey];
     const currentType = String(current.payload.type ?? current.viewType);
     const nextType = String(descriptor.type ?? "");
+    if (hasBlockMode(current.payload) && (nextType !== currentType ||
+      Object.prototype.hasOwnProperty.call(descriptor, 'mode') && descriptor.mode !== current.payload.mode)) {
+      throw new TreeCommandError('Background conversion would reinterpret this Block Mode; clear it explicitly first');
+    }
     const types = ["image-background-block", "video-background-block", "youtube-video-background-block", "canvas-background-block"];
     if (!types.includes(currentType) || !types.includes(nextType)) {
       throw new TreeCommandError("Background replacement requires two background descriptors");

@@ -1,4 +1,5 @@
 import { clone } from '../block-tree/clone';
+import { hasBlockMode } from '../block-tree/mode-editing';
 import { planCrossTextEdit, type CrossTextSegment } from '../block-tree/cross-text-edit';
 import { createBlockId, createContentKey, createPlacementKey } from '../block-tree/ids';
 import { deriveLocations } from '../block-tree/repository';
@@ -21,7 +22,7 @@ export function inlineMergePredicate(fragment: BlockFragment, viewType: string) 
   for (const p of references) if (p.type === 'codex/block-reference') anchored.add(p.value);
   const uses = new Map<string, number>();
   for (const p of Object.values(fragment.state.placements)) uses.set(p.contentKey, (uses.get(p.contentKey) ?? 0) + 1);
-  return (c: ContentRecord) => c.viewType === viewType && c.inlineKind === 'standoff' && !c.children.length && !Object.keys(c.ownedRelations).length && !Object.keys(c.opaqueRelations).length && !anchored.has(c.payload.id) && !(c.payload.metadata as any)?.anchor && uses.get(c.key) === 1;
+  return (c: ContentRecord) => !hasBlockMode(c.payload) && c.viewType === viewType && c.inlineKind === 'standoff' && !c.children.length && !Object.keys(c.ownedRelations).length && !Object.keys(c.opaqueRelations).length && !anchored.has(c.payload.id) && !(c.payload.metadata as any)?.anchor && uses.get(c.key) === 1;
 }
 
 /** Pure, one-shot structural plan. No command-per-atom loop and no DOM access. */
@@ -36,6 +37,7 @@ export function planFragmentInsertion(source: RepositoryState, segments: CrossTe
   const rootRecords = fragment.roots.map(k => fragment.state.contents[fragment.state.placements[k].contentKey]);
   const canMerge = inlineMergePredicate(fragment, first.viewType);
   const single = segments.length === 1 && rootRecords.length === 1 && slices[0].openStart && slices[0].openEnd && canMerge(rootRecords[0]);
+  if (!single && records.some(c => hasBlockMode(c.payload))) throw Error('Structural paste into mode-bearing text needs an explicit continuation policy; paste a single inline slice or insert whole Blocks beside it.');
   const base = segments.length > 1 ? planCrossTextEdit(source, segments, '').state : source;
   const state: RepositoryState = { ...base, contents: { ...base.contents, ...clone(fragment.state.contents) }, placements: { ...base.placements, ...clone(fragment.state.placements) } };
   const keep = (c: ContentRecord) => { c.revision++; c.inlineRevision++; state.contents[c.key] = c; };

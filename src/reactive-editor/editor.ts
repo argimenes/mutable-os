@@ -45,6 +45,7 @@ import { OccurrenceIndex } from "../block-tree/occurrences";
 import { BlockTreeProjection } from "../block-tree/projection";
 import { BlockRegistry, CommandRegistry } from "../block-tree/registry";
 import { BlockPropertyDefinitionIndex } from "../properties/block-property-definitions";
+import { BlockModeRegistry, validateModeAssignment } from "../block-tree/block-mode-registry";
 import { StandoffPropertyDefinitionIndex } from "../properties/standoff-property-definitions";
 import { CanonicalRepository } from "../block-tree/repository";
 import type { ExistingBlockDto, NodeKey, PlacementKey, ViewId } from "../block-tree/types";
@@ -121,6 +122,7 @@ export class ReactiveEditor {
   readonly registry = new BlockRegistry();
   /** Partial declaration indexes; historical property support does not require membership. */
   readonly blockPropertyTypes = new BlockPropertyDefinitionIndex();
+  readonly blockModes = new BlockModeRegistry();
   readonly standoffPropertyTypes = new StandoffPropertyDefinitionIndex();
   readonly commandRegistry = new CommandRegistry();
   readonly featureHost = new FeatureHost();
@@ -340,6 +342,15 @@ export class ReactiveEditor {
     this.viewVisibility.set(node.placementKey, true);
   }
 
+  /** Explicit semantic authoring. Registry availability never governs loading. */
+  setBlockMode(key: NodeKey, mode: string | undefined): void {
+    if (!this.features.blockModes) throw Error('Block Mode authoring is disabled');
+    const node = this.node(key);
+    if (!node || ['text-cell', 'image-cell'].includes(node.viewType)) throw Error('Select an authored Block');
+    validateModeAssignment(this.blockModes, node.viewType, mode);
+    this.commands.setPayloadField(key, 'mode', mode, mode === undefined ? 'Clear Block Mode' : 'Set Block Mode');
+  }
+
   installGateway(document: Document): () => void {
     this.disposeInterchangeStatus?.();
     this.disposeInterchangeStatus = this.features.documentInterchange ? installInterchangeStatus(document, this.interchange) : undefined;
@@ -381,6 +392,7 @@ export class ReactiveEditor {
       () => this.completionInput,
       key => { const target=this.surfaces.wholeBlockKey(key); return this.surfaces.confirmDelete([target])?target:undefined; },
       this.markdownInput,
+      message => this.crossText.notice(message),
     );
     const dispose = this.gateway.install();
     const crossInput = this.crossInput;
@@ -545,6 +557,7 @@ export class ReactiveEditor {
     this.decorations.dispose();
     this.persistence.dispose();
     this.featureHost.dispose();
+    this.blockModes.dispose();
     this.blockPropertyTypes.dispose();
     this.standoffPropertyTypes.dispose();
     this.disposeFindInput?.();

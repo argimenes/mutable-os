@@ -1,4 +1,5 @@
 import { openBlockContextMenu } from "../runtime/open-block-context-menu";
+import { modeContinuationError, modeJoinError } from '../block-tree/mode-editing';
 import type { MutableClipboard } from '../runtime/mutable-clipboard';
 import type { NodeKey, PlacementKey, ViewId } from "../block-tree/types";
 import type { TreeCommands } from "../block-tree/commands";
@@ -67,6 +68,7 @@ export class InputGateway {
     private readonly completion?: () => CompletionInput | undefined,
     private readonly blockDeleteTarget?: (key:NodeKey)=>NodeKey|undefined,
     private readonly markdown?: { typed(key: string, start: number, end: number, text: string): number | undefined; cancel(): void },
+    private readonly notice: (message: string) => void = () => {},
   ) {}
 
   install(): () => void {
@@ -221,6 +223,8 @@ export class InputGateway {
         if (previous) {
           if (event.cancelable) event.preventDefault();
           event.stopPropagation();
+          const reason = modeJoinError(previous.payload, node.payload);
+          if (reason) { this.notice(reason); return; }
           if (node.inlineContent.length === 0) {
             this.focus.clearRemoved(resolved.nodeKey);
             this.commands.remove(resolved.nodeKey);
@@ -260,6 +264,8 @@ export class InputGateway {
         if (next) {
           if (event.cancelable) event.preventDefault();
           event.stopPropagation();
+          const reason = modeJoinError(node.payload, next.payload);
+          if (reason) { this.notice(reason); return; }
           if (next.viewType !== "standoff-editor-block") {
             queueMicrotask(() => this.focus.request(next.key, { reason: "delete-boundary", caret: "start" }));
             return;
@@ -682,6 +688,8 @@ export class InputGateway {
     start: number,
     end: number,
   ): void {
+    const reason = modeContinuationError(node.payload);
+    if (reason) { this.notice(reason); return; }
     if (this.listInput.taskEnter?.(nodeKey, start, end)) return;
     if (start === 0 && end === 0 && node.inlineContent.length === 0 && this.listInput.exitEmpty(nodeKey)) return;
     const resultingLength = node.inlineContent.length - (end - start);

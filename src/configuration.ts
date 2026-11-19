@@ -15,6 +15,8 @@
  * disabled unless a host or dedicated demo explicitly enables it.
  */
 export type FeatureFlags = Readonly<{
+  /** Explicit Block Mode authoring; retained data and safety do not depend on this flag. */
+  blockModes: boolean;
   /** Lezer-derived, session-only syntax on standoff CodeBlocks. */
   standoffCodeHighlighting: boolean;
   markdownInputTransformation: boolean;
@@ -169,6 +171,7 @@ export type FeatureFlags = Readonly<{
 }>;
 
 export const featureFlags: FeatureFlags = Object.freeze({
+  blockModes: true,
   standoffCodeHighlighting: true,
   markdownInputTransformation: true,
   verticalTabs: true,

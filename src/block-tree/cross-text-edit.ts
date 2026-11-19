@@ -1,4 +1,5 @@
 import { clipProperties } from '../interchange/ranges';
+import { hasBlockMode, modeContinuationError } from './mode-editing';
 import { clone } from "./clone";
 import { createBlockId, createContentKey, createPlacementKey } from "./ids";
 import { readBlockId } from "./identity";
@@ -16,6 +17,12 @@ function fragment(content: ContentRecord, from: number, to: number, offset: numb
 /** Pure structural plan: untouched Cells are moved, never round-tripped as text. */
 export function planCrossTextEdit(source: RepositoryState, segments: CrossTextSegment[], text: string): CrossTextEditResult {
   if (!segments.length) throw new Error("Select a text range first");
+  const moded = segments.map(s => source.contents[source.placements[s.placementKey]?.contentKey]).filter(c => c && hasBlockMode(c.payload));
+  if (moded.length && segments.length > 1) throw Error('Replacing across mode-bearing Blocks needs an explicit merge policy; nothing was changed.');
+  if (moded.length && /[\r\n]/.test(text)) {
+    const reason = modeContinuationError(moded[0].payload);
+    if (reason) throw Error(reason);
+  }
   const locations = deriveLocations(source);
   const records = segments.map(segment => {
     const placement = source.placements[segment.placementKey], content = placement && source.contents[placement.contentKey];
