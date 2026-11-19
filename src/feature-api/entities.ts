@@ -9,7 +9,10 @@ export interface EntityEvidence {kind:string;text:string;resourceId?:string;ment
 export interface EntityCandidate {id:string;name:string;evidence:EntityEvidence[];localMentions?:number}
 export interface EntityResolution {candidates:EntityCandidate[];complete:boolean;diagnostics:string[];current():void}
 export interface AuthorityRecord { typeIds?:string[];classifications?:string[];dates?:import('./entity-enrichment').EntityDate[];thumbnail?:{url:string;source?:string;attribution?:string;license?:string;licenseUrl?:string};cache?:{vault?:string;key:string;stale:boolean;fetchedAt:string}; provider:'wikidata'|'gnd'; id:string; name:string; description:string; aliases:string[]; url:string; retrievedAt:string; wikidata?:string; revision?:number }
+export interface DocumentEntityDatabaseLink {method:'user-confirmed';entityId:string;vaultId:string;vault?:string;sourceResourceId:string;sourceEntityId:string;associationId:string;revision:number}
 export interface EntityService {
+ /** Exact persistent identity association; independent of the Document's saved marker. */
+ documentAssociation?(source:{resourceId:string;entityId:string},signal:AbortSignal):Promise<{link?:DocumentEntityDatabaseLink;entity?:CanonicalEntity}>;
  historyScope?():Promise<string>;
  /** Durable Vault identity for scope-qualified references; not a filesystem location. */
  scopeIdentity?(signal?:AbortSignal):Promise<string>;

@@ -50,3 +50,22 @@ it('manual association works with authority lookup disabled and Undo clears the 
  const next=structuredClone(f.current());next.metadata.scopedEntity.identityAssociation={version:1,method:'user-confirmed',vaultId:'vault-id',entityId:'authentic'};f.scoped.commit({[next.id]:next});await f.resolver.resolve(f.current());expect(f.resolver.states()[next.id].status).toBe('linked');
  f.editor.repository.undo();f.resolver.observe([f.current()]);await vi.waitFor(()=>expect(f.resolver.states()[next.id].status).toBe('unresolved'));expect(searchAuthority).not.toHaveBeenCalled();expect(authorityDetails).not.toHaveBeenCalled();
 });
+
+it('recovers an exact database association without a local marker, authority lookup, dirtying or snapshots',async()=>{
+ const f=fixture(false),link={method:'user-confirmed' as const,vaultId:'vault-id',vault:'.',sourceResourceId:f.scoped.resourceId,sourceEntityId:f.definition.id,entityId:'authentic',associationId:'link',revision:0};
+ const lookup=vi.fn(async()=>({link,entity:{id:'authentic',name:'Bologna',revision:1,aliases:[]}}));Object.assign(f.service,{documentAssociation:lookup});
+ const revision=f.editor.repository.state.revision,snapshot=vi.spyOn(f.editor.repository,'snapshot');await f.resolver.resolve(f.current());
+ expect(f.resolver.states()[f.definition.id]).toMatchObject({status:'linked',databaseChecked:true,databaseLink:link,canonical:{id:'authentic'}});
+ expect(f.current().metadata.scopedEntity.identityAssociation).toBeUndefined();expect(f.editor.repository.state.revision).toBe(revision);expect(snapshot).not.toHaveBeenCalled();expect(searchAuthority).not.toHaveBeenCalled();expect(authorityDetails).not.toHaveBeenCalled();
+ expect(lookup).toHaveBeenCalledWith({resourceId:f.scoped.resourceId,entityId:f.definition.id},expect.any(AbortSignal));
+});
+it('does not publish late recovered associations and distinguishes failed lookup from no association',async()=>{
+ const f=fixture(false);let finish!:(v:any)=>void;const lookup=vi.fn(()=>new Promise<any>(r=>finish=r));Object.assign(f.service,{documentAssociation:lookup});
+ const pending=f.resolver.resolve(f.current());await vi.waitFor(()=>expect(finish).toBeTypeOf('function'));f.suspend();finish({link:{sourceResourceId:f.scoped.resourceId,sourceEntityId:f.definition.id},entity:{id:'target'}});await pending;expect(f.resolver.states()[f.definition.id].status).not.toBe('linked');
+ const other=fixture(false);Object.assign(other.service,{documentAssociation:vi.fn(async()=>{throw Error('Database unavailable');})});await other.resolver.resolve(other.current());expect(other.resolver.states()[other.definition.id]).toMatchObject({status:'unavailable',databaseChecked:false});
+ Object.assign(other.service,{documentAssociation:vi.fn(async()=>({}))});await other.resolver.resolve(other.current());expect(other.resolver.states()[other.definition.id]).toMatchObject({status:'unresolved',databaseChecked:true});
+});
+it('reports a missing Cavern as an unavailable link check instead of an unhandled selection error',async()=>{
+ const f=fixture(false);const unregister=registerStandaloneEntityService(f.editor,()=>{throw Error('Open a vault first');});clean.push(unregister);
+ await expect(f.resolver.resolve(f.current())).resolves.toBeUndefined();expect(f.resolver.states()[f.definition.id]).toMatchObject({status:'unavailable',databaseChecked:false,message:expect.stringContaining('Open a vault first')});
+});

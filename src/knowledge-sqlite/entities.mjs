@@ -35,7 +35,10 @@ export function canonicalEntities(db, request, check = () => {}, ledger = canoni
   if(op?.startsWith('scholarly-'))return scholarly(db,request,ledger,check);
   if (!entityMutation(op)) return db.transaction(() => {
     const revision = sqlRevision(db); let result;
-    if (op === 'current') result = {};
+    if (op === 'document-association') {
+      const association=db.prepare('SELECT guid,sourceResourceGuid,sourceEntityGuid,entityGuid,revision FROM DocumentEntityAssociation WHERE sourceResourceGuid=? AND sourceEntityGuid=?').get(string(request.resourceId,512),string(request.entityId,512));
+      result={vaultId:db.prepare("SELECT value FROM SchemaInfo WHERE key='vaultGuid'").get().value,association:association??null,entity:association?entity(db,association.entityGuid):undefined};
+    } else if (op === 'current') result = {};
     else if (op === 'names' || op === 'db-mentions') {
       if (!Array.isArray(request.ids) || request.ids.length > 500) throw Error('List at most 500 Entities per batch');
       const ids = [...new Set(request.ids.map(id => string(id,512)))];

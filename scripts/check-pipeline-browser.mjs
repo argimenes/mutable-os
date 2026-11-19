@@ -77,6 +77,12 @@ try{
  assert.equal(await evaluate("document.querySelector('.semantics-list-item[aria-pressed=true] .semantics-identity-badge')?.textContent"),'Linked to database');
  await writeFile(path.join(directory,'bologna-linked.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
  assert.ok(bologna.canonical.aliases.some(a=>a.name==='Bononia'));assert.deepEqual(bologna.canonical.attributes.enrichment.subtypes,['City']);assert.deepEqual(bologna.canonical.attributes.enrichment.externalIds,[{namespace:'wikidata',value:'Q1891'}]);
+ // Reopening the older saved Document has no marker, but the audited database association survives.
+ const markerRevision=await evaluate('window.identityFixture.removeBolognaMarker()');
+ await waitFor("document.querySelector('.semantics-identity-status')?.textContent.includes('recovered from the database')");
+ assert.equal(await evaluate("document.querySelector('.semantics-identity-name')?.textContent"),'Bologna');
+ assert.equal(await evaluate('window.identityFixture.editor.repository.state.revision'),markerRevision,'recovery must not modify or save the Document');
+ await writeFile(path.join(directory,'bologna-recovered.png'),Buffer.from((await send('Page.captureScreenshot',{format:'png'},sessionId)).data,'base64'));
  // The alternate route creates a new canonical Entity, retaining its local source.
  await evaluate("[...document.querySelectorAll('.semantics-list-item')].find(b=>b.textContent.includes('Beatrice')).click()");await click('Resolve Entity Identity…');await click('No Matching Identity');await waitFor("!!window.identityFixture.button('Confirm Import')&&!window.identityFixture.button('Confirm Import').disabled");
  assert.equal(await evaluate("document.querySelectorAll('.pipeline-pipe:not([hidden])').length"),2);

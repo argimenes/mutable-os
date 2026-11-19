@@ -85,12 +85,12 @@ it('revalidates the displayed link before opening Cardex and reports unavailable
  const execute=vi.spyOn(f.editor.commandRegistry,'execute').mockResolvedValue(undefined),open=()=>[...document.querySelectorAll<HTMLButtonElement>('.semantics-detail button')].find(b=>b.textContent==='Open linked Entity')!;
  f.setAuthorityStates({[next.id]:{status:'unavailable',message:'The reviewed authentic Entity is unavailable'}});open().click();await vi.waitFor(()=>expect(document.querySelector('.semantics-identity-status [role="alert"]')?.textContent).toContain('unavailable'));expect(execute).not.toHaveBeenCalled();
  f.setAuthorityStates({[next.id]:{status:'linked',canonical:{id:'bologna-sql',name:'Bologna',revision:0,aliases:[]}}});open().click();await vi.waitFor(()=>expect(execute).toHaveBeenCalledWith('cardex.entity.open',{targetKey:f.root.key,args:{id:'bologna-sql',vault:'/vault'}}));
- expect(f.c.authorityResolution.resolve).toHaveBeenCalledTimes(2);
+ expect(f.c.authorityResolution.resolve).toHaveBeenCalledTimes(3);
  const inventory=vi.mocked(f.c.semanticInventory).mock.calls.length,reads=vi.spyOn(ScopedEntities.prototype,'registry'),snapshot=vi.spyOn(f.editor.repository,'snapshot'),requests=f.reader.get.mock.calls.length;
  const text=Object.values(f.view.state.nodes).find(n=>n.payload.id==='text')!;for(let i=0;i<30;i++)f.editor.commands.replaceInlineRange(text.key,0,0,'x');
  expect(reads).not.toHaveBeenCalled();expect(snapshot).not.toHaveBeenCalled();expect(vi.mocked(f.c.semanticInventory).mock.calls.length).toBe(inventory);expect(f.reader.get.mock.calls.length).toBe(requests);
  for(let i=0;i<30;i++)f.editor.repository.undo();
- f.editor.repository.undo();expect(document.querySelector('.semantics-detail')?.textContent).toContain('No database link recorded in this Document');expect(document.querySelector('.semantics-identity-badge')).toBeNull();
+ f.editor.repository.undo();expect(document.querySelector('.semantics-detail')?.textContent).toContain('Database link has not yet been checked.');expect(document.querySelector('.semantics-identity-badge')).toBeNull();
 });
 
 it('a retained Semantics panel reads the current Conversation resolver instead of capturing an earlier runtime',()=>{

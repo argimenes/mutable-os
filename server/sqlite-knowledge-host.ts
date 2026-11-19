@@ -251,7 +251,7 @@ export class SqliteKnowledgeHost {
    * read-only connection keeps them out of the writer's reconciliation queue. */
   async entityLookup(body:any,signal?:AbortSignal,archive=false){
     if(this.closed || this.options.entitiesEnabled===false)throw Error('Canonical Entity service is unavailable');
-    if(typeof body.vault!=='string' || !(archive || ['search','get','authority-lookup'].includes(body.request?.op)))throw Error('Invalid Entity lookup');
+    if(typeof body.vault!=='string' || !(archive || ['search','get','authority-lookup','document-association'].includes(body.request?.op)))throw Error('Invalid Entity lookup');
     signal?.throwIfAborted();
     const root=await this.store.resolve(body.vault),file=await this.store.resolve(path.posix.join(body.vault,'.mutable/mutable.db'));
     const stamp=await stat(file),identity=`${stamp.dev}:${stamp.ino}`;

@@ -114,6 +114,13 @@ export function entityService(editor:ReactiveEditor,owner:string):EntityService 
  };
  return {
   historyScope:()=>lookupRoot(),
+  async documentAssociation(source,signal){
+   const vault=await lookupRoot(signal),result=await request('entity-lookup',{vault,request:{op:'document-association',...source}},signal);lookupCurrent();
+   if(await lookupRoot(signal)!==vault)throw Error('Entity lookup Vault changed');
+   if(result.entity?.attributes!==undefined)result.entity.attributes=decodeAuthoredValue(result.entity.attributes);
+   const a=result.association;
+   return {entity:result.entity,link:a?{method:'user-confirmed',entityId:a.entityGuid,vaultId:result.vaultId,vault,sourceResourceId:a.sourceResourceGuid,sourceEntityId:a.sourceEntityGuid,associationId:a.guid,revision:a.revision}:undefined};
+  },
   async scopeIdentity(signal){const vault=await lookupRoot(signal),result=await request('propositions',{vault,request:{op:'context'}},signal);lookupCurrent();if(typeof result.vaultGuid!=='string'||!result.vaultGuid)throw Error('Vault identity unavailable');return result.vaultGuid;},
   async authorityLookup(record,signal){const vault=await lookupRoot(signal),result=await request('entity-lookup',{vault,request:{op:'authority-lookup',record}},signal);lookupCurrent();if(result.entity?.attributes!==undefined)result.entity.attributes=decodeAuthoredValue(result.entity.attributes);return result.entity;},
   async acquireIdentity(input){return mutate({op:'authority-import',...input});},
