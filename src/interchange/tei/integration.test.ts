@@ -46,7 +46,7 @@ it.each([true,false])('passes semantic feature selection through the actual impo
  const points=Object.values(resource.contents).flatMap(c=>c.payload.standoffProperties as any[]??[]);
  expect(points.some(p=>p.isZeroWidth)).toBe(enabled);
  const root=Object.values(resource.contents).find(c=>c.viewType==='document-block')!;
- expect((root.payload.metadata as any).tei.conversion?.milestone).toBe(enabled?2:undefined);
+ expect((root.payload.metadata as any).tei.conversion?.milestone).toBe(enabled?3:undefined);
  expect(Object.values(resource.contents).some(c=>c.viewType==='text-cell')).toBe(false);
 });
 it('enforces the feature flag and keeps existing documents unchanged on disabled, oversized, cancelled and stale imports',async()=>{
@@ -81,4 +81,13 @@ it.each(['html','markdown','text'] as const)('wraps the %s full-document convert
 });
 it.each(['image-block','mutable/structured-resource-block','mutable/academic-resource-block'])('wraps already prepared %s without inventing another page',type=>{
  const fragment=plainFragment('payload');fragment.blocks[0].type=type;const wrapped=documentFragment(fragment,'Title','Title.ink');expect(wrapped.blocks.filter(b=>b.type==='page-block')).toHaveLength(1);expect(wrapped.blocks.find(b=>b.type===type)).toBeTruthy();
+});
+
+it.each([true,false])('passes the operational feature flag through worker preparation (enabled=%s)',async enabled=>{
+ const e=setup({features:{teiOperationalSemantics:enabled}}),open=vi.fn();
+ await e.interchange.importNew([file('relations.tei','<TEI><listPerson><person xml:id="a"><persName>A</persName></person><person xml:id="b"><persName>B</persName></person></listPerson><relation name="knows" active="#a" passive="#b"/></TEI>')],{current:()=>true,open});
+ const resource=captureNative(e.repository.readState(),open.mock.calls[0][0]),root=Object.values(resource.contents).find(c=>c.viewType==='document-block')!;
+ const defs=Object.values(root.payload.linkedAnnotations as any) as any[];
+ expect(defs.flatMap(d=>Object.values(d.metadata?.gloss?.links??{}))).toHaveLength(enabled?1:0);
+ expect((root.payload.metadata as any).tei.conversion.milestone).toBe(enabled?3:2);
 });

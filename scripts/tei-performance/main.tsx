@@ -9,6 +9,7 @@ import { runInterchange } from '../../src/runtime/interchange-worker';
 import { captureNative, nativeText, decodeNative, admitNative } from '../../src/persistence/native-resource';
 import small from '../../src/interchange/tei/fixtures/A040080.xml?raw';
 import large from '../../src/interchange/tei/fixtures/A041209.xml?raw';
+import operational from '../../src/interchange/tei/fixtures/operational-semantics.xml?raw';
 import semantic from '../../src/interchange/tei/fixtures/semantic-sublimation.xml?raw';
 import '../../src/assets/reset.css';
 import '../../src/index.css';
@@ -137,4 +138,80 @@ let cleanup = () => {};
 
  cleanup=()=>{stop();editor.dispose();host.remove();};
  return {name,compactCanonicalText,canonicalCells,canonicalWorkspaceCells,captureMs,saveMs,reopenMs,undoMs,redoMs,settled:stats(settled),display:stats(display),sync:stats(samples),host:'Flint application',repositoryBefore,work,projectionEvents,notifications,reactiveRuns,admissionSnapshots,openSynchronousMs,framesMs,sourceBytes:new TextEncoder().encode(sources[name]).length,...result.stats,counts:result.counts,nativeBytes:result.bytes.length,timings:result.timings,workerMs:(result as any).workerMs,workerRoundTripMs:received-start,transferAndDispatchMs:performance.timeOrigin+received-(result as any).sentAt,admissionMs:admitted-received,admissionTimings,candidateMs:candidate-admitted,projectionMs,openAndRenderMs:usable-candidate,usableMs:usable-start,metadataMs,metadataSyncMs,pageCount,truncated:result.truncated,candidate:session.isCandidate(result.id),dirty:session.isDirty(result.id),heapBefore,heapMounted,heapMetadata:memory(),typing:{samples:samples.length,medianMs:stats(samples).median,p95Ms:stats(samples).p95,snapshots:typingSnapshots,restored}};
+};
+
+// Operational UI qualification in the real Flint host. Only isolated candidates
+// and in-memory manual-save bytes are used; no user document is written.
+(window as any).teiOperationalSetup = async (compactCanonicalText=true) => {
+ cleanup();
+ const {materializeLocalWorkspace}=await import('../../src/reactive-editor/workspace-manifest');
+ const {documentApplicationPorts}=await import('../../src/application/document-application-ports');
+ const {nativeDocumentSession}=await import('../../src/persistence/native-session');
+ const {glossPresentationControls}=await import('../../src/features/gloss/presentation-context');
+ const {WorkspaceSession}=await import('../../src/application/workspace-session');
+ const {WorkspacePresentationView}=await import('../../src/application/workspace-presentation-view');
+ const workspaceSession=new WorkspaceSession(materializeLocalWorkspace({id:'operational-workspace',type:'workspace-block',children:[]}),{features:{compactCanonicalText,nativeKnowledge:false,sqliteKnowledge:false,entityReferences:false,desktopApplicationIcons:false}});
+ const editor=workspaceSession.editor,workspace=workspaceSession.projection;
+ editor.commandRegistry.execute('flint.open',{targetKey:workspace.state.rootKey,args:undefined});
+ const host=document.body.appendChild(document.createElement('div'));
+ host.className='workspace-demo workspace-demo--canonical';host.dataset.windowWorkArea='';host.style.cssText='position:fixed;inset:0';
+ const stop=render(()=><WorkspacePresentationView session={workspaceSession}/>,host);editor.installGateway(document);await frame();
+ const app=documentApplicationPorts(editor).ports()[0].application;
+ const prepared=await runInterchange({kind:'tei-document',file:{name:'operational.xml',blob:new Blob([operational])}},new AbortController().signal);
+ const bank=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='workspace-object-bank-block')!;
+ admitNative(editor.repository,prepared.bytes,bank.key);nativeDocumentSession(editor).trackCandidate(prepared.id);app.openDocument(prepared.id);await frame();
+ const session=editor.documentSessions!.sessions().find(s=>s.projection.node(s.rootKey)?.payload.id===prepared.id)!;
+ const controls=glossPresentationControls(session)!;controls.toggle();await frame();
+ const index=(session.element as any).glossIndex, milestones=(session.element as any).teiMilestoneIndex;
+ if(!index||!milestones)throw Error('Operational inventories did not mount in Flint');
+ const root=editor.repository.readState().contents[session.projection.node(session.rootKey)!.contentKey];
+ const ada=index.rows[0]().find((r:any)=>r.data().source?.sourceId==='ada');
+ controls.inspectDefinition!(ada.definitionId);await frame();
+ const clickElement=async(button:HTMLElement)=>{
+  for(let parent=button.parentElement;parent;parent=parent.parentElement)if(parent instanceof HTMLDetailsElement)parent.open=true;
+  button.scrollIntoView({block:'center'});await frame();const r=button.getBoundingClientRect();
+  if(!r.width||!r.height||!button.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)))throw Error('Navigation control is obscured: '+button.textContent+' '+JSON.stringify({x:r.x,y:r.y,w:r.width,h:r.height}));
+  await (window as any).teiTrustedClick(r.x+r.width/2,r.y+r.height/2);await frame();
+ };
+ const click=async(selector:string,label:string)=>{const button=[...host.querySelectorAll<HTMLButtonElement>(selector)].find(b=>b.textContent?.trim()===label);if(!button)throw Error('Missing UI: '+label);await clickElement(button);};
+ const original=nativeText(captureNative(editor.repository.readState(),prepared.id));
+ const initialMention=ada.occurrences().find((o:any)=>o.role==='tei/mention'),initialRange=index.range(initialMention);
+ editor.gloss.open(initialMention.nodeKey,{anchor:initialRange.start,head:initialRange.end},ada.definitionId);await frame();
+ const popupButton=[...document.querySelectorAll<HTMLButtonElement>('.gloss-input button')].find(b=>b.textContent==='Definition and mentions')!;
+ if(!popupButton)throw Error('Mention popup lacks source-definition navigation');await clickElement(popupButton);
+ const definitionPopup=!document.querySelector('.gloss-input')&&!!host.querySelector('.tei-definition-details');
+ await click('.tei-definition-details button','Source definition 1');
+ const definitionVisible=[...host.querySelectorAll('[role=tab][aria-selected=true]')].some(b=>b.textContent==='Metadata');
+ await click('.tei-definition-details button','Mention 1');
+ const mentionVisible=[...host.querySelectorAll('[role=tab][aria-selected=true]')].some(b=>b.textContent==='Text');
+ const links=index.relationships.relations(ada.localId).activeOutgoing;
+ const points=[];
+ for(const li of host.querySelectorAll<HTMLElement>('.tei-milestones li')){
+  await clickElement(li.querySelector<HTMLButtonElement>('button')!);
+  const focused=editor.focus.state.focusedKey,selection=focused&&editor.mounts.get(focused)?.captureInlineSelection?.();
+  const h=focused&&editor.mounts.get(focused),r=h&&h.focusElement.getBoundingClientRect(),p=h&&h.root.closest('.reactive-document-occurrence__content')!.getBoundingClientRect();
+  points.push({label:li.querySelector('strong')!.textContent,selection,visible:!!r&&!!p&&r.bottom>p.top&&r.top<p.bottom});
+ }
+ const navigationUnchanged=nativeText(captureNative(editor.repository.readState(),prepared.id))===original;
+ // Return to an ordinary mention for trusted CDP typing with both panels active.
+ await click('.tei-definition-details button','Mention 1');
+ const mention=ada.occurrences().find((o:any)=>o.role==='tei/mention'),mount=editor.mounts.get(mention.nodeKey)!;
+ mount.focus();mount.restoreInlineSelection!({anchor:0,head:0});editor.selections.setPrimary(mention.nodeKey,editor.node(mention.nodeKey)!.contentKey,session.projection.viewId,0,0);
+ const mentionRect=mount.focusElement.getBoundingClientRect();
+ const pane=mount.root.closest('.reactive-document-occurrence__content')!.getBoundingClientRect();
+ const mentionVisibleInPane=mentionRect.bottom>pane.top&&mentionRect.top<pane.bottom;
+ const mentionSelection=mount.captureInlineSelection?.();
+ const before=mount.focusElement.textContent,inventoryBefore={...milestones.diagnostics},glossBefore={...index.diagnostics},graphBefore={...index.relationships.diagnostics};
+ let snapshots=0;const snapshot=editor.repository.snapshot.bind(editor.repository);editor.repository.snapshot=()=>{snapshots++;return snapshot();};
+ (window as any).teiOperationalFinish=async()=>{
+  const inserted=mount.focusElement.textContent==='X'+before;editor.repository.undo();const undone=mount.focusElement.textContent===before;editor.repository.redo();const redone=mount.focusElement.textContent==='X'+before;editor.repository.undo();
+  const unchangedInventories=milestones.diagnostics.treeVisits===inventoryBefore.treeVisits&&milestones.diagnostics.definitionReads===inventoryBefore.definitionReads&&milestones.diagnostics.rowPublications===inventoryBefore.rowPublications&&index.diagnostics.treeVisits===glossBefore.treeVisits&&index.diagnostics.definitionReads===glossBefore.definitionReads&&JSON.stringify(index.relationships.diagnostics)===JSON.stringify(graphBefore);
+  const typingSnapshots=snapshots;editor.repository.snapshot=snapshot;
+  let saved='';const pair=new ResourcePair(editor.repository,prepared.id,{save:async generation=>{saved=generation.native;return {phase:'saved',generation:generation.generation};},recover:async()=>({phase:'failed'})},()=>[]);const save=await pair.save();
+  const reloaded=decodeNative(new TextEncoder().encode(saved),undefined,compactCanonicalText);
+  const result={compactCanonicalText,definitionPopup,mentionVisibleInPane,mentionSelection,definitionVisible,mentionVisible,relationships:links.length,points,navigationUnchanged,inserted,undone,redone,unchangedInventories,typingSnapshots,savePhase:save.phase,reloadEqual:nativeText(reloaded)===saved,canonicalCells:Object.values(reloaded.contents).filter(c=>c.viewType==='text-cell').length,sourceDetails:host.textContent?.includes('Source ID: ada')};
+  return result;
+ };
+ cleanup=()=>{stop();workspaceSession.dispose();host.remove();};
+ return {ready:true};
 };

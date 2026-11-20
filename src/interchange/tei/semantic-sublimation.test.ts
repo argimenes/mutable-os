@@ -127,7 +127,7 @@ it.each([true, false])('completes semantic conversion before native admission an
   }
   const projection = await projectSaved(saved, '12345678-1234-1234-1234-123456789abc');
   expect(projection.blocks.flatMap(b => b.segments).some(p => p.startIndex === p.endIndex)).toBe(true);
-  expect((d.metadata as any).interchange.provenance).toMatchObject({ filename: 'scholarly.xml', converter: 'tei/semantic-sublimation-v2' });
+  expect((d.metadata as any).interchange.provenance).toMatchObject({ filename: 'scholarly.xml', converter: 'tei/operational-semantics-v3' });
   expect(JSON.stringify(d)).not.toContain('<TEI');
 });
 

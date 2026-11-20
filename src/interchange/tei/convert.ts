@@ -1,3 +1,4 @@
+import { promoteTeiRelationships } from './relationships';
 import type { ExistingBlockDto, JsonObject } from '../../block-tree/types';
 import { containerModes, textModes, validateTeiDeclarations } from './definitions';
 import { Diagnostics, incompleteMessage, isTei, nodeText, TeiBudget, teiLimits, type TeiConversionOptions, type TeiLimits, type TeiNode } from './model';
@@ -8,7 +9,7 @@ import { validateTeiDocument } from './validate';
 type Block = ExistingBlockDto & { id: string; children?: Block[]; text?: string; standoffProperties?: JsonObject[] };
 type Mark = { id: string; type: string; metadata?: JsonObject; linked: boolean };
 interface Context {
-  marks: Mark[]; preserve?: boolean; language?: string; base?: string; header?: boolean; textual?: boolean;
+  marks: Mark[]; unsupportedRelationContext?: boolean; preserve?: boolean; language?: string; base?: string; header?: boolean; textual?: boolean;
   headerRole?: 'title' | 'author'; titleStmt?: boolean; action?: JsonObject; correspondence?: JsonObject;
   actionRole?: string; dateRole?: string; section: number; textMode?: string;
 }
@@ -17,6 +18,7 @@ const editorial: Readonly<Record<string, string>> = Object.freeze(Object.assign(
 const richEditorial: Readonly<Record<string, string>> = Object.freeze(Object.assign(Object.create(null), { ...editorial, subst: 'substitution', surplus: 'surplus', gap: 'gap', damage: 'damage', restore: 'restoration', handShift: 'hand-shift' }));
 const pointRoles: Readonly<Record<string, string>> = Object.freeze(Object.assign(Object.create(null), { pb: 'page-break', lb: 'line-break', cb: 'column-break', milestone: 'milestone', anchor: 'anchor', space: 'space' }));
 const mentionKinds: Readonly<Record<string, string>> = Object.freeze(Object.assign(Object.create(null), { 'tei/person-name': 'person', 'tei/place-name': 'place', 'tei/organisation-name': 'org', 'tei/name': '*' }));
+const relationContainers = ['TEI', 'teiHeader', 'fileDesc', 'profileDesc', 'particDesc', 'text', 'front', 'body', 'back', 'div', 'p', 'listRelation', 'listPerson', 'listOrg', 'listPlace', 'person', 'org', 'place'];
 const structural = new Set(['TEI', 'p', ...Object.keys(containerModes), ...Object.keys(textModes), 'choice', 'app', 'fileDesc', 'titleStmt', 'publicationStmt', 'sourceDesc', 'profileDesc', 'particDesc', 'listPerson', 'person', 'listOrg', 'org', 'listPlace', 'place', 'revisionDesc', 'encodingDesc']);
 const refs = new Set(['ref', 'target', 'corresp', 'who', 'ana', 'wit', 'facs', 'sameAs', 'next', 'prev', 'resp', 'source']);
 const knownAttributes = new Set(['xml:id', 'xml:lang', 'xml:space', 'xml:base', 'type', 'subtype', 'n', 'rend', 'rendition', 'when', 'from', 'to', 'notBefore', 'notAfter', 'calendar', 'reason', 'cert', 'place', 'break', 'unit', 'quantity', ...refs]);
@@ -27,6 +29,7 @@ export function convertTei(source: string | Uint8Array, options: Partial<TeiLimi
 }
 function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, filename: string, fragmentOperation: boolean, timings?: Record<string, number>, conversion: TeiConversionOptions = {}) {
   const rich = conversion.semanticSublimation !== false;
+  const operational = rich && conversion.operationalSemantics !== false;
   const editorialRoles = rich ? richEditorial : editorial;
   const roleId = (role: string) => rich ? `tei/${role}` : role;
   const alternative = (n: TeiNode) => isTei(n) && (['choice', 'app'].includes(n.name) || rich && n.name === 'rdgGrp');
@@ -55,7 +58,9 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
   function context(n: TeiNode, parent: Context): Context {
     let base = parent.base;
     if (n.attrs['xml:base']) { try { base = parent.base ? new URL(n.attrs['xml:base'], parent.base).href : n.attrs['xml:base']; } catch { base = n.attrs['xml:base']; } }
-    return { ...parent, preserve: n.attrs['xml:space'] ? n.attrs['xml:space'] === 'preserve' : parent.preserve,
+    const unsupportedRelationContext = parent.unsupportedRelationContext || n.name !== 'relation' &&
+      (!isTei(n) || !relationContainers.includes(n.name) || Object.keys(n.attrs).some(k => !['xmlns', 'xml:id', 'xml:lang', 'xml:base'].includes(k) && !k.startsWith('xmlns:')));
+    return { ...parent, unsupportedRelationContext, preserve: n.attrs['xml:space'] ? n.attrs['xml:space'] === 'preserve' : parent.preserve,
       language: n.attrs['xml:lang'] ?? parent.language, base };
   }
   function metadata(n: TeiNode, ctx: Context, role: string): JsonObject {
@@ -79,12 +84,12 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
     let map = spans.get(b); if (!map) spans.set(b, map = new Map());
     let p = map.get(m.id);
     if (p) { p.end = end; p.start = Math.min(Number(p.start), start); return; }
-    propertyBudget(); p = { id: id(), type: m.type, start, end, ...(m.linked ? { annotationId: m.id } : {}), ...(!m.linked && m.metadata ? { metadata: m.metadata } : {}) };
+    propertyBudget(); p = { id: id(), type: m.type, start, end, ...(m.linked ? { annotationId: m.id } : {}), ...(operational && m.type === 'mutable/gloss' ? { metadata: { tei: { role: 'tei/definition' } } } : {}), ...(!m.linked && m.metadata ? { metadata: m.metadata } : {}) };
     map.set(m.id, p); (b.standoffProperties ??= []).push(p);
   }
   function point(b: Block, m: Mark) {
     propertyBudget(); const start = lengths.get(b)!;
-    (b.standoffProperties ??= []).push({ id: id(), type: m.type, annotationId: m.id, start, end: start, isZeroWidth: true });
+    (b.standoffProperties ??= []).push({ id: id(), type: m.type, annotationId: m.id, start, end: start, isZeroWidth: true, ...(operational && m.type === 'mutable/gloss' ? { metadata: { tei: { role: 'tei/definition' } } } : {}) });
   }
   function identifyBlock(n: TeiNode, b: Block, ctx: Context, force = false) {
     references.identify(n.attrs['xml:id'], { kind: 'block', id: b.id });
@@ -104,6 +109,10 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
     if (rich && type === 'tei/editorial') {
       const parent = [...ctx.marks].reverse().find(m => m.type === 'tei/editorial');
       if (parent) meta.parentEditorialId = parent.id;
+    }
+    if (operational && type === 'tei/relationship') {
+      if (ctx.unsupportedRelationContext) meta.unsupportedContext = true;
+      if (n.parts.some(p => typeof p !== 'string' || p.trim())) meta.unsupportedContent = true;
     }
     const m = mark(type, meta, n), result = [m];
     if (ctx.action && isTei(n)) {
@@ -254,7 +263,7 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
       definitions[m.id].value = `entity: ${label}`; next.marks = [...ctx.marks, m];
     } else identifyBlock(n, b, ctx);
     if (!mode && !structural.has(n.name)) diagnostics.add('generic-element', 'Unsupported elements kept readable content and recognised descendants in native structures.', n.name);
-    b.children = flow(n.parts, next);
+    b.children = flow(n.parts, next, operational && isTei(n) && ['person', 'org', 'place'].includes(n.name));
     if (isTei(n) && n.name === 'correspAction' && !b.children.length) b.children = flow([`[Imported ${n.attrs.type ?? 'unspecified'} action — participant not recorded]`], next, true);
     if (n.name === 'teiHeader' && isTei(n)) { headers.push(b); return []; }
     return [b];
@@ -283,8 +292,12 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
     }) : []) ?? [];
     for (const target of new Set(targets)) {
       if (properties >= limits.annotations) { diagnostics.add('entity-link-limit', 'Local Entity links exceeded the annotation budget; semantic mentions and reference states remain.'); break; }
-      propertyBudget(); b.standoffProperties!.push({ id: id(), type: 'mutable/gloss', annotationId: target, start: p.start, end: p.end, ...(p.isZeroWidth ? { isZeroWidth: true } : {}) });
+      propertyBudget(); b.standoffProperties!.push({ id: id(), type: 'mutable/gloss', annotationId: target, start: p.start, end: p.end, ...(operational ? { metadata: { tei: { role: 'tei/mention', sourceAnnotationId: p.annotationId } } } : {}), ...(p.isZeroWidth ? { isZeroWidth: true } : {}) });
     }
+  }
+  if (operational) {
+    const { preserved } = promoteTeiRelationships(definitions);
+    for (let i = 0; i < preserved; i++) diagnostics.add('relationship-preserved', 'Relationship assertions outside the supported unqualified local binary subset remain inspectable TEI records, without active edges.');
   }
   stage('referenceResolution');
   // Fixed, small assembly/notice reserve is outside source-content budgets.
@@ -293,8 +306,8 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
   const roots = headers.length ? [fixed('tab-row-block', { children: [fixed('tab-block', { metadata: { name: 'Text', active: true }, children: content }), fixed('tab-block', { metadata: { name: 'Metadata', active: false }, children: headers })] })] : content;
   if (truncated) roots.unshift(fixed('standoff-editor-block', { text: incompleteMessage, blockProperties: [{ id: id(), type: 'block/font/size', value: 'h2' }] }));
   const document: Block = fixed('document-block', { id: documentId, metadata: { documentId, title: title || filename.replace(/\.(tei|xml)$/i, ''),
-    ...(rich ? { interchange: { provenance: { version: 1, filename: filename.split(/[\\/]/).at(-1)!, format: 'tei', converter: 'tei/semantic-sublimation-v2' } } } : {}),
-    tei: { version: 1, ...(rich ? { conversion: { type: 'tei/conversion', milestone: 2, alternativeSelection: 'tei/source-order', pointConvention: 'tei/equal-endpoints', references: 'tei/import-time-observation' } } : {}), ...(sourceId ? { sourceId } : {}), ...(sourceMetadata ? { source: sourceMetadata } : {}), header, truncated } }, linkedAnnotations: definitions, children: [fixed('page-block', { children: roots })] });
+    ...(rich ? { interchange: { provenance: { version: 1, filename: filename.split(/[\\/]/).at(-1)!, format: 'tei', converter: operational ? 'tei/operational-semantics-v3' : 'tei/semantic-sublimation-v2' } } } : {}),
+    tei: { version: 1, ...(rich ? { conversion: { type: 'tei/conversion', milestone: operational ? 3 : 2, alternativeSelection: 'tei/source-order', pointConvention: 'tei/equal-endpoints', references: 'tei/import-time-observation' } } : {}), ...(sourceId ? { sourceId } : {}), ...(sourceMetadata ? { source: sourceMetadata } : {}), header, truncated } }, linkedAnnotations: definitions, children: [fixed('page-block', { children: roots })] });
   stage('assembly');
   validateTeiDocument(document);
   stage('teiValidation');

@@ -3,7 +3,7 @@ export interface TeiLimits {
   bytes: number; cells: number; elements: number; depth: number; blocks: number;
   annotations: number; references: number; diagnosticExamples: number; timeoutMs: number;
 }
-export interface TeiConversionOptions { semanticSublimation?: boolean }
+export interface TeiConversionOptions { semanticSublimation?: boolean; operationalSemantics?: boolean }
 export const defaultTeiLimits: Readonly<TeiLimits> = Object.freeze({
   bytes: 64 * 1024 * 1024, cells: 5_000_000, elements: 1_000_000, depth: 128,
   blocks: 100_000, annotations: 500_000, references: 500_000, diagnosticExamples: 100, timeoutMs: 120_000,

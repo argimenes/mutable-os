@@ -105,6 +105,8 @@ export type FeatureFlags = Readonly<{
   teiImport: boolean;
   /** Rich TEI alternatives, exact points and editorial semantics on new imports. */
   teiSemanticSublimation: boolean;
+  /** Local TEI relationships and semantic navigation; no external knowledge writes. */
+  teiOperationalSemantics: boolean;
   /** Persistent Library listings with background filesystem reconciliation. */
   vaultDiscoveryCache: boolean;
   /** Accepted loaded-resource provider; false retains the legacy rollback. */
@@ -226,6 +228,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   nativeDocumentPersistence: true,
   teiImport: true,
   teiSemanticSublimation: true,
+  teiOperationalSemantics: true,
   vaultDiscoveryCache: true,
   nativeKnowledge: true,
   nativeKnowledgeSaved: false,

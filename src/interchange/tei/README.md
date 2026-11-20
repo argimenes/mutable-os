@@ -1,4 +1,4 @@
-# TEI importer — Milestones 1 and 2
+# TEI importer — Milestones 1–3
 
 Use **Import external files as new Ink documents**. `.tei` selects this converter automatically; for `.xml`, choose **TEI P5 XML** explicitly. The result is an unsaved native document. Save manually to a native filename; the XML source is never overwritten.
 
@@ -10,6 +10,24 @@ The document always owns one Page. When a header exists, the existing native tab
 set it false to retain M1's contextual milestone conversion. Saved documents are
 not migrated when either flag changes. New semantic roles use `tei/`; historical
 unprefixed role values remain readable.
+
+`teiOperationalSemantics` defaults on. New imports promote only unqualified,
+explicitly directed binary relationships between uniquely resolved local person,
+organisation or place definitions. Other assertions remain `tei/relationship`
+records with diagnostics. Native Gloss relationships can be inspected and followed
+in **Gloss Mode → Local References → References / Graph**.
+
+Open **TEI milestones** in the References panel to inspect source labels/attributes
+and navigate exact current positions, including hidden reading tabs and empty/EOF
+boundaries. Local entity rows provide **Source definition**, **Imported source
+details** and **Explicit mentions**; a mention's Gloss popup offers **Definition
+and mentions**. These identities are document-local, not canonical Entity IDs.
+Older imports without occurrence roles retain generic Passage navigation.
+
+Set `operationalSemantics: false` in headless conversion (or disable the editor
+flag) for M2 conversion. Flag changes do not migrate saved data. Save remains manual.
+Continuous inline alternatives await the separately documented native qualification;
+grouped source-order tabs remain supported. No XML archive or Source tab is created.
 
 ## Configuration and headless use
 
