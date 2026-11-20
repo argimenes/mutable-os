@@ -158,3 +158,26 @@ The follow-up findings and retained/rejected changes are documented in
 [NATIVE_DOCUMENT_ADMISSION_ARCHITECTURAL_QUALIFICATION.md](../../NATIVE_DOCUMENT_ADMISSION_ARCHITECTURAL_QUALIFICATION.md)
 and [NATIVE_DOCUMENT_ADMISSION_PERFORMANCE_REPORT.md](../../NATIVE_DOCUMENT_ADMISSION_PERFORMANCE_REPORT.md).
 The final qualification is conditional; release-blocking targets remain open.
+
+## Milestone 5 native alternative transfer
+
+Build and serve the same production harness, then run:
+
+```sh
+# Source maps are optional when collecting timings rather than CPU profiles.
+TEI_SOURCEMAP=0 node scripts/tei-performance/build.mjs
+python3 -m http.server 3108 --bind 127.0.0.1 --directory artifacts/tei-performance/site
+# In another terminal, sequentially:
+node scripts/test-inline-interoperability-browser.mjs
+INLINE_FUNCTIONAL_ONLY=1 node scripts/test-inline-alternatives-browser.mjs
+TEI_FLINT=1 TEI_RUNS=3 TEI_LABEL=m5-after node scripts/benchmark-tei-browser.mjs
+BENCHMARK_COMPACT=1 BENCHMARK_OUTPUT=artifacts/tei-m5/typing-after node scripts/benchmark-flint-typing-browser.mjs
+```
+
+The M5 script uses real Flint clipboard events, complete native closures, two
+Documents and an independent mounted occurrence. It profiles paste, joins,
+replacement and Undo/Redo with zero and 150 extra unrelated paragraphs, checking
+affected-record counts, snapshots, canonical Cells and unrelated DOM/projection
+work. Native Save uses an in-memory adapter. No source XML or user document is
+written. Evidence is in `artifacts/tei-m5/browser.json`; the implementation report
+records interpretation and remaining full-validation costs.

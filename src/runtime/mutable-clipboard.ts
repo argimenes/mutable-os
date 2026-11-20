@@ -1,4 +1,6 @@
 import { markdownLiteralContext } from './markdown-input';
+import { selectedReading } from './inline-alternatives';
+import { contentLength } from '../block-tree/inline-sequence';
 import { resourceSurface } from '../interchange/resource-surface';
 import {webCandidate} from '../web-resources/registry';
 import {academicIdentifier,academicJob} from '../academic/identifiers';
@@ -16,7 +18,7 @@ import { captureFiles, imagesFragment, resolveClipboardImages, type ClipboardFil
 import { createSignal } from 'solid-js';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import type { Destination } from '../block-tree/types';
-import { resourceOwner, resourceSource } from '../block-tree/resource-identity';
+import { resourceOwner, resourceSource, indexedResourceLookup } from '../block-tree/resource-identity';
 import { serializeSelection, plainFragment, type Slice } from '../interchange/serializer';
 import { materializeFragment } from '../interchange/materialize';
 import { inlineMergePredicate } from '../interchange/insertion';
@@ -126,7 +128,7 @@ export class MutableClipboard {
   }
   private scope(contentKey?: string): InterchangeScope {
     const state = this.editor.repository.readState();
-    const resource = contentKey && resourceOwner(state, contentKey);
+    const resource = contentKey && resourceOwner(state, contentKey,indexedResourceLookup(this.editor.repository));
     let resourceId: string | undefined;
     try { if (resource) resourceId = resourceSource(resource)?.resourceId; } catch { /* Legacy untitled documents have no portable identity. */ }
     return { ...(this.context().cavernId ? { cavernId: this.context().cavernId } : {}), ...(resourceId ? { resourceId } : {}) };
@@ -384,7 +386,10 @@ export class MutableClipboard {
     });
   }
   private write(b: Bookmark, cut: boolean, event?: ClipboardEvent, cross = false) {
-    const fragment = serializeSelection(this.editor.repository.readState(), b.slices, b.scope);
+    const fragment = serializeSelection(this.editor.repository.readState(), b.slices, b.scope,false,undefined,(placement,slot)=>{
+      const node=this.editor.nodeForPlacementInView(placement,b.viewId);return node?slot.readings.indexOf(selectedReading(this.editor,node,slot)):0;
+    },indexedResourceLookup(this.editor.repository));
+    if(!this.editor.features.inlineAlternativeInteroperability&&fragment.requiredCapabilities?.length)throw Error('Inline alternative clipboard interoperability is disabled.');
     const representations = exportClipboard(fragment);
     if (canWriteAsync() && (!event || event.isTrusted)) {
       // Start the write within the activation callback; don't await a resolver first.
@@ -488,6 +493,9 @@ export class MutableClipboard {
     this.insert(b, plainFragment(''), true);
   }
   private insert(b: Bookmark, fragment: MutableFragment, cut = false, prepared?: BlockFragment[]): string | undefined {
+    const hasAlternatives=fragment.blocks.some(c=>c.inline?.atoms.some(a=>a.kind==='alternative'));
+    if(hasAlternatives&&!this.editor.features.inlineAlternativeInteroperability)throw Error('Inline alternative clipboard interoperability is disabled.');
+    if(hasAlternatives&&!this.editor.features.compactCanonicalText)throw Error('Inline alternatives require compact admission.');
     validateFragment(fragment);
     let assets = new Map<string, string>();
     // Only imports containing embeds need an availability check. No typing or
@@ -522,7 +530,7 @@ export class MutableClipboard {
     const results = this.editor.commands.insertMutableText(edits, cut); this.assetInserted = true;
     const positions = results.map((r, i) => ({ ...r, caret: r.caret + edits.slice(i + 1).reduce((delta, e) => {
       const root = e.fragment.state.contents[e.fragment.state.placements[e.fragment.roots[0]].contentKey];
-      return delta + root.inlineContent.length - (e.segments[0].end - e.segments[0].start);
+      return delta + contentLength(root) - (e.segments[0].end - e.segments[0].start);
     }, 0) })).reverse();
     const result = b.disjoint ? positions[Math.min(b.primaryIndex ?? 0, positions.length - 1)] : results.at(-1)!;
     this.editor.crossText.clear();

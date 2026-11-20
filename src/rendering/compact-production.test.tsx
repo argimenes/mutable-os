@@ -69,12 +69,44 @@ it('Backspace deletes a whole grapheme and composition over an image is rejected
  expect(f.flow().children[1]).toBe(image);expect(nativeText(captureNative(editor.repository.readState(),'doc'))).toBe(before);
 });
 
-it.each([true, false])('rejects cutting a slot before clipboard writes or deletion (Mutable clipboard=%s)', async mutableClipboard => {
- const f=fixture({mutableClipboard}),e=f.editor;
+it.each([true, false])('retains safe cut rejection with interoperability disabled (Mutable clipboard=%s)', async mutableClipboard => {
+ const f=fixture({mutableClipboard,inlineAlternativeInteroperability:false}),e=f.editor;
  e.commands.insertInlineAlternative(f.node().key,1,[{type:'standoff-editor-block',text:'first'},{type:'standoff-editor-block',text:''}]);
  const mount=e.mounts.get(f.node().key)!;mount.focus();mount.restoreInlineSelection!({anchor:1,head:2});e.selections.setPrimary(f.node().key,f.node().contentKey,f.node().viewId,1,2);
  const before=nativeText(captureNative(e.repository.readState(),'doc')),changed=vi.fn();e.repository.subscribeChanges(changed);
  const event=new Event('cut',{bubbles:true,cancelable:true}),data=new Map<string,string>();
  Object.defineProperty(event,'clipboardData',{value:{types:[],getData:()=>'',setData:(type:string,value:string)=>data.set(type,value)}});f.flow().dispatchEvent(event);
  await new Promise(r=>setTimeout(r,0));expect(event.defaultPrevented).toBe(true);expect(data.size).toBe(0);expect(changed).not.toHaveBeenCalled();expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(before);
+});
+
+it.each(['copy','cut','failed-cut','malformed'])('native slot clipboard through the input gateway: %s',async action=>{
+ const f=fixture({managedAssetClipboard:false}),e=f.editor;
+ e.commands.insertInlineAlternative(f.node().key,1,[{type:'standoff-editor-block',text:'first'},{type:'standoff-editor-block',text:''}]);
+ const mount=e.mounts.get(f.node().key)!;mount.focus();mount.restoreInlineSelection!({anchor:1,head:2});e.selections.setPrimary(f.node().key,f.node().contentKey,f.node().viewId,1,2);
+ const before=nativeText(captureNative(e.repository.readState(),'doc')),snapshot=vi.spyOn(e.repository,'snapshot'),changed=vi.fn();e.repository.subscribeChanges(changed);
+ const dispatch=(type:string,data:Record<string,string>,fail=false)=>{const event=new Event(type,{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{types:Object.keys(data),getData:(t:string)=>data[t]??'',setData:(t:string,v:string)=>{if(fail)throw Error('denied');data[t]=v;}}});mount.focusElement.dispatchEvent(event);return event;};
+ const data:Record<string,string>={};dispatch(action==='copy'||action==='malformed'?'copy':'cut',data,action==='failed-cut');
+ await Promise.resolve();
+ if(action==='failed-cut'){expect(e.clipboard.message()).toContain('denied');expect(changed).not.toHaveBeenCalled();expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(before);return;}
+ expect(data['text/plain']).toBe('first');expect(data['application/x-mutable-fragment+json']).toContain('alternative');
+ if(action==='cut'){expect(changed).toHaveBeenCalledTimes(1);e.repository.undo();expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(before);}
+ if(action==='malformed'){data['application/x-mutable-fragment+json']='{"kind":"alternative","version":999}';dispatch('paste',data);expect(e.clipboard.message()).toContain('No lossy fallback');expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(before);return;}
+ mount.focus();mount.restoreInlineSelection!({anchor:0,head:0});e.selections.setPrimary(f.node().key,f.node().contentKey,f.node().viewId,0,0);dispatch('paste',data);
+ await vi.waitFor(()=>expect((e.repository.readState().contents[f.node().contentKey].compactInline!.spans.filter(a=>a.kind==='alternative'))).toHaveLength(2));
+ expect(snapshot).not.toHaveBeenCalled();const after=nativeText(captureNative(e.repository.readState(),'doc'));e.repository.undo();expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(before);e.repository.redo();expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(after);
+ expect(Object.values(e.repository.readState().contents).some(c=>c.viewType==='text-cell')).toBe(false);
+});
+
+it('limits slot paste/history to affected occurrences and updates native dirty membership without recapture',async()=>{
+ const f=fixture(),e=f.editor; e.commands.insertInlineAlternative(f.node().key,1,[{type:'standoff-editor-block',text:'first'},{type:'standoff-editor-block',text:''}]);
+ const second=e.createView('slot-second',f.pk),other=f.mount(second),unrelated=Object.values(f.projection.state.nodes).find(n=>n.payload.id==='b')!;
+ const observer=new MutationObserver(()=>{});observer.observe(e.mounts.get(unrelated.key)!.root,{subtree:true,childList:true,attributes:true,characterData:true});
+ const {nativeDocumentSession}=await import('../persistence/native-session'),{serializeSelection}=await import('../interchange/serializer'),{materializeFragment}=await import('../interchange/materialize');
+ const native=nativeDocumentSession(e),binding=(native as any).bind('doc',{folder:'qualification',filename:'test.mutable.json'},{nativeHash:'baseline',markdownHash:null,generation:null},Object.keys(captureNative(e.repository.readState(),'doc').contents));binding.pair.acknowledgeOpen(nativeText(captureNative(e.repository.readState(),'doc')));binding.pair.adapter.save=async(g:any)=>({phase:'saved',generation:g.generation});
+ const builds=[vi.spyOn(f.projection as any,'build'),vi.spyOn(second as any,'build')],snapshot=vi.spyOn(e.repository,'snapshot'),before=nativeText(captureNative(e.repository.readState(),'doc'));
+ const fragment=serializeSelection(e.repository.readState(),[{placementKey:f.node().placementKey,start:1,end:2}]);e.commands.insertMutableText([{segments:[{placementKey:f.node().placementKey,start:0,end:0}],fragment:materializeFragment(fragment),slices:fragment.roots}]);
+ expect(f.host.querySelectorAll('.native-inline-alternative')).toHaveLength(2);expect(other.querySelectorAll('.native-inline-alternative')).toHaveLength(2);expect(native.isDirty('doc')).toBe(true);
+ e.repository.undo();expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(before);e.repository.redo();builds.forEach(spy=>expect(spy).not.toHaveBeenCalled());expect(snapshot).not.toHaveBeenCalled();expect(observer.takeRecords()).toHaveLength(0);observer.disconnect();snapshot.mockRestore();
+ await native.save('doc');expect(native.isDirty('doc')).toBe(false);
+ const host=e.repository.readState().contents[f.node().contentKey],slot=host.compactInline!.spans.find(a=>a.kind==='alternative')!;if(slot.kind!=='alternative')throw Error('slot');e.commands.replaceInlineRange(host.ownedRelations[slot.properties.readings[0]],0,0,'new');expect(native.isDirty('doc')).toBe(true);
 });

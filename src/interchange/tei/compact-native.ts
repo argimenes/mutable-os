@@ -1,4 +1,5 @@
 import { isReadingRelation } from '../../block-tree/inline-alternative';
+import { INLINE_ALTERNATIVES_CAPABILITY } from '../capabilities';
 import { inlineLength, type InlineAtom } from '../../block-tree/inline-sequence';
 import type { ExistingBlockDto, JsonObject } from '../../block-tree/types';
 import { createPlacementKey } from '../../block-tree/ids';
@@ -44,7 +45,8 @@ export function encodeTeiNative(document: ExistingBlockDto) {
   };
   const root = visit(document);
   const envelope: NativeDocument = { format: 'mutable-document', version: 1, resourceId: document.id!, valueEncoding: 'codex-authored-value-v1',
-    document: { format: 'codex-portable-resource-gate', version: 1, resourceId: document.id!, root, blocks }, definitionOwnerBlockIds: [] };
+    document: { format: 'codex-portable-resource-gate', version: 1, resourceId: document.id!, root, blocks }, definitionOwnerBlockIds: [],
+    ...(blocks.some(b=>b.inline?.some(a=>a.kind==='alternative'))?{requiredCapabilities:[INLINE_ALTERNATIVES_CAPABILITY]}:{}) };
   const bytes = new TextEncoder().encode(JSON.stringify(envelope));
   // Validate the reserved wire shape now. Semantic DTO/range validation has
   // already run; full canonical graph validation belongs to native admission.

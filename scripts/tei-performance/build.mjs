@@ -30,5 +30,5 @@ await build({
   // Vite runs a separate plugin pipeline for workers. Both realms must use the
   // baseline; overriding only the main bundle produces a misleading hybrid.
   worker: {format: 'es', plugins: baseline ? [baselinePlugin()] : []},
-  build: {target: 'esnext', sourcemap: true, outDir: 'artifacts/tei-performance/site', rollupOptions: {input: 'scripts/tei-performance/index.html'}},
+  build: {target: 'esnext', sourcemap: process.env.TEI_SOURCEMAP !== '0', outDir: 'artifacts/tei-performance/site', rollupOptions: {input: 'scripts/tei-performance/index.html'}},
 });

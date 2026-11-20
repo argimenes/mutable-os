@@ -291,6 +291,8 @@ type CaptureAttempt = {
 type HistorySubscriber = { listener: (event: DeepReadonly<HistoryChanges>) => void; onError: CommitSubscriber["onError"] };
 
 export interface RepositoryChange {
+  /** General validated commits expose affected edges to occurrence consumers. */
+  changedPlacements?: readonly string[];
   compactEdits?: ReadonlyMap<string, import("./inline-sequence").InlineSplice>;
   /** Lightweight identity/cause for occurrence-local history restoration.
    * Does not enable exact-record capture on ordinary typing. */
@@ -613,7 +615,7 @@ export class CanonicalRepository {
       let observer = 0;
       for (const subscriber of this.changeSubscribers) {
         const started = timings ? performance.now() : 0;
-        subscriber({ compactEdits:compactEdits(operations), commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
+        subscriber({ changedPlacements:[...placements], compactEdits:compactEdits(operations), commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
         if (timings) timings[`observer.${observer++}`] = performance.now() - started;
       }
       stage("changeObservers");

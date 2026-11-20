@@ -6,7 +6,9 @@ import { isAutomaticListMetadata, type AutomaticListMetadata } from "./list-wrap
 import { diffRecordBatch } from "./record-batch";
 import { conversionSource } from '../interchange/conversion';
 import { mapStandoffPropertiesForReplacement, pointAffinity } from '../interchange/ranges';
-import { planFragmentInsertion } from '../interchange/insertion';
+import { planFragmentInsertion, planCompactFragmentInsertion } from '../interchange/insertion';
+import { serializeSelection } from '../interchange/serializer';
+import { materializeFragment } from '../interchange/materialize';
 import type { MutableFragment } from '../interchange/fragment';
 import { planBlockRestore, type BlockRestorePlan, type LeafAuthoredState } from "./block-restore";
 import { type DeepReadonly } from "./commit-capture";
@@ -14,7 +16,7 @@ import { clone } from "./clone";
 import { ownNewDefinitions } from "./definition-ownership";
 import { planCrossTextEdit, type CrossTextSegment } from "./cross-text-edit";
 import { linkedRegistry, linkedSourcesForMove } from "./linked-annotations";
-import { resourceOwner, resourceSource } from "./resource-identity";
+import { resourceOwner, resourceSource, indexedResourceLookup } from "./resource-identity";
 import { captureBlocks, cloneBlocks, remapKnownBlockReferences, type BlockFragment } from "./clipboard";
 import type { BlockCommitSubject, CommandDescriptor } from "./commit-capture";
 import { isAuthoredBlock, prepareNewBlockIdentities, readBlockId } from "./identity";
@@ -110,7 +112,14 @@ export class TreeCommands {
   insertMutableText(edits: Array<{ segments: CrossTextSegment[]; fragment: BlockFragment; slices: MutableFragment['roots'] }>, cut = false, operation: 'paste' | 'import' | 'convert' = 'paste') {
     if (!edits.length) return [];
     const before = this.current();
-    if(edits.some(e=>e.segments.some(s=>before.contents[before.placements[this.placementKey(s.placementKey,before)].contentKey].compactInline)))throw new TreeCommandError('Rich clipboard insertion is not yet available for compact documents');
+    if(edits.some(e=>e.segments.some(s=>before.contents[before.placements[this.placementKey(s.placementKey,before)].contentKey].compactInline))){
+      if(!this.inlineInteroperability())throw new TreeCommandError('Compact clipboard interoperability is disabled.');
+      const draft=new StructuralDraft(before,k=>this.repository.locationOf(k),k=>this.repository.contentReferenceCount(k),k=>this.repository.ownedPlacementKeys(k));
+      const results=[];
+      for(const edit of edits){if(operation==='convert')throw new TreeCommandError('Compact source conversion is not supported by this clipboard operation.');const result=planCompactFragmentInsertion(draft.state,edit.segments,edit.fragment,edit.slices,{locationOf:k=>draft.locationOf(k),referenceCount:k=>draft.referenceCount(k),ownerOf:k=>resourceOwner(before,k,indexedResourceLookup(this.repository))});draft.apply(result.operations!);results.push({placementKey:result.placementKey,caret:result.caret});}
+      this.publish(cut?'Cut selected text':'Paste Mutable content',draft.operations(),{commandId:cut?'selection.cut':'selection.paste',subjects:results.map(r=>this.subject(draft.state,r.placementKey)),clipboard:{token:crypto.randomUUID(),action:cut?'cut':'paste',preservedIds:false}});return results;
+    }
+    if(edits.some(e=>Object.values(e.fragment.state.contents).some(c=>c.compactInline?.spans.some(a=>a.kind==='alternative'))))throw new TreeCommandError('Inline alternatives require a compact destination; nothing was pasted.');
     let state = before;
     const results: Array<{ placementKey: string; caret: number }> = [];
     for (const edit of edits) {
@@ -147,6 +156,7 @@ export class TreeCommands {
   replaceAcrossBlocks(segments: CrossTextSegment[], text: string) {
     const state = this.current(true);
     const resolved = segments.map(segment => ({ ...segment, placementKey: this.placementKey(segment.placementKey, state) }));
+    if(!this.inlineInteroperability()&&resolved.some(s=>state.contents[state.placements[s.placementKey].contentKey].compactInline?.spans.some(a=>a.kind==='alternative')))throw new TreeCommandError('Inline alternative structural interoperability is disabled.');
     const result = planCrossTextEdit(state, resolved, text,state.contents[state.placements[resolved[0]?.placementKey]?.contentKey]?.compactInline&&(!this.pending||this.pending.local)?{locationOf:k=>this.location(k,state),referenceCount:k=>this.pending?.local?.referenceCount(k)??this.repository.contentReferenceCount(k)}:undefined);
     if(!result.operations)this.pruneUnreachable(result.state);
     this.publish("Replace selected text", result.operations??this.diff(state, result.state), {
@@ -187,6 +197,7 @@ export class TreeCommands {
     private readonly repository: CanonicalRepository,
     private readonly resolveOccurrence: (key: NodeKey | PlacementKey) => PlacementKey | undefined,
     private readonly resolveEditingAtom?: (key:NodeKey)=>{placementKey:string;index:number}|undefined,
+    private readonly inlineInteroperability:()=>boolean=()=>true,
   ) {}
 
   private current(local = false): RepositoryState {
@@ -1150,8 +1161,17 @@ export class TreeCommands {
   }
 
   copy(key: NodeKey | PlacementKey, destination: Destination): PlacementKey {
-    const state = this.state();
+    const state = this.current();
     const placementKey = this.placementKey(key, state);
+    const content=state.contents[state.placements[placementKey].contentKey];
+    if(content.compactInline?.spans.some(a=>a.kind==='alternative')){
+      if(!this.inlineInteroperability())throw new TreeCommandError('Inline alternative clipboard interoperability is disabled.');
+      const owner=resourceOwner(state,content.key,indexedResourceLookup(this.repository)),scope=owner?{resourceId:String(owner.payload.id)}:{};
+      const serialized=serializeSelection(state,[{placementKey}],scope,false,undefined,undefined,indexedResourceLookup(this.repository));
+      if(serialized.embeds.length)throw new TreeCommandError('Use native clipboard copy and paste for alternatives containing images so resource availability can be checked. Nothing was copied.');
+      const fragment=materializeFragment(serialized,scope);
+      return this.insertFragment(fragment,destination,{commandId:'tree.copy',subjects:[this.subject(state,placementKey),this.subject(fragment.state,fragment.roots[0])]})[0];
+    }
     // Stage A retains the old command's explicit legacy-export limitations.
     // Copy the canonical graph itself so internal shared identity is preserved.
     encodeDocument(state, placementKey);
@@ -1290,8 +1310,9 @@ export class TreeCommands {
     if (modeError) throw new TreeCommandError(modeError);
     const compactLeft=current.contents[current.placements[this.placementKey(leftKey,current)].contentKey],compactRight=current.contents[current.placements[this.placementKey(rightKey,current)].contentKey];
     if(compactLeft.compactInline||compactRight.compactInline){
+      if(!this.inlineInteroperability()&&[compactLeft,compactRight].some(c=>c.compactInline?.spans.some(a=>a.kind==='alternative')))throw new TreeCommandError('Inline alternative structural interoperability is disabled.');
       if(!compactLeft.compactInline||!compactRight.compactInline)throw new TreeCommandError('Joining different canonical representations is not supported');
-      if(compactRight.children.length||Object.keys(compactRight.ownedRelations).length||Object.keys(compactRight.opaqueRelations).length)throw new TreeCommandError('Move paragraph attachments before joining');
+      if(compactRight.children.length||Object.keys(compactRight.ownedRelations).some(name=>!isReadingRelation(name))||Object.keys(compactRight.opaqueRelations).length)throw new TreeCommandError('Move paragraph attachments before joining');
       const left=this.placementKey(leftKey,current),right=this.placementKey(rightKey,current),at=contentLength(compactLeft);
       const result=planCrossTextEdit(current,[{placementKey:left,start:at,end:at},{placementKey:right,start:0,end:0}],'',{locationOf:k=>this.location(k,current),referenceCount:k=>this.pending?.local?.referenceCount(k)??this.repository.contentReferenceCount(k)});
       this.publish('Join Standoff Blocks',result.operations!,{commandId:'tree.joinStandoff',subjects:result.inputs,relation:{kind:'join',survivor:result.inputs[0],absorbed:result.inputs[1],at}});return at;

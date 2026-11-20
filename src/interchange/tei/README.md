@@ -1,4 +1,4 @@
-# TEI importer — Milestones 1–4
+# TEI importer — Milestones 1–5
 
 Use **Workspace → Open TEI XML…** (also available in the Flint menu), or **Import external files as new Ink documents**. The dedicated Open action accepts `.xml` and `.tei` with TEI interpretation already selected. `.tei` selects this converter automatically; for `.xml`, choose **TEI P5 XML** explicitly. The result is an unsaved native document. Save manually to a native filename; the XML source is never overwritten.
 
@@ -33,10 +33,14 @@ one-position slots with independently editable owned readings. First authored
 reading is selected separately in each viewing occurrence. Block-bearing,
 cross-range or unsupported apparatus retains grouped source-order tabs. Disable
 this flag (or compact admission) for grouped imports. Existing saved slots require
-compact admission and remain readable when the creation flag is off. Slot copy,
-legacy/Markdown export and cross-paragraph joins explicitly reject unsupported
-operations. Use native Save to preserve the whole reading closure. No XML archive
-or Source tab is created. See the M4 implementation report for qualification.
+compact admission and remain readable when the creation flag is off. Native copy/cut/paste preserves complete reading closures, including inactive, nested
+and empty readings. `inlineAlternativeInteroperability` defaults on and enables
+qualified ordinary-paragraph joins and replacements. External clipboard text/HTML
+uses the displayed reading; unsupported structured operations and legacy/Markdown
+export reject explicitly. Saved slot documents declare
+`mutable/inline-alternatives/v1`; existing M4 files remain readable. Use native Save
+to preserve the whole reading closure. No XML archive or Source tab is created.
+See the [M5 report](../../../TEI_P5_IMPORTER_MILESTONE_5_IMPLEMENTATION.md) for qualification and limits.
 
 ## Configuration and headless use
 
@@ -82,7 +86,7 @@ see [the performance harness](../../../scripts/tei-performance/README.md).
 - Unknown elements retain readable content and supported descendants. Unexpected fields are inert metadata.
 - Broken, forward and ambiguous references retain original ordered tokens. Resolution is an import-time observation, not a permanent binding.
 - Undefined entities can be retained literally with up to four fresh strict parser restarts. Other syntax errors retain a trusted prefix and an editable literal suffix. Never continue interpreting a parser's guessed post-error events. Even pre-error close events are checked because `saxes` emits a guessed close before signalling a mismatch.
-- Inline alternatives use structural native tabs; all readings survive, but paragraph flow can change. `choice`, `app` and nested `rdgGrp` retain their distinct group and branch roles, empty readings and attributes. The first authored branch is initially active; switching tabs is session presentation, not an editorial preference saved to the document. No superposition flag is enabled.
+- Unsupported apparatus uses structural native tabs; all readings survive, but paragraph flow can change. `choice`, `app` and nested `rdgGrp` retain their distinct group and branch roles, empty readings and attributes. The first authored branch is initially active; switching tabs is session presentation, not an editorial preference saved to the document. No superposition flag is enabled.
 - Ordinary line breaks retain a logical newline. `pb`, `cb`, `anchor`, `milestone`, `space` and `lb break="no"` use exact zero-width code-point boundaries. `space` retains dimensions without inventing visible width. Source page breaks never create Pages. M1 opt-out retains its explicitly approximate context ranges.
 - New points use `isZeroWidth: true, start: boundary, end: boundary`. Compact editing preserves both native endpoint forms, including `end = start - 1`; affinity follows the existing before/after policy. Deleting an annotated boundary can consume its segment while retaining the Document-owned definition. Empty elements need no placeholder character.
 - Editorial roles include substitution, addition, deletion, supplied, surplus, unclear, gap, damage, restoration and hand shift. Nested operations retain a parent editorial-definition ID; multi-Block text shares the same definition. Certainty, attribution, reason, placement and hand references remain authored data, without inferred values or destructive deletion.

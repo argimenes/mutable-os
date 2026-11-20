@@ -58,7 +58,7 @@ it('enforces the feature flag and keeps existing documents unchanged on disabled
  }
 });
 it('leaves the workspace unchanged on native admission failure',async()=>{
- vi.stubGlobal('crypto',webcrypto);const e=new ReactiveEditor({type:'workspace-block',children:[]});cleanups.push(()=>e.dispose());const before=e.encodeDocument(),open=vi.fn();
+ vi.stubGlobal('crypto',webcrypto);const e=new ReactiveEditor({type:'workspace-block',children:[{type:'workspace-object-bank-block'},{type:'workspace-object-bank-block'}]});cleanups.push(()=>e.dispose());const before=e.encodeDocument(),open=vi.fn();
  await e.interchange.importNew([file('x.tei','<TEI><p>new</p></TEI>')],{current:()=>true,open});expect(e.encodeDocument()).toEqual(before);expect(open).not.toHaveBeenCalled();expect(e.interchange.message()).toContain('object bank');
 });
 it('reports and persists unmistakable partial conversion',async()=>{

@@ -1,5 +1,6 @@
 /** History-independent native resource codec/admission. Reuses the accepted resource graph and preserves its guards. */
 import { clone } from "../block-tree/clone";
+import { INLINE_ALTERNATIVES_CAPABILITY, validateCapabilities, NATIVE_CAPABILITIES } from '../interchange/capabilities';
 import { freeze, type DeepReadonly } from "../block-tree/commit-capture";
 import { externalDefinitionLink } from "../block-tree/external-reference";
 import { linkedDefinitionOwner, definitionProvenance } from "../block-tree/linked-annotations";
@@ -108,12 +109,14 @@ export interface NativeDocument {
   valueEncoding?: "codex-authored-value-v1";
   document: GateDocument;
   definitionOwnerBlockIds: string[];
+  requiredCapabilities?: string[];
 }
 export function nativeEnvelope(resource: DeepReadonly<ResourceSnapshot>): NativeDocument {
   for (const c of Object.values(resource.contents)) if (!["text-cell", "image-cell"].includes(c.viewType)) {
     check(typeof c.payload.type === "string" && viewTypeFor(c.payload.type) === c.viewType, "missing/mismatched authored type");
   }
   return { format: "mutable-document", version: 1, resourceId: resource.resourceId, valueEncoding: "codex-authored-value-v1",
+    ...(Object.values(resource.contents).some(c=>c.compactInline?.spans.some(a=>a.kind==='alternative'))?{requiredCapabilities:[INLINE_ALTERNATIVES_CAPABILITY]}:{}),
     document: encodeGateDocument(resource, "native"), definitionOwnerBlockIds: Object.values(resource.contents)
       .filter(c => c.definitionOwnerKey !== undefined).map(c => c.payload.id as string).sort() };
 }
@@ -140,10 +143,11 @@ function target(value: any) {
   fields(value.version, value.version?.kind === "unpinned" ? ["kind"] : ["kind", "memoirId", "segmentId", "revisionId"]);
 }
 /** Parse reserved wire shape only; callers still require semantic resource validation. */
-export function parseNativeEnvelope(bytes: Uint8Array): NativeDocument {
+export function parseNativeEnvelope(bytes: Uint8Array, supported: ReadonlySet<string> = NATIVE_CAPABILITIES): NativeDocument {
   const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as NativeDocument;
   assertPortableJson(value);
-  fields(value, ["format", "version", "resourceId", "document", "definitionOwnerBlockIds", "valueEncoding"]);
+  fields(value, ["format", "version", "resourceId", "document", "definitionOwnerBlockIds", "valueEncoding", "requiredCapabilities"]);
+  validateCapabilities(value.requiredCapabilities,supported);
   check(value.valueEncoding === undefined || value.valueEncoding === "codex-authored-value-v1", "unsupported authored value encoding");
   check(value.format === "mutable-document" && value.version === 1 && id(value.resourceId), "unsupported native envelope/version");
   const doc = value.document;

@@ -29,6 +29,10 @@ export interface ResourceOwnershipLookup {
   parents(key: string): Iterable<string>;
   find(source: ResourceSource): ContentRecord | undefined;
 }
+/** Explicit consumers can reuse the repository's existing incoming-edge index. */
+export function indexedResourceLookup(repository: Pick<import('./repository').CanonicalRepository,'readState'|'ownedPlacementKeys'|'locationOf'|'findDocumentResource'>):ResourceOwnershipLookup {
+  return {parents:key=>[...repository.ownedPlacementKeys(key)].flatMap(pk=>{const at=repository.locationOf(pk);return at?[at.ownerContentKey]:[];}),find:source=>source.scope==='document'?repository.findDocumentResource(source.resourceId):findResource(repository.readState(),source)};
+}
 // Structural ownership only; reference occurrences never become parents.
 // Cache is revision-bound and weakly held. No observer or input dispatch hook.
 const cache = new WeakMap<RepositoryState, { revision: number; owners: Map<string, Set<string>>; resources: Map<string, ContentRecord[]> }>();

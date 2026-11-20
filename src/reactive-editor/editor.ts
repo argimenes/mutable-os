@@ -215,7 +215,7 @@ export class ReactiveEditor {
     }, this.features.caretModes, this.features.readingSpotlight);
     this.pointerSpotlight = new PointerSpotlight(this.visualEffects, this.features.pointerSpotlight, () => this.caretModes.select('normal'), this.caretModes.active);
     this.viewVisibility = new ViewVisibility(this.repository);
-    this.commands = new TreeCommands(this.repository, (key) => this.occurrences.resolve(key), key => {const cell=this.node(key),owner=cell?.editingInlineOwner&&this.node(cell.editingInlineOwner);if(!owner)return;const index=owner.inlineContent.indexOf(key);return index<0?undefined:{placementKey:owner.placementKey,index};});
+    this.commands = new TreeCommands(this.repository, (key) => this.occurrences.resolve(key), key => {const cell=this.node(key),owner=cell?.editingInlineOwner&&this.node(cell.editingInlineOwner);if(!owner)return;const index=owner.inlineContent.indexOf(key);return index<0?undefined:{placementKey:owner.placementKey,index};}, () => this.features.inlineAlternativeInteroperability);
     this.textRanges = new TextRanges(key => {
       const node = this.node(key), content = node && this.repository.readState().contents[node.contentKey];
       if (!node || !content || !["standoff-editor-block", "plain-text-block", ...sourceTextTypes].includes(node.viewType)) return;

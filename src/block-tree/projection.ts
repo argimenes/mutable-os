@@ -145,6 +145,17 @@ export class BlockTreeProjection {
         return;
       }
       if (change.structural && this.updateStructural(change.structural)) return;
+      // Full ownership validation does not imply every open Document changed.
+      if(change.changedPlacements && ![...change.previousContents.keys()].some(k=>this.contentNodes.has(k)) && !change.changedPlacements.some(k=>this.placementNodes.has(k)||k===this.rootPlacementKey))return;
+      if(change.changedPlacements) {
+        const source=repository.readState(),keys=[...change.previousContents.keys()];
+        const alternatives=keys.some(k=>[source.contents[k],change.previousContents.get(k)].some(c=>c?.compactInline?.spans.some(a=>a.kind==='alternative')));
+        const stable=keys.every(k=>{const before=change.previousContents.get(k),after=source.contents[k];return (!before||!after||before.viewType===after.viewType&&before.payload.id===after.payload.id) && (!after||[...after.children,...after.inlineContent,...Object.values(after.ownedRelations)].every(pk=>{const p=source.placements[pk];return p&&!p.externalReference&&!p.resolvedReference&&p.kind!=='reference';}));});
+        const sameTargets=change.changedPlacements.every(pk=>{const p=source.placements[pk];return !p||pk!==this.rootPlacementKey&&[...this.placementNodes.get(pk)??[]].every(key=>this.state.nodes[key].contentKey===p.contentKey);});
+        // The repository has already completed full ownership validation. Reuse
+        // its affected records for local presentation, without weakening proof.
+        if(alternatives&&stable&&sameTargets&&this.updateStructural({contents:keys,childrenOwners:keys.filter(k=>JSON.stringify(change.previousContents.get(k)?.children)!==JSON.stringify(source.contents[k]?.children)),inlineOwners:keys.filter(k=>!!source.contents[k]?.compactInline)}))return;
+      }
       const next = this.build();
       this.unregister();
       this.setState(reconcile(next));
@@ -437,13 +448,15 @@ export class BlockTreeProjection {
       if (!c) { detached.add(key); return; }
       const route = this.nodeRoutes.get(key)!;
       const children = c.children.map(pk=>ensure(pk,`${route}/child:${pk}`));
+      const relations=Object.fromEntries(Object.entries(c.ownedRelations).map(([name,pk])=>[name,ensure(pk,`${route}/relation:${name}:${pk}`)]));
       if(c.compactInline)this.updateCompactInline(key);
       const inline = c.compactInline ? [...this.state.nodes[key].inlineContent] : c.inlineContent.map(pk=>ensure(pk,`${route}/inline:${pk}`));
-      const retained = new Set([...children,...inline]);
-      for (const old of [...node.children,...node.inlineContent]) if (!retained.has(old)) detached.add(old);
+      const retained = new Set([...children,...inline,...Object.values(relations)]);
+      for (const old of [...node.children,...node.inlineContent,...Object.values(node.ownedRelations)]) if (!retained.has(old)) detached.add(old);
       this.setState('nodes',key,'payload',reconcile(clone(c.payload)));
       this.setState('nodes',key,'children',reconcile(children));
       this.setState('nodes',key,'inlineContent',reconcile(inline));
+      this.setState('nodes',key,'ownedRelations',reconcile(relations));
     };
     for (const key of mounted) refresh(key);
     const remove = (key: string) => {

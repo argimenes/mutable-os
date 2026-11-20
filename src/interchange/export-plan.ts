@@ -17,7 +17,7 @@ export function exportFragment(input:MutableFragment,format:ExportFormat,title='
  const image=(id:string)=>{const e=embeds.get(id)!,url=options.images?.[id];if(url){const alt=String(e.data.alt??'Image');return format==='html'?`<img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}">`:format==='markdown'?`![${md(alt)}](<${url}>)`:alt;}warn('image-reference','Images are exported as alt-text placeholders. Portable asset bundles are not part of this export.');const text=`[Image: ${String(e.data.alt??'Image')}]`;return format==='html'?escapeHtml(text):format==='markdown'?md(text):text;};
  const inline=(b:FragmentBlock)=>{
   if(!b.inline)return format==='html'?escapeHtml(String(b.data.text??'')):format==='markdown'?md(String(b.data.text??'')):String(b.data.text??'');
-  const tokens=b.inline.atoms.flatMap(a=>a.kind==='text'?[...a.text].map(text=>({text})): [{text:'\uFFFC',embed:a.embed}]);
+  const tokens=b.inline.atoms.flatMap(a=>{if(a.kind==='alternative')throw Error('This export cannot preserve native inline alternatives. Save as Mutable JSON.');return a.kind==='text'?[...a.text].map(text=>({text})): [{text:'\uFFFC',embed:a.embed}];});
   const marks:Mark[]=[];
   const htmlTags:Record<string,string>={'style/bold':'strong','style/italics':'em','style/underline':'u','style/strike':'s','style/strikethrough':'s','style/superscript':'sup','style/subscript':'sub'};
   for(const occurrence of b.inline.properties){

@@ -102,6 +102,8 @@ export type FeatureFlags = Readonly<{
   compactCanonicalText: boolean;
   /** Creation/import of native one-position owned inline alternatives. */
   inlineAlternatives: boolean;
+  /** Native clipboard and qualified structural operations for compact alternatives. */
+  inlineAlternativeInteroperability: boolean;
   /** Per-resource native/Markdown persistence through the managed server store. */
   nativeDocumentPersistence: boolean;
   teiImport: boolean;
@@ -228,6 +230,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   flintSpatialGraph: true,
   compactCanonicalText: true,
   inlineAlternatives: true,
+  inlineAlternativeInteroperability: true,
   nativeDocumentPersistence: true,
   teiImport: true,
   teiSemanticSublimation: true,

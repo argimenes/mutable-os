@@ -66,17 +66,18 @@ it.each([1, 300])('does not read unrelated payloads or rebuild repository indexe
   f.commands.replaceInlineRange(key, 1, 1, 'abc'); f.repo.undo(); f.repo.redo();
   expect(reads).not.toHaveBeenCalled(); expect(rebuild).not.toHaveBeenCalled(); expect(snapshot).not.toHaveBeenCalled();
 });
-it('rejects unsupported copy and cross-paragraph join without mutation', () => {
-  const f = fixture(1), before = nativeText(captureNative(f.repo.readState(), 'doc')), changed = vi.fn(); f.repo.subscribeChanges(changed);
-  expect(() => f.commands.copy(f.placement('host'), { kind: 'after', anchorKey: f.placement('host') })).toThrow(/native Save/);
-  expect(() => f.commands.joinStandoff(f.placement('host'), f.placement('unrelated-0'))).toThrow(/inline alternatives/);
-  expect(changed).not.toHaveBeenCalled(); expect(nativeText(captureNative(f.repo.readState(), 'doc'))).toBe(before);
+it('copies a slot-bearing Block through the native fragment path with exact Undo', () => {
+  const f=fixture(1),before=nativeText(captureNative(f.repo.readState(),'doc'));
+  const copy=f.commands.copy(f.placement('host'),{kind:'after',anchorKey:f.placement('host')});
+  const record=f.repo.readState().contents[f.repo.readState().placements[copy].contentKey];
+  expect(contentLength(record)).toBe(3);expect(Object.keys(record.ownedRelations)).toHaveLength(2);
+  expect(()=>captureNative(f.repo.readState(),'doc')).not.toThrow();f.repo.undo();expect(nativeText(captureNative(f.repo.readState(),'doc'))).toBe(before);
 });
 
-it('moves a host with its owned readings and rejects clipboard loss before mutation', async () => {
+it('moves a host with its owned readings and copies its complete native closure', async () => {
   const f = fixture(1), before = nativeText(captureNative(f.repo.readState(), 'doc'));
   const { serializeSelection } = await import('../interchange/serializer');
-  expect(() => serializeSelection(f.repo.readState(), [{ placementKey: f.placement('host'), start: 1, end: 2 }])).toThrow(/inline alternative/);
+  expect(serializeSelection(f.repo.readState(), [{ placementKey: f.placement('host'), start: 1, end: 2 }]).blocks).toHaveLength(3);
   f.commands.move(f.placement('host'), { kind: 'after', anchorKey: f.placement('unrelated-0') });
   expect(contentLength(f.content('host'))).toBe(3); expect(Object.keys(f.content('host').ownedRelations)).toHaveLength(2);
   f.repo.undo(); expect(nativeText(captureNative(f.repo.readState(), 'doc'))).toBe(before);

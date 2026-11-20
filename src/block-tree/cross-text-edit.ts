@@ -1,4 +1,5 @@
 import {contentLength,inlineSlice,normalizeInline,clipCompactProperties} from "./inline-sequence";
+import { isReadingRelation, removedReadingOperations } from './inline-alternative';
 import { clipProperties } from '../interchange/ranges';
 import { hasBlockMode, modeContinuationError } from './mode-editing';
 import { clone } from "./clone";
@@ -30,7 +31,6 @@ export function planCrossTextEdit(source: RepositoryState, segments: CrossTextSe
     if (!content || content.inlineKind !== "standoff" || !Number.isInteger(segment.start) || !Number.isInteger(segment.end) || segment.start < 0 || segment.end < segment.start || segment.end > contentLength(content)) throw new Error("The text selection is stale or invalid");
     return content;
   });
-  if (records.some(c => c.compactInline?.spans.some(a => a.kind === 'alternative'))) throw Error('Joining or replacing across paragraphs containing inline alternatives is not supported; edit or split within the host paragraph. Nothing was changed.');
   if(records.some(c=>!!c.compactInline!==!!records[0].compactInline))throw Error('Mixed canonical representation replacement is not supported');
   const location = locations.get(segments[0].placementKey);
   if (!location || location.slot.kind !== "children") throw new Error("Replacement requires an ordinary paragraph list");
@@ -38,7 +38,11 @@ export function planCrossTextEdit(source: RepositoryState, segments: CrossTextSe
   const firstIndex = parent.children.indexOf(segments[0].placementKey);
   const counts = new Map<string, number>();
   if(!evidence)for (const p of Object.values(source.placements)) counts.set(p.contentKey, (counts.get(p.contentKey) ?? 0) + 1);
-  const relations = { ...records[0].ownedRelations };
+  const relations = Object.fromEntries(Object.entries(records[0].ownedRelations).filter(([name])=>!isReadingRelation(name)));
+  const readings:Record<string,string>={};
+  for(const c of records)for(const [name,key] of Object.entries(c.ownedRelations))if(isReadingRelation(name)) {
+    if(readings[name]&&readings[name]!==key)throw Error('Conflicting inline reading identities; nothing was changed.');readings[name]=key;
+  }
   records.forEach((content, index) => {
     const segment = segments[index];
     if (parent.children[firstIndex + index] !== segment.placementKey || (index > 0 && segment.start !== 0) || (index < records.length - 1 && segment.end !== contentLength(content))) throw new Error("Replacement cannot skip paragraphs or cross structural boundaries");
@@ -46,6 +50,7 @@ export function planCrossTextEdit(source: RepositoryState, segments: CrossTextSe
     if (!index) return;
     if (content.children.length || Object.keys(content.opaqueRelations).length) throw new Error("Replacement would remove attached content; move those attachments first");
     for (const [side, key] of Object.entries(content.ownedRelations)) {
+      if(isReadingRelation(side))continue;
       if (!["leftMargin", "rightMargin"].includes(side) || relations[side]) throw new Error("Replacement has conflicting margins or other attachments; move them first");
       relations[side] = key;
     }
@@ -87,6 +92,8 @@ export function planCrossTextEdit(source: RepositoryState, segments: CrossTextSe
       content.payload.id = createBlockId(); content.children = []; content.ownedRelations = {}; content.opaqueRelations = {};
       content.wireChildren = "omitted"; content.wireRelation = "omitted";
     }
+    for(const atom of content.compactInline?.spans??[])if(atom.kind==='alternative')for(const name of atom.properties.readings)content.ownedRelations[name]=readings[name];
+    if(Object.keys(content.ownedRelations).length)content.wireRelation='present';
     state.contents[key] = content;
     state.placements[placementKey] = { ...(i === 0 ? clone(source.placements[placementKey]) : {}), key: placementKey, contentKey: key, kind: "owned" };
     output.push(placementKey);
@@ -98,6 +105,7 @@ export function planCrossTextEdit(source: RepositoryState, segments: CrossTextSe
   // surviving Cells/owned margin placements were transferred to output records.
   for (const content of records.slice(1)) delete state.contents[content.key];
   const operations:RepositoryOperation[]|undefined=compact?[...output.map(pk=>({kind:'put-content' as const,record:state.contents[state.placements[pk].contentKey]})),...output.slice(1).map(pk=>({kind:'put-placement' as const,record:state.placements[pk]})),{kind:'put-content',record:updatedParent},...records.slice(1).flatMap((c,i)=>[{kind:'remove-placement' as const,key:segments[i+1].placementKey},{kind:'remove-content' as const,key:c.key}])]:undefined;
+  if(operations)operations.push(...removedReadingOperations(source,records,output.map(pk=>state.contents[state.placements[pk].contentKey]),k=>evidence?evidence.referenceCount(k):counts.get(k)??0));
   return { state,operations, placementKey: output.at(-1)!, caret: (lines.length === 1 ? start : 0) + [...lines.at(-1)!].length,
     inputs: records.map((record, i) => ({ contentKey: record.key, placementKey: segments[i].placementKey, blockId: readBlockId(record) })),
     outputs: output.map(placementKey => { const record = state.contents[state.placements[placementKey].contentKey]; return { contentKey: record.key, placementKey, blockId: readBlockId(record) }; }),
