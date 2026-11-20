@@ -11,8 +11,8 @@ export type Bag = Record<string, any>;
 export type Atom = {kind:'text';text:string}|{kind:'image';properties:Bag};
 export type Block = Omit<NativeDocument['document']['blocks'][number], 'properties'|'inline'> & {properties:Bag;inline?:Atom[]};
 export type Delta = {id:string;start:number;end:number;insert:Atom[]};
-type Change = {before:Map<string,Block|undefined>;after:Map<string,Block|undefined>;forward:Delta[];inverse:Delta[]};
-export type Notice = {ids:string[];deltas:Delta[];revision:number;history?:'undo'|'redo'};
+type Change = {id:string;structural:boolean;before:Map<string,Block|undefined>;after:Map<string,Block|undefined>;forward:Delta[];inverse:Delta[]};
+export type Notice = {ids:string[];deltas:Delta[];revision:number;history?:'undo'|'redo';changeId?:string;structural?:boolean};
 const check=(ok:unknown,why:string):void=>{if(!ok)throw Error('Compact experiment: '+why);};
 export const length=(atoms:readonly Atom[])=>atoms.reduce((n,a)=>n+(a.kind==='text'?codepoints(a.text):1),0);
 export function codepoints(text:string){let n=0;for(const _ of text)n++;return n;}
@@ -50,6 +50,9 @@ export function validateCompact(envelope:NativeDocument):void{
 }
 function ordered(v:any):any {return Array.isArray(v)?v.map(ordered):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>[k,ordered(x)])):v;}
 export class CompactDocument {
+ private serial=0;
+ private beforeListeners=new Set<(n:{ids:string[];changeId:string;history?:'undo'|'redo'})=>void>();
+ private pending?:{after:Map<string,Block|undefined>;forward:Delta[];inverse:Delta[];structural:boolean;validate:boolean};
  private blocks=new Map<string,Block>();
  private versions=new Map<string,number>();
  private undoStack:Change[]=[];private redoStack:Change[]=[];
@@ -68,13 +71,15 @@ export class CompactDocument {
   this.envelope={...this.envelope,document:{...this.envelope.document,blocks:[]}};
  }
  get resourceId(){return this.envelope.resourceId;}
- get(id:string){this.metrics.blockReads++;const b=this.blocks.get(id);check(b,'unknown Block '+id);return b!;}
+ get(id:string){this.metrics.blockReads++;const b=this.pending?.after.has(id)?this.pending.after.get(id):this.blocks.get(id);check(b,'unknown Block '+id);return b!;}
  has(id:string){return this.blocks.has(id);}
- all(){return [...this.blocks.values()];}
+ all(){const all=new Map(this.blocks);if(this.pending)for(const [id,b]of this.pending.after)b?all.set(id,b):all.delete(id);return [...all.values()];}
+ subscribeBefore(f:(n:{ids:string[];changeId:string;history?:'undo'|'redo'})=>void){this.beforeListeners.add(f);return()=>{this.beforeListeners.delete(f);};}
+ transaction(action:()=>void){check(!this.pending,'nested experimental transaction');const p=this.pending={after:new Map<string,Block|undefined>(),forward:[] as Delta[],inverse:[] as Delta[],structural:false,validate:false};try{action();this.pending=undefined;if(p.after.size)this.commit(p.after,p.forward,p.inverse,p.structural,p.validate);}finally{this.pending=undefined;}}
  version(id:string){return this.versions.get(id)??-1;}
  subscribe(f:(n:Notice)=>void,id?:string){const set=id?(this.byBlock.get(id)??new Set<(n:Notice)=>void>()):this.listeners;if(id)this.byBlock.set(id,set);set.add(f);return()=>{set.delete(f);if(id&&!set.size)this.byBlock.delete(id);};}
  private wire(changes?:Map<string,Block|undefined>):NativeDocument{
-  const current=new Map(this.blocks);if(changes)for(const [id,b]of changes)b?current.set(id,b):current.delete(id);
+  const current=new Map(this.blocks);if(this.pending)for(const [id,b]of this.pending.after)b?current.set(id,b):current.delete(id);if(changes)for(const [id,b]of changes)b?current.set(id,b):current.delete(id);
   const blocks=[...current.values()].map(b=>{
    const p=clone(b.properties),atoms=normalize(b.inline??[]);
    if(b.inline&&Array.isArray(p.standoffProperties))for(const prop of p.standoffProperties){
@@ -88,17 +93,18 @@ export class CompactDocument {
   return {...this.envelope,definitionOwnerBlockIds:[...this.envelope.definitionOwnerBlockIds].sort(),valueEncoding:'codex-authored-value-v1',document:{...this.envelope.document,blocks}};
  }
  capture(){this.metrics.captures++;const wire=this.wire();validateCompact(wire);this.metrics.fullValidation++;wire.document.blocks.sort((a,b)=>a.id.localeCompare(b.id));return JSON.stringify(ordered(wire),null,2)+'\n';}
- private commit(after:Map<string,Block|undefined>,forward:Delta[]=[],inverse:Delta[]=[],structural=false){
+ private commit(after:Map<string,Block|undefined>,forward:Delta[]=[],inverse:Delta[]=[],structural=false,validate=structural){
   check(!this.publishing,'reentrant mutation');
-  if(structural){validateCompact(this.wire(after));this.metrics.fullValidation++;}
+  if(this.pending){for(const [id,b]of after)this.pending.after.set(id,b);this.pending.forward.push(...forward);this.pending.inverse.unshift(...inverse);this.pending.structural ||= structural;this.pending.validate ||= validate;return;}
+  if(validate){validateCompact(this.wire(after));this.metrics.fullValidation++;}
   const before=new Map<string,Block|undefined>();for(const id of after.keys())before.set(id,this.blocks.get(id));
   for(const [id,b]of after)if(b)after.set(id,freeze(clone(b)) as Block);
-  const c={before,after,forward,inverse};this.undoStack.push(c);this.redoStack=[];this.publish(after,forward);
+  const c={id:'compact-change:'+ ++this.serial,structural,before,after,forward,inverse};for(const f of this.beforeListeners)f({ids:[...after.keys()],changeId:c.id});this.undoStack.push(c);this.redoStack=[];this.publish(after,forward,undefined,c);
  }
- private publish(changes:Map<string,Block|undefined>,deltas:Delta[],history?:'undo'|'redo'){
+ private publish(changes:Map<string,Block|undefined>,deltas:Delta[],history?:'undo'|'redo',change?:Change){
   for(const [id,b]of changes){b?this.blocks.set(id,b):this.blocks.delete(id);this.versions.set(id,this.version(id)+1);}
   this.revision++;this.metrics.changedBlocks+=changes.size;this.metrics.publications++;this.publishing=true;
-  try{const notice={ids:[...changes.keys()],deltas,revision:this.revision,history};for(const id of notice.ids)for(const f of this.byBlock.get(id)??[]){this.metrics.subscriberCalls++;f(notice);}for(const f of this.listeners){this.metrics.subscriberCalls++;f(notice);}}finally{this.publishing=false;}
+  try{const notice={ids:[...changes.keys()],deltas,revision:this.revision,history,changeId:change?.id,structural:change?.structural};for(const id of notice.ids)for(const f of this.byBlock.get(id)??[]){this.metrics.subscriberCalls++;f(notice);}for(const f of this.listeners){this.metrics.subscriberCalls++;f(notice);}}finally{this.publishing=false;}
  }
  private mapProperties(properties:unknown[],start:number,end:number,inserted:number,n:number){
   if(this.pointPolicy==='legacy')return mapStandoffPropertiesForReplacement(properties,start,end,inserted,[],n);
@@ -121,15 +127,15 @@ export class CompactDocument {
   const inserted=length(insert),removed=slice(b.inline!,start,end),p={...b.properties};
   if(Array.isArray(p.standoffProperties))p.standoffProperties=this.mapProperties(p.standoffProperties,start,end,inserted,n);
   this.commit(new Map([[id,{...b,properties:p,inline:normalize([...slice(b.inline!,0,start),...insert,...slice(b.inline!,end,n)])}]]),
-   [{id,start,end,insert:clone(insert)}],[{id,start,end:start+inserted,insert:removed}],insert.some(a=>a.kind==='image'));
+   [{id,start,end,insert:clone(insert)}],[{id,start,end:start+inserted,insert:removed}],false,insert.some(a=>a.kind==='image'));
  }
- annotations(id:string,properties:unknown[]){const b=this.get(id);this.commit(new Map([[id,{...b,properties:{...b.properties,standoffProperties:clone(properties)}}]]),[],[],true);}
- undo(){const c=this.undoStack.pop();if(!c)return false;this.redoStack.push(c);this.publish(c.before,c.inverse,'undo');return true;}
- redo(){const c=this.redoStack.pop();if(!c)return false;this.undoStack.push(c);this.publish(c.after,c.forward,'redo');return true;}
- private location(id:string){const hits=this.all().flatMap(b=>(b.children??[]).flatMap((e,index)=>e.target.kind==='local'&&e.target.blockId===id&&e.kind==='owned'?[{parent:b,index}]:[]));check(hits.length===1,'requires one owned child occurrence');return hits[0];}
- split(id:string,index:number){
+ annotations(id:string,properties:unknown[]){const b=this.get(id);this.commit(new Map([[id,{...b,properties:{...b.properties,standoffProperties:clone(properties)}}]]),[],[],false,true);}
+ undo(){const c=this.undoStack.pop();if(!c)return false;for(const f of this.beforeListeners)f({ids:[...c.before.keys()],changeId:c.id,history:'undo'});this.redoStack.push(c);this.publish(c.before,c.inverse,'undo',c);return true;}
+ redo(){const c=this.redoStack.pop();if(!c)return false;for(const f of this.beforeListeners)f({ids:[...c.after.keys()],changeId:c.id,history:'redo'});this.undoStack.push(c);this.publish(c.after,c.forward,'redo',c);return true;}
+ private location(id:string,placementId?:string){const hits=this.all().flatMap(b=>(b.children??[]).flatMap((e,index)=>e.target.kind==='local'&&e.target.blockId===id&&(placementId?e.placementId===placementId:e.kind==='owned')?[{parent:b,index}]:[]));check(hits.length===1,'requires one owned child occurrence');return hits[0];}
+ split(id:string,index:number,placementId?:string){
   const b=this.get(id),n=length(b.inline??[]),error=modeContinuationError(b.properties);check(!error,error??'');check(b.inline&&Number.isInteger(index)&&index>0&&index<n,'boundary split unsupported');
-  const {parent,index:at}=this.location(id),rightId=crypto.randomUUID(),left:Bag[]=[],right:Bag[]=[];
+  const {parent,index:at}=this.location(id,placementId),rightId=crypto.randomUUID(),left:Bag[]=[],right:Bag[]=[];
   for(const a of b.properties.standoffProperties??[]){const start=Number(a.start),end=Number(a.end);
    if(!Number.isFinite(start)||!Number.isFinite(end))left.push(clone(a));
    else if(a.isZeroWidth===true){const affinity=pointAffinity(a,n);if(start<index||start===index&&affinity==='before')left.push({...a,affinity});else right.push({...a,start:start-index,end:start-index+(this.pointPolicy==='equivalent'&&a.end===a.start-1?-1:0),affinity});}
@@ -140,9 +146,20 @@ export class CompactDocument {
   const rightBlock:Block={id:rightId,type:b.type,properties:{...b.properties,standoffProperties:right},children:[],inline:slice(b.inline!,index,n)};
   this.commit(new Map([[id,{...b,properties:{...b.properties,standoffProperties:left},inline:slice(b.inline!,0,index)}],[rightId,rightBlock],[parent.id,{...parent,children}]]),[{id,start:index,end:n,insert:[]}],[{id,start:index,end:index,insert:slice(b.inline!,index,n)}],true);return rightId;
  }
+ insertEmpty(id:string,where:'before'|'after',placementId?:string){
+  const b=this.get(id),error=modeContinuationError(b.properties);check(!error,error??'');const {parent,index}=this.location(id,placementId),created=crypto.randomUUID();
+  const children=[...parent.children!];children.splice(index+(where==='after'?1:0),0,{placementId:crypto.randomUUID(),kind:'owned',target:{kind:'local',blockId:created}});
+  this.commit(new Map([[created,{id:created,type:b.type,properties:{...b.properties,standoffProperties:[]},children:[],inline:[]}],[parent.id,{...parent,children}]]),[],[],true);return created;
+ }
+ removeEmpty(id:string,placementId?:string){
+  const b=this.get(id);check(b.inline?.length===0&&!b.children?.length&&!Object.keys(b.relations?.owned??{}).length,'only empty unattached text removal qualified');
+  const {parent,index}=this.location(id,placementId),children=parent.children!.filter((_,i)=>i!==index);
+  const edges=this.all().flatMap(b=>[...b.children??[],...Object.values(b.relations?.owned??{})]);check(edges.filter(e=>e.target.kind==='local'&&e.target.blockId===id).length===1,'shared empty removal needs retention policy');
+  this.commit(new Map<string,Block|undefined>([[id,undefined],[parent.id,{...parent,children}]]),[],[],true);
+ }
  /** Restricted to two adjacent ordinary siblings, matching the production join guards. */
- join(leftId:string,rightId:string,selection?:{start:number;end:number;text:string}){
-  const l=this.get(leftId),r=this.get(rightId),a=this.location(leftId),b=this.location(rightId),error=modeJoinError(l.properties,r.properties);
+ join(leftId:string,rightId:string,selection?:{start:number;end:number;text:string},leftPlacement?:string,rightPlacement?:string){
+  const l=this.get(leftId),r=this.get(rightId),a=this.location(leftId,leftPlacement),b=this.location(rightId,rightPlacement),error=modeJoinError(l.properties,r.properties);
   check(!error,error??'');check(l.inline&&r.inline&&a.parent.id===b.parent.id&&a.index+1===b.index,'adjacent standoff siblings required');
   check(!r.children?.length&&!Object.keys(r.relations?.owned??{}).length,'right attachments');
   const edges=this.all().flatMap(x=>[...x.children??[],...Object.values(x.relations?.owned??{})]);check(edges.filter(e=>e.target.kind==='local'&&e.target.blockId===rightId).length===1,'shared right content');

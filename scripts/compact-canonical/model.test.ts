@@ -118,3 +118,12 @@ it('differentially preserves every commit and Undo/Redo with ZWJ, CR/LF and comb
 it('constructing and disposing editing projections never commits, captures or creates undo history',()=>{const d=new CompactDocument(fixtureBytes()),before={...d.metrics};const o=new EditingOccurrence(d,'a');o.dispose();expect(d.revision).toBe(0);expect(d.metrics.publications).toBe(before.publications);expect(d.metrics.captures).toBe(before.captures);expect(d.undo()).toBe(false);});
 
 it('matches native capture ordering for retained-definition membership without reordering properties',()=>{const f=fixture();f.definitionOwnerBlockIds=['b','a'];const d=new CompactDocument(bytes(f));expect(d.capture()).toBe(nativeText(decodeNative(bytes(f))));expect(d.get('a').properties.blockProperties.map((p:any)=>p.value)).toEqual(['left','center']);});
+
+for(const at of [0,1,4,5,12])it('typed image insertion follows text boundary policy at '+at,()=>{
+ const d=new CompactDocument(fixtureBytes()),o=oracle(),payload={assetId:'local',src:'data:image/png;base64,',alt:'retained',metadata:{unknown:['preserved']}};
+ const before=d.capture();d.replace('b',at,at,[{kind:'image',properties:payload}]);o.commands.replaceInlineRange(o.placement('b'),at,at,'x');
+ const expected=JSON.parse(o.capture()).document.blocks.find((b:any)=>b.id==='b');
+ expect(d.get('b').properties.standoffProperties).toEqual(expected.properties.standoffProperties);
+ expect(d.get('b').inline!.find(a=>a.kind==='image')).toEqual({kind:'image',properties:payload});
+ const after=d.capture();expect(native(d)).toBe(after);d.undo();expect(d.capture()).toBe(before);d.redo();expect(d.capture()).toBe(after);
+});

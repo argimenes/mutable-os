@@ -49,3 +49,45 @@ win.compactBrowserFixture=()=>{
 };
 win.compactReadonlyFixture=()=>{editor?.dispose();editor=undefined;host.replaceChildren();return mountReadonly(model!,host);};
 win.compactReady=true;
+
+win.compactContext=()=>({model,editor,host,allocations});
+win.compactM2Fixture=(kind='structural')=>{
+ win.compactCleanup();const f=fixture();
+ if(kind!=='mixed'){
+  f.document.blocks=f.document.blocks.filter(b=>['doc','page','b','mode'].includes(b.id));
+  f.document.blocks.find(b=>b.id==='page')!.children=[edge('b','b'),edge('mode','mode')];
+  const b=f.document.blocks.find(b=>b.id==='b')!,m=f.document.blocks.find(b=>b.id==='mode')!;
+  b.inline=[{kind:'text',text:'Alpha beta'}];m.inline=[{kind:'text',text:'Gamma delta'}];
+  if(kind!=='modes')delete m.properties.mode;
+  b.properties.standoffProperties=[{type:'style/bold',start:0,end:6},{type:'style/italics',start:2,end:8},{type:'point/a',start:4,end:4,isZeroWidth:true},{type:'point/b',start:4,end:3,isZeroWidth:true}];
+  if(kind==='shared')f.document.blocks.find(b=>b.id==='page')!.children!.push(edge('shared-b','b','reference'));
+ }
+ model=new CompactDocument(new TextEncoder().encode(JSON.stringify(f)));editor=mountEditor(model,host,kind==='mixed'?['a','a','b']:kind==='shared'?['b','mode','b']:undefined);win.poc={model,editor,host};return {keys:[...editor.occurrences.keys()]};
+};
+win.compactSecond=()=>{const h=document.createElement('section');h.style.cssText=host.style.cssText;document.body.append(h);const e=mountEditor(model!,h);extras.push({host:h,editor:e});return e.occurrences.size;};
+win.compactProfile=()=>{
+ const totals:Record<string,{ms:number;calls:number}>={},stack:Array<{child:number}>=[],undo:Array<()=>void>=[];
+ const wrap=(object:any,key:string,label:string)=>{const f=object[key];if(typeof f!=='function')return;object[key]=function(...args:any[]){const t=performance.now(),s={child:0};stack.push(s);try{return f.apply(this,args);}finally{const dt=performance.now()-t;stack.pop();if(stack.length)stack.at(-1)!.child+=dt;const v=totals[label]??={ms:0,calls:0};v.ms+=dt-s.child;v.calls++;}};undo.push(()=>object[key]=f);};
+ for(const [key,label]of Object.entries({replace:'canonicalReplacement',commit:'historyConstruction',publish:'notifications',mapProperties:'standoffTransformation'}))wrap(model,key,label);
+ for(const e of [editor,...extras.map(x=>x.editor)].filter(Boolean)){
+  for(const [key,o]of e!.occurrences){for(const k of ['render','paint','paintChanges'])wrap(o,k,'presentation');wrap(o,'beforeRender','selectionCapture');wrap(o,'afterRender','occurrenceCommit');wrap(o.renderer,'update','keyedDOM');if(o.index)wrap(o.index,'splice','positionIndex');const mount=e!.mounts.get(key);for(const k of ['restoreInlineSelection','captureInlineSelection','inlineBoundary'])wrap(mount,k,'selectionDOM');wrap(mount,'adjacentGrapheme','graphemes');}
+  for(const k of ['invalidateRanges','releaseCaret'])wrap(e!.measurements,k,'geometryInvalidation');for(const k of ['mapContentEdit','setPrimary'])wrap(e!.selections,k,'selectionMapping');
+ }
+ win.compactProfileStop=()=>{undo.reverse().forEach(f=>f());return totals;};return true;
+};
+win.compactMeasure=async(position:'begin'|'middle'|'end',rounds=6)=>{
+ const [key,o]=[...editor!.occurrences].find(([,o])=>o.cells.length>100000)!,records:any[]=[],metrics={...model!.metrics},alloc={...allocations},prior=plain(model!.get(o.id).inline!);
+ const measure=async(operation:string,action:()=>void)=>{const t=performance.now();action();const syncMs=performance.now()-t;await frame();records.push({operation,syncMs,settledMs:performance.now()-t});};
+ const at=()=>position==='begin'?1:position==='middle'?Math.floor(o.cells.length/2):o.cells.length-1;
+ const input=(inputType:string,data?:string)=>o.flow!.dispatchEvent(new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType,data}));
+ for(let i=0;i<rounds;i++){
+  editor!.focusAt(key,at());await frame();
+  await measure('insert',()=>input('insertText','x'));await measure('backspace',()=>input('deleteContentBackward'));
+  await measure('delete',()=>input('deleteContentForward'));await measure('undoDelete',()=>model!.undo());
+  await measure('unicodeInsert',()=>input('insertText','é'));await measure('graphemeBackspace',()=>input('deleteContentBackward'));
+  await measure('undo',()=>model!.undo());await measure('redo',()=>model!.redo());
+  await measure('selection',()=>editor!.focusAt(key,at()+1));
+ }
+ const restored=plain(model!.get(o.id).inline!)===prior,sharedConsistent=[editor,...extras.map(x=>x.editor)].filter(Boolean).every(e=>[...e!.occurrences.values()].filter((x:any)=>x.id===o.id).every((x:any)=>x.cells.map((c:any)=>c.text).join('')===prior));
+ return {position,records,restored,sharedConsistent,metrics:Object.fromEntries(Object.entries(model!.metrics).map(([k,v])=>[k,v-(metrics as any)[k]])),allocations:Object.fromEntries(Object.entries(allocations).map(([k,v])=>[k,v-(alloc as any)[k]])),index:[...editor!.occurrences.values()].map(o=>o.index?.work)};
+};

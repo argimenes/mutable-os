@@ -2,31 +2,61 @@
 import {DirectCharacterCells,type CharacterCellPresentation} from '../../src/rendering/direct-character-cells';
 import {compileCellStyleRuns,cellStyleAt,standoffStyleSchema} from '../../src/rendering/standoff-styles';
 import {ReplacePositionMap} from '../../src/block-tree/position-map';
-import {CompactDocument,codepoints,length,type Atom,type Block} from './model';
+import {CompactDocument,codepoints,length,type Atom,type Block,type Notice} from './model';
+import {EditingIndex} from './editing-index';
 export const allocations={editingCells:0,projections:0,renderVisits:0,readonlyRuns:0};
 let serial=0;
 const image=(p:Record<string,any>)=>({src:String(p.src??p.url??''),alt:String(p.alt??''),label:String(p.alt??'Image'),width:p.width,height:p.height});
 export function cells(atoms:readonly Atom[]):CharacterCellPresentation[]{const out:CharacterCellPresentation[]=[];for(const a of atoms){if(a.kind==='image')out.push({key:`edit:${++serial}`,text:'\uFFFC',image:image(a.properties)});else for(const text of a.text)out.push({key:`edit:${++serial}`,text});}allocations.editingCells+=out.length;return out;}
 export class EditingOccurrence {
- cells:CharacterCellPresentation[];selection={anchor:0,head:0};updates=0;
+ cells:CharacterCellPresentation[];keys:string[];index:EditingIndex;selection={anchor:0,head:0};updates=0;
  readonly renderer?:DirectCharacterCells;private unsubscribe:()=>void;
- beforeRender?:()=>void;afterRender?:()=>void;
+ beforeRender?:(notice:Notice)=>void;afterRender?:(notice:Notice,removed:CharacterCellPresentation[],added:CharacterCellPresentation[])=>void;
+ holdDOM=false;suppressedKeys=new Set<string>();suppressedRemoved=new Set<string>();
+ private styles:ReturnType<typeof compileCellStyleRuns>=[];
  constructor(readonly model:CompactDocument,readonly id:string,readonly flow?:HTMLElement){
-  this.cells=cells(model.get(id).inline??[]);allocations.projections++;if(flow)this.renderer=new DirectCharacterCells(flow);
+  this.cells=cells(model.get(id).inline??[]);this.keys=this.cells.map(c=>c.key);this.index=new EditingIndex(this.cells);allocations.projections++;if(flow)this.renderer=new DirectCharacterCells(flow);
   this.render();this.unsubscribe=model.subscribe(n=>{
    if(!n.ids.includes(id))return;
-   this.beforeRender?.();
-   for(const d of n.deltas.filter(d=>d.id===id)){this.cells.splice(d.start,d.end-d.start,...cells(d.insert));const map=new ReplacePositionMap(d.start,d.end,length(d.insert));this.selection={anchor:map.map(this.selection.anchor,'after'),head:map.map(this.selection.head,'after')};}
-   // Structural removal ends this occurrence; reopening is owned by the host.
-   if(!model.has(id)){this.dispose();return;}
-   this.render();this.afterRender?.();
+   this.beforeRender?.(n);
+   if(!model.has(id)){this.afterRender?.(n,this.cells,[]);this.dispose();return;}
+   const removed:CharacterCellPresentation[]=[],added:CharacterCellPresentation[]=[];
+   for(const d of n.deltas.filter(d=>d.id===id)){
+    const fresh=cells(d.insert),gone=this.cells.slice(d.start,d.end),oldStyles=this.styles;
+    this.index.splice(d.start,gone,fresh);this.cells.splice(d.start,d.end-d.start,...fresh);this.keys.splice(d.start,d.end-d.start,...fresh.map(c=>c.key));removed.push(...gone);added.push(...fresh);
+    const map=new ReplacePositionMap(d.start,d.end,fresh.length);this.selection={anchor:map.map(this.selection.anchor,'after'),head:map.map(this.selection.head,'after')};
+    this.styles=compileCellStyleRuns(model.get(id).properties.standoffProperties??[]);
+    this.paintChanges(oldStyles,d.start,d.end,fresh.length,gone.map(c=>c.key));
+   }
+   if(!n.deltas.some(d=>d.id===id)){const old=this.styles;this.styles=compileCellStyleRuns(model.get(id).properties.standoffProperties??[]);this.paintChanges(old,0,0,0,[]);}
+   this.updates++;this.afterRender?.(n,removed,added);
   },id);
  }
- render(){const b=this.model.get(this.id),styles=compileCellStyleRuns(b.properties.standoffProperties??[]);this.updates++;
-  for(let i=0;i<this.cells.length;i++){const c=this.cells[i];c.index=i;c.style=cellStyleAt(styles,i);allocations.renderVisits++;}
+ private paintChanges(old:ReturnType<typeof compileCellStyleRuns>,start:number,end:number,inserted:number,removed:string[]){
+  const shift=inserted-(end-start),n=this.cells.length,points=new Set<number>([0,n,start,start+inserted]);
+  for(const run of this.styles)if(run.start<=n)points.add(run.start);
+  for(const run of old){if(run.start<start)points.add(run.start);else if(run.start>=end)points.add(Math.min(n,run.start+shift));}
+  const bounds=[...points].filter(i=>i>=0&&i<=n).sort((a,b)=>a-b);let removedPending=removed;
+  for(let i=0;i<bounds.length-1;i++){
+   const a=bounds[i],b=bounds[i+1],prior=a<start?a:a>=start+inserted?a-shift:undefined;
+   if(prior!==undefined&&JSON.stringify(cellStyleAt(old,prior))===JSON.stringify(cellStyleAt(this.styles,a)))continue;
+   this.paint(a,b,removedPending);removedPending=[];
+  }
+  if(removedPending.length)this.paint(start,start,removedPending);
+ }
+ paint(start:number,end:number,removed:string[]=[]){
+  const changed=this.cells.slice(start,end);for(let i=0;i<changed.length;i++){changed[i].style=cellStyleAt(this.styles,start+i);allocations.renderVisits++;}
+  if(this.holdDOM){changed.forEach(c=>this.suppressedKeys.add(c.key));removed.forEach(k=>this.suppressedRemoved.add(k));return;}
+  if(!this.renderer)return;
+  const r=this.renderer as DirectCharacterCells & {experimentalSplice?:boolean;update(c:readonly CharacterCellPresentation[],delta?:{removed:string[];before?:string}):void};
+  if(!r.experimentalSplice)throw Error('M2 renderer port is absent: use the isolated experimental bundle');
+  r.update(changed,{removed,before:this.cells[end]?.key});
+ }
+ render(){this.styles=compileCellStyleRuns(this.model.get(this.id).properties.standoffProperties??[]);this.updates++;
+  for(let i=0;i<this.cells.length;i++){const c=this.cells[i];c.index=i;c.style=cellStyleAt(this.styles,i);allocations.renderVisits++;}
   this.renderer?.update(this.cells);
  }
- dispose(){this.unsubscribe?.();this.renderer?.dispose();this.cells=[];}
+ dispose(){this.unsubscribe?.();this.renderer?.dispose();this.cells=[];this.keys=[];}
 }
 export function readonlyRuns(block:Block){
  const annotations=block.properties.standoffProperties??[],unsupported=new Set<string>();
