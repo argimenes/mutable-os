@@ -9,6 +9,7 @@ import { runInterchange } from '../../src/runtime/interchange-worker';
 import { captureNative, nativeText, decodeNative, admitNative } from '../../src/persistence/native-resource';
 import small from '../../src/interchange/tei/fixtures/A040080.xml?raw';
 import large from '../../src/interchange/tei/fixtures/A041209.xml?raw';
+import semantic from '../../src/interchange/tei/fixtures/semantic-sublimation.xml?raw';
 import '../../src/assets/reset.css';
 import '../../src/index.css';
 import '../../src/features/flint/flint.css';
@@ -16,7 +17,7 @@ import '../../src/features/flint/flint.css';
 const frame = () => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 const anthology = (sections: number) => large.replace('</body>', Array.from({length:sections},(_,i)=>`<div n="${i}"><head>Correspondence section ${i+1}</head>` + Array.from({length:20},()=>'<p>A letter records a place, a date, and a reading. <persName ref="#missing">The correspondent</persName> retained the original wording, including <del>deleted</del> and <add>added</add> passages, for later scholarly interpretation.</p>').join('') + '</div>').join('')+'</body>');
 const paragraph=(n:number)=>'<TEI><text><body><p>'+('Prose text '.repeat(Math.ceil(n/11))).slice(0,n)+'</p></body></text></TEI>';
-const sources = {ordinary:paragraph(500),long:paragraph(1500),verylong:paragraph(3000),exceptional:paragraph(10000),stress:paragraph(120624).replace('<p>','<p><hi rend="bold">').replace('</p>','</hi></p>'),small, large, anthology: anthology(12), populated: large, extended: anthology(30)};
+const sources = {ordinary:paragraph(500),long:paragraph(1500),verylong:paragraph(3000),exceptional:paragraph(10000),stress:paragraph(120624).replace('<p>','<p><hi rend="bold">').replace('</p>','</hi></p>'),small, large, semantic, anthology: anthology(12), populated: large, extended: anthology(30)};
 let cleanup = () => {};
 (window as any).teiCleanup = () => { cleanup(); cleanup = () => {}; };
 (window as any).teiPerformance = async (name: keyof typeof sources) => {
@@ -118,7 +119,11 @@ let cleanup = () => {};
  samples.sort((a,b)=>a-b);settled.sort((a,b)=>a-b);display.sort((a,b)=>a-b);const restored=flow.textContent===before,heapMounted=memory();
  const typingSnapshots=snapshots;editor.repository.snapshot=snapshot;
  const metadataButton=[...host.querySelectorAll<HTMLButtonElement>('[role=tab]')].find(b=>b.textContent==='Metadata'&&!b.closest('[hidden]'));
- const metadataStart=performance.now();if(metadataButton){metadataButton.click();await frame();}const metadataMs=metadataButton?performance.now()-metadataStart:null;
+ const metadataStart=performance.now();let metadataSyncMs:number|null=null;
+ performance.mark('admission-test.metadata');
+ if(metadataButton){metadataButton.click();metadataSyncMs=performance.now()-metadataStart;await frame();}
+ const metadataMs=metadataButton?performance.now()-metadataStart:null;
+ performance.mark('admission-test.metadataReady');
  const pageCount=Object.values(view.state.nodes).filter(n=>n.viewType==='page-block').length;
  const canonicalWorkspaceCells=Object.values(editor.repository.readState().contents).filter(c=>c.viewType==='text-cell').length;
  const captureStart=performance.now(),captured=captureNative(editor.repository.readState(),result.id),saved=nativeText(captured),captureMs=performance.now()-captureStart;
@@ -131,5 +136,5 @@ let cleanup = () => {};
  let t=performance.now();editor.repository.undo();const undoMs=performance.now()-t;t=performance.now();editor.repository.redo();const redoMs=performance.now()-t;
 
  cleanup=()=>{stop();editor.dispose();host.remove();};
- return {name,compactCanonicalText,canonicalCells,canonicalWorkspaceCells,captureMs,saveMs,reopenMs,undoMs,redoMs,settled:stats(settled),display:stats(display),sync:stats(samples),host:'Flint application',repositoryBefore,work,projectionEvents,notifications,reactiveRuns,admissionSnapshots,openSynchronousMs,framesMs,sourceBytes:new TextEncoder().encode(sources[name]).length,...result.stats,counts:result.counts,nativeBytes:result.bytes.length,timings:result.timings,workerMs:(result as any).workerMs,workerRoundTripMs:received-start,transferAndDispatchMs:performance.timeOrigin+received-(result as any).sentAt,admissionMs:admitted-received,admissionTimings,candidateMs:candidate-admitted,projectionMs,openAndRenderMs:usable-candidate,usableMs:usable-start,metadataMs,pageCount,truncated:result.truncated,candidate:session.isCandidate(result.id),dirty:session.isDirty(result.id),heapBefore,heapMounted,heapMetadata:memory(),typing:{samples:samples.length,medianMs:stats(samples).median,p95Ms:stats(samples).p95,snapshots:typingSnapshots,restored}};
+ return {name,compactCanonicalText,canonicalCells,canonicalWorkspaceCells,captureMs,saveMs,reopenMs,undoMs,redoMs,settled:stats(settled),display:stats(display),sync:stats(samples),host:'Flint application',repositoryBefore,work,projectionEvents,notifications,reactiveRuns,admissionSnapshots,openSynchronousMs,framesMs,sourceBytes:new TextEncoder().encode(sources[name]).length,...result.stats,counts:result.counts,nativeBytes:result.bytes.length,timings:result.timings,workerMs:(result as any).workerMs,workerRoundTripMs:received-start,transferAndDispatchMs:performance.timeOrigin+received-(result as any).sentAt,admissionMs:admitted-received,admissionTimings,candidateMs:candidate-admitted,projectionMs,openAndRenderMs:usable-candidate,usableMs:usable-start,metadataMs,metadataSyncMs,pageCount,truncated:result.truncated,candidate:session.isCandidate(result.id),dirty:session.isDirty(result.id),heapBefore,heapMounted,heapMetadata:memory(),typing:{samples:samples.length,medianMs:stats(samples).median,p95Ms:stats(samples).p95,snapshots:typingSnapshots,restored}};
 };

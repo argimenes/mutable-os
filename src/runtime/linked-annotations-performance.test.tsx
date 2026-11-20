@@ -23,20 +23,20 @@ it('resolves mounted semantic annotations and rebased ranges without repository 
  const values=Object.values;let scans=0;
  vi.spyOn(Object,'values').mockImplementation((table:any)=>{if(tables.has(table))scans++;return values(table);});
  const snapshot=vi.spyOn(editor.repository,'snapshot'),rebuild=vi.spyOn(editor.repository as any,'rebuildReferences'),project=vi.spyOn(view as any,'build');
- for(let i=0;i<100;i++)expect((editor.linkedAnnotations.resolve(property,node.contentKey).metadata as JsonObject)?.role).toBe('person-name');
+ for(let i=0;i<100;i++)expect((editor.linkedAnnotations.resolve(property,node.contentKey).metadata as JsonObject)?.role).toBe('tei/person-name');
  editor.commands.replaceInlineRange(node.key,1,1,'x');editor.repository.undo();editor.repository.redo();
- for(let i=0;i<100;i++)expect((editor.linkedAnnotations.resolve(property,node.contentKey).metadata as JsonObject)?.role).toBe('person-name');
+ for(let i=0;i<100;i++)expect((editor.linkedAnnotations.resolve(property,node.contentKey).metadata as JsonObject)?.role).toBe('tei/person-name');
  expect(scans).toBe(0);expect(snapshot).not.toHaveBeenCalled();expect(rebuild).not.toHaveBeenCalled();expect(project).not.toHaveBeenCalled();
 });
 it('observes shared definition edits and Undo without stale cached annotation values',()=>{
  const {editor,node,property}=setup();let resolved:JsonObject|undefined;
  createRoot(dispose=>{cleanup.push(dispose);createComputed(()=>{resolved=editor.linkedAnnotations.resolve(property,node.contentKey);});});
- expect((resolved?.metadata as JsonObject)?.role).toBe('person-name');
+ expect((resolved?.metadata as JsonObject)?.role).toBe('tei/person-name');
  const owner=resourceOwner(editor.repository.readState(),node.contentKey)!;
  const definitions=owner.payload.linkedAnnotations as Record<string,JsonObject>,id=String(property.annotationId);
  editor.repository.commit('Edit shared value',[{kind:'put-content',record:{...owner,payload:{...owner.payload,linkedAnnotations:{...definitions,[id]:{...definitions[id],value:'Reviewed',metadata:{role:'reviewed-name'}}}}}}]);
  expect(resolved?.value).toBe('Reviewed');expect((resolved?.metadata as JsonObject)?.role).toBe('reviewed-name');
- editor.repository.undo();expect((resolved?.metadata as JsonObject)?.role).toBe('person-name');expect(resolved?.value).toBeUndefined();
+ editor.repository.undo();expect((resolved?.metadata as JsonObject)?.role).toBe('tei/person-name');expect(resolved?.value).toBeUndefined();
 });
 it('shares headless ownership evidence across annotation lookups while retaining identity ambiguity checks',()=>{
  const dto=convertTei('<TEI><p>'+Array.from({length:100},()=>'<persName ref="#missing">Name</persName>').join('')+'</p></TEI>').document;

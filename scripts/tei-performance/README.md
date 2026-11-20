@@ -1,5 +1,29 @@
 # TEI import performance qualification
 
+## M2 and compact canonical text
+
+The Flint command now passes the compact flag explicitly: `TEI_COMPACT=1`
+(the benchmark default) verifies **zero canonical character Cells in the imported
+resource** and zero worker canonical records. The workspace can already contain
+legacy startup text; its total Cell count is not the imported resource count.
+`TEI_COMPACT=0` retains historical legacy admission comparisons. In particular,
+use `TEI_COMPACT=0` with `TEI_EXPECT_BASELINE=1` for the original remediation build.
+The former script omitted the argument and thereby selected the harness's
+legacy default despite the merged application's default being compact.
+
+`TEI_CASES=semantic` additionally measures the invented M2 fixture. The Flint
+harness includes native capture, the existing manual-save coordinator with an
+in-memory sink, exact native reopening and Undo/Redo timings. It performs twenty
+insert/delete events per case, including the anthology; `sync`, `settled` and
+`display` distinguish handler, microtask and frame intervals. `metadataSyncMs`
+separates synchronous tab switching (including retained-panel movement and focus) from the complete
+Metadata interval. These fields supersede the earlier six-event probe description
+below. No benchmark saves user files.
+
+M2 evidence: `m2-merged-baseline.json` and `m2-final.json` in
+`artifacts/tei-performance/`. The original remediation and native-admission
+sections below describe their historical measurements, not the merged baseline.
+
 An isolated production-build harness using the actual interchange worker, native
 object-bank admission, application views, Cell editor, and native metadata tabs.
 It never opens a user workspace or saves a document. No online reference lookup.
@@ -16,7 +40,7 @@ remediation files while keeping identical profiling and harness code:
 
 ```sh
 TEI_BASELINE_REF=5e2f0f4 NODE_OPTIONS=--max-old-space-size=8192 node scripts/tei-performance/build.mjs
-TEI_FLINT=1 TEI_EXPECT_BASELINE=1 TEI_CASES=small,large TEI_RUNS=3 TEI_LABEL=before node scripts/benchmark-tei-browser.mjs
+TEI_FLINT=1 TEI_COMPACT=0 TEI_EXPECT_BASELINE=1 TEI_CASES=small,large TEI_RUNS=3 TEI_LABEL=before node scripts/benchmark-tei-browser.mjs
 ```
 
 `TEI_CASES=small,large,anthology` selects cases; `TEI_CPU=1` saves main-thread CPU

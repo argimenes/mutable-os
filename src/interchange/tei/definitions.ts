@@ -20,9 +20,9 @@ const validate = (p: Readonly<Record<string, unknown>>) => {
 };
 export const teiBlockProperties: readonly BlockPropertyDefinition[] = Object.freeze([{ type: 'tei/semantic', label: 'TEI container semantics', validate }]);
 export const teiStandoffProperties: readonly StandoffPropertyDefinition[] = Object.freeze(
-  ['semantic', 'editorial', 'milestone', 'correspondence', 'correspAction'].map(name => ({ type: `tei/${name}`, label: `TEI ${name}`, validate })),
+  ['semantic', 'editorial', 'milestone', 'relationship', 'correspondence', 'correspAction'].map(name => ({ type: `tei/${name}`, label: `TEI ${name}`, validate })),
 );
-export const teiRecordTypes = Object.freeze(['tei/entity', 'tei/reference']);
+export const teiRecordTypes = Object.freeze(['tei/entity', 'tei/reference', 'tei/alternatives', 'tei/alternative', 'tei/conversion']);
 export function validateTeiDeclarations() {
   for (const id of [...teiModes.map(d => d.mode), ...teiBlockProperties.map(d => d.type), ...teiStandoffProperties.map(d => d.type), ...teiRecordTypes]) {
     if (!id.startsWith('tei/')) throw Error(`TEI configuration: invalid identifier ${id}`);

@@ -103,6 +103,8 @@ export type FeatureFlags = Readonly<{
   /** Per-resource native/Markdown persistence through the managed server store. */
   nativeDocumentPersistence: boolean;
   teiImport: boolean;
+  /** Rich TEI alternatives, exact points and editorial semantics on new imports. */
+  teiSemanticSublimation: boolean;
   /** Persistent Library listings with background filesystem reconciliation. */
   vaultDiscoveryCache: boolean;
   /** Accepted loaded-resource provider; false retains the legacy rollback. */
@@ -223,6 +225,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   compactCanonicalText: true,
   nativeDocumentPersistence: true,
   teiImport: true,
+  teiSemanticSublimation: true,
   vaultDiscoveryCache: true,
   nativeKnowledge: true,
   nativeKnowledgeSaved: false,

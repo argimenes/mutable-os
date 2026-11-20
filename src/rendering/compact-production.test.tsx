@@ -28,6 +28,13 @@ it('real renderer uses occurrence-local Cells, broadcasts edits, preserves unaff
  const saved=nativeText(captureNative(editor.repository.readState(),'doc'));expect(nativeText(decodeNative(new TextEncoder().encode(saved)))).toBe(saved);
  expect(new Set(f.node().inlineContent).size).toBe(8);expect(projection.state.nodes[f.node().inlineContent[0]].editingInlineOwner).toBe(f.node().key);
 });
+it('retains mounted compact editing atoms when an authored metadata change rebuilds the projection',()=>{
+ const f=fixture(),before=[...f.node().inlineContent],first=f.flow().firstChild;
+ expect(()=>f.editor.commands.setPayloadField(f.projection.state.rootKey,'metadata',{reviewed:true})).not.toThrow();
+ expect(f.node().inlineContent).toEqual(before);expect(f.flow().firstChild).toBe(first);expect(f.flow().textContent).toBe('A😀éBCD');
+ f.editor.repository.undo();expect(f.node().inlineContent).toEqual(before);expect(f.flow().textContent).toBe('A😀éBCD');
+ expect(Object.values(f.editor.repository.readState().contents).some(c=>c.viewType==='text-cell')).toBe(false);
+});
 it('compact Enter split, join and cross-block replacement preserve text and history',()=>{
  const f=fixture(),{editor}=f;const snapshot=vi.spyOn(editor.repository,'snapshot').mockImplementation(()=>{throw Error('structural snapshot');});const right=editor.commands.splitStandoff(f.node().key,4);
  expect([...f.host.querySelectorAll('.reactive-standoff-flow')].map(e=>e.textContent)).toEqual(['A😀é','BCD','Other']);

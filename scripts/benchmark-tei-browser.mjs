@@ -26,13 +26,19 @@ try{
   await send('HeapProfiler.collectGarbage',{},sessionId);
   if(process.env.TEI_CPU){await send('Profiler.enable',{},sessionId);await send('Profiler.start',{},sessionId);}
   if(process.env.TEI_TRACE)await send('Tracing.start',{categories:'devtools.timeline,blink.user_timing',transferMode:'ReturnAsStream'});
-  const result=await evaluate(`window.${process.env.TEI_PREP ? "teiPreparationProfile" : process.env.TEI_FLINT ? "teiFlintPerformance" : "teiPerformance"}(${JSON.stringify(name)})`);
+  const result=await evaluate(`window.${process.env.TEI_PREP ? "teiPreparationProfile" : process.env.TEI_FLINT ? "teiFlintPerformance" : "teiPerformance"}(${JSON.stringify(name)}${process.env.TEI_FLINT && !process.env.TEI_PREP ? ',' + (process.env.TEI_COMPACT !== '0') : ''})`);
   if(process.env.TEI_CPU){const cpu=await send('Profiler.stop',{},sessionId);await mkdir('artifacts/tei-performance',{recursive:true});await writeFile(`artifacts/tei-performance/${process.env.TEI_LABEL??'run'}-${name}.cpuprofile`,JSON.stringify(cpu.profile));}
   if(process.env.TEI_TRACE){const completed=new Promise(resolve=>{finishTrace=resolve;});await send('Tracing.end');const handle=await completed;let data='';for(;;){const chunk=await send('IO.read',{handle});data+=chunk.base64Encoded?Buffer.from(chunk.data,'base64').toString():chunk.data;if(chunk.eof)break;}await send('IO.close',{handle});await mkdir('artifacts/tei-performance',{recursive:true});await writeFile(`artifacts/tei-performance/${process.env.TEI_LABEL??'run'}-${name}-${run}.trace.json`,data);}
   console.log(JSON.stringify({...result,run}));
   if(process.env.TEI_EXPECT_BASELINE)assert(result.timings.canonicalConstruction!==undefined && result.counts.contents>0,'Baseline worker was not loaded');
   if(!process.env.TEI_PREP){assert.equal(result.pageCount,1);assert.equal(result.truncated,false);assert(result.typing.restored);assert.equal(result.typing.snapshots,0); }
   if(process.env.TEI_FLINT){
+   if(process.env.TEI_COMPACT !== '0') {
+    assert.equal(result.compactCanonicalText,true);
+    assert.equal(result.canonicalCells,0);
+    assert.equal(result.counts.contents,0);
+    assert.equal(result.counts.placements,0);
+   }
    assert.equal(result.notifications,1);assert.equal(result.reactiveRuns,1);assert.equal(result.admissionSnapshots,0);
    assert.equal(result.projectionEvents.filter(e=>e.phase==='admission'&&e.view!=='performance-workspace').length,0,'Admission rebuilt an unrelated Document projection');
   }

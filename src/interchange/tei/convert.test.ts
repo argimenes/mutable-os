@@ -22,14 +22,14 @@ it('uses genuine text Blocks, native Modes, independent semantic overlaps and ex
  const all = blocks(r.document); expect(all.filter(b => b.type === 'page-block')).toHaveLength(1);
  expect(all.map(b => b.mode)).toEqual(expect.arrayContaining(['tei/section','tei/heading','tei/verse-group','tei/verse-line','tei/dramatic-speech','tei/speaker','tei/stage-direction']));
  expect(texts(r)).toContain('A 😀é');
- const deletion = defs(r).find(d => d.metadata.role === 'deletion'); expect(deletion.isDeleted).toBeUndefined();
+ const deletion = defs(r).find(d => d.metadata.role === 'tei/deletion'); expect(deletion.isDeleted).toBeUndefined();
  expect(annotations(r).find(p => p.annotationId === deletion.id)).toMatchObject({start:2,end:4});
 });
 
 it('recovers known descendants under unknown and foreign wrappers without interpreting foreign TEI names', () => {
  const r = convertTei(wrap('<unknown odd="yes"><p>A <persName>Mary</persName></p><x:del xmlns:x="urn:other">still here</x:del></unknown><p><div><p>imperfect nesting</p></div></p>'));
  expect(texts(r).join('')).toContain('A Marystill hereimperfect nesting');
- expect(defs(r).some(d=>d.metadata.role==='person-name')).toBe(true);
+ expect(defs(r).some(d=>d.metadata.role==='tei/person-name')).toBe(true);
  expect(defs(r).find(d=>d.metadata.namespace==='urn:other')).toMatchObject({type:'tei/semantic'});
  expect(r.diagnostics.map(d=>d.code)).toContain('generic-element');
  expect(JSON.stringify(r.document)).toContain('"odd":"yes"');
@@ -38,7 +38,7 @@ it('recovers known descendants under unknown and foreign wrappers without interp
 it('preserves forward, broken, duplicate, external and ordered references without services or placeholders', () => {
  const fetch = vi.spyOn(globalThis, 'fetch');
  const r = convertTei(wrap('<p><persName ref="#later #missing #later https://example.test/#later">A</persName><name target="#dup" corresp="#missing" who="#missing" ana="#missing" wit="#w2 #w1 #w2">B</name></p><p xml:id="later">later</p><p xml:id="dup">one</p><p xml:id="dup">two</p><p xml:base="https://example.test/other"><name ref="#later">C</name></p>'));
- const a = defs(r).find(d=>d.metadata.role==='person-name').metadata.references[0];
+ const a = defs(r).find(d=>d.metadata.role==='tei/person-name').metadata.references[0];
  expect(a.raw).toBe('#later #missing #later https://example.test/#later');
  expect(a.tokens.map((t:any)=>t.state)).toEqual(['resolved','unresolved','resolved','unresolved']);
  expect(a.tokens[0].target).toEqual(a.tokens[2].target);
@@ -54,8 +54,8 @@ it('keeps header secondary and distinguishes correspondence roles, dates and gen
  expect(row.children!.map(b=>b.metadata)).toEqual([{name:'Text',active:true},{name:'Metadata',active:false}]);
  expect(blocks(row.children![0]).some(b=>b.text==='Clara')).toBe(false);
  const ds=defs(r); expect(ds.filter(d=>d.type==='mutable/gloss')).toHaveLength(1);
- const sent=ds.find(d=>d.type==='tei/correspAction'&&d.metadata.role==='sent'); expect(sent.metadata.participantAnnotationIds).toHaveLength(1);
- expect(ds.map(d=>d.metadata.role)).toEqual(expect.arrayContaining(['author','sending-date','receiving-date','writing-date']));
+ const sent=ds.find(d=>d.type==='tei/correspAction'&&d.metadata.role==='tei/sent'); expect(sent.metadata.participantAnnotationIds).toHaveLength(1);
+ expect(ds.map(d=>d.metadata.role)).toEqual(expect.arrayContaining(['tei/author','tei/sending-date','tei/receiving-date','tei/writing-date']));
  const metadata=r.document.metadata as any; expect(metadata.title).toBe('Letter title'); expect(metadata.tei.header.titleBlockIds).toHaveLength(1); expect(metadata.tei.header.authorBlockIds).toHaveLength(1);
  const alice=ds.find(d=>d.metadata.references?.[0]?.raw==='#alice'); expect(alice.metadata.references[0].tokens[0].state).toBe('resolved');
  expect(annotations(r).some(p=>p.type==='codex/entity-reference')).toBe(false);
@@ -77,25 +77,25 @@ it('keeps every alternative without Cartesian multiplication, duplication of con
  expect(annotations(r).some(p=>p.isDeleted||p.type==='text/superposition')).toBe(false);
 });
 
-it('keeps page breaks distinct from the native Page and uses no unqualified zero-width range', () => {
+it('keeps page breaks distinct from the native Page and emits exact qualified points', () => {
  const r=convertTei(wrap('<p>ab<lb break="no"/>cd<pb n="2" facs="https://example.test/scan"/>ef<anchor xml:id="a"/>g<lb/>h</p><p><ref target="#a">anchor</ref></p>'));
  expect(texts(r)).toContain('abcdefg\nh'); expect(blocks(r.document).filter(b=>b.type==='page-block')).toHaveLength(1);
  const ms=defs(r).filter(d=>d.type==='tei/milestone'); expect(ms).toHaveLength(4);
- expect(ms.filter(d=>d.metadata.precision==='block-context')).toHaveLength(3);
- expect(annotations(r).every(p=>!p.isZeroWidth&&p.end>=p.start)).toBe(true);
- expect(defs(r).find(d=>d.metadata.role==='reference').metadata.references[0].tokens[0]).toMatchObject({state:'resolved',target:{kind:'definition',precision:'block-context'}});
+ expect(ms.filter(d=>d.metadata.precision==='point')).toHaveLength(3);
+ expect(annotations(r).filter(p=>p.isZeroWidth).map(p=>[p.start,p.end])).toEqual([[2,2],[4,4],[6,6]]);
+ expect(defs(r).find(d=>d.metadata.role==='tei/reference').metadata.references[0].tokens[0]).toMatchObject({state:'resolved',target:{kind:'definition'}});
 });
 
 it.each(['<p>bad</wrong><p>later</p>', '<p q="broken>bad</p><p>later</p>', '<p>truncated'])('retains trusted rich prefix and literal malformed suffix: %s', bad => {
  const source='<TEI><text><body><p><persName>Good</persName></p>'+bad;
  const r=convertTei(source);
  expect(texts(r)[0]).toBe('Good'); expect(texts(r).slice(1).join('')).toBe(bad);
- expect(defs(r).some(d=>d.metadata.role==='person-name')).toBe(true); expect(r.diagnostics.map(d=>d.code)).toContain('malformed-xml');
+ expect(defs(r).some(d=>d.metadata.role==='tei/person-name')).toBe(true); expect(r.diagnostics.map(d=>d.code)).toContain('malformed-xml');
 });
 
 it('recovers subsequent semantics only through a fresh strict parse for undefined entities', () => {
  const r=convertTei(wrap('<p>A &missing; B</p><p><persName>Later</persName></p>'));
- expect(texts(r)).toEqual(['A &missing; B','Later']); expect(defs(r).some(d=>d.metadata.role==='person-name')).toBe(true);
+ expect(texts(r)).toEqual(['A &missing; B','Later']); expect(defs(r).some(d=>d.metadata.role==='tei/person-name')).toBe(true);
  expect(r.diagnostics.map(d=>d.code)).toContain('literal-entity'); expect(r.diagnostics.map(d=>d.code)).not.toContain('malformed-xml');
  const safe=convertTei(wrap('<p><![CDATA[<p>&missing;</p>]]></p><!-- <p>fake</p> --><p>real</p>'));
  expect(texts(safe)).toEqual(['<p>&missing;</p>','real']);
@@ -160,10 +160,10 @@ it('qualifies a scholarly text above the former 200,000-Cell ceiling through nat
 it('retains root pointers, publication dates, alignment ordering and compound semantic roles',()=>{
  const r=convertTei('<TEI xml:id="root" corresp="#missing"><teiHeader><publicationStmt><date when="2020">2020</date></publicationStmt></teiHeader><text><body><p rend="left center">Aligned</p><postscript><p>Postscript body</p></postscript><p><ref target="#root">self</ref></p></body></text></TEI>');
  expect((r.document.metadata as any).tei.source.references[0].tokens[0].state).toBe('unresolved');
- expect(defs(r).find(d=>d.metadata.role==='publication-date')).toBeTruthy();
+ expect(defs(r).find(d=>d.metadata.role==='tei/publication-date')).toBeTruthy();
  expect((blocks(r.document).find(b=>b.text==='Aligned')!.blockProperties as any[]).filter(p=>p.type==='block/alignment').map(p=>p.value)).toEqual(['left','center']);
- expect(blocks(r.document).some(b=>(b.blockProperties as any[]??[]).some(p=>p.metadata?.role==='postscript'))).toBe(true);
- expect(defs(r).find(d=>d.metadata.role==='reference').metadata.references[0].tokens[0]).toMatchObject({state:'resolved',target:{kind:'block',id:r.document.id}});
+ expect(blocks(r.document).some(b=>(b.blockProperties as any[]??[]).some(p=>p.metadata?.role==='tei/postscript'))).toBe(true);
+ expect(defs(r).find(d=>d.metadata.role==='tei/reference').metadata.references[0].tokens[0]).toMatchObject({state:'resolved',target:{kind:'block',id:r.document.id}});
  const f=convertTeiFragment('<TEI xml:id="root"><p><ref target="#root">self</ref></p></TEI>');
  expect((Object.values(f.definitions)[0] as any).metadata.references[0].tokens[0].state).toBe('unresolved');
 });

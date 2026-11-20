@@ -273,7 +273,7 @@ export class DocumentInterchange {
     if(isTei(file)) {
      if(!this.editor.features.teiImport)throw Error('TEI import is disabled.');
      if(/\.(ink|phosphor|mutable\.json)$/i.test(file.name))throw Error('Open existing native Ink files through the native document workflow.');
-     const prepared=await runInterchange({kind:'tei-document',file,limits:this.editor.teiImportLimits},signal);this.check(ticket);
+     const prepared=await runInterchange({kind:'tei-document',file,limits:this.editor.teiImportLimits,semanticSublimation:this.editor.features.teiSemanticSublimation},signal);this.check(ticket);
      const state=this.editor.repository.readState(),workspace=state.contents[state.placements[state.rootPlacementKey].contentKey];
      const banks=workspace.children.map(k=>state.contents[state.placements[k].contentKey]).filter(c=>c.viewType==='workspace-object-bank-block');
      if(banks.length!==1)throw Error('A workspace with one object bank is required.');

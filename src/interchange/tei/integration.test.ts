@@ -38,6 +38,17 @@ it('owns declarations independently and disposes them without changing stored In
  expect(e.blockModes.get('tei/verse-line')?.appliesTo).toEqual(['standoff-editor-block']);expect(e.standoffPropertyTypes.owner('tei/semantic')).toBe('tei/import');expect(e.blockPropertyTypes.owner('tei/semantic')).toBe('tei/import');
  stop();expect(e.standoffPropertyTypes.get('tei/semantic')).toBeUndefined();expect(e.encodeDocument()).toEqual(before);
 });
+it.each([true,false])('passes semantic feature selection through the actual import request (enabled=%s)',async enabled=>{
+ const e=setup({features:{teiSemanticSublimation:enabled}}),open=vi.fn();
+ await e.interchange.importNew([file('points.tei','<TEI><text><p>A<pb n="2"/>B</p></text></TEI>')],{current:()=>true,open});
+ expect(open).toHaveBeenCalledTimes(1);
+ const resource=captureNative(e.repository.readState(),open.mock.calls[0][0]);
+ const points=Object.values(resource.contents).flatMap(c=>c.payload.standoffProperties as any[]??[]);
+ expect(points.some(p=>p.isZeroWidth)).toBe(enabled);
+ const root=Object.values(resource.contents).find(c=>c.viewType==='document-block')!;
+ expect((root.payload.metadata as any).tei.conversion?.milestone).toBe(enabled?2:undefined);
+ expect(Object.values(resource.contents).some(c=>c.viewType==='text-cell')).toBe(false);
+});
 it('enforces the feature flag and keeps existing documents unchanged on disabled, oversized, cancelled and stale imports',async()=>{
  for(const kind of ['disabled','oversize','cancel','stale'] as const){
   const e=setup(kind==='disabled'?{features:{teiImport:false}}:kind==='oversize'?{teiImportLimits:{bytes:3}}:{}),before=e.encodeDocument(),open=vi.fn();let current=true;

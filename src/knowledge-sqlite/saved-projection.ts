@@ -132,9 +132,10 @@ export async function projectSaved(bytes:Uint8Array,vaultGuid:string,policy?:Ext
       const a=resolveLinkedProperty(state,raw,c.key),owner=linkedDefinitionOwner(state,raw,c.key),external=externalDefinitionLink(raw);
       const definition=owner?.payload.linkedAnnotations?.[raw.annotationId];
       const resolved=!!definition&&!external;
-      requireValue(coordinate&&Number.isSafeInteger(raw.start)&&Number.isSafeInteger(raw.end)&&raw.start>=0&&raw.end+1>=raw.start&&raw.end+1<=(coordinate==='cell'?units.length:text!.length),'invalid or unrepresentable standoff range');
       const zeroWidth=raw.isZeroWidth===true;
-      if(zeroWidth)requireValue(raw.end===raw.start-1,'marked zero-width annotation is not collapsed');
+      const length=coordinate==='cell'?units.length:text?.length??0;
+      requireValue(coordinate&&Number.isSafeInteger(raw.start)&&Number.isSafeInteger(raw.end)&&raw.start>=0&&
+        (zeroWidth ? raw.start<=length&&(raw.end===raw.start||raw.end===raw.start-1) : raw.end+1>=raw.start&&raw.end+1<=length),'invalid or unrepresentable standoff range');
       const segmentCoordinate=zeroWidth?'utf16':coordinate;
       const startIndex=zeroWidth&&coordinate==='cell'?units.slice(0,raw.start).map(c=>c.viewType==='text-cell'?String(c.payload.text):'\ufffc').join('').length:raw.start;
       const endIndex=zeroWidth?startIndex:raw.end+1;

@@ -8,3 +8,11 @@ Unmodified XML retrieved on 19 November 2026 from the Carl-Maria-von-Weber-Gesam
 - **A041209.xml**: WeGA, Briefe, Digitale Edition
   - Source: https://weber-gesamtausgabe.de/A041209.xml
   - SHA-256: `c19a89d981feb1405e2d8dafebf1830e12f7a206ab2bf61451069d3f438ce3d0`; 28,829 bytes.
+
+## Milestone 2 synthetic coverage
+
+`semantic-sublimation.xml` is an invented regression fixture, not a historical
+edition. It combines nested and empty choices, multiple witnesses and `rdgGrp`,
+exact milestones, editorial operations, Unicode/whitespace, local Entity
+definitions, correspondence, unresolved participants and structural additions.
+The two attributed WeGA source files above remain unmodified.

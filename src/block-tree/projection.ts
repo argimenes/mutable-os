@@ -279,8 +279,8 @@ export class BlockTreeProjection {
       // Structural rebuild preserves equal surviving editing atoms at either edge.
       let prefix=0,suffix=0;const old=previous?.inlineContent??[];
       const same=(i:number,j:number)=>{const a=this.state.nodes[old[i]],b=cells[j];return a?.viewType===b.viewType&&JSON.stringify(a.payload)===JSON.stringify(b.payload);};
-      while(prefix<old.length&&prefix<cells.length&&same(prefix,prefix)){cells[prefix]=clone(this.state.nodes[old[prefix]]);prefix++;}
-      while(suffix<old.length-prefix&&suffix<cells.length-prefix&&same(old.length-1-suffix,cells.length-1-suffix)){cells[cells.length-1-suffix]=clone(this.state.nodes[old[old.length-1-suffix]]);suffix++;}
+      while(prefix<old.length&&prefix<cells.length&&same(prefix,prefix)){cells[prefix]=clone(unwrap(this.state.nodes[old[prefix]]));prefix++;}
+      while(suffix<old.length-prefix&&suffix<cells.length-prefix&&same(old.length-1-suffix,cells.length-1-suffix)){cells[cells.length-1-suffix]=clone(unwrap(this.state.nodes[old[old.length-1-suffix]]));suffix++;}
       this.compactVersions.set(key,c.inlineRevision);
       nodes[key].inlineContent=cells.map(c=>c.key);for(const c of cells)nodes[c.key]=c;
     }

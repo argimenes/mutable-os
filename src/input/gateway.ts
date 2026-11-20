@@ -597,7 +597,9 @@ export class InputGateway {
       const properties = node.payload.standoffProperties;
       const indexes = Array.isArray(properties) ? properties.flatMap((p, index) =>
         p && !p.isDeleted && Number.isInteger(p.start) && Number.isInteger(p.end) && p.start >= 0 &&
-          p.end < node.inlineContent.length && p.start <= cell && cell <= p.end ? [index] : []) : [];
+          (p.isZeroWidth === true
+            ? p.start <= node.inlineContent.length && (p.end === p.start || p.end === p.start - 1) && p.start === selection.anchor
+            : p.end < node.inlineContent.length && p.start <= cell && cell <= p.end) ? [index] : []) : [];
       const range = this.document.getSelection()?.rangeCount ? this.document.getSelection()!.getRangeAt(0) : undefined;
       const rect = range && typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : resolved.handle.root.getBoundingClientRect();
       this.overlays.open({ viewType: "annotation-panel", ownerKey: node.key, annotationIndexes: indexes,

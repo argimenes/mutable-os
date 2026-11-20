@@ -21,7 +21,11 @@ export function validateTeiDocument(document: ExistingBlockDto) {
     let length = 0; if (typeof b.text === 'string') for (const _ of b.text) length++;
     for (const p of b.standoffProperties as JsonObject[] ?? []) {
       validateProperty(p, true);
-      if (b.type !== 'standoff-editor-block' || !Number.isSafeInteger(p.start) || !Number.isSafeInteger(p.end) || Number(p.start) < 0 || Number(p.end) < Number(p.start) || Number(p.end) >= length || p.isZeroWidth) fail('invalid emitted Cell range');
+      const start = Number(p.start), end = Number(p.end);
+      const validRange = p.isZeroWidth === true
+        ? start <= length && (end === start || end === start - 1)
+        : end >= start && end < length;
+      if (b.type !== 'standoff-editor-block' || !Number.isSafeInteger(p.start) || !Number.isSafeInteger(p.end) || start < 0 || !validRange) fail('invalid emitted Cell range');
       if (p.annotationId && !Object.hasOwn(definitions, String(p.annotationId))) fail('missing owned definition');
     }
     b.children?.forEach(visit);
