@@ -181,3 +181,31 @@ affected-record counts, snapshots, canonical Cells and unrelated DOM/projection
 work. Native Save uses an in-memory adapter. No source XML or user document is
 written. Evidence is in `artifacts/tei-m5/browser.json`; the implementation report
 records interpretation and remaining full-validation costs.
+
+## Matched M4–M5 closure comparison
+
+Run builds sequentially, then serve each directory in its own terminal:
+
+```sh
+TEI_M5_COMPARE=m4 TEI_SOURCEMAP=0 NODE_OPTIONS=--max-old-space-size=3072 node scripts/tei-performance/build.mjs
+TEI_M5_COMPARE=m5 TEI_SOURCEMAP=0 NODE_OPTIONS=--max-old-space-size=3072 node scripts/tei-performance/build.mjs
+python3 -m http.server 3108 --bind 127.0.0.1 --directory artifacts/tei-m5-closure/site-m4
+python3 -m http.server 3109 --bind 127.0.0.1 --directory artifacts/tei-m5-closure/site-m5
+# After both builds have completed, with no concurrent tests/builds:
+node scripts/tei-performance/compare-m5.mjs
+```
+
+Both builds use the exact `f249c72` harness entry, excluding M5's unrelated
+clipboard fixture setup. The M4 build restores every changed application module
+from that commit in both main and worker pipelines, rejecting accidental use of
+an M5-only module. M5 uses current application source. Build manifests record
+refs, restored paths, source differences, harness and fixture hashes.
+
+The runner reuses `benchmark-tei-browser.mjs` and its existing checks. It alternates
+M4/M5, M5/M4, M4/M5 batches, each with a fresh Chrome profile and small/large/anthology
+fixtures. Three samples per version/fixture are written to
+`artifacts/tei-m5-closure/matched.json`, with original per-batch results/stages in
+`artifacts/tei-performance/m5-closure-r*-m*.json`. Use the ordinary M5 production
+build for clipboard qualification; the matched harness intentionally has no
+`inlineInteropSetup`. Its browser script accepts `TEI_OUTPUT` to preserve separate
+closure evidence. See `TEI_P5_MILESTONE_5_FINAL_QUALIFICATION.md` for results.

@@ -4,6 +4,7 @@ import {spawn} from 'node:child_process';
 import {mkdtemp,rm,writeFile,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';import path from 'node:path';import assert from 'node:assert/strict';
 const origin=process.env.TEI_QUALIFICATION_URL??'http://127.0.0.1:3108';
+const output=process.env.TEI_OUTPUT??'artifacts/tei-m5';
 const profile=await mkdtemp(path.join(tmpdir(),'tei-m5-'));
 const chrome=spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless=new','--disable-extensions','--enable-precise-memory-info','--no-first-run','--no-default-browser-check','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank']);
 let socket;const checkpoints=[];let finishTrace;
@@ -50,7 +51,7 @@ try{
  // Larger unrelated content must not change the affected record count.
  await evaluate('inlineInteropSetup(150)');report.large=await evaluate('interop.profile()');await send('HeapProfiler.collectGarbage',{},sessionId);report.large.retainedHeap=await evaluate('performance.memory.usedJSHeapSize');
  for(const [i,sample] of report.large.samples.entries()){assert.equal(sample.timings[0]['count.previousContents'],report.performance.samples[i].timings[0]['count.previousContents']);assert.equal(sample.work.snapshots,0);assert.equal(sample.work.unrelatedBuilds,0);assert.equal(sample.work.unrelatedMutations,0);assert.equal(sample.work.canonicalCells,0);}
- await mkdir('artifacts/tei-m5',{recursive:true});await writeFile('artifacts/tei-m5/browser.json',JSON.stringify(report,null,2));
+ await mkdir(output,{recursive:true});await writeFile(path.join(output,'browser.json'),JSON.stringify(report,null,2));
  console.log('M5 real Flint/OS clipboard, complete native closures, cut, Undo/Redo, manual Save and structural profiles passed');
 }finally{socket?.close();chrome.kill();await new Promise(r=>setTimeout(r,300));await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
 process.exit(0);
