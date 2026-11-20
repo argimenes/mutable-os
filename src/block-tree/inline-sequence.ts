@@ -1,11 +1,12 @@
 import {textModes} from "../interchange/tei/definitions";
+import { isReadingRelation, validateAlternativeSlot, type InlineAlternativeAtom } from './inline-alternative';
 import type { ContentRecord, JsonObject, RepositoryState } from './types';
 import { clone } from './clone';
 import { mapStandoffPropertiesForReplacement, replacePoint, clipProperties } from '../interchange/ranges';
 
 /** Canonical value, never an editing Cell or a placement table. Absence on a
  * record denotes the legacy Cell-backed representation. Version is in-memory. */
-export type InlineAtom = { kind: 'text'; text: string } | { kind: 'image'; properties: JsonObject };
+export type InlineAtom = { kind: 'text'; text: string } | { kind: 'image'; properties: JsonObject } | InlineAlternativeAtom;
 export interface InlineSplice { start:number; end:number; insert:InlineAtom[] }
 export interface CompactInline { version: 1; spans: InlineAtom[] }
 export function inlineLength(atoms: readonly InlineAtom[]): number {
@@ -13,7 +14,7 @@ export function inlineLength(atoms: readonly InlineAtom[]): number {
 }
 export function inlineSlice(atoms: readonly InlineAtom[], start:number, end:number): InlineAtom[] {
   const out:InlineAtom[]=[];let pos=0;
-  for(const a of atoms){if(pos>=end)break;if(a.kind==='image'){if(pos>=start)out.push(clone(a));pos++;continue;}
+  for(const a of atoms){if(pos>=end)break;if(a.kind!=='text'){if(pos>=start)out.push(clone(a));pos++;continue;}
     let from=-1,to=a.text.length,offset=0;for(const ch of a.text){if(pos===start)from=offset;if(pos===end){to=offset;break;}pos++;offset+=ch.length;}
     if(from<0&&pos>start)from=0;if(from>=0&&to>from)out.push({kind:'text',text:a.text.slice(from,to)});
   }return out;
@@ -26,13 +27,21 @@ export function logicalInline(state: Pick<RepositoryState,'contents'|'placements
 }
 export const inlineText=(atoms:readonly InlineAtom[])=>atoms.map(a=>a.kind==='text'?a.text:'\uFFFC').join('');
 export function validateCompactInline(c:ContentRecord):void {
-  if(c.compactInline===undefined)return;
+  if(c.compactInline===undefined){if(Object.keys(c.ownedRelations).some(isReadingRelation))throw Error('Inline readings require a versioned compact host slot');return;}
   const unsupported=compactPayloadReason(c.payload,c.ownedRelations);
   if(unsupported)throw Error(unsupported+'; reopen with compact canonical text disabled');
   const s=c.compactInline;
   if(c.inlineKind!=='standoff'||c.viewType!=='standoff-editor-block'||c.inlineContent.length||'text' in c.payload||s.version!==1||!Array.isArray(s.spans))throw Error('Invalid compact inline authority');
+  const slots=new Set<string>(),readings=new Set<string>();
   for(const a of s.spans){if(a.kind==='text'){if(typeof a.text!=='string'||!a.text.length||Object.keys(a).some(k=>k!=='kind'&&k!=='text'))throw Error('Invalid compact text span');}
+    else if(a.kind==='alternative'){
+      validateAlternativeSlot(a.properties);
+      if(Object.keys(a).some(k=>k!=='kind'&&k!=='properties')||slots.has(a.properties.id))throw Error('Duplicate or invalid inline slot identity');
+      slots.add(a.properties.id);
+      for(const name of a.properties.readings){if(readings.has(name)||!Object.hasOwn(c.ownedRelations,name))throw Error('Missing/shared inline reading ownership');readings.add(name);}
+    }
     else if(a.kind!=='image'||!a.properties||typeof a.properties!=='object'||Array.isArray(a.properties)||Object.keys(a).some(k=>k!=='kind'&&k!=='properties'))throw Error('Invalid compact inline object');}
+  if(Object.keys(c.ownedRelations).some(name=>isReadingRelation(name)&&!readings.has(name)))throw Error('Unrepresented inline reading relation');
 }
 export function replaceCompact(c:ContentRecord,start:number,end:number,insert:readonly InlineAtom[],origins:(number|null)[]=[]):ContentRecord {
   if(!c.compactInline)throw Error('Compact content required');const spans=c.compactInline.spans,n=inlineLength(spans),count=inlineLength(insert);
@@ -44,7 +53,10 @@ export function replaceCompact(c:ContentRecord,start:number,end:number,insert:re
     }
     const mapped=mapStandoffPropertiesForReplacement([p],start,end,count,[],n);mapped.forEach(()=>origins.push(index));return mapped;
   });
-  const next={...clone(c),payload,compactInline:{version:1 as const,spans:normalizeInline([...inlineSlice(spans,0,start),...insert,...inlineSlice(spans,end,n)])},inlineRevision:c.inlineRevision+1,revision:c.revision+1};validateCompactInline(next);return next;
+  const next={...clone(c),payload,compactInline:{version:1 as const,spans:normalizeInline([...inlineSlice(spans,0,start),...insert,...inlineSlice(spans,end,n)])},inlineRevision:c.inlineRevision+1,revision:c.revision+1};
+  const kept=new Set(next.compactInline.spans.flatMap(a=>a.kind==='alternative'?a.properties.readings:[]));
+  for(const name of Object.keys(next.ownedRelations))if(isReadingRelation(name)&&!kept.has(name))delete next.ownedRelations[name];
+  validateCompactInline(next);return next;
 }
 
 export const contentLength=(c:ContentRecord)=>c.compactInline?inlineLength(c.compactInline.spans):c.inlineContent.length;

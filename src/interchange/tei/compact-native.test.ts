@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { convertTei } from './convert';
+import { convertTei as convertCurrentTei } from './convert';
+// Preserve the pre-M4 grouped-alternative compatibility oracle.
+const convertTei: typeof convertCurrentTei = (source, limits, filename, timings, options) => convertCurrentTei(source, limits, filename, timings, { ...options, inlineAlternatives: false });
 import { encodeTeiNative } from './compact-native';
 import { decodeBlockTree, encodeDocument } from '../../block-tree/codecs';
 import { captureNative, decodeNative, nativeBytes, nativeText } from '../../persistence/native-resource';

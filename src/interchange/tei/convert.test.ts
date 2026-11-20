@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { convertTei, convertTeiFragment } from './convert';
+import { convertTei as convertCurrentTei, convertTeiFragment } from './convert';
 import { defaultTeiLimits, teiLimits } from './model';
 import { decodeBlockTree } from '../../block-tree/codecs';
 import { captureNative, decodeNative, nativeBytes } from '../../persistence/native-resource';
@@ -197,3 +197,6 @@ it('does not reject useful content for one local NUL corruption',()=>{
  expect(r.diagnostics.some(d=>d.code==='malformed-xml')).toBe(true);
  expect(()=>captureNative(decodeBlockTree(r.document).state,r.document.id)).not.toThrow();
 });
+
+// Retained M1–M3 grouped conversion compatibility oracle.
+function convertTei(...args: Parameters<typeof convertCurrentTei>) { return convertCurrentTei(args[0], args[1], args[2], args[3], { ...args[4], inlineAlternatives: false }); }

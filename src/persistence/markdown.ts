@@ -78,6 +78,7 @@ export function admitMarkdown(repository: CanonicalRepository, bank: string, sou
 }
 
 export function exportMarkdown(resource: DeepReadonly<ResourceSnapshot>, targets: readonly LinkTarget[] = []) {
+  if (Object.values(resource.contents).some(c => c.compactInline?.spans.some(a => a.kind === "alternative"))) throw Error("Markdown export cannot preserve inline alternatives; save as Mutable JSON");
   const diagnostics: Diagnostic[] = [], seen = new Set<string>(); let budget = 10000;
   const warn = (id: unknown, code: string, detail: string) => diagnostics.push({ blockId: typeof id === "string" ? id : undefined, code, detail });
   const plain = (key: string): string => {
@@ -91,7 +92,7 @@ export function exportMarkdown(resource: DeepReadonly<ResourceSnapshot>, targets
     const tokens = atoms.map(atom => {
       if(!atom)return '';
       if (atom.viewType === "text-cell") return escapeText(String(atom.payload.text));
-      const src = String(atom.payload.src ?? ""), alt = escapeText(String(atom.payload.alt ?? "Image"));
+      const src = String((atom.payload as Record<string, unknown>).src ?? ""), alt = escapeText(String((atom.payload as Record<string, unknown>).alt ?? "Image"));
       warn(c.payload.id, "image-projection", "Image appearance/metadata is not fully represented; no assets copied");
       return /^(https?:|data:image\/|\.\.?\/)/.test(src) && !/[\s()<>]/.test(src) ? `![${alt}](${src})` : `[Image: ${alt}]`;
     });

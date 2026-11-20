@@ -30,6 +30,7 @@ export interface DocumentApplicationInstance {
     importCollection():void;
     exportCollection():void;
     importFiles():void;
+    openTeiXml?():void;
     importPackage():void;
     exportPackage():void;
     exportPortable(format:'html'|'markdown',standalone?:boolean):void;

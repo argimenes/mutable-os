@@ -69,6 +69,7 @@ export class InputGateway {
     private readonly blockDeleteTarget?: (key:NodeKey)=>NodeKey|undefined,
     private readonly markdown?: { typed(key: string, start: number, end: number, text: string): number | undefined; cancel(): void },
     private readonly notice: (message: string) => void = () => {},
+    private readonly inlineNavigation?: (event:KeyboardEvent)=>boolean,
   ) {}
 
   install(): () => void {
@@ -129,6 +130,7 @@ export class InputGateway {
     return resolved.handle.inputPolicy === "standoff" ? ["editor/standoff", "editor"] : ["editor"];
   }
   private onKeyDown = (event: KeyboardEvent) => {
+    if(this.inlineNavigation?.(event))return;
     if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1 && event.key !== "Shift") this.markdown?.cancel();
     if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1 && event.key !== "Shift") this.listInput.cancelTask?.();
     this.clipboard?.key(event);
@@ -422,6 +424,10 @@ export class InputGateway {
       const bi = Math.min(b.anchor.boundary.index, b.head.boundary.index);
       return ai - bi;
     });
+    if (ordered.some(item => context.node.inlineContent.slice(Math.min(item.anchor.boundary.index, item.head.boundary.index), Math.max(item.anchor.boundary.index, item.head.boundary.index)).some(key => this.node(key)?.viewType === 'inline-alternative-cell'))) {
+      if (event.cancelable) event.preventDefault(); event.stopPropagation();
+      this.notice('The legacy clipboard cannot preserve inline alternatives. Use native Save for the complete reading closure.'); return false;
+    }
     const fragments = ordered.map((item) => {
       const start = Math.min(item.anchor.boundary.index, item.head.boundary.index);
       const end = Math.max(item.anchor.boundary.index, item.head.boundary.index);

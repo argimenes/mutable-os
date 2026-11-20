@@ -15,7 +15,8 @@ const clean: (() => void)[] = [];
 afterEach(() => { clean.splice(0).reverse().forEach(f => f()); document.body.replaceChildren(); vi.restoreAllMocks(); });
 const xml = '<TEI><teiHeader><titleStmt><title>Semantic edition</title></titleStmt></teiHeader><text><p>Before <choice><orig>olde <hi rend="italic">😀</hi></orig><reg>modern <choice><abbr/><expan>expanded</expan></choice></reg></choice> after.</p><p>A😀<pb n="2"/>BC<anchor xml:id="end"/></p><p><supplied reason="lost" cert="low">restored</supplied></p><p>Unrelated text.</p></text></TEI>';
 function setup(compact = true, source = xml, endpointDelta = 0) {
-  const d = convertTei(source).document;
+  // Retain the M2 grouped-reading contract in both canonical representations.
+  const d = convertTei(source, {}, 'TEI document', undefined, { inlineAlternatives: false }).document;
   const endpoints = (b: typeof d) => { for (const p of b.standoffProperties ?? []) if (p.isZeroWidth) p.end = Number(p.start) + endpointDelta; b.children?.forEach(child => endpoints(child as typeof d)); };
   endpoints(d);
   const editor = new ReactiveEditor({ type: 'workspace-block', children: [{ type: 'workspace-object-bank-block' }] }, { features: { compactCanonicalText: compact } });

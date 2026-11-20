@@ -60,7 +60,7 @@ export class DocumentInterchange {
  private busySignal=createSignal(false); readonly busy=this.busySignal[0];
  private questionSignal=createSignal<Question>(); readonly question=this.questionSignal[0];
  private answer?: (value:string[]|undefined)=>void;
- private pickerSignal=createSignal<{title:string;fullDocument?:boolean;embed?:boolean;package?:boolean;link?:boolean;sourceFormat?:'html'|'markdown';run:(files:SuppliedFile[],format?:ImportFormat)=>void}>();readonly picker=this.pickerSignal[0];
+ private pickerSignal=createSignal<{title:string;fullDocument?:boolean;embed?:boolean;package?:boolean;link?:boolean;sourceFormat?:'html'|'markdown'|'tei';run:(files:SuppliedFile[],format?:ImportFormat)=>void}>();readonly picker=this.pickerSignal[0];
  constructor(private editor:ReactiveEditor){}
  respond(value:string[]|undefined){if(value===undefined)this.controller?.abort();this.answer?.(value);}
  closePicker(){this.pickerSignal[1](undefined);this.pickerView=undefined;}
@@ -198,6 +198,7 @@ export class DocumentInterchange {
   else throw Error('Unknown refresh action.');
   this.status[1]('Refreshed source snapshot. Save Ink explicitly; the external source is unchanged.');
  });}
+ pickTei(host:ImportHost){if(!this.editor.features.documentInterchange||!this.editor.features.teiImport)return;this.pickerView=undefined;this.pickerSignal[1]({title:'Open TEI XML',fullDocument:true,sourceFormat:'tei',run:files=>{this.closePicker();void this.importNew(files,host,'tei');}});}
  pickNew(host:ImportHost){if(!this.editor.features.documentInterchange)return;this.pickerView=undefined;this.pickerSignal[1]({title:'Import external files as new Ink documents',fullDocument:true,run:(files,format)=>{this.closePicker();void this.importNew(files,host,format);}});}
  pickInsert(key:string){try{const t=this.selection(key);this.pickerView=t.viewId;this.pickerSignal[1]({title:'Insert external files at the captured selection',run:(files,format)=>{this.closePicker();void this.insertFiles(files,t,format);}});}catch(e){this.status[1](String(e));}}
  pickEmbed(key:string,link=false){
@@ -273,11 +274,20 @@ export class DocumentInterchange {
     if(isTei(file)) {
      if(!this.editor.features.teiImport)throw Error('TEI import is disabled.');
      if(/\.(ink|phosphor|mutable\.json)$/i.test(file.name))throw Error('Open existing native Ink files through the native document workflow.');
-     const prepared=await runInterchange({kind:'tei-document',file,limits:this.editor.teiImportLimits,semanticSublimation:this.editor.features.teiSemanticSublimation,operationalSemantics:this.editor.features.teiOperationalSemantics},signal);this.check(ticket);
+     const prepared=await runInterchange({kind:'tei-document',file,limits:this.editor.teiImportLimits,semanticSublimation:this.editor.features.teiSemanticSublimation,operationalSemantics:this.editor.features.teiOperationalSemantics,inlineAlternatives:this.editor.features.inlineAlternatives&&this.editor.features.compactCanonicalText},signal);this.check(ticket);
      const state=this.editor.repository.readState(),workspace=state.contents[state.placements[state.rootPlacementKey].contentKey];
      const banks=workspace.children.map(k=>state.contents[state.placements[k].contentKey]).filter(c=>c.viewType==='workspace-object-bank-block');
-     if(banks.length!==1)throw Error('A workspace with one object bank is required.');
-     admitNative(this.editor.repository,prepared.bytes,banks[0].key);this.committed=true;
+     if(banks.length>1)throw Error('Ambiguous workspace object bank.');
+     // The Workspace menu is usable before Flint or any Document has opened.
+     // Provision its owner only after preparation and the stale-result check.
+     const createdBank=!banks.length?this.editor.commands.insert({id:crypto.randomUUID(),type:'workspace-object-bank-block',children:[]},{kind:'at',parentKey:state.rootPlacementKey,index:workspace.children.length}):undefined;
+     try {
+      const bankKey=banks[0]?.key??this.editor.repository.state.placements[createdBank!].contentKey;
+      admitNative(this.editor.repository,prepared.bytes,bankKey);this.committed=true;
+     } finally {
+      if(createdBank){const bank=this.editor.repository.state.placements[createdBank];if(bank&&!this.editor.repository.state.contents[bank.contentKey].children.length)this.editor.commands.remove(createdBank);}
+      ticket.revision=this.editor.repository.state.revision;
+     }
      nativeDocumentSession(this.editor).trackCandidate(prepared.id);host.open(prepared.id);
      const warnings=prepared.diagnostics.length;
      outcomes.push(`${file.name}: ${prepared.truncated?'INCOMPLETE IMPORT — content was omitted.':warnings?'Imported successfully with warnings.':'Imported successfully.'} Unsaved Ink copy${warnings?` (${warnings} grouped notices)`:''}.`);

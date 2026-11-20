@@ -1,3 +1,4 @@
+import {validateAlternativeReadings, validateReadingOwnership, isReadingRelation} from './inline-alternative';
 import { compactInlineOwnerFor } from "./compact-inline-plan";
 import { inlineLength, inlineSlice, normalizeInline, validateCompactInline } from "./inline-sequence";
 import { glossChangeFor } from "./gloss-plan";
@@ -125,9 +126,11 @@ function inverseFor(state: RepositoryState, operation: RepositoryOperation): Rep
 
 export function deriveLocations(state: RepositoryState, observe?: (c: ContentRecord) => void): Map<PlacementKey, Location> {
   const locations = new Map<PlacementKey, Location>();
+  const readingTargets = new Set<string>();
 
   for (const content of Object.values(state.contents)) {
     validateCompactInline(content);
+    validateAlternativeReadings(content,key=>{const p=state.placements[key];return p&&{owned:p.kind==='owned'&&!p.resolvedReference&&!p.externalReference,content:state.contents[p.contentKey]};});
     observe?.(content);
     content.children.forEach((childKey, index) => {
       if (locations.has(childKey)) {
@@ -152,6 +155,7 @@ export function deriveLocations(state: RepositoryState, observe?: (c: ContentRec
     });
 
     for (const [name, relationKey] of Object.entries(content.ownedRelations)) {
+      if (isReadingRelation(name)) readingTargets.add(state.placements[relationKey]?.contentKey);
       if (locations.has(relationKey)) {
         throw new ModelInvariantError(`Placement ${relationKey} has more than one owner`);
       }
@@ -162,6 +166,7 @@ export function deriveLocations(state: RepositoryState, observe?: (c: ContentRec
     }
   }
 
+  if (readingTargets.size) validateReadingOwnership(readingTargets, Object.values(state.placements));
   return locations;
 }
 

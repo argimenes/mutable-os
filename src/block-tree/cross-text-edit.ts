@@ -30,6 +30,7 @@ export function planCrossTextEdit(source: RepositoryState, segments: CrossTextSe
     if (!content || content.inlineKind !== "standoff" || !Number.isInteger(segment.start) || !Number.isInteger(segment.end) || segment.start < 0 || segment.end < segment.start || segment.end > contentLength(content)) throw new Error("The text selection is stale or invalid");
     return content;
   });
+  if (records.some(c => c.compactInline?.spans.some(a => a.kind === 'alternative'))) throw Error('Joining or replacing across paragraphs containing inline alternatives is not supported; edit or split within the host paragraph. Nothing was changed.');
   if(records.some(c=>!!c.compactInline!==!!records[0].compactInline))throw Error('Mixed canonical representation replacement is not supported');
   const location = locations.get(segments[0].placementKey);
   if (!location || location.slot.kind !== "children") throw new Error("Replacement requires an ordinary paragraph list");

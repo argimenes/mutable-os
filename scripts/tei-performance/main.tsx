@@ -1,3 +1,4 @@
+import './inline-alternatives';
 import {ResourcePair} from '../../src/persistence/resource-pair';
 import { render } from 'solid-js/web';
 import { createComputed, createRoot } from 'solid-js';

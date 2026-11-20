@@ -509,6 +509,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
         exportPackage() {guard();const id=requireId();void editor.interchange.exportPackage(id,selectedVault()?.root,()=>mounted&&scope.active()&&activeId()===id);},
         inspectPackage() {guard();const id=requireId();void editor.interchange.inspectPackage(id,()=>mounted&&scope.active()&&activeId()===id);},
         downloadViewer() {guard();const a=document.createElement('a');a.href='/ink-viewer.html';a.download='Ink Viewer.html';a.click();},
+        ...(editor.features.teiImport ? { openTeiXml() {guard();editor.interchange.pickTei({current:()=>mounted&&scope.active(),open:openDocument});} } : {}),
         importFiles() {guard();editor.interchange.pickNew({current:()=>mounted&&scope.active(),open:openDocument});},
         exportDocument(format:'html'|'markdown'|'text') {guard();const id=requireId();void editor.interchange.exportDocument(id,format,()=>mounted&&scope.active()&&activeId()===id);},
         suggestedFilename() {const id=activeId(),doc=id&&resolve(id);return doc ? (editor.repository.readState().contents[doc.contentKey].payload.metadata as any)?.interchange?.suggestedFilename : undefined;},

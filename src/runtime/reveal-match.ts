@@ -1,3 +1,4 @@
+import {revealInlineReading} from './inline-alternatives';
 import type { ReactiveEditor } from "../reactive-editor/editor";
 import type { SearchMatch } from "./text-search";
 import { ancestorPath } from "./text-search";
@@ -8,6 +9,7 @@ export async function revealMatch(editor: ReactiveEditor, match: SearchMatch, cu
   if (!current()) return false;
   for (let i = 0; i + 1 < match.path.length; i++) {
     const node = editor.node(match.path[i]);
+    if(node)revealInlineReading(editor,node,match.path[i+1]);
     if (node && ["tab-row-block", "document-tab-row-block", "sticky-tab-row-block", "surface-block"].includes(node.viewType)) editor.setViewChild(node.key, match.path[i + 1]);
   }
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -25,6 +27,7 @@ export async function revealPositionMarker(editor: ReactiveEditor, marker: Docum
   if (!path.length || !current()) return false;
   for (let index = 0; index + 1 < path.length; index++) {
     const node = editor.node(path[index]);
+    if(node)revealInlineReading(editor,node,path[index+1]);
     if (node && ["tab-row-block", "document-tab-row-block", "sticky-tab-row-block", "surface-block"].includes(node.viewType)) editor.setViewChild(node.key, path[index + 1]);
   }
   await new Promise(resolve => setTimeout(resolve, 0));

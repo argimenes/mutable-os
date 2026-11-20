@@ -11,7 +11,7 @@ export function compactInlineOwnerFor(state:RepositoryState,operations:Repositor
   validateCompactInline(next);
   const graph=(c:ContentRecord)=>{const {payload,compactInline,inlineRevision,revision,...rest}=c;return JSON.stringify(rest);};
   if(graph(prior)!==graph(next))return;
-  const objects=(c:ContentRecord)=>JSON.stringify(c.compactInline!.spans.filter(a=>a.kind==='image'));
+  const objects=(c:ContentRecord)=>JSON.stringify(c.compactInline!.spans.filter(a=>a.kind!=='text'));
   if(objects(prior)!==objects(next))return;
   return next.key;
 }

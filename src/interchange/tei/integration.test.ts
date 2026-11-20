@@ -46,7 +46,7 @@ it.each([true,false])('passes semantic feature selection through the actual impo
  const points=Object.values(resource.contents).flatMap(c=>c.payload.standoffProperties as any[]??[]);
  expect(points.some(p=>p.isZeroWidth)).toBe(enabled);
  const root=Object.values(resource.contents).find(c=>c.viewType==='document-block')!;
- expect((root.payload.metadata as any).tei.conversion?.milestone).toBe(enabled?3:undefined);
+ expect((root.payload.metadata as any).tei.conversion?.milestone).toBe(enabled?4:undefined);
  expect(Object.values(resource.contents).some(c=>c.viewType==='text-cell')).toBe(false);
 });
 it('enforces the feature flag and keeps existing documents unchanged on disabled, oversized, cancelled and stale imports',async()=>{
@@ -89,5 +89,5 @@ it.each([true,false])('passes the operational feature flag through worker prepar
  const resource=captureNative(e.repository.readState(),open.mock.calls[0][0]),root=Object.values(resource.contents).find(c=>c.viewType==='document-block')!;
  const defs=Object.values(root.payload.linkedAnnotations as any) as any[];
  expect(defs.flatMap(d=>Object.values(d.metadata?.gloss?.links??{}))).toHaveLength(enabled?1:0);
- expect((root.payload.metadata as any).tei.conversion.milestone).toBe(enabled?3:2);
+ expect((root.payload.metadata as any).tei.conversion.milestone).toBe(4);
 });

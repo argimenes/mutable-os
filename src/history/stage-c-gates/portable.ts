@@ -1,3 +1,4 @@
+import {type InlineAlternativeProperties} from '../../block-tree/inline-alternative';
 import {compactPayloadReason} from "../../block-tree/inline-sequence";
 import { inlineLength, inlineSlice, inlineText, normalizeInline } from "../../block-tree/inline-sequence";
 /** Semantic native codec shared by production Save/Open and the G1 gates. */
@@ -19,7 +20,7 @@ interface Block {
   id: string; type: string; properties: JsonObject;
   children?: Edge[] | null;
   relations?: { owned: Record<string, Edge>; opaque: JsonObject } | null;
-  inline?: Array<{ kind: "text"; text: string } | { kind: "image"; properties: JsonObject }>;
+  inline?: Array<{ kind: "text"; text: string } | { kind: "image" | "alternative"; properties: JsonObject }>;
 }
 export interface GateDocument {
   format: "codex-portable-resource-gate"; version: 1 | 2;
@@ -79,7 +80,7 @@ export function encodeGateDocument(state: DeepReadonly<ResourceSnapshot>, profil
     } else if (c.wireRelation === "null") block.relations = null;
     if (c.inlineKind === "standoff") {
       requireValue(c.viewType === "standoff-editor-block" && !own(properties, "text"), "unsupported inline host");
-      block.inline = c.compactInline ? c.compactInline.spans.map(a=>a.kind==='text'?{kind:'text' as const,text:a.text}:{kind:'image' as const,properties:value(a.properties)}) : [];
+      block.inline = c.compactInline ? c.compactInline.spans.map(a=>a.kind==='text'?{kind:'text' as const,text:a.text}:{kind:a.kind,properties:value(a.properties)}) : [];
       for (const key of c.inlineContent) {
         const p = state.placements[key];
         requireValue(p.kind === "inline" && p.target.kind === "local", "invalid inline target");
@@ -127,6 +128,7 @@ export function decodeGateDocument(document: GateDocument, profile: "legacy" | "
   // Whole-document admission decision, before constructing any canonical atoms.
   // No live fallback or representation conversion occurs after this boundary.
   compact = compact && !document.blocks.some(b=>['phosphor-screen-block','thesis-application-block'].includes(b.type)) && document.blocks.every(b=>b.type!=='standoff-editor-block'||(!compactPayloadReason(value(b.properties),b.relations?.owned??{}) && !(b.inline??[]).some(a=>a.kind==='image'&&Array.isArray(value(a.properties).standoffProperties))));
+  requireValue(compact || !document.blocks.some(b => b.inline?.some(a => a.kind === 'alternative')), 'Inline alternatives require compact canonical text admission; readings were not flattened');
   const contents: Record<string, ContentRecord> = Object.create(null), placements: Record<string, ResourcePlacement> = Object.create(null);
   const keys = new Map<string, string>();
   for (const b of document.blocks) {
@@ -166,6 +168,7 @@ export function decodeGateDocument(document: GateDocument, profile: "legacy" | "
           validateNativeTextSpan(span.text);
           if(c.compactInline)c.compactInline.spans.push({kind:"text",text:span.text});
           else for (const text of span.text) atom("text-cell", { text });
+        } else if (span.kind === "alternative") { requireValue(!!c.compactInline, "Inline alternatives require compact admission"); c.compactInline.spans.push({kind:"alternative",properties:value(span.properties) as InlineAlternativeProperties});
         } else { requireValue(span.kind === "image", "unsupported inline span"); if(c.compactInline)c.compactInline.spans.push({kind:"image",properties:value(span.properties)});else atom("image-cell", value(span.properties)); }
       }
       if(c.compactInline)c.compactInline.spans=normalizeInline(c.compactInline.spans);

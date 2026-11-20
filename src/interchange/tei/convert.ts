@@ -1,3 +1,4 @@
+import { type InlineAtom } from '../../block-tree/inline-sequence';
 import { promoteTeiRelationships } from './relationships';
 import type { ExistingBlockDto, JsonObject } from '../../block-tree/types';
 import { containerModes, textModes, validateTeiDeclarations } from './definitions';
@@ -30,10 +31,23 @@ export function convertTei(source: string | Uint8Array, options: Partial<TeiLimi
 function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, filename: string, fragmentOperation: boolean, timings?: Record<string, number>, conversion: TeiConversionOptions = {}) {
   const rich = conversion.semanticSublimation !== false;
   const operational = rich && conversion.operationalSemantics !== false;
+  const inlineAlternatives = rich && conversion.inlineAlternatives !== false;
   const editorialRoles = rich ? richEditorial : editorial;
   const roleId = (role: string) => rich ? `tei/${role}` : role;
   const alternative = (n: TeiNode) => isTei(n) && (['choice', 'app'].includes(n.name) || rich && n.name === 'rdgGrp');
-  const structuralNode = (n: TeiNode) => isTei(n) && (structural.has(n.name) || alternative(n));
+  const eligibility = new WeakMap<TeiNode, boolean>(), preserveWhitespace = new WeakMap<TeiNode, boolean>();
+  function eligible(n: TeiNode): boolean {
+    if (!inlineAlternatives || !isTei(n) || !['choice', 'app'].includes(n.name)) return false;
+    const cached = eligibility.get(n); if (cached !== undefined) return cached;
+    const roles = n.name === 'choice' ? ['orig', 'reg', 'sic', 'corr', 'abbr', 'expan'] : ['lem', 'rdg'];
+    const inline = (node: TeiNode): boolean => !node.recovery && isTei(node) &&
+      (alternative(node) ? eligible(node) : !structural.has(node.name) && node.parts.every(p => typeof p === 'string' || inline(p)));
+    const branches = n.parts.filter(p => typeof p !== 'string');
+    const result = !n.attrs.from && !n.attrs.to && branches.length > 0 && n.parts.every(p => typeof p === 'string' ? !p.trim() && !preserveWhitespace.get(n) :
+      isTei(p) && roles.includes(p.name) && !p.attrs.from && !p.attrs.to && inline(p));
+    eligibility.set(n, result); return result;
+  }
+  const structuralNode = (n: TeiNode) => isTei(n) && (structural.has(n.name) || alternative(n)) && !eligible(n);
   let last = timings ? performance.now() : 0;
   const stage = (name: string) => { if (timings) { const now = performance.now(); timings[name] = now - last; last = now; } };
   validateTeiDeclarations();
@@ -43,6 +57,12 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
   stage('xmlDecode');
   const parsed = parseTei(decoded, limits, diagnostics);
   stage('xmlParse');
+  const rememberSpace = (node: TeiNode, inherited = false) => {
+    const preserve = node.attrs['xml:space'] ? node.attrs['xml:space'] === 'preserve' : inherited;
+    preserveWhitespace.set(node, preserve);
+    for (const part of node.parts) if (typeof part !== 'string') rememberSpace(part, preserve);
+  };
+  rememberSpace(parsed.root);
   const references = new References(limits.references, diagnostics, rich), definitions: Record<string, JsonObject> = {};
   const headers: Block[] = [], content: Block[] = [], allText: Block[] = [];
   const lengths = new WeakMap<Block, number>(), spans = new WeakMap<Block, Map<string, JsonObject>>();
@@ -145,7 +165,7 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
       const b = textBlock(active), start = lengths.get(b)!; let count = 0, cut = value.length;
       for (const ch of value) { if (cells + count >= limits.cells) { cut = 0; break; } count++; }
       if (!cut) { let offset = 0, kept = 0; for (const ch of value) { if (kept++ === count) break; offset += ch.length; } value = value.slice(0, offset); }
-      b.text += value; lengths.set(b, start + count); cells += count;
+      if (b.inlineAtoms) { const atoms = b.inlineAtoms as InlineAtom[], last = atoms.at(-1); if (last?.kind === 'text') last.text += value; else atoms.push({ kind: 'text', text: value }); } else b.text += value; lengths.set(b, start + count); cells += count;
       for (const m of active.marks) segment(b, m, start, start + count - 1);
       for (const m of contextual) segment(b, m, 0, start + count - 1);
       if (!cut) throw new TeiBudget('text Cell budget');
@@ -176,7 +196,27 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
         else { contextual.push(m); if (current) segment(current, m, 0, lengths.get(current)! - 1); diagnostics.add('milestone-context', 'Positional markers retain Block context, not an exact live point.'); }
         return;
       }
-      const isBlock = structuralNode(part);
+      if (active.textual && eligible(part)) {
+        const b = textBlock(next), at = lengths.get(b)!, names: string[] = [], owned: Record<string, Block> = {};
+        const group = mark('tei/editorial', { ...metadata(part, next, part.name), selectionPolicy: 'tei/source-order' }, part);
+        for (const branch of part.parts) {
+          if (typeof branch === 'string') continue;
+          const reading = flow([branch], { ...next, marks: [], textual: true, header: false, headerRole: undefined, textMode: undefined }, true)[0];
+          if (!reading || exhausted) return;
+          reading.inlineAtoms ??= reading.text ? [{ kind: 'text', text: reading.text }] : []; delete reading.text;
+          const name = `inline-reading:${id()}`; names.push(name); owned[name] = reading;
+          reading.metadata = { ...(reading.metadata as JsonObject ?? {}), name: branch.name, tei: { role: roleId(editorialRoles[branch.name] ?? branch.name), ordinal: names.length - 1 } };
+        }
+        if (++cells > limits.cells) throw new TeiBudget('text Cell budget');
+        const atoms = (b.inlineAtoms ??= b.text ? [{ kind: 'text', text: b.text }] : []) as InlineAtom[]; delete b.text;
+        b.relation = { ...b.relation, ...owned };
+        atoms.push({ kind: 'alternative', properties: { version: 1, id: id(), readings: names, metadata: { tei: { ...group.metadata, annotationId: group.id } } } });
+        lengths.set(b, at + 1);
+        for (const m of [...next.marks, group]) segment(b, m, at, at);
+        for (const m of contextual) segment(b, m, 0, at);
+        return;
+      }
+      const isBlock = structuralNode(part) || alternative(part);
       if (isBlock || hasBlocks(part)) {
         finishMarkers(); current = undefined; contextual = [];
         // emit applies the element's context once. Passing `next` here would
@@ -274,7 +314,7 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
   catch (error) { if (!(error instanceof TeiBudget)) throw error; truncated = true; diagnostics.add('truncated', `INCOMPLETE IMPORT: ${error.message}.`); }
   stage('semanticTraversalAndDtoConstruction');
   const reachable = new Set<string>([documentId]);
-  const visitReachable = (b: Block) => { reachable.add(b.id); b.children?.forEach(visitReachable); };
+  const visitReachable = (b: Block) => { reachable.add(b.id); b.children?.forEach(visitReachable); Object.values(b.relation ?? {}).forEach(r => visitReachable(r as Block)); };
   [...content, ...headers].forEach(visitReachable);
   references.resolve(target => target.kind === 'definition' ? !!definitions[target.id] : reachable.has(target.id));
   // Local Entity mentions are additional genuine linked segments, never fake
@@ -306,8 +346,8 @@ function compileTei(source: string | Uint8Array, options: Partial<TeiLimits>, fi
   const roots = headers.length ? [fixed('tab-row-block', { children: [fixed('tab-block', { metadata: { name: 'Text', active: true }, children: content }), fixed('tab-block', { metadata: { name: 'Metadata', active: false }, children: headers })] })] : content;
   if (truncated) roots.unshift(fixed('standoff-editor-block', { text: incompleteMessage, blockProperties: [{ id: id(), type: 'block/font/size', value: 'h2' }] }));
   const document: Block = fixed('document-block', { id: documentId, metadata: { documentId, title: title || filename.replace(/\.(tei|xml)$/i, ''),
-    ...(rich ? { interchange: { provenance: { version: 1, filename: filename.split(/[\\/]/).at(-1)!, format: 'tei', converter: operational ? 'tei/operational-semantics-v3' : 'tei/semantic-sublimation-v2' } } } : {}),
-    tei: { version: 1, ...(rich ? { conversion: { type: 'tei/conversion', milestone: operational ? 3 : 2, alternativeSelection: 'tei/source-order', pointConvention: 'tei/equal-endpoints', references: 'tei/import-time-observation' } } : {}), ...(sourceId ? { sourceId } : {}), ...(sourceMetadata ? { source: sourceMetadata } : {}), header, truncated } }, linkedAnnotations: definitions, children: [fixed('page-block', { children: roots })] });
+    ...(rich ? { interchange: { provenance: { version: 1, filename: filename.split(/[\\/]/).at(-1)!, format: 'tei', converter: inlineAlternatives ? 'tei/native-inline-alternatives-v4' : operational ? 'tei/operational-semantics-v3' : 'tei/semantic-sublimation-v2' } } } : {}),
+    tei: { version: 1, ...(rich ? { conversion: { type: 'tei/conversion', milestone: inlineAlternatives ? 4 : operational ? 3 : 2, alternativeSelection: 'tei/source-order', pointConvention: 'tei/equal-endpoints', references: 'tei/import-time-observation' } } : {}), ...(sourceId ? { sourceId } : {}), ...(sourceMetadata ? { source: sourceMetadata } : {}), header, truncated } }, linkedAnnotations: definitions, children: [fixed('page-block', { children: roots })] });
   stage('assembly');
   validateTeiDocument(document);
   stage('teiValidation');

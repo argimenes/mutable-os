@@ -1,3 +1,4 @@
+import {validateAlternativeReadings, validateReadingOwnership, isReadingRelation} from '../../block-tree/inline-alternative';
 import { validateCompactInline } from "../../block-tree/inline-sequence";
 import type { ReadMeasure } from "../read-timing";
 /** G1 candidate only. Not a shipped schema or an editor repository. */
@@ -42,9 +43,12 @@ export function validateResource(state: ResourceSnapshot): void {
   const root = state.placements[state.rootPlacementKey];
   requireValid(root && root.kind === "owned" && root.target.kind === "local" &&
     state.contents[root.target.contentKey]?.viewType === "document-block", "invalid local Document root");
+  const readingTargets = new Set<string>();
   const assigned = new Set<string>(), authored = new Set<string>(), slots = new Set<string>();
   for (const [key, c] of Object.entries(state.contents)) {
     validateCompactInline(c);
+    for (const [name, key] of Object.entries(c.ownedRelations)) if (isReadingRelation(name)) { const p = state.placements[key]; if (p?.target.kind === 'local') readingTargets.add(p.target.contentKey); }
+    validateAlternativeReadings(c, key => { const p=state.placements[key];return p && {owned:p.kind==='owned'&&p.target.kind==='local',content:p.target.kind==='local'?state.contents[p.target.contentKey]:undefined}; });
     requireValid(c.key === key, "content key mismatch");
     if (c.definitionOwnerKey !== undefined) requireValid(root.target.kind === "local" &&
       c.definitionOwnerKey === root.target.contentKey && !["text-cell", "image-cell"].includes(c.viewType), "invalid definition membership");
@@ -66,6 +70,7 @@ export function validateResource(state: ResourceSnapshot): void {
     }
     for (const p of c.inlineContent) requireValid(state.placements[p]?.kind === "inline", "non-inline Cell placement");
   }
+  if (readingTargets.size) validateReadingOwnership(readingTargets, Object.values(state.placements).map(p => ({ kind: p.kind, contentKey: p.target.kind === 'local' ? p.target.contentKey : undefined })));
   for (const [key, p] of Object.entries(state.placements)) {
     requireValid(p.key === key && id(p.placementId) && !assigned.has(p.placementId), "missing/duplicate placement identity");
     assigned.add(p.placementId);

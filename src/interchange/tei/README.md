@@ -1,6 +1,6 @@
-# TEI importer — Milestones 1–3
+# TEI importer — Milestones 1–4
 
-Use **Import external files as new Ink documents**. `.tei` selects this converter automatically; for `.xml`, choose **TEI P5 XML** explicitly. The result is an unsaved native document. Save manually to a native filename; the XML source is never overwritten.
+Use **Workspace → Open TEI XML…** (also available in the Flint menu), or **Import external files as new Ink documents**. The dedicated Open action accepts `.xml` and `.tei` with TEI interpretation already selected. `.tei` selects this converter automatically; for `.xml`, choose **TEI P5 XML** explicitly. The result is an unsaved native document. Save manually to a native filename; the XML source is never overwritten.
 
 The document always owns one Page. When a header exists, the existing native tab row opens on **Text**, with editable header content in **Metadata**. No new metadata renderer is installed. Semantic annotations and correspondence records are editable through the existing annotation monitor. Real source Entity definitions use document-local Glosses; import does not create canonical SQLite Entities or relationships.
 
@@ -18,16 +18,25 @@ records with diagnostics. Native Gloss relationships can be inspected and follow
 in **Gloss Mode → Local References → References / Graph**.
 
 Open **TEI milestones** in the References panel to inspect source labels/attributes
-and navigate exact current positions, including hidden reading tabs and empty/EOF
+and navigate exact current positions, including inactive inline readings, hidden tabs and empty/EOF
 boundaries. Local entity rows provide **Source definition**, **Imported source
 details** and **Explicit mentions**; a mention's Gloss popup offers **Definition
 and mentions**. These identities are document-local, not canonical Entity IDs.
 Older imports without occurrence roles retain generic Passage navigation.
 
 Set `operationalSemantics: false` in headless conversion (or disable the editor
-flag) for M2 conversion. Flag changes do not migrate saved data. Save remains manual.
-Continuous inline alternatives await the separately documented native qualification;
-grouped source-order tabs remain supported. No XML archive or Source tab is created.
+flag) to disable operational graph promotion. For the complete M2 policy also
+set `inlineAlternatives: false`. Flag changes do not migrate saved data.
+
+`inlineAlternatives` defaults on. Eligible inline `choice` and `app` become native
+one-position slots with independently editable owned readings. First authored
+reading is selected separately in each viewing occurrence. Block-bearing,
+cross-range or unsupported apparatus retains grouped source-order tabs. Disable
+this flag (or compact admission) for grouped imports. Existing saved slots require
+compact admission and remain readable when the creation flag is off. Slot copy,
+legacy/Markdown export and cross-paragraph joins explicitly reject unsupported
+operations. Use native Save to preserve the whole reading closure. No XML archive
+or Source tab is created. See the M4 implementation report for qualification.
 
 ## Configuration and headless use
 

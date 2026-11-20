@@ -1,3 +1,4 @@
+import { normalizeInlineSelection } from '../runtime/inline-alternatives';
 import type { ReactiveEditor } from "../reactive-editor/editor";
 import type { ViewPosition } from "../block-tree/types";
 import { graphemeBoundaries } from "./graphemes";
@@ -35,7 +36,15 @@ export class CrossBlockInput {
       if (capture?.element === event.target && capture.pointerId === event.pointerId && !capture.element.hasPointerCapture?.(capture.pointerId)) this.up();
     });
     document.defaultView?.addEventListener('blur', this.up);
-    listen("keydown", this.key); listen("selectionchange", event => { if (editor.crossText.range()) event.stopImmediatePropagation(); });
+    listen("keydown", this.key); listen("selectionchange", event => {
+      if (editor.crossText.range()) { event.stopImmediatePropagation(); return; }
+      const selection = document.getSelection();
+      const element = (node: Node | null | undefined) => node instanceof Element ? node : node?.parentElement ?? null;
+      if (editor.mounts.resolveElement(element(selection?.anchorNode))?.nodeKey === editor.mounts.resolveElement(element(selection?.focusNode))?.nodeKey) return;
+      const native = this.native(); if (!native) return;
+      const normalized = normalizeInlineSelection(editor, native.anchor, native.head);
+      if (normalized) { this.select(normalized.anchor, normalized.head); event.stopImmediatePropagation(); }
+    });
     for (const name of ["beforeinput", "input", "compositionstart", "compositionupdate", "compositionend", "copy", "cut", "paste", "contextmenu", "click", "drop", "dragstart"]) listen(name, this.guard);
     listen("focusin", event => {
       if (!editor.crossText.range()) return;
@@ -114,6 +123,8 @@ export class CrossBlockInput {
     return anchor && head ? { anchor, head } : undefined;
   }
   private select(anchor: ViewPosition, head: ViewPosition) {
+    const normalized = normalizeInlineSelection(this.editor, anchor, head);
+    if (normalized) { anchor = normalized.anchor; head = normalized.head; }
     try {
       if (anchor.occurrenceKey === head.occurrenceKey) {
         this.editor.crossText.clear();

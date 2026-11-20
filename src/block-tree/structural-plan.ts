@@ -1,3 +1,4 @@
+import { isReadingRelation } from './inline-alternative';
 import { tabOrientationRecordChange, tabMetadataRecordChange } from './tab-orientation';
 import { inlineOwnerFor } from './inline-plan';
 import type { ContentRecord, Location, PlacementRecord, RepositoryOperation, RepositoryState } from './types';
@@ -36,6 +37,15 @@ export function structuralChangeFor(state: RepositoryState, operations: Reposito
         if (!same(rest(old), rest(next))) return;
       }
       if (next?.definitionOwnerKey && ['text-cell', 'image-cell'].includes(next.viewType)) return;
+      if (old && next && (next.children.length || Object.keys(next.opaqueRelations).length)) {
+        // Reading shape is an invariant of its owning host, which may be absent
+        // from this batch. Use the existing incoming-edge index, then let the
+        // full graph validator reject unsupported structural reading edits.
+        for (const pk of evidence.ownedKeys(key)) {
+          const location = evidence.locationOf(pk);
+          if (location?.slot.kind === 'relation' && isReadingRelation(location.slot.name)) return;
+        }
+      }
       contents.set(key, next);
     } else {
       if (placements.has(key) || key === state.rootPlacementKey) return;

@@ -7,8 +7,8 @@ import {ReactiveTreeView} from './reactive-tree-view';
 import {decodeBlockTree} from '../block-tree/codecs';
 import {admitNative,captureNative,nativeText,decodeNative} from '../persistence/native-resource';
 const clean:(()=>void)[]=[];afterEach(()=>{while(clean.length)clean.pop()!();document.body.replaceChildren();vi.restoreAllMocks();});
-function fixture(){
- const editor=new ReactiveEditor({type:'workspace-block',children:[{id:'bank',type:'workspace-object-bank-block'}]},{features:{autocompleteWorkstation:false}});registerCoreViews(editor);
+function fixture(features = {}){
+ const editor=new ReactiveEditor({type:'workspace-block',children:[{id:'bank',type:'workspace-object-bank-block'}]},{features:{autocompleteWorkstation:false,...features}});registerCoreViews(editor);
  const source=decodeBlockTree({id:'doc',type:'document-block',children:[{id:'a',type:'standoff-editor-block',text:'A😀éBCD',standoffProperties:[{type:'style/bold',start:1,end:4}]},{id:'b',type:'standoff-editor-block',text:'Other'}]}).state;
  const bank=Object.values(editor.repository.readState().contents).find(c=>c.payload.id==='bank')!;admitNative(editor.repository,new TextEncoder().encode(nativeText(captureNative(source,'doc'))),bank.key);
  const doc=Object.values(editor.repository.readState().contents).find(c=>c.payload.id==='doc')!,pk=Object.values(editor.repository.readState().placements).find(p=>p.contentKey===doc.key)!.key;
@@ -67,4 +67,14 @@ it('Backspace deletes a whole grapheme and composition over an image is rejected
  editor.commands.insertInlineImage(f.node().key,1,{assetId:'image',src:'',alt:'picture',status:'failed'});m.restoreInlineSelection!({anchor:1,head:2});const before=nativeText(captureNative(editor.repository.readState(),'doc')),image=f.flow().children[1];
  f.flow().dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));image.remove();f.flow().dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'draft'}));
  expect(f.flow().children[1]).toBe(image);expect(nativeText(captureNative(editor.repository.readState(),'doc'))).toBe(before);
+});
+
+it.each([true, false])('rejects cutting a slot before clipboard writes or deletion (Mutable clipboard=%s)', async mutableClipboard => {
+ const f=fixture({mutableClipboard}),e=f.editor;
+ e.commands.insertInlineAlternative(f.node().key,1,[{type:'standoff-editor-block',text:'first'},{type:'standoff-editor-block',text:''}]);
+ const mount=e.mounts.get(f.node().key)!;mount.focus();mount.restoreInlineSelection!({anchor:1,head:2});e.selections.setPrimary(f.node().key,f.node().contentKey,f.node().viewId,1,2);
+ const before=nativeText(captureNative(e.repository.readState(),'doc')),changed=vi.fn();e.repository.subscribeChanges(changed);
+ const event=new Event('cut',{bubbles:true,cancelable:true}),data=new Map<string,string>();
+ Object.defineProperty(event,'clipboardData',{value:{types:[],getData:()=>'',setData:(type:string,value:string)=>data.set(type,value)}});f.flow().dispatchEvent(event);
+ await new Promise(r=>setTimeout(r,0));expect(event.defaultPrevented).toBe(true);expect(data.size).toBe(0);expect(changed).not.toHaveBeenCalled();expect(nativeText(captureNative(e.repository.readState(),'doc'))).toBe(before);
 });

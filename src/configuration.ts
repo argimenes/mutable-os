@@ -100,6 +100,8 @@ export type FeatureFlags = Readonly<{
   flintSpatialGraph: boolean;
   /** Selected at native admission; false retains legacy loading. Never converts a live Document. */
   compactCanonicalText: boolean;
+  /** Creation/import of native one-position owned inline alternatives. */
+  inlineAlternatives: boolean;
   /** Per-resource native/Markdown persistence through the managed server store. */
   nativeDocumentPersistence: boolean;
   teiImport: boolean;
@@ -225,6 +227,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   presentationProbe: false,
   flintSpatialGraph: true,
   compactCanonicalText: true,
+  inlineAlternatives: true,
   nativeDocumentPersistence: true,
   teiImport: true,
   teiSemanticSublimation: true,

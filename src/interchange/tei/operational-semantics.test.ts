@@ -66,7 +66,7 @@ it.each([true, false])('retains native graph and source roles through capture/re
 
 it('defaults the operational flag on and preserves the M2 rollback', () => {
   expect(resolveFeatureFlags().teiOperationalSemantics).toBe(true);
-  const d = convertTei(source('<relation name="knows" active="#a" passive="#b"/>'), {}, 'source.xml', undefined, { operationalSemantics: false }).document;
+  const d = convertTei(source('<relation name="knows" active="#a" passive="#b"/>'), {}, 'source.xml', undefined, { operationalSemantics: false, inlineAlternatives: false }).document;
   expect(graph(d).allEdges()).toHaveLength(0);
   expect((d.metadata as any).tei.conversion.milestone).toBe(2);
 });

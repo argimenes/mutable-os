@@ -1,3 +1,5 @@
+import { isReadingRelation } from '../../block-tree/inline-alternative';
+import { inlineLength, type InlineAtom } from '../../block-tree/inline-sequence';
 import type { ExistingBlockDto, JsonObject } from '../../block-tree/types';
 import { createPlacementKey } from '../../block-tree/ids';
 import { encodeAuthoredValue } from '../../history/preplan-spike/wire';
@@ -13,16 +15,22 @@ export function encodeTeiNative(document: ExistingBlockDto) {
   const blocks: GateDocument['blocks'] = [], ids = new Set<string>();
   let cells = 0, segments = 0;
   const visit = (dto: ExistingBlockDto): GateDocument['root'] => {
-    const { id, type, children, ...properties } = dto;
+    const { id, type, children, relation, ...properties } = dto;
     if (typeof id !== 'string' || !id.trim() || ids.has(id) || !type || !implementations.has(type) ||
-      (type === 'document-block' && dto !== document) || Object.hasOwn(properties, 'relation')) throw Error('TEI native producer: unsupported structure or identity');
+      (type === 'document-block' && dto !== document) || (relation !== undefined && (!relation || Object.keys(relation).some(name => !isReadingRelation(name))))) throw Error('TEI native producer: unsupported structure or identity');
     ids.add(id);
     const block: GateDocument['blocks'][number] = { id, type, properties: {} };
     if (type === 'standoff-editor-block') {
-      if (typeof properties.text !== 'string') throw Error('TEI native producer: missing text');
-      for (const _ of properties.text) cells++;
-      block.inline = properties.text ? [{ kind: 'text', text: properties.text }] : [];
-      delete properties.text;
+      if (Array.isArray(properties.inlineAtoms) && properties.text === undefined) {
+        cells += inlineLength(properties.inlineAtoms as InlineAtom[]);
+        block.inline = (properties.inlineAtoms as InlineAtom[]).map(a => a.kind === 'text' ? a : { kind: a.kind, properties: encodeAuthoredValue(a.properties) as JsonObject });
+        delete properties.inlineAtoms;
+      } else {
+        if (typeof properties.text !== 'string') throw Error('TEI native producer: missing text');
+        for (const _ of properties.text) cells++;
+        block.inline = properties.text ? [{ kind: 'text', text: properties.text }] : [];
+        delete properties.text;
+      }
     }
     segments += Array.isArray(properties.standoffProperties) ? properties.standoffProperties.length : 0;
     block.properties = encodeAuthoredValue(properties) as JsonObject;
@@ -31,6 +39,7 @@ export function encodeTeiNative(document: ExistingBlockDto) {
       if (!Array.isArray(children)) throw Error('TEI native producer: invalid children');
       block.children = children.map(visit);
     }
+    if (relation) block.relations = { owned: Object.fromEntries(Object.entries(relation).map(([name, reading]) => [name, visit(reading as ExistingBlockDto)])), opaque: {} };
     return { placementId: `legacy:${document.id}:${createPlacementKey()}`, kind: 'owned', target: { kind: 'local', blockId: id } };
   };
   const root = visit(document);

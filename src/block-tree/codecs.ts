@@ -11,7 +11,7 @@ import type {
 } from "./types";
 
 const ownedRelationNames = new Set(["leftMargin", "rightMargin"]);
-const isOwnedRelationName = (name: string) => ownedRelationNames.has(name) || name.startsWith("superposition:");
+const isOwnedRelationName = (name: string) => ownedRelationNames.has(name) || name.startsWith("superposition:") || name.startsWith("inline-reading:");
 
 function collectionState(value: unknown, present: boolean): WireCollectionState {
   if (!present) return "omitted";
@@ -57,7 +57,8 @@ export function decodeBlockTree(dto: ExistingBlockDto): DecodedSubtree {
     delete payload.relation;
     const isStandoff = input.type === "standoff-editor-block";
     const standoffText = isStandoff ? payload.text : undefined;
-    if (isStandoff) delete payload.text;
+    if (isStandoff) { delete payload.text; delete payload.inlineAtoms; }
+    if (input.inlineAtoms !== undefined && (!isStandoff || input.text !== undefined || !Array.isArray(input.inlineAtoms))) throw Error('Invalid DTO inline authority');
 
     const content: ContentRecord = {
       key: contentKey,
@@ -76,6 +77,7 @@ export function decodeBlockTree(dto: ExistingBlockDto): DecodedSubtree {
     contents[contentKey] = content;
     placements[placementKey] = { key: placementKey, contentKey, kind: "owned" };
 
+    if (isStandoff && input.inlineAtoms !== undefined) content.compactInline = {version:1,spans:clone(input.inlineAtoms as import('./inline-sequence').InlineAtom[])};
     if (isStandoff && typeof standoffText === "string") {
       content.inlineContent = [...standoffText].map((text) => {
         const cellContentKey = createContentKey();
@@ -168,6 +170,7 @@ export function encodeBlock(
     if (content.inlineKind === "standoff") {
       output.text = logicalInline(state,content).map(atom=>{
         if(atom.kind==='text')return atom.text;
+        if(atom.kind==='alternative')throw new LegacyExportLossError('Inline alternatives require native Save; legacy text export would discard readings');
         const message=`Inline image ${String(atom.properties.assetId??'')} cannot be represented in legacy text JSON`;
         if(!context.allowLossyInline)throw new LegacyExportLossError(message);
         context.losses?.push(message);return String(atom.properties.alt??'');

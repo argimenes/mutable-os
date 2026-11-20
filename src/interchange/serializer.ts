@@ -84,6 +84,7 @@ export function serializeSelection(state: RepositoryState, slices: Slice[], scop
       if (start < 0 || end < start || end > contentLength(c)) throw Error('Stale text selection.');
       b.inline = { atoms: [], properties: [] };
       for (const atom of contentSlice(state,c,start,end)) {
+        if (atom.kind === 'alternative') throw Error('Copy/export of an inline alternative is not supported by the clipboard format. Save the Document as Mutable JSON to preserve every reading.');
         const cell=atom.kind==='text'?{viewType:'text-cell',payload:{text:atom.text} as Record<string,any>}:{viewType:'image-cell',payload:atom.properties};
         if (cell.viewType === 'text-cell') {
           const text = String(cell.payload.text ?? ''), last = b.inline.atoms.at(-1);

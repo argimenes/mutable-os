@@ -31,7 +31,7 @@ export class BlockTreeProjection {
   }
   private editingAtoms(owner:BlockNode,spans:readonly InlineAtom[]):BlockNode[]{
     const out:BlockNode[]=[];const atom=(viewType:string,payload:Record<string,unknown>)=>out.push({key:createNodeKey(this.viewId,owner.placementKey),contentKey:owner.contentKey,placementKey:owner.placementKey,viewId:this.viewId,editingInlineOwner:owner.key,viewType,payload,children:[],inlineContent:[],ownedRelations:{}});
-    for(const a of spans)if(a.kind==='text')for(const text of a.text)atom('text-cell',{text});else atom('image-cell',clone(a.properties));return out;
+    for(const a of spans)if(a.kind==='text')for(const text of a.text)atom('text-cell',{text});else atom(a.kind==='alternative'?'inline-alternative-cell':'image-cell',clone(a.properties));return out;
   }
   private updateCompactInline(key:string,splice?:InlineSplice){
     const owner=this.state.nodes[key];if(!owner)return;const c=this.repository.readState().contents[owner.contentKey];if(!c?.compactInline)return;

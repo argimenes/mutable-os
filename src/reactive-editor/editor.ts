@@ -1,3 +1,4 @@
+import {inlineAlternativeKey} from '../runtime/inline-alternatives';
 import {compactSelectionHistory} from "../runtime/compact-selection-history";
 import { teiLimits, type TeiLimits } from '../interchange/tei/model';
 import { MarkdownInput } from '../runtime/markdown-input';
@@ -180,6 +181,20 @@ export class ReactiveEditor {
     this.teiImportLimits = teiLimits(configuration.teiImportLimits);
     this.markdownInput = new MarkdownInput(this);
     this.commandRegistry.register({ id: 'markdown.toggleInput', label: 'Toggle Markdown Input Transformation', canExecute: () => true, execute: () => this.markdownInput.toggle() });
+    this.commandRegistry.register({
+      id: 'inlineAlternative.insert', label: 'Insert Inline Alternative',
+      canExecute: ({ targetKey }) => {
+        const node = this.node(targetKey), range = this.mounts.get(targetKey)?.captureInlineSelection?.();
+        return this.features.inlineAlternatives && !!node && !!this.repository.readState().contents[node.contentKey]?.compactInline && !!range && range.anchor === range.head;
+      },
+      execute: ({ targetKey }) => {
+        const range = this.mounts.get(targetKey)!.captureInlineSelection!()!;
+        this.commands.insertInlineAlternative(targetKey, range.head, [
+          { type: 'standoff-editor-block', text: '', metadata: { name: 'Reading 1' } },
+          { type: 'standoff-editor-block', text: '', metadata: { name: 'Reading 2' } },
+        ]);
+      },
+    });
     registerInputActions(this.bindings);
     const loadedWorkspace = "state" in dto && "references" in dto ? dto as LoadedWorkspace : undefined;
     if ((loadedWorkspace?.localContainer || loadedWorkspace?.manifest?.schemaVersion === 2) && !this.features.mutableWindowManager) throw new Error("Enable the Mutable Window Manager to open a managed Workspace.");
@@ -304,6 +319,7 @@ export class ReactiveEditor {
       this.mounts.releaseOccurrence(key);
       this.setViewChild(key, undefined);
     }
+    for(const choice of Object.keys(this.viewChildren))if([...keys].some(key=>choice.startsWith(key+'/inline-alternative/')))this.setViewChild(choice,undefined);
     projection.dispose();
     this.projections.delete(projection.viewId);
   }
@@ -399,6 +415,7 @@ export class ReactiveEditor {
       key => { const target=this.surfaces.wholeBlockKey(key); return this.surfaces.confirmDelete([target])?target:undefined; },
       this.markdownInput,
       message => this.crossText.notice(message),
+      event => inlineAlternativeKey(this,event),
     );
     const dispose = this.gateway.install();
     const crossInput = this.crossInput;

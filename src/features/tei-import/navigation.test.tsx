@@ -16,7 +16,7 @@ const xml = readFileSync('src/interchange/tei/fixtures/operational-semantics.xml
 const clean: (() => void)[] = [];
 afterEach(() => { clean.splice(0).reverse().forEach(f => f()); vi.restoreAllMocks(); document.body.replaceChildren(); });
 function setup(compact = true) {
-  const d = convertTei(xml).document;
+  const d = convertTei(xml, {}, 'operational.xml', undefined, { inlineAlternatives: false }).document;
   const e = new ReactiveEditor({ type: 'workspace-block', children: [{ type: 'workspace-object-bank-block' }] }, { features: { compactCanonicalText: compact } });
   clean.push(() => e.dispose()); registerCoreViews(e);
   const bank = Object.values(e.repository.readState().contents).find(c => c.viewType === 'workspace-object-bank-block')!;

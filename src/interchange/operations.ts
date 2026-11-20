@@ -21,7 +21,7 @@ import type { SuppliedFile } from './file-input';
 import type { ImportFormat, ExportFormat } from './formats';
 import type { MutableFragment, InterchangeScope } from './fragment';
 export type InterchangeRequest =
- | {kind:'tei-document';file:SuppliedFile;limits?:Partial<TeiLimits>;profile?:boolean;semanticSublimation?:boolean;operationalSemantics?:boolean}
+ | {kind:'tei-document';file:SuppliedFile;limits?:Partial<TeiLimits>;profile?:boolean;semanticSublimation?:boolean;operationalSemantics?:boolean;inlineAlternatives?:boolean}
  | {kind:'academic-parse';bytes:Uint8Array;format:AcademicFormat}
  | {kind:'structured-preview';source:string;format:Presentation}
  | {kind:'resource-iiif';bytes:Uint8Array}
@@ -39,7 +39,7 @@ export type InterchangeRequest =
  | {kind:'materialize';fragment:MutableFragment;scope:InterchangeScope;assets:[string,string][]};
 export async function prepareInterchange(request:InterchangeRequest) {
  switch(request.kind){
-  case 'tei-document':return prepareTeiDocument(request.file,request.limits,request.profile,request.semanticSublimation,request.operationalSemantics);
+  case 'tei-document':return prepareTeiDocument(request.file,request.limits,request.profile,request.semanticSublimation,request.operationalSemantics,request.inlineAlternatives);
   case 'academic-parse':return (await import('../academic/parse')).parseAcademic(request.bytes,request.format);
   case 'structured-preview':return parseStructured(request.source,request.format);
   case 'resource-iiif':return normalizeIIIF(request.bytes);

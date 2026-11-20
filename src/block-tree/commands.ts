@@ -1,3 +1,4 @@
+import {INLINE_READING, isReadingRelation} from './inline-alternative';
 import { replaceCompact, contentLength, inlineSlice, normalizeInline, logicalInline, inlineText } from "./inline-sequence";
 import { StructuralDraft } from "./structural-draft";
 import { hasBlockMode, modeContinuationError, modeJoinError } from './mode-editing';
@@ -64,7 +65,7 @@ export class TreeCommands {
     if(content.compactInline){
       const reviewedSource=reviewed.find(op=>op.kind==='put-content'&&op.record.key===content.key) as Extract<RepositoryOperation,{kind:'put-content'}>|undefined;
       let next=clone(reviewedSource?.record??content),origins:(number|null)[]=(next.payload.standoffProperties as unknown[]??[]).map((_,i)=>i);
-      for(const edit of edits){const mapped:(number|null)[]=[];next=replaceCompact(next,edit.start,edit.end,edit.text?[{kind:'text',text:edit.text}]:[],mapped);origins=mapped.map(i=>i===null?null:origins[i]??null);}
+      for(const edit of edits){if(inlineSlice(next.compactInline!.spans,edit.start,edit.end).some(a=>a.kind==='alternative'))throw new TreeCommandError('Finish provisional input before replacing an inline alternative slot');const mapped:(number|null)[]=[];next=replaceCompact(next,edit.start,edit.end,edit.text?[{kind:'text',text:edit.text}]:[],mapped);origins=mapped.map(i=>i===null?null:origins[i]??null);}
       if(JSON.stringify(next.compactInline)===JSON.stringify(content.compactInline)){next.payload.standoffProperties=clone(reviewedSource?.record.payload.standoffProperties??content.payload.standoffProperties??[]);origins=(next.payload.standoffProperties as unknown[]).map((_,i)=>i<(content.payload.standoffProperties as unknown[]??[]).length?i:null);}
       if(annotation){
         if(!annotation.value||!Number.isInteger(annotation.start)||!Number.isInteger(annotation.end)||annotation.start<0||annotation.end<=annotation.start||annotation.end>contentLength(next))throw new TreeCommandError('Invalid Scry annotation');
@@ -927,7 +928,17 @@ export class TreeCommands {
     if (content.inlineKind !== "standoff") {
       throw new TreeCommandError("Inline text operations require a Standoff content record");
     }
-    if(content.compactInline){const annotationOrigins:(number|null)[]=[];const record=replaceCompact(content,start,end,text?[{kind:'text',text}]:[],annotationOrigins);return [{kind:'put-content',record,annotationOrigins,inlineSplice:{start,end,insert:text?[{kind:'text',text}]:[]}}];}
+    if(content.compactInline){
+      const annotationOrigins:(number|null)[]=[],insert=text?[{kind:'text' as const,text}]:[];
+      const record=replaceCompact(content,start,end,insert,annotationOrigins);
+      if(Object.keys(record.ownedRelations).length!==Object.keys(content.ownedRelations).length){
+        // Deleting a slot is a structural edit: retain the established liveness,
+        // reference and inverse-operation semantics for its owned closure.
+        const next=clone(state);next.contents[content.key]=record;this.pruneUnreachable(next);
+        return this.diff(state,next).map(op=>op.kind==='put-content'&&op.record.key===content.key?{...op,annotationOrigins,inlineSplice:{start,end,insert}}:op);
+      }
+      return [{kind:'put-content',record,annotationOrigins,inlineSplice:{start,end,insert}}];
+    }
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > content.inlineContent.length) {
       throw new TreeCommandError(`Invalid inline range ${start}..${end}`);
     }
@@ -1227,8 +1238,12 @@ export class TreeCommands {
     const rightPayload: Record<string, unknown> = { ...clone(content.payload), standoffProperties: rightAnnotations };
     rightPayload.id = createBlockId();
     if (checked !== undefined) rightPayload.checked = checked;
+    const rightReadingNames=new Set(content.compactInline?inlineSlice(content.compactInline.spans,index,contentLength(content)).flatMap(a=>a.kind==='alternative'?a.properties.readings:[]):[]);
+    const leftRelations=Object.fromEntries(Object.entries(content.ownedRelations).filter(([name])=>!rightReadingNames.has(name)));
+    const rightRelations=Object.fromEntries(Object.entries(content.ownedRelations).filter(([name])=>rightReadingNames.has(name)));
     operations.push({ kind: "put-content", record: {
       ...clone(content),
+      ownedRelations:leftRelations,
       payload: leftPayload,
       inlineContent: content.inlineContent.slice(0, index),
       ...(content.compactInline ? {compactInline:{version:1 as const,spans:inlineSlice(content.compactInline.spans,0,index)}}:{}),
@@ -1243,10 +1258,10 @@ export class TreeCommands {
       inlineContent: content.inlineContent.slice(index),
       ...(content.compactInline ? {compactInline:{version:1 as const,spans:inlineSlice(content.compactInline.spans,index,contentLength(content))}}:{}),
       inlineRevision: 0,
-      ownedRelations: {},
+      ownedRelations: rightRelations,
       opaqueRelations: {},
       wireChildren: "present",
-      wireRelation: "omitted",
+      wireRelation: Object.keys(rightRelations).length?"present":"omitted",
       revision: 0,
     } });
     operations.push({ kind: "put-placement", record: {
@@ -1339,6 +1354,26 @@ export class TreeCommands {
     const survivor = this.subject(state, leftPlacementKey), absorbed = this.subject(state, rightPlacementKey);
     this.publish("Join Standoff Blocks", this.diff(state, next), { commandId: "tree.joinStandoff", subjects: [survivor, absorbed], relation: { kind: "join", survivor, absorbed, at: joinIndex } });
     return joinIndex;
+  }
+
+  /** One native structural transaction. Reading coordinates are never inserted
+   * into the host sequence, and no character records are materialised. */
+  insertInlineAlternative(key:NodeKey|PlacementKey,index:number,readings:ExistingBlockDto[],metadata:JsonObject={}):string {
+    const state=this.current(true),placement=this.placementKey(key,state),host=state.contents[state.placements[placement].contentKey];
+    if(!host.compactInline||!readings.length)throw new TreeCommandError('Inline alternatives require compact text and at least one reading');
+    const prepare=(dto:ExistingBlockDto):ExistingBlockDto=>{
+      if(dto.type!=='standoff-editor-block'||dto.children?.length||Object.keys(dto.relation??{}).some(name=>!isReadingRelation(name)))throw new TreeCommandError('Inline readings must be rich inline TextBlocks');
+      const {text, ...rest}=clone(dto);
+      return {...rest,id:crypto.randomUUID(),inlineAtoms:dto.inlineAtoms??(text?[{kind:'text',text}]:[]),
+        ...(dto.relation?{relation:Object.fromEntries(Object.entries(dto.relation).map(([name,d])=>[name,prepare(d as ExistingBlockDto)]))}:{})};
+    };
+    const decoded=readings.map(d=>decodeDetachedSubtree(prepare(d))),names=readings.map(()=>INLINE_READING+crypto.randomUUID());
+    const id=crypto.randomUUID(),insert=[{kind:'alternative' as const,properties:{version:1 as const,id,readings:names,metadata:clone(metadata)}}];
+    const staged={...clone(host),ownedRelations:{...host.ownedRelations,...Object.fromEntries(names.map((n,i)=>[n,decoded[i].rootPlacementKey]))},wireRelation:'present' as const};
+    const origins:(number|null)[]=[],record=replaceCompact(staged,index,index,insert,origins);
+    const operations:RepositoryOperation[]=decoded.flatMap(d=>[...Object.values(d.state.contents).map(record=>({kind:'put-content' as const,record})),...Object.values(d.state.placements).map(record=>({kind:'put-placement' as const,record}))]);
+    operations.push({kind:'put-content',record,annotationOrigins:origins,inlineSplice:{start:index,end:index,insert}});
+    this.publish('Insert inline alternative',operations,{commandId:'tree.insertInlineAlternative',subjects:[this.subject(state,placement)]});return id;
   }
 
   insertInlineImage(

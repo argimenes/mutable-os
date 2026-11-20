@@ -14,6 +14,8 @@ export interface MountHandle {
   inputPolicy: "native-text" | "standoff" | "control" | "container" | "opaque-widget";
   generation: number;
   focus(): void;
+  /** Invalidate the existing reading geometry after enclosing inline reflow. */
+  invalidateInlineLayout?():void;
   captureSelection?(): NativeTextSelection;
   restoreSelection?(selection: NativeTextSelection): void;
   captureInlineSelection?(): { anchor: number; head: number } | undefined;
@@ -82,6 +84,7 @@ export class MountRegistry {
   selection(nodeKey: NodeKey): NativeTextSelection | undefined {
     return this.selections.get(nodeKey);
   }
+  rememberInlineSelection(nodeKey:NodeKey,selection:{anchor:number;head:number}) { this.inlineSelections.set(nodeKey,selection); }
   inlineSelection(nodeKey: NodeKey) { return this.inlineSelections.get(nodeKey); }
 
   /** Final occurrence disposal, unlike an ordinary unmount/remount. */

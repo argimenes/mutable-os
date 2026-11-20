@@ -14,8 +14,8 @@ import { GlossSessionIndex } from '../features/gloss/session-index';
 const cleanup:(()=>void)[]=[];
 afterEach(()=>{cleanup.splice(0).reverse().forEach(f=>f());vi.restoreAllMocks();document.body.replaceChildren();});
 const source='<TEI><teiHeader><titleStmt><title>Header title</title><author>Header author</author></titleStmt><correspDesc><correspAction type="sent"><persName ref="#missing">Alice</persName></correspAction></correspDesc></teiHeader><text><body><p>Read <persName ref="#missing">Mary</persName> now.</p><lg><l>A😀BC</l><l xml:id="identified">Other</l></lg><p>Before<choice><orig>olde</orig><reg>old</reg></choice>after</p></body></text></TEI>';
-function setup(xml=source,enabled=true){
- const result=convertTei(xml),e=new ReactiveEditor(result.document,{features:{teiImport:enabled}});
+function setup(xml=source,enabled=true,inlineAlternatives=true){
+ const result=convertTei(xml,{},'TEI document',undefined,{inlineAlternatives}),e=new ReactiveEditor(result.document,{features:{teiImport:enabled,inlineAlternatives}});
  registerCoreViews(e);if(enabled)e.featureHost.activate(createTeiImportFeature(e));
  const v=e.createView(),host=document.body.appendChild(document.createElement('div')),unmount=render(()=><ReactiveTreeView editor={e} projection={v}/>,host);e.installGateway(document);
  cleanup.push(()=>{unmount();e.dispose();});
@@ -58,8 +58,8 @@ it('keeps typing and provisional input local and retains existing Mode continuat
  const beforeRefusal=save();expect(()=>f.e.commands.splitStandoff(q.key,1)).toThrow(/continuation policy/);expect(save()).toBe(beforeRefusal);
  expect(()=>f.e.commands.joinStandoff(p.key,q.key)).toThrow(/policy/);expect(save()).toBe(beforeRefusal);
 });
-it('changes native alternative tabs, edits each reading and reloads native state',async()=>{
- const f=setup();const reg=[...f.host.querySelectorAll<HTMLButtonElement>('[role=tab]')].find(b=>b.textContent==='reg')!;reg.click();
+it('changes fallback alternative tabs, edits each reading and reloads native state with inline alternatives disabled',async()=>{
+ const f=setup(source,true,false);const reg=[...f.host.querySelectorAll<HTMLButtonElement>('[role=tab]')].find(b=>b.textContent==='reg')!;reg.click();
  const p=f.text('old');f.input(p.key,3,'insertText','er');expect(f.value(p.key)).toBe('older');
  const bytes=native.nativeBytes(native.captureNative(f.e.repository.readState(),f.result.document.id)),state=resourceToRepository(native.decodeNative(bytes));
  expect(Object.values(state.contents).filter(c=>c.viewType==='page-block')).toHaveLength(1);
