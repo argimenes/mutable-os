@@ -1,3 +1,4 @@
+import {contentLength} from "./inline-sequence";
 import { clone } from "./clone";
 import type { ContentRecord, JsonObject } from "./types";
 
@@ -7,7 +8,7 @@ export type AnnotationPatch = { start: number; end: number; value?: string; meta
 export function editAnnotation(record: JsonObject, action: AnnotationAction | AnnotationPatch, content: ContentRecord, text: () => string): JsonObject {
   const next = clone(record);
   let start = Number(next.start), end = Number(next.end);
-  if (next.isDeleted || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end >= content.inlineContent.length) throw new Error("Annotation range is invalid or deleted");
+  if (next.isDeleted || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end >= contentLength(content)) throw new Error("Annotation range is invalid or deleted");
   if (typeof action !== "string") {
     for (const field of ["metadata", "attributes"] as const) {
       const value = action[field];
@@ -18,8 +19,8 @@ export function editAnnotation(record: JsonObject, action: AnnotationAction | An
     for (const field of ["value", "metadata", "attributes"] as const) if (action[field] !== undefined) next[field] = clone(action[field]);
   } else if (action === "delete") next.isDeleted = true;
   else if (action === "left") { if (start === 0) return next; start--; end--; }
-  else if (action === "right") { if (end === content.inlineContent.length - 1) return next; start++; end++; }
-  else if (action === "expand") { if (end === content.inlineContent.length - 1) return next; end++; }
+  else if (action === "right") { if (end === contentLength(content) - 1) return next; start++; end++; }
+  else if (action === "expand") { if (end === contentLength(content) - 1) return next; end++; }
   else if (action === "contract") { if (end === start) return next; end--; }
   else {
     const source = text();
@@ -35,6 +36,6 @@ export function editAnnotation(record: JsonObject, action: AnnotationAction | An
     if (!word) return next;
     start = word.start; end = word.end;
   }
-  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end >= content.inlineContent.length) throw new Error("Use inclusive Cell endpoints within the paragraph (start ≤ end)");
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end >= contentLength(content)) throw new Error("Use inclusive Cell endpoints within the paragraph (start ≤ end)");
   return { ...next, start, end };
 }

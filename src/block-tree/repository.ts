@@ -1,3 +1,5 @@
+import { compactInlineOwnerFor } from "./compact-inline-plan";
+import { inlineLength, inlineSlice, normalizeInline, validateCompactInline } from "./inline-sequence";
 import { glossChangeFor } from "./gloss-plan";
 import { structuralChangeFor, type StructuralChange } from "./structural-plan";
 import { taskStateChangeFor } from './task-state-plan';
@@ -29,6 +31,11 @@ import type {
   RepositoryState,
 } from "./types";
 
+function compactEdits(operations: RepositoryOperation[]) {
+  const result = new Map<string, import('./inline-sequence').InlineSplice>();
+  for(const op of recordOperations(operations))if(op.kind==='put-content'&&op.inlineSplice)result.set(op.record.key,op.inlineSplice);
+  return result;
+}
 function annotationOrigins(operations: RepositoryOperation[]) {
   const hints = new Map<ContentKey, readonly (number | null)[]>();
   const touched=new Set<string>();
@@ -92,7 +99,7 @@ function inverseFor(state: RepositoryState, operation: RepositoryOperation): Rep
     case "put-content": {
       const previous = state.contents[operation.record.key];
       return previous
-        ? { kind: "put-content", record: clone(previous), ...(operation.annotationOrigins ? { annotationOrigins: (Array.isArray(previous.payload.standoffProperties) ? previous.payload.standoffProperties : []).map((_, i) => { const n = operation.annotationOrigins!.indexOf(i); return n < 0 ? null : n; }) } : {}) }
+        ? { kind: "put-content", record: clone(previous), ...(operation.inlineSplice && previous.compactInline ? {inlineSplice:{start:operation.inlineSplice.start,end:operation.inlineSplice.start+inlineLength(operation.inlineSplice.insert),insert:inlineSlice(previous.compactInline.spans,operation.inlineSplice.start,operation.inlineSplice.end)}} : {}), ...(operation.annotationOrigins ? { annotationOrigins: (Array.isArray(previous.payload.standoffProperties) ? previous.payload.standoffProperties : []).map((_, i) => { const n = operation.annotationOrigins!.indexOf(i); return n < 0 ? null : n; }) } : {}) }
         : { kind: "remove-content", key: operation.record.key };
     }
     case "remove-content": {
@@ -120,6 +127,7 @@ export function deriveLocations(state: RepositoryState, observe?: (c: ContentRec
   const locations = new Map<PlacementKey, Location>();
 
   for (const content of Object.values(state.contents)) {
+    validateCompactInline(content);
     observe?.(content);
     content.children.forEach((childKey, index) => {
       if (locations.has(childKey)) {
@@ -278,6 +286,7 @@ type CaptureAttempt = {
 type HistorySubscriber = { listener: (event: DeepReadonly<HistoryChanges>) => void; onError: CommitSubscriber["onError"] };
 
 export interface RepositoryChange {
+  compactEdits?: ReadonlyMap<string, import("./inline-sequence").InlineSplice>;
   /** Lightweight identity/cause for occurrence-local history restoration.
    * Does not enable exact-record capture on ordinary typing. */
   commit?: { id: string; cause: CommitMetadata['cause'] };
@@ -298,6 +307,7 @@ export interface RepositoryChange {
 }
 
 export class CanonicalRepository {
+  readonly compactCanonicalText: boolean;
   private historyGuards=createSignal(0);
   /** Shared Document history lease; does not modify either stack. */
   suspendHistory(){this.historyGuards[1](n=>n+1);let live=true;return()=>{if(live){live=false;this.historyGuards[1](n=>n-1);}};}
@@ -320,6 +330,7 @@ export class CanonicalRepository {
   private deliveringCommit = false;
 
   constructor(initial: RepositoryState, options: RepositoryOptions = {}) {
+    this.compactCanonicalText = options.compactCanonicalText === true;
     const validation: BoundaryValidation | undefined = options.resourceBoundaryEvidence !== false ? {} : undefined;
     validateRepository(initial, validation);
     this.references = new ReferenceBookkeeping(!!validation);
@@ -455,6 +466,17 @@ export class CanonicalRepository {
     const stage = (name: string) => { if (timings) { const now = performance.now(); timings[`commit.${name}`] = now - last; last = now; } };
     this.assertNotCaptureCallback();
     if (!operations.length) return;
+    for(const op of recordOperations(operations))if(op.kind==='put-content'){
+      const before=this.readState().contents[op.record.key];
+      if(before?.inlineKind==='standoff'&&op.record.inlineKind==='standoff'&&!!before.compactInline!==!!op.record.compactInline)throw new ModelInvariantError('Canonical representation is fixed at admission');
+      if(op.record.compactInline)validateCompactInline(op.record);
+    }
+    for(const op of recordOperations(operations))if(op.kind==='put-content'&&op.inlineSplice){
+      const before=this.readState().contents[op.record.key],d=op.inlineSplice;
+      if(!before?.compactInline||!op.record.compactInline||!Number.isInteger(d.start)||!Number.isInteger(d.end)||d.start<0||d.end<d.start||d.end>inlineLength(before.compactInline.spans))throw new ModelInvariantError('Invalid compact splice preimage');
+      const expected=normalizeInline([...inlineSlice(before.compactInline.spans,0,d.start),...d.insert,...inlineSlice(before.compactInline.spans,d.end,inlineLength(before.compactInline.spans))]);
+      if(JSON.stringify(expected)!==JSON.stringify(op.record.compactInline.spans))throw new ModelInvariantError('Compact splice does not match committed content');
+    }
     const placementDelta = this.placementIdentity.validateCommit(operations);
     const bulk = operations.some(op => op.kind === "record-batch");
     const gloss = !bulk && glossChangeFor(this.readState(), operations, {locationOf:key=>this.locationOf(key),ownedKeys:key=>this.ownedPlacementKeys(key)});
@@ -467,7 +489,7 @@ export class CanonicalRepository {
       this.commitInline(label, operations, undefined, recordHistory, metadata, undefined, undefined, placementDelta, undefined, undefined, taskStateOwner);
       return;
     }
-    const inlineOwner = !bulk && inlineOwnerFor(this.readState(), operations, this.references);
+    const inlineOwner = !bulk && (compactInlineOwnerFor(this.readState(), operations) ?? inlineOwnerFor(this.readState(), operations, this.references));
     if (inlineOwner) {
       this.commitInline(label, operations, inlineOwner, recordHistory, metadata, undefined, undefined, placementDelta);
       return;
@@ -506,6 +528,7 @@ export class CanonicalRepository {
     for (const [key, content] of Object.entries(next.contents)) {
       const previous = current.contents[key];
       if (!previous || content === previous) continue;
+      if(content.compactInline&&previous.compactInline)content.inlineRevision=previous.inlineRevision+(JSON.stringify(content.compactInline)!==JSON.stringify(previous.compactInline)?1:0);
       const previousValue = { ...previous, revision: 0 };
       const nextValue = { ...content, revision: 0 };
       if (JSON.stringify(previousValue) !== JSON.stringify(nextValue)) {
@@ -585,7 +608,7 @@ export class CanonicalRepository {
       let observer = 0;
       for (const subscriber of this.changeSubscribers) {
         const started = timings ? performance.now() : 0;
-        subscriber({ commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
+        subscriber({ compactEdits:compactEdits(operations), commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
         if (timings) timings[`observer.${observer++}`] = performance.now() - started;
       }
       stage("changeObservers");
@@ -612,6 +635,7 @@ export class CanonicalRepository {
       const key = operation.kind === "put-content" ? operation.record.key : operation.key;
       const previous = current.contents[key];
       previousContents.set(key, previous ? clone(previous) : undefined);
+      if(operation.kind==='put-content'&&operation.record.compactInline&&previous?.compactInline)operation.record.inlineRevision=previous.inlineRevision+(JSON.stringify(operation.record.compactInline)!==JSON.stringify(previous.compactInline)?1:0);
       if (operation.kind === "put-content" && previous &&
         JSON.stringify({ ...previous, revision: 0 }) !== JSON.stringify({ ...operation.record, revision: 0 })) {
         operation.record.revision = previous.revision + 1;
@@ -666,7 +690,7 @@ export class CanonicalRepository {
       this.deliverCapture(capture, commitId, label, recordHistory);
       for (const subscriber of this.subscribers) subscriber(this.snapshot(), label);
       const origins = annotationOrigins(operations);
-      for (const subscriber of this.changeSubscribers) subscriber({ commit: { id: commitId, cause: metadata.cause }, label, previousContents, inlineOwner, split, childrenOwner, emptyParagraph, listWrap, taskStateOwner, structural, annotationOrigins: origins });
+      for (const subscriber of this.changeSubscribers) subscriber({ compactEdits:compactEdits(operations), commit: { id: commitId, cause: metadata.cause }, label, previousContents, inlineOwner, split, childrenOwner, emptyParagraph, listWrap, taskStateOwner, structural, annotationOrigins: origins });
     });
   }
 

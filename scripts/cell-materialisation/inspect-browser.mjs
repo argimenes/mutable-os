@@ -18,14 +18,14 @@ try{
  let ready=false;for(let i=0;i<200;i++){if(await evaluate('typeof cellInspection === "function"')){ready=true;break;}await new Promise(r=>setTimeout(r,100));}assert(ready);
  await evaluate('cellInspection("small","facts")');
  const results=[];
- for(let run=0;run<Number(process.env.CELL_RUNS??3);run++)for(const name of ['small','large','anthology','extended'])for(const mode of (process.env.CELL_FLINT?['flint']:['parse','decode','facts'])){
+ for(let run=0;run<Number(process.env.CELL_RUNS??3);run++)for(const name of (process.env.CELL_FIXTURES??'small,large,anthology,extended').split(','))for(const mode of (process.env.CELL_FLINT?['flint']:['parse','decode','facts'])){
   await evaluate('window.cellRetained=null;window.teiCleanup?.()');await send('HeapProfiler.collectGarbage',{},sessionId);
   const before=await send('Runtime.getHeapUsage',{},sessionId);
-  const result=await evaluate(mode==='flint'?`teiFlintPerformance(${JSON.stringify(name)})`:`cellInspection(${JSON.stringify(name)},${JSON.stringify(mode)})`);
+  const result=await evaluate(mode==='flint'?`teiFlintPerformance(${JSON.stringify(name)},${process.env.CELL_COMPACT==='1'})`:`cellInspection(${JSON.stringify(name)},${JSON.stringify(mode)})`);
   await send('HeapProfiler.collectGarbage',{},sessionId);const after=await send('Runtime.getHeapUsage',{},sessionId);
-  assert.equal(result.cellProbe.cells,(mode==='decode'||mode==='flint')?{small:3271,large:17283,anthology:58614,extended:120624}[name]:0);
-  if(mode==='flint'){assert.equal(result.pageCount,1);assert.equal(result.truncated,false);assert.equal(result.notifications,1);assert.equal(result.admissionSnapshots,0);assert(result.typing.restored);}
+  if(mode==='flint'&&process.env.CELL_COMPACT==='1'){assert.equal(result.cellProbe.cells,0);assert.equal(result.canonicalCells,0);}else if(['small','large','anthology','extended'].includes(name))assert.equal(result.cellProbe.cells,(mode==='decode'||mode==='flint')?{small:3271,large:17283,anthology:58614,extended:120624}[name]*(mode==='flint'?2:1):0);
+  if(mode==='flint'){assert.equal(result.pageCount,1);assert.equal(result.truncated,false);assert.equal(result.notifications,1);assert.equal(result.admissionSnapshots,0);assert.equal(result.typing.snapshots,0);assert(result.typing.restored);}
   results.push({...result,mode,run,heapBefore:before.usedSize,heapRetained:after.usedSize,retainedDelta:after.usedSize-before.usedSize});console.log(JSON.stringify(results.at(-1)));
-  await mkdir('artifacts/cell-materialisation',{recursive:true});await writeFile('artifacts/cell-materialisation/'+(process.env.CELL_FLINT?'flint':'inspection')+'.json',JSON.stringify({browser:await send('Browser.getVersion'),results},null,2)+'\n');
+  const out=process.env.CELL_OUTPUT??'artifacts/cell-materialisation';await mkdir(out,{recursive:true});await writeFile(out+'/'+(process.env.CELL_FLINT?'flint':'inspection')+'.json',JSON.stringify({browser:await send('Browser.getVersion'),results},null,2)+'\n');
  }
 }finally{socket?.close();chrome.kill();await new Promise(r=>setTimeout(r,300));await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});}

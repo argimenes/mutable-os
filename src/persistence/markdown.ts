@@ -1,3 +1,4 @@
+import {inlineUnits} from "../block-tree/inline-sequence";
 /** Bounded Markdown projection/import, qualified in B2. Native state is always authoritative. */
 import type { ExistingBlockDto, JsonObject } from "../block-tree/types";
 import type { DeepReadonly } from "../block-tree/commit-capture";
@@ -81,12 +82,14 @@ export function exportMarkdown(resource: DeepReadonly<ResourceSnapshot>, targets
   const warn = (id: unknown, code: string, detail: string) => diagnostics.push({ blockId: typeof id === "string" ? id : undefined, code, detail });
   const plain = (key: string): string => {
     const c = resource.contents[key];
+    if(c.compactInline)return c.compactInline.spans.map(a=>a.kind==='text'?a.text:String(a.properties.alt??'[image]')).join('');
     return c.inlineContent.map(pk => { const p = resource.placements[pk]; if (p.target.kind !== "local") return ""; const atom = resource.contents[p.target.contentKey]; return atom.viewType === "text-cell" ? String(atom.payload.text) : String(atom.payload.alt ?? "[image]"); }).join("");
   };
   const inline = (key: string) => {
-    const c = resource.contents[key], tokens = c.inlineContent.map(pk => {
-      const p = resource.placements[pk]; if (p.target.kind !== "local") return "";
-      const atom = resource.contents[p.target.contentKey];
+    const c = resource.contents[key];
+    const atoms=c.compactInline ? [...inlineUnits(c.compactInline.spans as any)].map(a=>a.kind==='text'?{viewType:'text-cell',payload:{text:a.text}}:{viewType:'image-cell',payload:a.properties}) : c.inlineContent.map(pk=>{const p=resource.placements[pk];return p.target.kind==='local'?resource.contents[p.target.contentKey]:undefined;});
+    const tokens = atoms.map(atom => {
+      if(!atom)return '';
       if (atom.viewType === "text-cell") return escapeText(String(atom.payload.text));
       const src = String(atom.payload.src ?? ""), alt = escapeText(String(atom.payload.alt ?? "Image"));
       warn(c.payload.id, "image-projection", "Image appearance/metadata is not fully represented; no assets copied");

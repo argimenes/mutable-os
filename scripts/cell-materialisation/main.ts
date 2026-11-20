@@ -10,9 +10,9 @@ const sources={small,large,anthology:anthology(12),extended:anthology(30)};
 const win=window as any;
 const probe=()=>({phase:'setup',ids:{} as Record<string,{count:number;ms:number}>,cells:0,cellMs:0});
 const original=win.teiFlintPerformance;
-win.teiFlintPerformance=async(name:string)=>{
+win.teiFlintPerformance=async(name:string,compact=false)=>{
  const p=probe();win.__cellProbe=p;
- try {const result=await original(name);return {...result,cellProbe:p,domElements:document.querySelectorAll('*').length,cellSpans:document.querySelectorAll('[data-inline-key]').length};}
+ try {const result=await original(name,compact);return {...result,cellProbe:p,domElements:document.querySelectorAll('*').length,cellSpans:document.querySelectorAll('[data-inline-key]').length};}
  finally {delete win.__cellProbe;}
 };
 // Separately retained outputs allow CDP GC samples without keeping discarded graphs alive.

@@ -1,3 +1,4 @@
+import {compactSelectionHistory} from "../runtime/compact-selection-history";
 import { teiLimits, type TeiLimits } from '../interchange/tei/model';
 import { MarkdownInput } from '../runtime/markdown-input';
 import { GlossRelationshipController } from "../features/gloss/relationship-controller";
@@ -169,6 +170,7 @@ export class ReactiveEditor {
   readonly multiSelections: MultiSelectionEditor;
   readonly projections = new Map<ViewId, BlockTreeProjection>();
   private gateway?: InputGateway;
+  private disposeCompactSelection?:()=>void;
   private crossInput?: CrossBlockInput;
   private disposeInterchangeStatus?: () => void;
   private disposeClipboardStatus?: () => void;
@@ -182,7 +184,7 @@ export class ReactiveEditor {
     const loadedWorkspace = "state" in dto && "references" in dto ? dto as LoadedWorkspace : undefined;
     if ((loadedWorkspace?.localContainer || loadedWorkspace?.manifest?.schemaVersion === 2) && !this.features.mutableWindowManager) throw new Error("Enable the Mutable Window Manager to open a managed Workspace.");
     const decoded = loadedWorkspace ? { state: loadedWorkspace.state } : isHistoryDocument(dto) ? decodeHistoryDocument(dto) : decodeBlockTree(dto as ExistingBlockDto);
-    this.repository = new CanonicalRepository(this.features.reversibleBlocks ? upgradeLegacySurfaces(decoded.state) : decoded.state);
+    this.repository = new CanonicalRepository(this.features.reversibleBlocks ? upgradeLegacySurfaces(decoded.state) : decoded.state, {compactCanonicalText:this.features.compactCanonicalText});
     this.annotationIdentities = new AnnotationIdentities(this.repository);
     registerVisualEffectRenderers(this.visualEffects);
     registerFocusFade(this.visualEffects);
@@ -198,7 +200,7 @@ export class ReactiveEditor {
     }, this.features.caretModes, this.features.readingSpotlight);
     this.pointerSpotlight = new PointerSpotlight(this.visualEffects, this.features.pointerSpotlight, () => this.caretModes.select('normal'), this.caretModes.active);
     this.viewVisibility = new ViewVisibility(this.repository);
-    this.commands = new TreeCommands(this.repository, (key) => this.occurrences.resolve(key));
+    this.commands = new TreeCommands(this.repository, (key) => this.occurrences.resolve(key), key => {const cell=this.node(key),owner=cell?.editingInlineOwner&&this.node(cell.editingInlineOwner);if(!owner)return;const index=owner.inlineContent.indexOf(key);return index<0?undefined:{placementKey:owner.placementKey,index};});
     this.textRanges = new TextRanges(key => {
       const node = this.node(key), content = node && this.repository.readState().contents[node.contentKey];
       if (!node || !content || !["standoff-editor-block", "plain-text-block", ...sourceTextTypes].includes(node.viewType)) return;
@@ -232,6 +234,7 @@ export class ReactiveEditor {
       this.selections,
       (nodeKey) => this.node(nodeKey),
     );
+    if(this.features.compactCanonicalText)this.disposeCompactSelection=compactSelectionHistory(this);
     this.repository.subscribeBeforeChanges((label) => {
       this.selectionGestures.cancelGesture();
       this.crossText.beforeChange();
@@ -577,6 +580,7 @@ export class ReactiveEditor {
     this.blockClipboard.dismiss();
     this.blockSelection.clear();
     this.bindings.dispose();
+    this.disposeCompactSelection?.();
     this.gateway?.dispose();
     this.focus.dispose();
     this.annotationEvents.dispose();

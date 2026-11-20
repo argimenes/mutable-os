@@ -1,6 +1,7 @@
+import { inlineLength, inlineSlice, type InlineAtom, type InlineSplice } from "./inline-sequence";
 import type { StructuralChange } from "./structural-plan";
 import type { ListWrapChange } from "./list-wrap-plan";
-import { createSignal } from 'solid-js';
+import { batch, createSignal } from 'solid-js';
 import { createStore, reconcile, unwrap } from "solid-js/store";
 import { clone } from "./clone";
 import { createNodeKey } from "./ids";
@@ -17,6 +18,36 @@ import type {
 } from "./types";
 
 export class BlockTreeProjection {
+  private compactMounts = new Map<string, number>();
+  private compactVersions=new Map<string,number>();
+  isCompact(key:string){const n=this.state.nodes[key];return !!n&&!!this.repository.state.contents[n.contentKey]?.compactInline;}
+  /** Editing projection only, acquired by the existing mounted TextBlock view.
+   * It is never registered as canonical content/placement ownership. */
+  acquireCompactInline(key:string):()=>void {
+    if(!this.isCompact(key))return ()=>{};
+    this.compactMounts.set(key,(this.compactMounts.get(key)??0)+1);
+    if(this.compactMounts.get(key)===1)this.updateCompactInline(key);
+    return ()=>{const count=(this.compactMounts.get(key)??1)-1;if(count){this.compactMounts.set(key,count);return;}this.compactMounts.delete(key);this.compactVersions.delete(key);const n=this.state.nodes[key];if(n)batch(()=>{for(const ck of n.inlineContent)this.setState('nodes',ck,undefined);this.setState('nodes',key,'inlineContent',[]);});};
+  }
+  private editingAtoms(owner:BlockNode,spans:readonly InlineAtom[]):BlockNode[]{
+    const out:BlockNode[]=[];const atom=(viewType:string,payload:Record<string,unknown>)=>out.push({key:createNodeKey(this.viewId,owner.placementKey),contentKey:owner.contentKey,placementKey:owner.placementKey,viewId:this.viewId,editingInlineOwner:owner.key,viewType,payload,children:[],inlineContent:[],ownedRelations:{}});
+    for(const a of spans)if(a.kind==='text')for(const text of a.text)atom('text-cell',{text});else atom('image-cell',clone(a.properties));return out;
+  }
+  private updateCompactInline(key:string,splice?:InlineSplice){
+    const owner=this.state.nodes[key];if(!owner)return;const c=this.repository.readState().contents[owner.contentKey];if(!c?.compactInline)return;
+    if(!this.compactMounts.has(key)){this.setState('nodes',key,'payload',reconcile(clone(c.payload)));return;}
+    if(this.compactVersions.get(key)===c.inlineRevision){this.setState('nodes',key,'payload',reconcile(clone(c.payload)));return;}
+    this.compactVersions.set(key,c.inlineRevision);
+    const old=[...owner.inlineContent];let start=splice?.start??0,end=splice?.end??old.length,added:BlockNode[];
+    if(splice)added=this.editingAtoms(owner,splice.insert);
+    else {
+      const next=this.editingAtoms(owner,c.compactInline.spans),same=(i:number,j:number)=>{const a=this.state.nodes[old[i]],b=next[j];return a?.viewType===b?.viewType&&JSON.stringify(a?.payload)===JSON.stringify(b?.payload);};
+      while(start<old.length&&start<next.length&&same(start,start))start++;let suffix=0;while(suffix<old.length-start&&suffix<next.length-start&&same(old.length-1-suffix,next.length-1-suffix))suffix++;
+      end=old.length-suffix;added=next.slice(start,next.length-suffix);
+    }
+    batch(()=>{for(const ck of old.slice(start,end))this.setState('nodes',ck,undefined);for(const cell of added)this.setState('nodes',cell.key,cell);const keys=[...old.slice(0,start),...added.map(c=>c.key),...old.slice(end)];this.setState('nodes',key,'inlineContent',reconcile(keys));this.setState('nodes',key,'payload',reconcile(clone(c.payload)));});
+  }
+
   private readonly topology = createSignal(0);
   readonly structureVersion = this.topology[0];
   /** Reuse the existing occurrence route index for bounded ancestor navigation. */
@@ -77,7 +108,7 @@ export class BlockTreeProjection {
         return;
       }
       if (change.inlineOwner) {
-        this.updateInline(change.inlineOwner);
+        this.updateInline(change.inlineOwner,change.compactEdits?.get(change.inlineOwner));
         // The validated inline batch may also annotate other existing text
         // owners. Update those occurrences without rebuilding the projection.
         for(const [key,previous] of change.previousContents){
@@ -242,6 +273,17 @@ export class BlockTreeProjection {
       }
       rootKey = keyFor(rootKey);
     }
+    for(const key of this.compactMounts.keys())if(nodes[key]){
+      const c=snapshot.contents[nodes[key].contentKey];if(!c?.compactInline)continue;
+      const previous=this.state?.nodes[key];const cells=this.editingAtoms(nodes[key],c.compactInline.spans);
+      // Structural rebuild preserves equal surviving editing atoms at either edge.
+      let prefix=0,suffix=0;const old=previous?.inlineContent??[];
+      const same=(i:number,j:number)=>{const a=this.state.nodes[old[i]],b=cells[j];return a?.viewType===b.viewType&&JSON.stringify(a.payload)===JSON.stringify(b.payload);};
+      while(prefix<old.length&&prefix<cells.length&&same(prefix,prefix)){cells[prefix]=clone(this.state.nodes[old[prefix]]);prefix++;}
+      while(suffix<old.length-prefix&&suffix<cells.length-prefix&&same(old.length-1-suffix,cells.length-1-suffix)){cells[cells.length-1-suffix]=clone(this.state.nodes[old[old.length-1-suffix]]);suffix++;}
+      this.compactVersions.set(key,c.inlineRevision);
+      nodes[key].inlineContent=cells.map(c=>c.key);for(const c of cells)nodes[c.key]=c;
+    }
     return { rootKey, nodes, revision: snapshot.revision };
   }
 
@@ -252,6 +294,7 @@ export class BlockTreeProjection {
   }
 
   private registerNode(node: BlockNode): void {
+    if(node.editingInlineOwner)return;
     this.registeredKeys.add(node.key);
     this.occurrences.register(node.key, node.placementKey);
     for (const [index, key] of [[this.contentNodes, node.contentKey], [this.placementNodes, node.placementKey]] as const) {
@@ -271,13 +314,14 @@ export class BlockTreeProjection {
     }
   }
 
-  private updateInline(contentKey: ContentKey): void {
+  private updateInline(contentKey: ContentKey, splice?: InlineSplice): void {
     // A text edit outside this view must not publish even a revision-only update.
     if (!this.contentNodes.has(contentKey)) return;
     const source = this.repository.readState();
     const content = source.contents[contentKey];
     const nodes = unwrap(this.state.nodes);
     for (const key of this.contentNodes.get(contentKey) ?? []) {
+      if(content.compactInline){this.updateCompactInline(key,splice);continue;}
       const owner = nodes[key];
       if (owner.viewType === "cyclic-reference") {
         this.setState("nodes", key, "payload", reconcile({ ...clone(content.payload), cycleTargetType: content.viewType }));
@@ -372,7 +416,7 @@ export class BlockTreeProjection {
       for (const child of [...node.children, ...node.inlineContent, ...Object.values(node.ownedRelations)]) {
         const previous = this.nodeRoutes.get(child)!;
         // A child may already have moved out of this parent in the same batch.
-        if (previous.startsWith(old + '/') && this.repository.locationOf(nodes[child].placementKey)?.ownerContentKey === node.contentKey)
+        if (previous?.startsWith(old + '/') && this.repository.locationOf(nodes[child].placementKey)?.ownerContentKey === node.contentKey)
           reroute(child, route + previous.slice(old.length));
       }
     };
@@ -393,7 +437,8 @@ export class BlockTreeProjection {
       if (!c) { detached.add(key); return; }
       const route = this.nodeRoutes.get(key)!;
       const children = c.children.map(pk=>ensure(pk,`${route}/child:${pk}`));
-      const inline = c.inlineContent.map(pk=>ensure(pk,`${route}/inline:${pk}`));
+      if(c.compactInline)this.updateCompactInline(key);
+      const inline = c.compactInline ? [...this.state.nodes[key].inlineContent] : c.inlineContent.map(pk=>ensure(pk,`${route}/inline:${pk}`));
       const retained = new Set([...children,...inline]);
       for (const old of [...node.children,...node.inlineContent]) if (!retained.has(old)) detached.add(old);
       this.setState('nodes',key,'payload',reconcile(clone(c.payload)));
@@ -500,6 +545,7 @@ export class BlockTreeProjection {
 
   dispose(): void {
     this.unsubscribe();
+    this.compactMounts.clear();this.compactVersions.clear();
     this.unregister();
   }
 }

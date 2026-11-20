@@ -179,8 +179,9 @@ export class InputGateway {
         event.inputType === "deleteContentBackward" ||
         event.inputType === "deleteContentForward")
     ) {
+      if(this.commands.isCompactText(resolved.nodeKey)){if(event.cancelable)event.preventDefault();event.stopPropagation();this.notice('Multiple-caret editing is not yet qualified for compact text. Use one selection or reopen in legacy mode.');return;}
       const sourceText = node.inlineContent
-        .map((cellKey) => this.node(cellKey)?.payload.text ?? "")
+        .map((cellKey) => this.node(cellKey)?.payload.text ?? (this.node(cellKey)?.editingInlineOwner ? "\uFFFC" : ""))
         .join("");
       const boundaries = graphemeBoundaries(sourceText);
       const replacements = selectionSet.items.map((item) => {
@@ -215,7 +216,7 @@ export class InputGateway {
     } else if (event.inputType === "deleteContentBackward") {
       if (start === end && start > 0) {
         const textValue = node.inlineContent
-          .map((cellKey) => this.node(cellKey)?.payload.text ?? "")
+          .map((cellKey) => this.node(cellKey)?.payload.text ?? (this.node(cellKey)?.editingInlineOwner ? "\uFFFC" : ""))
           .join("");
         start = graphemeBoundaries(textValue).filter((boundary) => boundary < start).at(-1) ?? 0;
       } else if (start === end && start === 0) {
@@ -256,7 +257,7 @@ export class InputGateway {
     } else if (event.inputType === "deleteContentForward") {
       if (start === end && end < node.inlineContent.length) {
         const textValue = node.inlineContent
-          .map((cellKey) => this.node(cellKey)?.payload.text ?? "")
+          .map((cellKey) => this.node(cellKey)?.payload.text ?? (this.node(cellKey)?.editingInlineOwner ? "\uFFFC" : ""))
           .join("");
         end = graphemeBoundaries(textValue).find((boundary) => boundary > end) ?? node.inlineContent.length;
       } else if (start === end && end === node.inlineContent.length) {
@@ -321,7 +322,8 @@ export class InputGateway {
     this.bindings.cancelChord();
     const resolved = this.mounts.resolveEvent(event);
     if (resolved && (resolved.handle.inputPolicy === "native-text" || resolved.handle.inputPolicy === "standoff")) {
-      if(!this.completion?.()?.composition?.(resolved.nodeKey,'start',event.data??''))this.completion?.()?.cancel();
+      if(resolved.handle.compactComposition){this.completion?.()?.cancel();resolved.handle.compactComposition('start',event.data??'');}
+      else if(!this.completion?.()?.composition?.(resolved.nodeKey,'start',event.data??''))this.completion?.()?.cancel();
       resolved.handle.composing = true;
       this.caretEvents?.setComposing?.(true);
     }
@@ -332,6 +334,7 @@ export class InputGateway {
     this.caretEvents?.setComposing?.(false);
     if (!resolved) return;
     resolved.handle.composing = false;
+    if(resolved.handle.compactComposition){resolved.handle.compactComposition('end',event.data??'');return;}
     if(this.completion?.()?.composition?.(resolved.nodeKey,'end',event.data??''))return;
     if (resolved.handle.inputPolicy === "native-text" && event.target instanceof HTMLTextAreaElement) {
       this.recordNativeText(resolved.nodeKey, event.target);
@@ -695,19 +698,11 @@ export class InputGateway {
     const resultingLength = node.inlineContent.length - (end - start);
     let focusPlacement: PlacementKey | undefined;
     const insert = () => {
-      const emptyDto = {
-        ...JSON.parse(JSON.stringify(node.payload)),
-        id: globalThis.crypto.randomUUID(),
-        type: "standoff-editor-block",
-        text: "",
-        standoffProperties: [],
-        children: [],
-      };
       if (start !== end) this.commands.replaceInlineRange(nodeKey, start, end, "");
       if (start === 0) {
-        this.commands.insert(emptyDto, { kind: "before", anchorKey: nodeKey });
+        this.commands.insertEmptyStandoffSibling(nodeKey,"before");
       } else if (start === resultingLength) {
-        focusPlacement = this.commands.insert(emptyDto, { kind: "after", anchorKey: nodeKey });
+        focusPlacement = this.commands.insertEmptyStandoffSibling(nodeKey,"after");
       } else {
         focusPlacement = this.commands.splitStandoff(nodeKey, start);
       }

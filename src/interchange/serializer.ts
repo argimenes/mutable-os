@@ -1,3 +1,4 @@
+import {contentLength,contentSlice} from "../block-tree/inline-sequence";
 import {glossDefinition} from "../features/gloss/model";
 import {STRUCTURED_BLOCK} from '../structured/model';
 import { isSourceType } from './source-block';
@@ -79,11 +80,11 @@ export function serializeSelection(state: RepositoryState, slices: Slice[], scop
     }
     for (const p of (Array.isArray(c.payload.blockProperties) ? c.payload.blockProperties : [])) b.blockProperties.push(property(p, c.key));
     if (c.inlineKind === 'standoff') {
-      const start = slice?.start ?? 0, end = slice?.end ?? c.inlineContent.length;
-      if (start < 0 || end < start || end > c.inlineContent.length) throw Error('Stale text selection.');
+      const start = slice?.start ?? 0, end = slice?.end ?? contentLength(c);
+      if (start < 0 || end < start || end > contentLength(c)) throw Error('Stale text selection.');
       b.inline = { atoms: [], properties: [] };
-      for (const key of c.inlineContent.slice(start, end)) {
-        const cell = state.contents[state.placements[key].contentKey];
+      for (const atom of contentSlice(state,c,start,end)) {
+        const cell=atom.kind==='text'?{viewType:'text-cell',payload:{text:atom.text} as Record<string,any>}:{viewType:'image-cell',payload:atom.properties};
         if (cell.viewType === 'text-cell') {
           const text = String(cell.payload.text ?? ''), last = b.inline.atoms.at(-1);
           if (last?.kind === 'text') last.text += text; else b.inline.atoms.push({ kind: 'text', text });
@@ -99,11 +100,11 @@ export function serializeSelection(state: RepositoryState, slices: Slice[], scop
       }
       for (const p of (Array.isArray(c.payload.standoffProperties) ? c.payload.standoffProperties : [])) {
         if (!p || !Number.isInteger(p.start) || !Number.isInteger(p.end) || p.start < 0 ||
-          (p.isZeroWidth === true ? p.start !== p.end || p.end > c.inlineContent.length : p.end < p.start || p.end >= c.inlineContent.length)) {
+          (p.isZeroWidth === true ? p.start !== p.end || p.end > contentLength(c) : p.end < p.start || p.end >= contentLength(c))) {
           throw Error('A selected Block contains an invalid annotation range; nothing was copied or cut.');
         }
       }
-      for (const p of clipProperties(c.payload.standoffProperties, start, end, c.inlineContent.length, -start, !slice)) {
+      for (const p of clipProperties(c.payload.standoffProperties, start, end, contentLength(c), -start, !slice)) {
         b.inline.properties.push({ ...property(p, c.key), startIndex: Number(p.start), endIndex: Number(p.end) + (p.isZeroWidth === true ? 0 : 1), isZeroWidth: p.isZeroWidth === true, ...(p.isZeroWidth === true ? { affinity: p.affinity as 'before' | 'after' } : {}) });
       }
     }
@@ -117,7 +118,7 @@ export function serializeSelection(state: RepositoryState, slices: Slice[], scop
   for (let i = 0; i < slices.length; i++) {
     const s = slices[i], partial = s.start !== undefined;
     const c = state.contents[state.placements[s.placementKey]?.contentKey];
-    f.roots.push({ placement: visit(s.placementKey, partial ? s : undefined), openStart: partial, openEnd: partial, clippedStart: partial && s.start! > 0, clippedEnd: partial && s.end! < c.inlineContent.length, ...(i < slices.length - 1 ? { separatorAfter: s.gap ? 'selection-gap' as const : 'paragraph' as const } : {}) });
+    f.roots.push({ placement: visit(s.placementKey, partial ? s : undefined), openStart: partial, openEnd: partial, clippedStart: partial && s.start! > 0, clippedEnd: partial && s.end! < contentLength(c), ...(i < slices.length - 1 ? { separatorAfter: s.gap ? 'selection-gap' as const : 'paragraph' as const } : {}) });
   }
   for (const { reference, sourceId } of pending) if (blockIds.has(sourceId)) Object.assign(reference, { kind: 'local', object: 'block', id: blockIds.get(sourceId) });
   // Validate authored values before JSON encoding can discard or coerce them

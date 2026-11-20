@@ -22,6 +22,8 @@ export interface MountHandle {
   inlineBoundary?(index: number): { node: Node; offset: number };
   inlinePointAt?(x: number, y: number): number;
   captureText?(): string;
+  /** Compact composition uses typed source coordinates in the existing gateway. */
+  compactComposition?(phase:'start'|'end',text:string):void;
   /** The existing character owner renders an occurrence-local Scry sequence. */
   presentProvisional?(draft:import('../features/autocomplete/provisional-cells').ProvisionalCells|undefined):void;
   finishProvisionalComposition?():void;

@@ -1,3 +1,4 @@
+import {compactComposition} from "./compact-composition";
 import {observeFontLayout} from './font-layout';
 import { CharacterSurfaceHost, type CharacterSurfaceRequest } from './character-surface-host';
 import { TaskControl, StandaloneTaskDisclosure } from './task-control';
@@ -330,6 +331,8 @@ function ProjectedAlternative(props: { nodeKey: NodeKey; sourceIndex: number; so
 export function StandoffEditorView(props: BlockViewProps) {
   const { editor, projection, coordinates, activity } = useReactiveView();
   const node = () => projection.state.nodes[props.nodeKey];
+  const releaseCompact = untrack(()=>projection.acquireCompactInline(props.nodeKey));
+  onCleanup(releaseCompact);
   const [draft,setDraft]=createSignal<ProvisionalCells>();
   const logical=(at:number)=>draft()?.fromPresentation(at)??at;
   const presented=(at:number)=>draft()?.toPresentation(at)??at;
@@ -616,7 +619,10 @@ export function StandoffEditorView(props: BlockViewProps) {
       });
     });
     document.addEventListener("scroll",onCandidateScroll,true);
+    const composition=projection.isCompact(props.nodeKey)?compactComposition(editor,props.nodeKey,flow,captureSelection,restoreSelection):undefined;
+    onCleanup(()=>composition?.dispose());
     disposeMount = editor.mounts.register(props.nodeKey, {
+      compactComposition:composition?.phase,
       root,
       focusElement: flow,
       inputPolicy: "standoff",

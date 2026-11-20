@@ -1,3 +1,4 @@
+import { validateCompactInline } from "../../block-tree/inline-sequence";
 import type { ReadMeasure } from "../read-timing";
 /** G1 candidate only. Not a shipped schema or an editor repository. */
 import { isOwnedResourceTarget } from "../../block-tree/resource-registration";
@@ -43,6 +44,7 @@ export function validateResource(state: ResourceSnapshot): void {
     state.contents[root.target.contentKey]?.viewType === "document-block", "invalid local Document root");
   const assigned = new Set<string>(), authored = new Set<string>(), slots = new Set<string>();
   for (const [key, c] of Object.entries(state.contents)) {
+    validateCompactInline(c);
     requireValid(c.key === key, "content key mismatch");
     if (c.definitionOwnerKey !== undefined) requireValid(root.target.kind === "local" &&
       c.definitionOwnerKey === root.target.contentKey && !["text-cell", "image-cell"].includes(c.viewType), "invalid definition membership");
@@ -51,7 +53,7 @@ export function validateResource(state: ResourceSnapshot): void {
       authored.add(c.payload.id);
     }
     requireValid(c.viewType !== "workspace-block" && (c.viewType !== "document-block" || root.target.kind === "local" && root.target.contentKey === key), "nested resource");
-    for (const value of [c.payload, ...Array.isArray(c.payload.standoffProperties) ? c.payload.standoffProperties : [], ...Array.isArray(c.payload.blockProperties) ? c.payload.blockProperties : []]) {
+    for (const value of [c.payload, ...c.compactInline?.spans.flatMap(a=>a.kind==='image'?[a.properties,...Array.isArray(a.properties.standoffProperties)?a.properties.standoffProperties:[]]:[])??[], ...Array.isArray(c.payload.standoffProperties) ? c.payload.standoffProperties : [], ...Array.isArray(c.payload.blockProperties) ? c.payload.blockProperties : []]) {
       if (value && typeof value === "object") {
         const link = externalDefinitionLink(value as Record<string, unknown>);
         externalAssetLink(value as Record<string, unknown>);

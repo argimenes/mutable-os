@@ -98,6 +98,8 @@ export type FeatureFlags = Readonly<{
   presentationProbe: boolean;
   /** Live sculptural entity graph in the normal Flint application. */
   flintSpatialGraph: boolean;
+  /** Selected at native admission; false retains legacy loading. Never converts a live Document. */
+  compactCanonicalText: boolean;
   /** Per-resource native/Markdown persistence through the managed server store. */
   nativeDocumentPersistence: boolean;
   teiImport: boolean;
@@ -218,6 +220,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   flintProbe: false,
   presentationProbe: false,
   flintSpatialGraph: true,
+  compactCanonicalText: true,
   nativeDocumentPersistence: true,
   teiImport: true,
   vaultDiscoveryCache: true,

@@ -1,3 +1,4 @@
+import {logicalInline} from "./inline-sequence";
 import { clone } from "./clone";
 import { createContentKey, createPlacementKey } from "./ids";
 import type {
@@ -165,20 +166,12 @@ export function encodeBlock(
       };
     }
     if (content.inlineKind === "standoff") {
-      output.text = content.inlineContent
-        .map((inlinePlacementKey) => {
-          const inlinePlacement = state.placements[inlinePlacementKey];
-          const inlineContent = inlinePlacement && state.contents[inlinePlacement.contentKey];
-          if (typeof inlineContent?.payload.text === "string") return inlineContent.payload.text;
-          if (inlineContent?.viewType === "image-cell") {
-            const message = `Inline image ${String(inlineContent.payload.assetId ?? inlineContent.key)} cannot be represented in legacy text JSON`;
-            if (!context.allowLossyInline) throw new LegacyExportLossError(message);
-            context.losses?.push(message);
-            return String(inlineContent.payload.alt ?? "");
-          }
-          return "";
-        })
-        .join("");
+      output.text = logicalInline(state,content).map(atom=>{
+        if(atom.kind==='text')return atom.text;
+        const message=`Inline image ${String(atom.properties.assetId??'')} cannot be represented in legacy text JSON`;
+        if(!context.allowLossyInline)throw new LegacyExportLossError(message);
+        context.losses?.push(message);return String(atom.properties.alt??'');
+      }).join('');
     }
     const metadata = output.metadata as Record<string, unknown> | undefined;
     const externalWorkspaceDocument =

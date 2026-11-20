@@ -173,11 +173,11 @@ export function parseNativeEnvelope(bytes: Uint8Array): NativeDocument {
   return value;
 }
 
-export function decodeNative(bytes: Uint8Array, timings?: Record<string, number>): DeepReadonly<ResourceSnapshot> {
+export function decodeNative(bytes: Uint8Array, timings?: Record<string, number>, compact = false): DeepReadonly<ResourceSnapshot> {
   let last = timings ? performance.now() : 0;
   const value = parseNativeEnvelope(bytes), doc = value.document;
   if (timings) { timings.nativeWireParsing = performance.now() - last; }
-  let resource = decodeGateDocument(doc, value.valueEncoding ? "native" : "legacy", timings);
+  let resource = decodeGateDocument(doc, value.valueEncoding ? "native" : "legacy", timings, compact);
   if (timings) last = performance.now();
   const root = resource.placements[resource.rootPlacementKey]; check(root.target.kind === "local", "external root");
   const rootContent = resource.contents[root.target.contentKey];
@@ -227,7 +227,7 @@ function validateNativeOwnership(resource: DeepReadonly<ResourceSnapshot>, rootK
   const registry = (resource.contents[rootKey].payload.linkedAnnotations ?? {}) as object;
   for (const c of Object.values(resource.contents)) {
     if (c.definitionOwnerKey === rootKey) visit(c.key);
-    if (Array.isArray(c.payload.standoffProperties)) for (const property of c.payload.standoffProperties) {
+    for(const properties of [c.payload.standoffProperties,...c.compactInline?.spans.flatMap(a=>a.kind==='image'?[a.properties.standoffProperties]:[])??[]]) if (Array.isArray(properties)) for (const property of properties) {
       if (!id(property.annotationId) || externalDefinitionLink(property)) continue;
       check(Object.hasOwn(registry, property.annotationId), `linked annotation ${property.annotationId} lacks Document ownership or explicit foreign provenance`);
     }
@@ -245,7 +245,7 @@ export function admitNative(repository: CanonicalRepository, bytes: Uint8Array, 
 export function admitNativeWithResource(repository: CanonicalRepository, bytes: Uint8Array, bankContentKey: string, expectedResourceId?: string, timings?: Record<string, number>) {
   let last = timings ? performance.now() : 0;
   const stage = (name: string) => { if (timings) { const now = performance.now(); timings[name] = now - last; last = now; } };
-  const resource = decodeNative(bytes, timings);
+  const resource = decodeNative(bytes, timings, repository.compactCanonicalText);
   stage('nativeDecodeAndValidation');
   check(expectedResourceId === undefined || resource.resourceId === expectedResourceId, 'Open response identity mismatch');
   const incoming = resourceToRepository(resource), before = repository.readState();
