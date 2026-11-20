@@ -81,12 +81,21 @@ export function validateResource(state: ResourceSnapshot): void {
     if (ancestors.has(p.target.contentKey)) {
       requireValid(p.kind === "reference", "owned cycle"); return;
     }
-    const c = state.contents[p.target.contentKey], next = new Set(ancestors).add(c.key);
+    const c = state.contents[p.target.contentKey];
+    // Target existence and all record/slot predicates were checked above. Keep
+    // the cycle check, but do not allocate ancestry for a childless Cell/Block.
+    if (!c.children.length && !c.inlineContent.length && !Object.keys(c.ownedRelations).length) return;
+    const next = new Set(ancestors).add(c.key);
     for (const child of [...c.children, ...c.inlineContent, ...Object.values(c.ownedRelations)]) visit(child, next);
   };
   visit(state.rootPlacementKey, new Set());
   // Owned unplaced content is still owned state; validate its component too.
-  for (const c of Object.values(state.contents)) for (const p of [...c.children, ...c.inlineContent, ...Object.values(c.ownedRelations)]) visit(p, new Set([c.key]));
+  for (const c of Object.values(state.contents)) {
+    if (!c.children.length && !c.inlineContent.length && !Object.keys(c.ownedRelations).length) continue;
+    // visit never mutates its incoming ancestry. Siblings can share this seed.
+    const ancestors = new Set([c.key]);
+    for (const p of [...c.children, ...c.inlineContent, ...Object.values(c.ownedRelations)]) visit(p, ancestors);
+  }
 }
 
 /** Whole-state correctness oracle, deliberately unsuitable for a commit callback. */

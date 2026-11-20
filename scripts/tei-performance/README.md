@@ -40,8 +40,8 @@ and application bundle startup are outside the interval, as they are outside a
 file import into an already-running application. Metadata timing includes click,
 mounting and two frames. Typing uses three insertion/deletion pairs on each
 letter, with frames between events so native caret restoration completes. The
-anthology measures import and metadata without typing; the real Flint benchmark
-provides a separate 40-edit regression sample. All times are unthrottled headless
+anthology measures import and metadata without typing; the existing browser typing benchmark
+provides a separate 40-edit regression sample using its default standalone host. All times are unthrottled headless
 Chrome measurements, not universal latency guarantees.
 
 `conversionTotal` includes the named decode/parse/traversal/reference/assembly/TEI
@@ -76,7 +76,7 @@ For a baseline run set `TEI_EXPECT_BASELINE=1` as well: this asserts that the
 worker actually used the old canonical construction path. The build overrides
 both Vite plugin pipelines (main and worker), not only the main bundle.
 
-The existing real Flint typing benchmark can be reproduced without altering the
+The existing real Cell-editor browser typing benchmark can be reproduced without altering the
 checkout's implementation:
 
 ```sh
@@ -88,3 +88,49 @@ BENCHMARK_URL=http://127.0.0.1:3107/src/interchange/tei/fixtures/README.md node 
 
 Run baseline, final, CPU profiles, builds and tests sequentially. Do not compare
 samples collected while another qualification job is consuming CPU/memory.
+
+## Shared native admission investigation
+
+The native-admission follow-up uses baseline `a089fab`, retaining the previous
+TEI remediation. Its instrumentation-only patch and completed five-sample
+baseline are retained in `artifacts/tei-performance/`. The earlier
+`TEI_BASELINE_REF=5e2f0f4` mode still means the original TEI baseline; do not use
+it as the baseline for the native-admission follow-up.
+
+```sh
+TEI_FLINT=1 TEI_RUNS=5 TEI_CASES=small,large,anthology,populated TEI_LABEL=admission-final node scripts/benchmark-tei-browser.mjs
+TEI_FLINT=1 TEI_RUNS=1 TEI_CASES=extended TEI_LABEL=admission-final-extended node scripts/benchmark-tei-browser.mjs
+TEI_FLINT=1 TEI_TRACE=1 TEI_CPU=1 TEI_RUNS=1 TEI_CASES=large TEI_LABEL=admission-final-trace node scripts/benchmark-tei-browser.mjs
+```
+
+`populated` imports A041209 after creating three unrelated 8,000-Cell native
+documents and opening two of their tabs. Flint mounts the active Document only.
+Setup is excluded from the timed interval; actual repository/projection counts
+are recorded. `extended` uses thirty synthetic sections instead of twelve:
+120,624 Cells, with complete source semantics and the same native lifecycle.
+
+The optional `commit.*` / `plan.*` intervals split canonical planning, full
+destination validation, history, record publication, indexes, subscribers and
+the batch flush. `count.*` are operation counts, not durations. `observer.*`
+durations are subsets of `commit.changeObservers`. `work.*` records projection
+build/registration/append calls and the distinct admission and Flint tab commits.
+Nested timings must not be added together. Revision and change probes assert
+one complete admission; the later tab-insertion commit is counted separately.
+`admissionSnapshots` counts repository snapshots through opening. These probes
+add small diagnostic overhead equally to the before/after harness.
+
+`TEI_TRACE=1` writes Chrome timeline events; user-timing marks delimit admission,
+candidate registration, synchronous opening and the final two frames.
+Trace/CPU-profile samples are diagnostic and must not replace unprofiled
+acceptance samples. Source maps belong to that exact build; extract any
+source-mapped summary before rebuilding the site.
+
+`scripts/native-admission-baseline.vite.mjs` provides read-only `a089fab` overrides
+for reproducing the separately reported lifecycle-test failures. The final
+qualification distinguishes the slower, reverted bulk-setter experiment
+(`admission-after.json`) from the retained implementation (`admission-final.json`).
+
+The follow-up findings and retained/rejected changes are documented in
+[NATIVE_DOCUMENT_ADMISSION_ARCHITECTURAL_QUALIFICATION.md](../../NATIVE_DOCUMENT_ADMISSION_ARCHITECTURAL_QUALIFICATION.md)
+and [NATIVE_DOCUMENT_ADMISSION_PERFORMANCE_REPORT.md](../../NATIVE_DOCUMENT_ADMISSION_PERFORMANCE_REPORT.md).
+The final qualification is conditional; release-blocking targets remain open.

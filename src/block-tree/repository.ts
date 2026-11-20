@@ -212,6 +212,9 @@ export function validateRepository(state: RepositoryState, boundary?: BoundaryVa
     if (ancestors.has(placement.contentKey)) return;
     const content = state.contents[placement.contentKey];
     if (!content) throw new ModelInvariantError(`Missing content ${placement.contentKey}`);
+    // All placement/target/cycle checks above still apply to leaves. A leaf has
+    // no descendants needing an ancestry copy (the common per-Cell case).
+    if (!content.children.length && !content.inlineContent.length && !Object.keys(content.ownedRelations).length) return;
     const next = new Set(ancestors).add(content.key);
     for (const childKey of content.children) visit(childKey, next);
     for (const inlineKey of content.inlineContent) visit(inlineKey, next);
@@ -247,14 +250,18 @@ export function planOperations(
 }
 
 /** Changed records are private; unchanged records remain read-only during validation. */
-function planChangedRecords(source: RepositoryState, operations: RepositoryOperation[], boundary?: BoundaryValidation) {
+function planChangedRecords(source: RepositoryState, operations: RepositoryOperation[], boundary?: BoundaryValidation, timings?: Record<string, number>) {
+  let started = timings ? performance.now() : 0;
   const next = {...source,contents:{...source.contents},placements:{...source.placements}};
+  if (timings) { timings["plan.tableCopy"] = performance.now() - started; started = performance.now(); }
   const inverse: RepositoryOperation[] = [];
   for (const operation of operations) {
     inverse.push(inverseFor(next, operation));
     applyOperation(next, operation);
   }
+  if (timings) { timings["plan.inverseAndApply"] = performance.now() - started; started = performance.now(); }
   validateRepository(next, boundary);
+  if (timings) timings["plan.validation"] = performance.now() - started;
   return { next, inverse: inverse.reverse() };
 }
 
@@ -443,7 +450,9 @@ export class CanonicalRepository {
     if (this.deliveringCommit) throw new ModelInvariantError("Commit observers cannot mutate the repository synchronously");
   }
 
-  commit(label: string, operations: RepositoryOperation[], recordHistory = true, metadata: CommitMetadata = {}): void {
+  commit(label: string, operations: RepositoryOperation[], recordHistory = true, metadata: CommitMetadata = {}, timings?: Record<string, number>): void {
+    let last = timings ? performance.now() : 0;
+    const stage = (name: string) => { if (timings) { const now = performance.now(); timings[`commit.${name}`] = now - last; last = now; } };
     this.assertNotCaptureCallback();
     if (!operations.length) return;
     const placementDelta = this.placementIdentity.validateCommit(operations);
@@ -486,11 +495,14 @@ export class CanonicalRepository {
       this.commitInline(label, operations, undefined, recordHistory, metadata, undefined, undefined, placementDelta, undefined, undefined, undefined, structural);
       return;
     }
+    stage("classification");
     const current = this.readState();
     for (const subscriber of this.beforeChangeSubscribers) subscriber(label, metadata.cause);
     for (const subscriber of this.beforeSubscribers) subscriber(this.snapshot(), label);
     const validation: BoundaryValidation | undefined = this.boundary ? {} : undefined;
-    const { next, inverse } = planChangedRecords(current, operations, validation);
+    stage("beforeObservers");
+    const { next, inverse } = planChangedRecords(current, operations, validation, timings);
+    stage("planning");
     for (const [key, content] of Object.entries(next.contents)) {
       const previous = current.contents[key];
       if (!previous || content === previous) continue;
@@ -501,8 +513,11 @@ export class CanonicalRepository {
       }
     }
     next.revision = current.revision + 1;
+    stage("revisionComparison");
     const identityDelta = this.identity?.validateCommit(operations);
+    stage("blockIdentity");
     const capture = this.prepareCapture(current, operations, metadata, next);
+    stage("prepareCapture");
     const commitId = createCommitId();
     const previousContents = new Map<ContentKey, ContentRecord | undefined>();
     for (const operation of recordOperations(operations)) {
@@ -523,6 +538,18 @@ export class CanonicalRepository {
       parent.children.every((key,i) => updated.children[i] === key) &&
       (() => { for (const op of recordOperations(operations)) if (!(op.kind === 'put-content' || op.kind === 'put-placement' && !current.placements[op.record.key])) return false; return true; })()
       ? parent.key : undefined;
+    stage("changePreparation");
+    if (timings) {
+      timings["count.publications"] = 1;
+      timings["count.changeObservers"] = this.changeSubscribers.size;
+      timings["count.snapshotObservers"] = this.subscribers.size;
+      timings["count.captureObservers"] = this.commitSubscribers.size + this.historySubscribers.size;
+      timings["count.previousContents"] = previousContents.size;
+      timings["count.repositoryContentsBefore"] = Object.keys(current.contents).length;
+      timings["count.repositoryContentsAfter"] = Object.keys(next.contents).length;
+      timings["count.repositoryPlacementsAfter"] = Object.keys(next.placements).length;
+    }
+    stage("diagnosticCounts");
     batch(() => {
       // Publish only changed records. Reconciling the entire graph recursively
       // unwraps every existing Cell even when opening a tiny new Document.
@@ -535,21 +562,35 @@ export class CanonicalRepository {
       // walking every new Cell twice through Solid's recursive unwrap.
       for (const key of contents) this.setState('contents',key,next.contents[key] && current.contents[key] ? reconcile(next.contents[key]) : next.contents[key]);
       for (const key of placements) this.setState('placements',key,next.placements[key] && current.placements[key] ? reconcile(next.placements[key]) : next.placements[key]);
+      if (timings) timings['count.recordStoreWrites'] = contents.size + placements.size;
       this.setState('rootPlacementKey',next.rootPlacementKey);
       this.setState('revision',next.revision);
+      stage('publishRecords');
       this.rebuildReferences();
       if (this.boundary) this.boundary.validation = validation!;
       if (identityDelta) this.identity!.acceptCommit(identityDelta);
       this.placementIdentity.acceptCommit(placementDelta);
+      stage("indexes");
       if (recordHistory) {
         this.undoStack.push(this.historyStorage.store(commitId, label, operations, inverse));
         this.redoStack = [];
       }
+      stage("history");
       this.deliverCapture(capture, commitId, label, recordHistory);
+      stage("captureDelivery");
       for (const subscriber of this.subscribers) subscriber(this.snapshot(), label);
+      stage("snapshotObservers");
       const origins = annotationOrigins(operations);
-      for (const subscriber of this.changeSubscribers) subscriber({ commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
+      stage("annotationOrigins");
+      let observer = 0;
+      for (const subscriber of this.changeSubscribers) {
+        const started = timings ? performance.now() : 0;
+        subscriber({ commit: { id: commitId, cause: metadata.cause }, label, previousContents, appendedChildrenOwner, annotationOrigins: origins });
+        if (timings) timings[`observer.${observer++}`] = performance.now() - started;
+      }
+      stage("changeObservers");
     });
+    stage("reactiveFlush");
   }
 
   private commitInline(label: string, operations: RepositoryOperation[], inlineOwner: ContentKey | undefined, recordHistory: boolean, metadata: CommitMetadata, split?: SplitChange, childrenOwner?: ContentKey, placementDelta?: PlacementIdentityDelta, emptyParagraph?: EmptyParagraphChange, listWrap?: ListWrapChange, taskStateOwner?: ContentKey, structural?: StructuralChange): void {

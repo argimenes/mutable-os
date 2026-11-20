@@ -64,12 +64,18 @@ export function captureNative(state: DeepReadonly<RepositoryState>, resourceId: 
   const dependencies = new Map<string, unknown[]>();
   for (const key of membership.keys()) {
     const c = state.contents[key];
-    if (Array.isArray(c.payload.standoffProperties)) dependencies.set(key, c.payload.standoffProperties.map(property => {
-      if (!id(property.annotationId) || externalDefinitionLink(property)) return clone(property);
-      const owner = linkedDefinitionOwner(state as RepositoryState, property, key);
-      check(owner, `linked annotation ${property.annotationId} lacks Document ownership or explicit foreign provenance`);
-      return owner.key === root.key ? clone(property) : { ...clone(property), externalDefinition: definitionProvenance(owner, property.annotationId) };
-    }));
+    if (Array.isArray(c.payload.standoffProperties)) {
+      let rewritten = false;
+      const properties = c.payload.standoffProperties.map(property => {
+        if (!id(property.annotationId) || externalDefinitionLink(property)) return property;
+        const owner = linkedDefinitionOwner(state as RepositoryState, property, key);
+        check(owner, `linked annotation ${property.annotationId} lacks Document ownership or explicit foreign provenance`);
+        if (owner.key === root.key) return property;
+        rewritten = true;
+        return { ...property, externalDefinition: definitionProvenance(owner, property.annotationId) };
+      });
+      if (rewritten) dependencies.set(key, properties);
+    }
     for (const slot of slots(c)) {
       const p = state.placements[slot];
       if (!p.resolvedReference) continue;
@@ -81,15 +87,19 @@ export function captureNative(state: DeepReadonly<RepositoryState>, resourceId: 
   const parent = Object.values(state.contents).find(c => slots(c).includes(owners[0].key));
   const nestedRoot = parent && resourceOwner(state as RepositoryState, parent.key)?.viewType === "document-block";
   const rootPlacementId = nestedRoot ? `resource-root:${resourceId}` : durablePlacementId(owners[0], resourceId);
-  const projected = clone(projectOwned(state as RepositoryState, resourceId, {
+  const projected = projectOwned(state as RepositoryState, resourceId, {
     contents: membership,
     placementIds: new Map(Object.values(state.placements).map(p => [p.key, durablePlacementId(p, resourceId)])),
     externalTargets, // Only actual authored nested ownership; reference provenance is never guessed.
     root: { key: owners[0].key, contentKey: root.key, placementId: rootPlacementId },
-  }, 0)) as ResourceSnapshot;
-  for (const [key, properties] of dependencies) projected.contents[key].payload.standoffProperties = properties;
-  validateResource(projected);
-  return freeze(projected);
+  }, 0);
+  // projectOwned already owns, validates and freezes this exact graph. No second
+  // materialisation/proof is needed unless canonical provenance was transformed.
+  if (!dependencies.size) return projected;
+  const transformed = clone(projected) as ResourceSnapshot;
+  for (const [key, properties] of dependencies) transformed.contents[key].payload.standoffProperties = clone(properties);
+  validateResource(transformed);
+  return freeze(transformed);
 }
 
 export interface NativeDocument {
@@ -277,7 +287,7 @@ export function admitNativeWithResource(repository: CanonicalRepository, bytes: 
   repository.commit("B1 admit native Document", [
     { kind: "record-batch", contents: { ...incoming.contents, [bank.key]: updatedBank },
       placements: { ...incoming.placements, ...Object.fromEntries(bindings.map(record => [record.key, record])) } },
-  ]);
+  ], true, {}, timings);
   stage('repositoryCommit');
   return { placementKey: incoming.rootPlacementKey, reused: false, resource, members: Object.keys(incoming.contents) };
 }
