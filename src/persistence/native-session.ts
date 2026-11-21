@@ -3,6 +3,8 @@ import {isNativeDocumentName,nativeDocumentStem,isDerivedMarkdownName} from './d
 import { batch, createSignal } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import type { RepositoryChange } from '../block-tree/repository';
+import type { ContentRecord } from '../block-tree/types';
+import { resourceOwner, indexedResourceLookup } from '../block-tree/resource-identity';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import type { DocumentLocation } from '../reactive-editor/persistence';
 import { admitNative, admitNativeWithResource, captureNative, nativeText } from './native-resource';
@@ -155,7 +157,13 @@ export class NativeDocumentSession {
       else members.delete(child);
       return members;
     }
-    return new Set(Object.keys(captureNative(this.editor.repository.snapshot(), id).contents));
+    const repository=this.editor.repository,state=repository.readState(),affected=new Set(change.previousContents.keys());
+    const edges=(c:ContentRecord)=>[...c.children,...c.inlineContent,...Object.values(c.ownedRelations)];
+    const visit=(key:string)=>{if(affected.has(key))return;affected.add(key);const c=state.contents[key];if(c)for(const pk of edges(c)){const p=state.placements[pk];if(p&&!p.externalReference&&p.kind!=='reference')visit(p.contentKey);}};
+    for(const [key,before] of change.previousContents){const after=state.contents[key],old=new Set(before?edges(before):[]),next=new Set(after?edges(after):[]);for(const pk of new Set([...old,...next]))if(old.has(pk)!==next.has(pk)){const p=state.placements[pk];if(p&&!p.externalReference&&p.kind!=='reference')visit(p.contentKey);}}
+    const lookup=indexedResourceLookup(repository);
+    for(const key of affected){const c=state.contents[key];if(!c){members.delete(key);continue;}const owner=resourceOwner(state,key,lookup);if(owner?.viewType==='document-block'&&String((owner.payload.metadata as any)?.documentId??owner.payload.id)===id)members.add(key);else members.delete(key);}
+    return members;
   }
   private touch() { this.changed[1](v => v + 1); }
   private touchStorage() { this.storageChanged[1](v => v + 1);this.notifyKnowledge(); }
@@ -163,7 +171,9 @@ export class NativeDocumentSession {
   location(id?: string) { this.storageChanged[0](); const b = id && (this.bindings.get(id)??this.compatibleSources.get(id)); return b ? { ...b.location } : undefined; }
   compatibleSource(id:string){const source=this.compatibleSources.get(id);return source?Object.freeze({...source,location:Object.freeze({...source.location})}):undefined;}
   trackCandidate(id: string) {
-    captureNative(this.editor.repository.snapshot(),id);
+    // Capture is synchronous and copies its owned resource. Cloning the entire
+    // workspace first adds no isolation, and includes unrelated open Documents.
+    captureNative(this.editor.repository.readState(),id);
     markNativeBinding(this.editor.repository,id);this.candidates.add(id);this.markDirty(id,true);this.touch();
   }
   isCandidate(id: string) { this.changed[0]();return this.candidates.has(id); }

@@ -89,3 +89,14 @@ test('existing binding verification rejects missing and corrupted originals with
  await rm(original);await assert.rejects(store.get(asset.assetId,'cavern'));
  await assert.rejects(store.get('sha256:'+'f'.repeat(64),'cavern'));
 });
+
+test('Quill SVG admission is feature-gated, sanitised, lease-bound and content-addressed',async()=>{
+ for(const enabled of [false,true]){
+  const {root}=await fixture(),service=createManagedAssetService({root,cavernId:'cavern',session:'session',quillEnabled:enabled}),app=express();app.use(express.json());app.use('/api/assets',service.router);const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}/api/assets`;
+  try{const lease=await service.store.begin(),upload=async(svg,token=lease.token)=>{const form=new FormData();form.append('asset',new Blob([svg],{type:'image/svg+xml'}),'art.svg');return (await fetch(`${base}/${lease.id}/images/svg`,{method:'POST',headers:{'X-Mutable-Asset-Lease':token},body:form})).json();};
+   const safe='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M0 0L100 100"/></svg>';
+   assert.equal((await upload(safe,'wrong')).Success,false);assert.equal((await upload('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')).Success,false);
+   const result=await upload(safe);assert.equal(result.Success,enabled,result.Error);if(enabled){assert.equal(result.Data.mediaType,'image/svg+xml');await service.store.publish(lease);const stored=await service.store.get(result.Data.assetId,'cavern');assert.equal(result.Data.assetId,'sha256:'+createHash('sha256').update(stored.bytes).digest('hex'));assert.match(stored.bytes.toString(),/<path d="M0 0L100 100"><\/path>/);await service.store.finish(lease);}else await service.store.abort(lease);
+  }finally{await service.close();await new Promise(r=>server.close(r));}
+ }
+});

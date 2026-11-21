@@ -59,7 +59,9 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
   };
   return { register(definition) {
     requireActive();
-    const presentationKey=editor.features.applicationPresentations?registerDocumentPresentations(editor,scope,definition.applicationId??definition.type):undefined;
+    const appId = definition.applicationId ?? (definition.type === "flint-application-block" ? "flint" : definition.type);
+    const label = definition.label ?? (appId === "flint" ? "Flint" : appId);
+    const presentationKey=editor.features.applicationPresentations?registerDocumentPresentations(editor,scope,appId):undefined;
     // One launch may request an existing presentation. Never persist that UI mode.
     const launchViews = new Map<string, "graph">();
     const recents = definition.type === 'flint-application-block' && editor.features.flintRecentDocuments ? createRecentDocuments() : undefined;
@@ -112,7 +114,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
       const navigation = navigationTabs.get(props.nodeKey) ?? {tabs: new Map<string, string>()};
       navigationTabs.set(props.nodeKey, navigation);
       const [navigationRevision, setNavigationRevision] = createSignal(0);
-      const detachment = retainedSessions?.detachment;
+      const detachment = appId === "flint" ? retainedSessions?.detachment : undefined;
       const tabSession = (key: string) => detachment?.forSlot(props.nodeKey,key);
       const detachedTab = (key: string) => detachment?.detached(tabSession(key)) ?? false;
       const liveViews = new Map<string, BlockTreeProjection>();
@@ -561,6 +563,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
         exportPackage() {guard();const id=requireId();void editor.interchange.exportPackage(id,selectedVault()?.root,()=>mounted&&scope.active()&&activeId()===id);},
         inspectPackage() {guard();const id=requireId();void editor.interchange.inspectPackage(id,()=>mounted&&scope.active()&&activeId()===id);},
         downloadViewer() {guard();const a=document.createElement('a');a.href='/ink-viewer.html';a.download='Ink Viewer.html';a.click();},
+        ...(editor.features.teiImport ? { openTeiXml() {guard();editor.interchange.pickTei({current:()=>mounted&&scope.active(),open:openDocument});} } : {}),
         importFiles() {guard();editor.interchange.pickNew({current:()=>mounted&&scope.active(),open:openDocument});},
         exportDocument(format:'html'|'markdown'|'text') {guard();const id=requireId();void editor.interchange.exportDocument(id,format,()=>mounted&&scope.active()&&activeId()===id);},
         suggestedFilename() {const id=activeId(),doc=id&&resolve(id);return doc ? (editor.repository.readState().contents[doc.contentKey].payload.metadata as any)?.interchange?.suggestedFilename : undefined;},
@@ -580,6 +583,25 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
         },
       } : undefined;
       const application: import('../feature-api/document-application').DocumentApplicationInstance = {
+          id: applicationId, activeDocumentId: activeId,
+          createDocument(title = 'Untitled document') {
+            guard();
+            const { document } = createFormattedDocument('page');
+            document.metadata = { ...document.metadata as object, title: title.trim() || 'Untitled document' };
+            const state = editor.repository.readState(), root = state.rootPlacementKey;
+            if (state.contents[state.placements[root].contentKey].viewType !== 'workspace-block') throw Error('Create Documents in a workspace.');
+            const banks = state.contents[state.placements[root].contentKey].children.filter(k => state.contents[state.placements[k].contentKey].viewType === 'workspace-object-bank-block');
+            if (banks.length > 1) throw Error('Ambiguous workspace object bank.');
+            editor.commands.structuralTransaction('Create Document', () => {
+              const bank = banks[0] ?? editor.commands.insert({type:'workspace-object-bank-block',children:[]}, {kind:'at',parentKey:root,index:editor.commands.childrenOf(root).length});
+              editor.commands.insert(document, {kind:'at',parentKey:bank,index:editor.commands.childrenOf(bank).length});
+            });
+            native?.trackCandidate(String(document.id));
+            // Refresh only on explicit resource creation; typing never calls catalog().
+            setRevision(n => n + 1);
+            openDocument(String(document.id), true);
+            return String(document.id);
+          },
           documents: () => documents().map(({ id, title }) => ({ id, title })), tabs, files, vault, properties, knowledge, interchange, entityBacklinks: EntityBacklinks,
           recentDocuments: recents ? {
             items: () => recents.items(recentVaultId()).map(d => ({ ...d, title: resolve(d.id)?.title ?? d.title, location: native?.location(d.id) ?? d.location })),
@@ -619,7 +641,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
           closeActiveTab() { const key = activeTab(); if (key) closeTab(key); },
         };
       const presentationPort = {
-          key:props.nodeKey,applicationId:definition.applicationId??definition.type,application,windowId:()=>editor.windowManager?.ownerForNode(props.nodeKey),
+          key:props.nodeKey,applicationId:appId,application,windowId:()=>editor.windowManager?.ownerForNode(props.nodeKey),
           desktop:()=> <Dynamic component={definition.view} initialView={initialView} application={application}/>,
           tabs:()=>tabKeys().map(key=>({key,documentId:tabId(key),title:resolve(tabId(key)??'')?.title??'Unavailable Document',dirty:!!native?.isDirty(tabId(key)??'')})),
           documentTabs,closeTab,
@@ -631,29 +653,32 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
           saveAs:documentSaver?()=>documentSaver.save(requireId(),undefined,true):undefined,
       };
       onMount(()=>{const id=presentationPort.windowId();if(id&&editor.windowManager)onCleanup(editor.windowManager.lifecycle.guard(id,signal=>conversationCloseGuard?.(documentTabs().map(t=>t.documentId??''),signal,documentTabs().map(t=>t.key))??true));});
-      if(presentationKey || (editor.features.textualWorkspace && retainedSessions))onMount(()=>onCleanup(documentApplicationPorts(editor).register(presentationPort)));
+      onMount(()=>onCleanup(documentApplicationPorts(editor).register(presentationPort)));
       return <>{documentSaver && <documentSaver.Dialogs/>}<Show when={publication()}>{p=><PublicationDialog editor={editor} initial={p().initial} close={()=>setPublication(undefined)}/>}</Show><Show when={collectionMode()}>{mode=><CollectionDialog editor={editor} vault={selectedVault()?.root??'.'} current={()=>mounted&&scope.active()} mode={mode()} close={()=>setCollectionMode(undefined)}/>}</Show><Show when={choosingVault()}><DocumentBrowser mode="directory" initialLocation={{folder:selectedVault()?.root??'.',filename:''}} busy={chooserBusy()} error={chooserError()} onClose={()=>setChoosingVault(false)} onChoose={async location=>{setChooserBusy(true);setChooserError('');try{await vault!.open(location.folder);if(mounted)setChoosingVault(false);return true;}catch(e){if(mounted)setChooserError(String(e));return false;}finally{if(mounted)setChooserBusy(false);}}}/></Show><div ref={root} tabIndex={-1} data-block-type={definition.type} data-runtime-key={props.nodeKey}>
         <Show when={presentationKey} fallback={<Dynamic component={definition.view} initialView={initialView} application={application} />}>{key=><RegisteredApplicationView editor={editor} application={key()} instance={presentationPort} workspace="desktop" host={originPresentationHost}/>}</Show>
       </div></>;
     };
     scope.own(editor.registry.register({ type: definition.type, capabilities: ["container"], view: props => <Show when={scope.active()}><Instance nodeKey={props.nodeKey} /></Show> }, scope.owner));
-    if (definition.launch !== false) scope.own(editor.commandRegistry.register({ id: "flint.open", label: "Open Flint", canExecute: () => editor.repository.state.contents[editor.repository.state.placements[editor.repository.state.rootPlacementKey].contentKey].viewType === "workspace-block", execute({ args }) {
+    if (definition.launch !== false) scope.own(editor.commandRegistry.register({ id: `${appId}.open`, label: `Open ${label}`, canExecute: () => editor.repository.state.contents[editor.repository.state.placements[editor.repository.state.rootPlacementKey].contentKey].viewType === "workspace-block", execute({ args }) {
       requireActive();
+      definition.beforeOpen?.();
       const root = editor.repository.state.rootPlacementKey;
       const existing = catalog();
-      const examples: ExistingBlockDto[] = existing.length ? [] : ["Notes", "Ideas"].map(title => { const id = crypto.randomUUID(); return { id, type: "document-block", metadata: { documentId: id, title, folder: ".", filename: `${id}.json` }, children: [{ id: crypto.randomUUID(), type: "standoff-editor-block", text: `${title} — write here.` }, { id: crypto.randomUUID(), type: "standoff-editor-block", text: "An ordinary Codex Document, shared across its views." }] }; });
+      const examples: ExistingBlockDto[] = existing.length ? [] : definition.seedDocuments ? definition.seedDocuments() : ["Notes", "Ideas"].map(title => { const id = crypto.randomUUID(); return { id, type: "document-block", metadata: { documentId: id, title, folder: ".", filename: `${id}.json` }, children: [{ id: crypto.randomUUID(), type: "standoff-editor-block", text: `${title} — write here.` }, { id: crypto.randomUUID(), type: "standoff-editor-block", text: "An ordinary Codex Document, shared across its views." }] }; });
       const initialTabs = existing.length ? existing.map(d => ({ id: d.id, title: d.title })) : examples.map(d => ({ id: (d.metadata as any).documentId as string, title: (d.metadata as any).title as string }));
       const state = editor.repository.readState(), rootContent = state.contents[state.placements[root].contentKey];
       const banks = rootContent.children.filter(key => state.contents[state.placements[key].contentKey].viewType === "workspace-object-bank-block");
       if (banks.length > 1) throw new Error("Ambiguous workspace object bank.");
       const desktopParent = rootContent.children.find(key => ["image-background-block", "video-background-block", "youtube-video-background-block", "canvas-background-block"].includes(state.contents[state.placements[key].contentKey].viewType)) ?? root;
       const zIndex = editor.windowManager?.launchMetadata().zIndex ?? Math.max(0, ...Object.values(state.contents).filter(c => ["window-block", "document-window-block"].includes(c.viewType)).map(c => Number((c.payload.metadata as any)?.zIndex) || 0)) + 1;
-      const application = definition.create(initialTabs.slice(0, 2));
+      const requestedId = (args as { documentId?: string } | undefined)?.documentId;
+      if (requestedId && existing.filter(d => d.id === requestedId && d.placement).length !== 1) throw Error('Requested Document is missing or ambiguous.');
+      const application = definition.create(requestedId ? initialTabs.filter(d => d.id === requestedId) : initialTabs.slice(0, 2));
       if ((args as { view?: string } | undefined)?.view === 'graph' && editor.features.flintSpatialGraph) launchViews.set(String(application.id), 'graph');
-      try { editor.commands.transaction("Open Flint", () => {
+      try { editor.commands.structuralTransaction(`Open ${label}`, () => {
         const bank = banks[0] ?? editor.commands.insert({ id: crypto.randomUUID(), type: "workspace-object-bank-block", children: [] }, { kind: "at", parentKey: root, index: editor.commands.childrenOf(root).length });
         for (const document of examples) editor.commands.insert(document, { kind: "at", parentKey: bank, index: editor.commands.childrenOf(bank).length });
-        const placement = editor.commands.insert({ id: crypto.randomUUID(), type: "window-block", metadata: { title: "Flint", position: { x: 35 + (zIndex - 1) * 24, y: 35 + (zIndex - 1) * 24 }, size: { w: Math.min(1380, Math.max(840, window.innerWidth - 90)), h: Math.min(900, Math.max(620, window.innerHeight - 120)) }, zIndex }, children: [application] }, { kind: "at", parentKey: desktopParent, index: 0 });
+        const placement = editor.commands.insert({ id: crypto.randomUUID(), type: "window-block", metadata: { title: label, desktopApplication: appId, position: { x: 35 + (zIndex - 1) * 24, y: 35 + (zIndex - 1) * 24 }, size: { w: Math.min(1380, Math.max(840, window.innerWidth - 90)), h: Math.min(900, Math.max(620, window.innerHeight - 120)) }, zIndex }, children: [application] }, { kind: "at", parentKey: desktopParent, index: 0 });
         editor.windowManager?.activatePlacement(placement);
       }); } finally { launchViews.delete(String(application.id)); }
     } }, scope.owner));

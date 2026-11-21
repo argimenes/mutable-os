@@ -52,7 +52,7 @@ const provenance={version:1 as const,actor:'ai' as const,exchangeId:'AUDIT',prot
 
 // Reviewed evidence, not an application registry. Runtime keys determine coverage.
 const blockSources:Record<string,string>={
- 'standoff-editor-block':'src/runtime/markdown-input.ts', 'container-block':'src/runtime/block-menu-actions.ts',
+ 'mutable/svg-text-composition-block':'src/application/quill-operations.ts', 'standoff-editor-block':'src/runtime/markdown-input.ts', 'container-block':'src/runtime/block-menu-actions.ts',
  'indented-list-block':'src/runtime/text-lists.ts', 'checkbox-block':'src/runtime/tasks.ts',
  'horizontal-line-block':'src/runtime/markdown-input.ts', 'standoff-code-block':'src/runtime/standoff-code.ts',
  'sticky-note-block':'src/runtime/sticky-notes.ts', 'phosphor-screen-block':'src/features/phosphor/model.ts',
@@ -63,11 +63,11 @@ const blockSources:Record<string,string>={
  'mutable/academic-resource-block':'src/academic/block.ts','mutable/web-resource-block':'src/web-resources/block.ts','mutable/structured-resource-block':'src/structured/model.ts',
 };
 const core='src/rendering/register-core-views.ts';
-const registrationSources:Record<string,string>={legacy:core,cardex:'src/application/cardex.tsx',thesis:'src/application/thesis.tsx',dialectic:'src/features/dialectic/index.tsx',phosphor:'src/application/phosphor.tsx',flint:'src/features/flint/index.tsx','desktop-placeholders':'src/application/desktop-applications.tsx',timer:'src/features/timer/index.tsx','three-d-object':'src/features/three-d-object/index.tsx','canvas-counter':'src/features/canvas-counter/index.tsx'};
+const registrationSources:Record<string,string>={quill:'src/application/quill.tsx',legacy:core,cardex:'src/application/cardex.tsx',thesis:'src/application/thesis.tsx',dialectic:'src/features/dialectic/index.tsx',phosphor:'src/application/phosphor.tsx',flint:'src/features/flint/index.tsx','desktop-placeholders':'src/application/desktop-applications.tsx',timer:'src/features/timer/index.tsx','three-d-object':'src/features/three-d-object/index.tsx','canvas-counter':'src/features/canvas-counter/index.tsx'};
 const structural=new Set('table-row-block table-cell-block grid-row-block grid-cell-block side-block tab-block document-tab-block document-tab-row-block sticky-tab-block fixed-size-page-block left-margin-block right-margin-block page-block'.split(' '));
 const compatibility=new Set('book-block plain-text-block html-block html-editor-block pdf-block embed-document-block entities-list-block control-panel-block monitor-block'.split(' '));
 const generated=new Set('root-block universe-block context-menu-block error-block unknown-block cyclic-reference document-reference-block mutable/opaque-block workspace-object-bank-block resource-information-block'.split(' '));
-const host=new Set('document-block workspace-block window-block document-window-block image-background-block video-background-block youtube-video-background-block canvas-background-block flint-application-block dialectic-application-block cardex-application-block thesis-application-block desktop-application-placeholder-block'.split(' '));
+const host=new Set('quill-application-block document-block workspace-block window-block document-window-block image-background-block video-background-block youtube-video-background-block canvas-background-block flint-application-block dialectic-application-block cardex-application-block thesis-application-block desktop-application-placeholder-block'.split(' '));
 const blockRoutes:Record<string,{schema:string;syntax:string;catalogue:string}>={
  'standoff-editor-block':{schema:'Paragraph',syntax:'composition[].{id,kind:"paragraph",markup,ranges}',catalogue:'composition.paragraph'},
  'container-block':{schema:'Group',syntax:'composition[].{id,kind:"group",children}; also generated list item container',catalogue:'composition.group'},
@@ -427,7 +427,10 @@ it('keeps the documentary vocabulary aligned with native registrations and the D
   // old wire contract checked; new projection qualification lives beside DCP.
   // Do not rewrite historical availability claims as if they predated Stage 1.
   const baseline=JSON.parse(read(root+'.json'));
-  for(const key of ['blocks','blockProperties','configuration','standoffProperties'] as const)expect(data[key].map(item=>item.id)).toEqual(baseline[key].map((item:any)=>item.id));
+  const addedBlocks=['mutable/svg-text-composition-block','quill-application-block'];
+  expect(data.blocks.map(item=>item.id)).toEqual([...baseline.blocks.map((item:any)=>item.id),...addedBlocks].sort((a,b)=>a.localeCompare(b)));
+  for(const type of addedBlocks)expect(data.blocks.find(item=>item.id===type)).toMatchObject({registration:{owner:'quill',source:'src/application/quill.tsx'},dcp:{authorable:'no'}});
+  for(const key of ['blockProperties','configuration','standoffProperties'] as const)expect(data[key].map(item=>item.id)).toEqual(baseline[key].map((item:any)=>item.id));
   expect(data.aliases).toEqual(baseline.aliases);
   expect(data.wire.responseSchema).toEqual(baseline.wire.responseSchema);
   expect(data.wire.initial).toEqual(baseline.wire.initial);

@@ -53,7 +53,7 @@ export function RelationBlocks(props: { parentKey: NodeKey }) {
   const { projection } = useReactiveView();
   const relations = () =>
     Object.entries(projection.state.nodes[props.parentKey]?.ownedRelations ?? {})
-      .filter(([name]) => !name.startsWith("superposition:"));
+      .filter(([name]) => !name.startsWith("superposition:") && !name.startsWith("inline-reading:"));
   return (
     <For each={relations()}>
       {([name, key]) => <RelationBlock ownerKey={props.parentKey} name={name} nodeKey={key} />}

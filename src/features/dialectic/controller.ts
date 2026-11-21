@@ -1,3 +1,4 @@
+import {contentLength,contentUnits} from '../../block-tree/inline-sequence';
 import {reconcileSemanticRefresh} from './dcp/semantic-refresh';
 import {createEntityAuthorityResolution} from '../../application/entity-authority-resolution';
 import {createConversationCoordinator} from './conversation-coordinator';
@@ -174,7 +175,7 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
   const found=resolveReference(target(ref.blockId,'block')),node=found.node;
   if(found.status!=='resolved'||!node)return undefined;
   const property=(node.payload.standoffProperties as any[]??[]).find(p=>p.id===ref.propertyId&&!p.isDeleted);
-  if(!property||!Number.isInteger(property.start)||!Number.isInteger(property.end)||property.start<0||property.end<property.start||property.end>=node.inlineContent.length)return undefined;
+  if(!property||!Number.isInteger(property.start)||!Number.isInteger(property.end)||property.start<0||property.end<property.start||property.end>=contentLength(editor.repository.readState().contents[node.contentKey]))return undefined;
   return {node,property,text:references()!.text(node.contentKey,property.start,Math.min(property.end+1,property.start+180))};
  };
  const inspectedAnnotation=createMemo(()=>{const ref=annotationInspection();return ref?.resourceId===resourceId()?annotationDetails(ref):undefined;});
@@ -265,7 +266,7 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
   const d=draft();if(!d||rows().filter(r=>r.data.state==='draft').length!==1)throw Error('The conversation must contain exactly one draft.');
   const n=resolve(target(d.id))!;if(!n.children.length)throw Error('Add a Block to the draft before submitting.');
   const only=n.children.length===1?session()!.projection.node(n.children[0]):undefined;
-  if(!attachments(d.data.attachments).length&&only?.viewType==='standoff-editor-block'&&!only.children.length&&!Object.keys(only.ownedRelations).length&&only.inlineContent.every(k=>{const cell=session()!.projection.node(k);return cell?.viewType==='text-cell'&&!String(cell.payload.text??'').trim();}))throw Error('Write a contribution or add content before submitting.');
+  if(!attachments(d.data.attachments).length&&only?.viewType==='standoff-editor-block'&&!only.children.length&&!Object.keys(only.ownedRelations).length&&(()=>{const state=editor.repository.readState();for(const atom of contentUnits(state,state.contents[only.contentKey]))if(atom.kind!=='text'||atom.text.trim())return false;return true;})())throw Error('Write a contribution or add content before submitting.');
   const to=reply();if(to)requireCommittedTarget(to);
   const ordinal=nextOrdinal();
   editor.commands.structuralTransaction('Submit contribution',()=>{
@@ -293,7 +294,8 @@ export function createConversationRuntime(editor:ReactiveEditor,port:Accessor<Do
      if(editor.features.dialecticDcp&&glossOwner(editor.repository.readState(),n.contentKey,{locationOf:k=>editor.repository.locationOf(k),ownedKeys:k=>editor.repository.ownedPlacementKeys(k)})!==root()!.contentKey)throw Error('Context includes content outside this Symposium');
      if(++visited>512)throw Error('Selected context exceeds the 512 Block budget. Select a smaller composition.');
      diagnostics.contextNodes++;record(n.contentKey);
-     if(n.inlineContent.length){if(n.inlineContent.length+1>remaining)throw Error('Selected context exceeds 6,000 characters. Select fewer or smaller Blocks.');const value=references()!.text(n.contentKey);remaining-=value.length+1;if(remaining<0)throw Error('Selected context exceeds 6,000 characters.');text+=value+'\n';}
+     const length=contentLength(editor.repository.readState().contents[n.contentKey]);
+     if(length){if(length+1>remaining)throw Error('Selected context exceeds 6,000 characters. Select fewer or smaller Blocks.');const value=references()!.text(n.contentKey);remaining-=value.length+1;if(remaining<0)throw Error('Selected context exceeds 6,000 characters.');text+=value+'\n';}
      for(const k of [...n.children,...Object.values(n.ownedRelations)]){const child=session()!.projection.node(k);if(child)walk(child);}
     };walk(resolved.node!);
    }

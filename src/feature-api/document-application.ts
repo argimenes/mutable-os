@@ -7,6 +7,11 @@ export interface ApplicationDocument { id: string; title: string }
 export interface RecentApplicationDocument extends ApplicationDocument { location?: {folder: string; filename: string} }
 /** The first composite Document application: core owns the rendered tabs/editors. */
 export interface DocumentApplicationInstance {
+  /** Stable application Block identity; contextual state stays outside its payload. */
+  id?: string;
+  createDocument?(title?: string): string;
+  /** Identity-only observation: library rows must not depend on dirty/save status. */
+  activeDocumentId?(): string | undefined;
   publish?:()=>void;
   documents(): readonly ApplicationDocument[];
   openDocument(id: string): void;
@@ -30,6 +35,7 @@ export interface DocumentApplicationInstance {
     importCollection():void;
     exportCollection():void;
     importFiles():void;
+    openTeiXml?():void;
     importPackage():void;
     exportPackage():void;
     exportPortable(format:'html'|'markdown',standalone?:boolean):void;
@@ -59,6 +65,11 @@ export interface DocumentApplicationCapabilities {
     applicationId?: string;
     /** Composite applications may provide their own launch/content creation command. */
     launch?: false;
+    label?: string;
+    /** Activate the application’s supported presentation before creating a Window. */
+    beforeOpen?(): void;
+    /** Defaults to the existing Flint examples; an empty list starts an empty host. */
+    seedDocuments?(): ExistingBlockDto[];
     type: string;
     create(documents: readonly ApplicationDocument[]): ExistingBlockDto;
     view: Component<{ application: DocumentApplicationInstance; initialView?: "document" | "graph" }>;

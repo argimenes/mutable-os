@@ -1,3 +1,4 @@
+import {contentLength} from './inline-sequence';
 import {argumentDefinition,argumentRelation} from '../features/dialectic/arguments';
 import {localEntity,localEntityRelation,ENTITY_REFERENCE,entityReference} from '../feature-api/scoped-entities';
 import {glossDefinition,GLOSS} from '../features/gloss/model';
@@ -47,15 +48,15 @@ export function dialecticRangeRoot(state:RepositoryState,ops:RepositoryOperation
  }
  if(!changed)return;
  for(const op of ops)if(op.kind==='put-content'&&op.record.inlineKind==='standoff'){
-  const c=op.record,old=state.contents[c.key];
+  const c=op.record,old=state.contents[c.key],length=contentLength(c);
   const p=c.payload.standoffProperties??[],q=old?.payload.standoffProperties??[];
   if(!Array.isArray(p)||!Array.isArray(q))return;
-  for(const x of p.filter(dcpProperty))if(!Number.isInteger(x.start)||!Number.isInteger(x.end)||x.start<0||x.end<x.start||x.end>=c.inlineContent.length)return;
+  for(const x of p.filter(dcpProperty))if(!Number.isInteger(x.start)||!Number.isInteger(x.end)||x.start<0||x.end<x.start||x.end>=length)return;
   for(const x of p)if(x.type===ENTITY_REFERENCE){const r=x.metadata?.entityReference;if(!entityReference(r)||r.scope==='document'&&(r.resourceId!==resourceId||!localEntity(b[r.entityId])))return;}else if(x.type===GLOSS&&x.metadata?.dcp&&!glossDefinition(b[x.annotationId]))return;
   const anchors=p.filter(x=>x.type===RANGE_ANCHOR);
   if(!anchors.length&&!q.some(x=>x.type===RANGE_ANCHOR)&&!p.some(dcpProperty))continue;
   if(!owned(c.key))return;
-  for(const x of anchors)if(!rangeDefinition(b[x.annotationId])||!Number.isInteger(x.start)||!Number.isInteger(x.end)||x.start<0||x.end<x.start||x.end>=c.inlineContent.length||x.isZeroWidth)return;
+  for(const x of anchors)if(!rangeDefinition(b[x.annotationId])||!Number.isInteger(x.start)||!Number.isInteger(x.end)||x.start<0||x.end<x.start||x.end>=length||x.isZeroWidth)return;
  }
  // Strip only the independently validated registry change for structural proof.
  return {...root,payload:{...root.payload,linkedAnnotations:prior.payload.linkedAnnotations}};

@@ -20,7 +20,7 @@ async function host(readOnly=false) {
  const app=express();app.use('/api/native',createNativeDocumentStoreRouter({root,readOnly}));
  const server:any=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});cleanup.push(()=>new Promise(r=>server.close(r)));
  const actual=globalThis.fetch;vi.stubGlobal('fetch',(input:any,options:any)=>actual(typeof input==='string'&&input.startsWith('/')?`http://127.0.0.1:${server.address().port}${input}`:input,options));
- const make=()=>{const editor=new ReactiveEditor({id:crypto.randomUUID(),type:'workspace-block',children:[{id:crypto.randomUUID(),type:'workspace-object-bank-block',children:[]}]});cleanup.push(()=>editor.dispose());return {editor,service:nativeDocumentSession(editor)}};
+ const make=(compactCanonicalText=false)=>{const editor=new ReactiveEditor({id:crypto.randomUUID(),type:'workspace-block',children:[{id:crypto.randomUUID(),type:'workspace-object-bank-block',children:[]}]},{features:{compactCanonicalText}});cleanup.push(()=>editor.dispose());return {editor,service:nativeDocumentSession(editor)}};
  return {root,make};
 }
 it('opens canonically without an occurrence, saves/reopens, and blocks tree/extended/Workspace bypasses',async()=>{
@@ -209,3 +209,68 @@ it('marks Initialis authoring dirty without saving, and persists full settings o
  expect(property.metadata.renderer).toBe('initialis');expect(Object.keys(property.metadata.settings)).toHaveLength(156);expect(property.metadata.settings).not.toHaveProperty('text');
  expect((await fs.readdir(f.root)).filter(name=>name.endsWith('.md'))).toEqual(['import.md']);
 });
+
+it('saves a TEI import only on explicit native Save and reopens its semantic document without changing the XML',async()=>{
+ const f=await host(),{editor,service}=f.make(),{Blob}=await import('node:buffer');
+ const xml='<TEI><teiHeader><titleStmt><title>Imported letter</title></titleStmt></teiHeader><text><body><p><persName ref="#missing">Mary</persName><del> old</del></p></body></text></TEI>';
+ await fs.writeFile(path.join(f.root,'letter.tei'),xml);const opened:string[]=[];
+ await editor.interchange.importNew([{name:'letter.tei',blob:new Blob([xml]) as unknown as globalThis.Blob}],{current:()=>true,open:id=>opened.push(id)});
+ expect(opened).toHaveLength(1);const id=opened[0];expect(service.isCandidate(id)).toBe(true);expect(service.isDirty(id)).toBe(true);
+ expect(await fs.readFile(path.join(f.root,'letter.tei'),'utf8')).toBe(xml);await expect(fs.stat(path.join(f.root,'letter.ink'))).rejects.toThrow();
+ expect(await service.save(id,{folder:'.',filename:'letter.ink'})).toMatchObject({phase:'saved',dirty:false});
+ expect(await fs.readFile(path.join(f.root,'letter.tei'),'utf8')).toBe(xml);
+ const other=f.make();expect(await other.service.open({folder:'.',filename:'letter.ink'})).toBe(id);
+ const resource=captureNative(other.editor.repository.readState(),id);expect(Object.values(resource.contents).filter(c=>c.viewType==='page-block')).toHaveLength(1);
+ const saved=nativeText(resource);expect(saved).toContain('tei/editorial');expect(saved).toContain('unresolved');expect(saved).not.toContain('opaque-property');
+});
+
+it('compact native session manually saves and reopens through compact and legacy readers without editing Cells',async()=>{
+ const f=await host();await fs.copyFile('vaults/imported/documents/michelangelo-letters/1507-02-13-[a7a41cd3].ink',path.join(f.root,'ordinary.ink'));
+ const one=f.make(true),location={folder:'.',filename:'ordinary.ink'},id=await one.service.open(location);
+ const c=Object.values(one.editor.repository.readState().contents).find(c=>c.inlineKind==='standoff')!,p=Object.values(one.editor.repository.readState().placements).find(p=>p.contentKey===c.key)!;
+ expect(c.compactInline).toBeDefined();expect(one.editor.projections.size).toBe(0);
+ const snapshot=vi.spyOn(one.editor.repository,'snapshot');one.editor.commands.replaceInlineRange(p.key,0,0,'Compact saved ');expect(snapshot).not.toHaveBeenCalled();snapshot.mockRestore();
+ expect(one.service.isDirty(id)).toBe(true);one.editor.repository.undo();one.editor.repository.redo();
+ expect(await one.service.save(id)).toMatchObject({phase:'saved',dirty:false});
+ const expected=nativeText(captureNative(one.editor.repository.readState(),id));
+ for(const compact of [true,false]){const reopened=f.make(compact);expect(await reopened.service.open(location)).toBe(id);expect(nativeText(captureNative(reopened.editor.repository.readState(),id))).toBe(expected);expect(Object.values(reopened.editor.repository.readState().contents).some(c=>c.viewType==='text-cell')).toBe(!compact);}
+ expect((await fs.readdir(f.root)).filter(n=>n.endsWith('.md'))).toEqual(['import.md']);
+});
+it('compact native recovery preserves newer edits and rejects a stale client baseline',async()=>{
+ const f=await host();await fs.copyFile('vaults/imported/documents/michelangelo-letters/1507-02-13-[a7a41cd3].ink',path.join(f.root,'recover.ink'));
+ const one=f.make(true),two=f.make(true),location={folder:'.',filename:'recover.ink'},id=await one.service.open(location);await two.service.open(location);
+ const c=Object.values(one.editor.repository.readState().contents).find(c=>c.compactInline)!,p=Object.values(one.editor.repository.readState().placements).find(p=>p.contentKey===c.key)!;
+ one.editor.commands.replaceInlineRange(p.key,0,0,'Captured ');
+ const fetch=globalThis.fetch;let loseReply=true;
+ vi.stubGlobal('fetch',async(input:any,options:any)=>{const response=await fetch(input,options);if(loseReply&&String(input).endsWith('/save')){loseReply=false;throw Error('Lost acknowledgement');}return response;});
+ const failed=await one.service.save(id);expect(failed).toMatchObject({phase:'failed'});expect(failed?.generation).toBeTruthy();
+ one.editor.commands.replaceInlineRange(p.key,0,0,'Newer ');
+ expect(await one.service.recover(id,location)).toMatchObject({phase:'saved',dirty:true});expect(one.service.isDirty(id)).toBe(true);
+ expect(await fs.readFile(path.join(f.root,'recover.ink'),'utf8')).toContain('Captured ');expect(await fs.readFile(path.join(f.root,'recover.ink'),'utf8')).not.toContain('Newer ');
+ expect(await one.service.save(id)).toMatchObject({phase:'saved',dirty:false});
+ expect(await two.service.save(id)).toMatchObject({phase:'failed',conflict:true});
+ expect(Object.values(one.editor.repository.readState().contents).some(c=>c.viewType==='text-cell')).toBe(false);
+ const reopened=f.make(false);await reopened.service.open(location);expect(nativeText(captureNative(reopened.editor.repository.readState(),id))).toBe(nativeText(captureNative(one.editor.repository.readState(),id)));
+});
+it('full Flint defaults to compact native open, typing, undo/redo, manual save, close and reopen',async()=>{
+ const {render}=await import('solid-js/web'),{createComponent}=await import('solid-js'),{registerApplicationViews}=await import('../application/features'),{ReactiveTreeView}=await import('../rendering/reactive-tree-view'),{materializeLocalWorkspace}=await import('../reactive-editor/workspace-manifest'),{documentApplicationPorts}=await import('../application/document-application-ports');
+ const f=await host();await fs.copyFile('vaults/imported/documents/michelangelo-letters/1507-02-13-[a7a41cd3].ink',path.join(f.root,'flint.ink'));
+ const location={folder:'.',filename:'flint.ink'},original=await fs.readFile(path.join(f.root,'flint.ink'),'utf8');
+ const open=async()=>{
+  const editor=new ReactiveEditor(materializeLocalWorkspace({type:'workspace-block',children:[]}));registerApplicationViews(editor);const workspace=editor.createView();
+  cleanup.push(()=>editor.dispose());editor.commandRegistry.execute('flint.open',{targetKey:workspace.state.rootKey,args:undefined});const element=document.body.appendChild(document.createElement('div'));const dispose=render(()=>createComponent(ReactiveTreeView,{editor,projection:workspace}),element);cleanup.push(()=>{dispose();element.remove();});editor.installGateway(document);
+  const service=nativeDocumentSession(editor),id=await service.open(location);documentApplicationPorts(editor).ports()[0].application.openDocument(id);await Promise.resolve();await Promise.resolve();
+  const view=[...editor.projections.values()].find(p=>p!==workspace&&p.state.nodes[p.state.rootKey]?.payload.id===id)!;
+  const text=Object.values(view.state.nodes).find(n=>n.viewType==='standoff-editor-block'&&editor.mounts.get(n.key))!,mount=editor.mounts.get(text.key)!;
+  return {editor,service,id,view,text,mount,element};
+ };
+ const a=await open();const before=a.mount.captureText!();a.mount.focus();a.mount.restoreInlineSelection!({anchor:0,head:0});
+ a.mount.focusElement.dispatchEvent(new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertText',data:'Saved compact '}));await Promise.resolve();await Promise.resolve();
+ expect(a.mount.captureText!()).toBe('Saved compact '+before);expect(a.service.isDirty(a.id)).toBe(true);expect(await fs.readFile(path.join(f.root,'flint.ink'),'utf8')).toBe(original);
+ a.editor.repository.undo();await Promise.resolve();await Promise.resolve();expect(a.mount.captureText!()).toBe(before);a.editor.repository.redo();await Promise.resolve();await Promise.resolve();expect(a.mount.captureText!()).toBe('Saved compact '+before);
+ expect(await a.service.save(a.id)).toMatchObject({phase:'saved',dirty:false});
+ expect(Object.values(captureNative(a.editor.repository.readState(),a.id).contents).some(c=>c.viewType==='text-cell')).toBe(false);
+ const close=a.element.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')!.closest('.flint-document-tab')!.querySelector<HTMLButtonElement>('.flint-document-tab__close')!;close.click();await Promise.resolve();await Promise.resolve();expect(a.editor.mounts.get(a.text.key)).toBeUndefined();
+ const b=await open();expect(b.mount.captureText!()).toBe('Saved compact '+before);expect(b.editor.repository.readState().contents[b.text.contentKey].compactInline).toBeDefined();expect(b.service.isDirty(b.id)).toBe(false);
+ expect((await fs.readdir(f.root)).filter(n=>n.endsWith('.md'))).toEqual(['import.md']);
+},20000);

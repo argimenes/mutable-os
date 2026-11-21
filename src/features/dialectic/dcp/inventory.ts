@@ -1,3 +1,4 @@
+import {contentUnits,contentLength} from '../../../block-tree/inline-sequence';
 import type {DcpSources} from './sources';
 import type {BlockNode} from '../../../block-tree/types';
 import {contribution} from '../model';
@@ -48,12 +49,13 @@ export class DcpInventory {
    s.check();const next=page.walk.next();if(next.done){done=true;break;}visited++;s.diagnostics.inventoryVisited++;
    const {node:n,root,position,eligible}=next.value;if(!n)continue;s.fence(n.contentKey);if(!eligible)continue;
    const data=contribution((root.payload.metadata as any)?.dialectic)!;
-   let preview='',cells=0;const state=s.editor.repository.readState(),inline=state.contents[n.contentKey].inlineContent;
-   for(let i=0;i<inline.length&&i<inventoryLimits.previewCharacters&&preview.length<inventoryLimits.previewCharacters;i++){
-    const cell=state.contents[state.placements[inline[i]]?.contentKey];cells++;preview+=cell?.viewType==='text-cell'?String(cell.payload.text??'').slice(0,inventoryLimits.previewCharacters-preview.length):'\uFFFC';
+   let preview='',cells=0;const state=s.editor.repository.readState(),content=state.contents[n.contentKey];
+   for(const atom of contentUnits(state,content)){
+    cells++;preview+=atom.kind==='text'?atom.text.slice(0,inventoryLimits.previewCharacters-preview.length):'\uFFFC';
+    if(cells>=inventoryLimits.previewCharacters||preview.length>=inventoryLimits.previewCharacters)break;
    }
    previewCells+=cells;
-   items.push({handle:s.issue({kind:'block',resourceId:s.owner,blockId:String(n.payload.id)}),blockId:n.payload.id,nativeType:n.viewType,position,preview,previewTruncated:cells<inline.length||preview.length===inventoryLimits.previewCharacters,readRequired:true,
+   items.push({handle:s.issue({kind:'block',resourceId:s.owner,blockId:String(n.payload.id)}),blockId:n.payload.id,nativeType:n.viewType,position,preview,previewTruncated:cells<contentLength(content)||preview.length===inventoryLimits.previewCharacters,readRequired:true,
     contribution:{handle:s.issue({kind:'contribution',resourceId:s.owner,blockId:String(root.payload.id)}),blockId:root.payload.id,ordinal:data.ordinal,author:data.author,participant:data.participant??null}});
   }
   s.diagnostics.inventoryPreviewCells+=previewCells;s.check();

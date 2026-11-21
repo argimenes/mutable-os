@@ -1,5 +1,6 @@
 import {surfaceSide,surfaceShell} from '../block-tree/compound-authoring';
 import { createStore } from 'solid-js/store';
+import { hasBlockMode } from '../block-tree/mode-editing';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import type { BlockNode } from '../block-tree/types';
 import { resourceTypes, resourceNotes, resourceInformation } from '../interchange/resource-surface';
@@ -106,10 +107,12 @@ export class BlockSurfaces {
       let dissolveSurface:BlockNode|undefined;
       if(id==='container.dissolve') {
         if(n.viewType!=='container-block')throw Error('Choose a ContainerBlock.');
+        if(hasBlockMode(n.payload))throw Error('Dissolving would remove this Block Mode; clear it explicitly first.');
         const parent=this.parent(n);
         if(parent?.viewType==='side-block'&&this.parent(parent)?.viewType==='surface-block'){
           if(parent.children.length!==1||Object.keys(n.ownedRelations).length||e.repository.contentReferenceCount(n.contentKey)!==1)throw Error('This container has other face content, owned relations or shared occurrences. Unwrap the reverse explicitly before dissolving it.');
           dissolveSurface=this.parent(parent);
+          if(hasBlockMode(parent.payload)||hasBlockMode(dissolveSurface!.payload))throw Error('Dissolving would remove the surrounding Block Mode; move the children explicitly instead.');
           if(dissolveSurface!.children[0]!==parent.key)throw Error('Use reverse unwrap to extract a reverse container.');
           if(dissolveSurface!.children[1]&&!window.confirm('Dissolve this container and unwrap its reverse after its children? All reverse content will be preserved. Cancel to keep the structure.'))return;
         }
@@ -154,6 +157,7 @@ export class BlockSurfaces {
     const e=this.editor, c=e.commands, back=e.node(surface.children[1]);if(!back)return;
     const parent=this.parent(surface);if(extract&&!parent)throw Error('This surface has no surrounding insertion point.');
     const containers=back.children.map(k=>e.node(k)!);
+    if(extract&&(hasBlockMode(back.payload)||containers.some(n=>n.viewType==='container-block'&&hasBlockMode(n.payload))))throw Error('Extracting this reverse would remove a Block Mode; move its Blocks explicitly instead.');
     const children=containers.flatMap(n=>n.viewType==='container-block'?n.children.map(k=>e.node(k)!):[n]);
     if(extract){let after=surface.placementKey;for(const child of children){
       // Preserve the information Block and its typed resource reference.

@@ -1,3 +1,4 @@
+import type { TeiLimits } from './interchange/tei/model';
 /**
  * Application feature switches.
  *
@@ -32,6 +33,8 @@ export type FeatureFlags = Readonly<{
   dialecticAutomaticTitles: boolean;
   /** Bounded native text flows. Opt-in pending browser qualification. */
   virtualTextFlows: boolean;
+  /** Explicit Block Mode authoring; retained data and safety do not depend on this flag. */
+  blockModes: boolean;
   /** Lezer-derived, session-only syntax on standoff CodeBlocks. */
   standoffCodeHighlighting: boolean;
   markdownInputTransformation: boolean;
@@ -91,6 +94,7 @@ export type FeatureFlags = Readonly<{
   /** Generic Desktop Window maximize/restore; normal geometry is retained. */
   windowMaximize: boolean;
   /** Composite Document application; transient tabs share canonical content. */
+  quill: boolean;
   flint: boolean;
   /** Scry slash commands for activating Flint and choosing a native Document. */
   flintSlashCommands: boolean;
@@ -118,8 +122,19 @@ export type FeatureFlags = Readonly<{
   presentationProbe: boolean;
   /** Live sculptural entity graph in the normal Flint application. */
   flintSpatialGraph: boolean;
+  /** Selected at native admission; false retains legacy loading. Never converts a live Document. */
+  compactCanonicalText: boolean;
+  /** Creation/import of native one-position owned inline alternatives. */
+  inlineAlternatives: boolean;
+  /** Native clipboard and qualified structural operations for compact alternatives. */
+  inlineAlternativeInteroperability: boolean;
   /** Per-resource native/Markdown persistence through the managed server store. */
   nativeDocumentPersistence: boolean;
+  teiImport: boolean;
+  /** Rich TEI alternatives, exact points and editorial semantics on new imports. */
+  teiSemanticSublimation: boolean;
+  /** Local TEI relationships and semantic navigation; no external knowledge writes. */
+  teiOperationalSemantics: boolean;
   /** Persistent Library listings with background filesystem reconciliation. */
   vaultDiscoveryCache: boolean;
   /** Accepted loaded-resource provider; false retains the legacy rollback. */
@@ -249,6 +264,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   dialecticImageGeneration: true,
   dialecticAutomaticTitles: true,
   virtualTextFlows: true,
+  blockModes: true,
   standoffCodeHighlighting: true,
   markdownInputTransformation: true,
   verticalTabs: true,
@@ -282,6 +298,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   cavernStartup: true,
   browserSaveDiagnostics: true,
   windowMaximize: true,
+  quill: true,
   flint: true,
   flintSlashCommands: true,
   flintCompactShell: true,
@@ -296,7 +313,13 @@ export const featureFlags: FeatureFlags = Object.freeze({
   flintProbe: false,
   presentationProbe: false,
   flintSpatialGraph: true,
+  compactCanonicalText: true,
+  inlineAlternatives: true,
+  inlineAlternativeInteroperability: true,
   nativeDocumentPersistence: true,
+  teiImport: true,
+  teiSemanticSublimation: true,
+  teiOperationalSemantics: true,
   vaultDiscoveryCache: true,
   nativeKnowledge: true,
   nativeKnowledgeSaved: false,
@@ -370,6 +393,8 @@ export const featureFlags: FeatureFlags = Object.freeze({
 
 export type ReactiveEditorConfiguration = {
   features?: Partial<FeatureFlags>;
+  /** Explicit import budgets; unrelated to clipboard and typing. */
+  teiImportLimits?: Partial<TeiLimits>;
 };
 
 export function resolveFeatureFlags(configuration: ReactiveEditorConfiguration = {}): FeatureFlags {

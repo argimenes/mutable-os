@@ -11,6 +11,8 @@ export const virtualTextFlowDiagnostics = new WeakMap<HTMLElement, { itemKeys: n
 export function plainTextItem(key: string, context: ReturnType<typeof useReactiveView>) {
   const node = context.projection.state.nodes[key];
   if (node?.viewType !== 'standoff-editor-block') return false;
+  const compact=context.editor.repository.state.contents[node.contentKey]?.compactInline;
+  if (compact?.spans.some(atom=>atom.kind!=='text')) return false;
   if (node.inlineContent.some(cell => context.projection.state.nodes[cell]?.viewType !== 'text-cell')) return false;
   return !((node.payload.standoffProperties ?? []) as Array<{ type: string; isDeleted?: boolean }>).some(p => !p.isDeleted && /superposition|show-hide|animation|video|iframe|shader/.test(p.type));
 }

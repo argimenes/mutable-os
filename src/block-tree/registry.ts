@@ -1,4 +1,5 @@
 import type { BlockTypeRegistration, CommandDefinition, CommandContext } from "./types";
+import type { BlockRegistrationInfo } from "./type-declarations";
 
 export class BlockRegistry {
   private registrations = new Map<string, BlockTypeRegistration>();
@@ -10,6 +11,17 @@ export class BlockRegistry {
   }
   private notify() { for (const listener of this.listeners) listener(); }
   private aliases = new Map<string, string>();
+
+  /** Active registrations only; aliases stay with their primary registration.
+   * No views, factories or document state are evaluated during discovery. */
+  list(): readonly BlockRegistrationInfo[] {
+    return Object.freeze([...this.registrations].map(([type, registration]) => Object.freeze({
+      type,
+      capabilities: Object.freeze([...registration.capabilities]),
+      aliases: Object.freeze([...(registration.aliases ?? [])]),
+      owner: this.owners.get(type)!,
+    })));
+  }
 
   register(registration: BlockTypeRegistration, owner = "legacy"): () => void {
     const names = [registration.type, ...(registration.aliases ?? [])];

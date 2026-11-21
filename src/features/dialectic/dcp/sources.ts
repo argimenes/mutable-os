@@ -1,3 +1,4 @@
+import {contentLength} from '../../../block-tree/inline-sequence';
 import {lookupAuthority} from './authority-lookup';
 import {entityService} from '../../../application/entity-service';
 import {retrievalRequest} from '../../../application/retrieval-client';
@@ -96,7 +97,7 @@ export class DcpSources {
   if(target.kind==='gloss'||target.kind==='range')return {status:'complete',...base,text:found.text??'',historical:found.historical};
   if(!n)return {status:'missing',...base};
   if(['mutable/markdown-source-block','mutable/html-source-block'].includes(n.viewType)&&typeof n.payload.text==='string'&&n.payload.text.length>24000)return {status:'truncated',...base,nativeType:n.viewType,reason:'Literal source exceeds the bounded UTF-16 read budget',omissions:['text']};
-  if(n.inlineContent.length>12000)return {status:'truncated',...base,reason:'Source Cell budget; select a smaller passage',omissions:['text']};
+  if(contentLength(this.editor.repository.readState().contents[n.contentKey])>12000)return {status:'truncated',...base,reason:'Source Cell budget; select a smaller passage',omissions:['text']};
   const cached=await this.text(n);this.check();const objects=cached.runs.length>1,text=cached.runs.map(r=>r.text).join('\uFFFC');
   const children:string[]=[];let omitted=false;
   for(const key of edges(n)){if(children.length>=64){omitted=true;break;}const child=this.node(key);if(!child)continue;const t:ReplyTarget={kind:'block',resourceId:this.owner,blockId:String(child.payload.id)};const resolved=this.resolve(t);if(resolved.status!=='resolved'||resolved.node?.contentKey!==child.contentKey){omitted=true;continue;}children.push(this.issue(t));}
@@ -176,7 +177,7 @@ export class DcpSources {
    if(++visited>512||this.diagnostics.visited>=512||this.diagnostics.characters>=100000){truncated=true;break;}this.diagnostics.visited++;
    if(seen.has(n.contentKey))continue;seen.add(n.contentKey);
    const t:ReplyTarget={kind:'block',resourceId:this.owner,blockId:String(n.payload.id)};const resolved=this.resolve(t);if(resolved.status!=='resolved'||resolved.node?.contentKey!==n.contentKey||!this.committed(n))continue;
-   if(n.inlineContent.length){if(n.inlineContent.length>12000){truncated=true;continue;}const handle=this.issue(t),source=await this.source(handle);characters+=source.text?.length??0;this.diagnostics.characters+=source.text?.length??0;
+   if(contentLength(this.editor.repository.readState().contents[n.contentKey])){if(contentLength(this.editor.repository.readState().contents[n.contentKey])>12000){truncated=true;continue;}const handle=this.issue(t),source=await this.source(handle);characters+=source.text?.length??0;this.diagnostics.characters+=source.text?.length??0;
     if(characters>100000){truncated=true;break;}if(source.text?.includes(query))items.push({...source,excerpt:source.text.slice(Math.max(0,source.text.indexOf(query)-50),source.text.indexOf(query)+query.length+100)});
     if(items.length>=limit){truncated=true;break;}}
    if(stack.length>=32){truncated=true;continue;}

@@ -88,6 +88,10 @@ export class NativeTextProtection {
      // Selected tabs and media load status are presentation, not authored text.
      if(c.viewType==='tab-block'&&payload.metadata){const {active,...m}=payload.metadata as any;payload.metadata=m;}
      if(c.viewType==='image-cell'){const {status,...p}=payload;return {...c,payload:p,revision:0};}
+     if(c.compactInline)return {...c,payload,revision:0,inlineRevision:0,compactInline:{...c.compactInline,spans:c.compactInline.spans.map(atom=>{
+      if(atom.kind!=='image')return atom;
+      const {status,...properties}=atom.properties;return {...atom,properties};
+     })}};
      return {...c,payload,revision:0};
     };
     if(!equal(base(old),base(r)))fail();

@@ -1,3 +1,4 @@
+import {contentLength,contentSlice,inlineText} from '../../block-tree/inline-sequence';
 import {argumentDefinition,argumentRelation} from './arguments';
 import {localEntity,localEntityRelation,entityReference} from '../../feature-api/scoped-entities';
 import {batch,createSignal,untrack,type Accessor} from 'solid-js';
@@ -151,7 +152,7 @@ export class DialecticReferences {
    // ordinary rebasing must not invalidate contribution activity or read text.
    if((this.editor.features.dialecticSemanticsWorkspace||this.editor.features.dialecticContributionActivity||this.editor.features.dialecticSemanticContents)&&typeof p.id==='string'){
     const d=p.metadata?.dcp,ref=p.metadata?.entityReference;
-    activity.set(p.id,{id:p.id,type:p.type,annotationId:p.annotationId,active:!p.isDeleted&&!p.externalDefinition&&Number.isInteger(p.start)&&Number.isInteger(p.end)&&p.start>=0&&p.end>=p.start&&p.end<c.inlineContent.length,exchangeId:d?.exchangeId,sourceResourceId:d?.sourceResourceId,appliedTo:d?.appliedTo,...(entityReference(ref)?{entity:{...ref}}:{})});
+    activity.set(p.id,{id:p.id,type:p.type,annotationId:p.annotationId,active:!p.isDeleted&&!p.externalDefinition&&Number.isInteger(p.start)&&Number.isInteger(p.end)&&p.start>=0&&p.end>=p.start&&p.end<contentLength(c),exchangeId:d?.exchangeId,sourceResourceId:d?.sourceResourceId,appliedTo:d?.appliedTo,...(entityReference(ref)?{entity:{...ref}}:{})});
    }
   }}
   if(this.editor.features.dcpSemanticWorkspace)this.indexMentions(key,semantic);
@@ -227,7 +228,7 @@ export class DialecticReferences {
   return false;
  }
  node(contentKey:string,preferred?:string){const nodes=this.projection.nodesForContent(contentKey);return nodes.find(n=>n.key===preferred)??nodes[0];}
- text(contentKey:string,start=0,end?:number){const state=this.editor.repository.readState(),c=state.contents[contentKey];return c?.inlineContent.slice(start,end).map(pk=>{const cell=state.contents[state.placements[pk]?.contentKey];return cell?.viewType==='text-cell'?String(cell.payload.text??''):'\ufffc';}).join('')??'';}
+ text(contentKey:string,start=0,end?:number){const state=this.editor.repository.readState(),c=state.contents[contentKey];return c?inlineText(contentSlice(state,c,start,end??contentLength(c))):'';}
  resolve(t:ReplyTarget,preferred?:string):Resolution {
   if(!t||typeof t.resourceId!=='string'||!['range','gloss','block','contribution','argument','entity','argument-relation','entity-relation'].includes(t.kind)||
    typeof (t.kind==='range'?t.anchorId:['gloss','argument-relation','entity-relation'].includes(t.kind)?t.definitionId:t.kind==='argument'?t.argumentId:t.kind==='entity'?t.entity?.entityId:t.blockId)!=='string')return {status:'invalid',reason:'Unsupported reference descriptor.'};
@@ -256,7 +257,7 @@ export class DialecticReferences {
    if(d.isDeleted)return {status:'unanchored',historical,reason:'The anchor definition is deleted.'};
    for(const key of this.anchors.get(id)??[]){const c=this.editor.repository.readState().contents[key],node=this.node(key,preferred);if(!c||!node)continue;
     for(const p of (c.payload.standoffProperties??[]) as any[])if(p.type===RANGE_ANCHOR&&p.annotationId===id&&!p.isDeleted){
-     if(!Number.isInteger(p.start)||!Number.isInteger(p.end)||p.start<0||p.end<p.start||p.end>=c.inlineContent.length||p.externalDefinition)return {status:'invalid',reason:'Range coordinates or ownership are invalid.',historical};
+     if(!Number.isInteger(p.start)||!Number.isInteger(p.end)||p.start<0||p.end<p.start||p.end>=contentLength(c)||p.externalDefinition)return {status:'invalid',reason:'Range coordinates or ownership are invalid.',historical};
      segments.push({contentKey:key,id:String(p.id),start:p.start,end:p.end+1,node});
     }
    }

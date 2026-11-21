@@ -269,7 +269,7 @@ export async function prepare(raw:string,exchangeId:string,resourceId:string,reg
    if(typeof value.revision!=='string'||sources.revisions.get(value.block)!==value.revision)throw Error('Semantic target must use current complete source authority');
    const source=await sources.source(value.block),t=sources.target(value.block),n=sources.resolve(t).node;
    if(t.kind!=='block'||!n||n.viewType!=='standoff-editor-block'||source.status!=='complete'||source.hasInlineObjects||source.revision!==value.revision||!source.text)throw Error('Semantic target needs a nonempty complete TextBlock');
-   const span=whole?{start:0,end:n.inlineContent.length,text:source.text}:await sources.exact(value.block,value.revision,{exact:value.quote,prefix:value.prefix,suffix:value.suffix});
+   const span=whole?{start:0,end:[...source.text].length,text:source.text}:await sources.exact(value.block,value.revision,{exact:value.quote,prefix:value.prefix,suffix:value.suffix});
    range={key:n.key,blockId:String(n.payload.id),start:span.start,end:span.end,text:span.text,sourceAuthor:source.sourceAuthor,revision:value.revision};
    properties=annotations.get(n.key)??[];annotations.set(n.key,properties);
   }

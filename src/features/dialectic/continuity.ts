@@ -1,3 +1,4 @@
+import {logicalInline,inlineText} from '../../block-tree/inline-sequence';
 import {attachments} from './attachments-contract';
 import type {ReactiveEditor} from '../../reactive-editor/editor';
 import type {ContentRecord} from '../../block-tree/types';
@@ -30,8 +31,8 @@ export class ConversationHistory {
     const members=new Set<string>();let count=0,chars=0;
     const project=(r:ContentRecord):any=>{
      if(members.has(r.key))return {blockId:r.payload.id,reference:true};if(++count>2048)throw Error('Contribution exceeds the native projection budget');members.add(r.key);
-     let text='';for(const pk of r.inlineContent){const cell=state.contents[state.placements[pk]?.contentKey];text+=cell?.viewType==='text-cell'?String(cell.payload.text??''):'\uFFFC';}
-     if(!r.inlineContent.length&&typeof r.payload.text==='string')text=r.payload.text;chars+=text.length;if(chars>continuityLimits.characters)throw Error('Contribution exceeds the text replay budget');
+     let text=inlineText(logicalInline(state,r));
+     if(!r.compactInline&&!r.inlineContent.length&&typeof r.payload.text==='string')text=r.payload.text;chars+=text.length;if(chars>continuityLimits.characters)throw Error('Contribution exceeds the text replay budget');
      const m=r.payload.metadata as any,annotations=(r.payload.standoffProperties as any[]??[]).filter(p=>!p.isDeleted).map(p=>({type:p.type,start:p.start,end:p.end,value:p.value,annotationId:p.annotationId}));
      const child=(pk:string)=>{const p=state.placements[pk];return p&&state.contents[p.contentKey]?project(state.contents[p.contentKey]):{unavailable:true};};
      return {blockId:r.payload.id,type:r.viewType,...(text?{text}:{}),...(m?.name?{name:m.name}:{}),...(annotations.length?{annotations}:{}),children:r.children.map(child),faces:Object.fromEntries(Object.entries(r.ownedRelations).map(([name,pk])=>[name,child(pk)]))};

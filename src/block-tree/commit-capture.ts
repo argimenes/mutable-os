@@ -54,6 +54,8 @@ export interface RepositoryCommitResult {
   inputIntent?: InputIntent;
 }
 export interface RepositoryOptions {
+  /** Admission policy only; existing content never changes representation. */
+  compactCanonicalText?: boolean;
   enforceBlockIdentity?: boolean;
   /** Repository-semantic evidence, enabled by default. False retains count-only
    * bookkeeping for compatibility/rollback; cannot be changed after construction. */

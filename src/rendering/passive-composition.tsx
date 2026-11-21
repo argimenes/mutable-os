@@ -1,3 +1,4 @@
+import {contentLength} from '../block-tree/inline-sequence';
 import {Show,onCleanup,onMount,untrack,createSignal,createEffect} from 'solid-js';
 import type {ReactiveEditor} from '../reactive-editor/editor';
 import type {BlockTreeProjection} from '../block-tree/projection';
@@ -12,7 +13,8 @@ export function admitPassiveComposition(editor:ReactiveEditor,placement:string) 
  while(queue.length){const item=queue.pop()!,p=state.placements[item.key];if(!p||p.externalReference)continue;const c=state.contents[p.contentKey];if(!c||item.ancestors.has(c.key))continue;
   if(c.viewType==='text-cell'||c.viewType==='image-cell'){if(++cells>30000)throw Error('This composition exceeds the 30,000 Cell presentation budget. Open source for its complete native view.');continue;}
   if(++blocks>240)throw Error('This composition exceeds the 240 Block presentation budget. Open source for its complete native view.');
-  if(cells+c.inlineContent.length>30000)throw Error('This composition exceeds the 30,000 Cell presentation budget. Open source for its complete native view.');
+  if(cells+contentLength(c)>30000)throw Error('This composition exceeds the 30,000 Cell presentation budget. Open source for its complete native view.');
+  if(c.compactInline)cells+=contentLength(c);
   const ancestors=new Set(item.ancestors).add(c.key);queue.push(...[...c.children,...c.inlineContent,...Object.values(c.ownedRelations)].map(key=>({key,ancestors})));
  }
  return {cells,blocks};
