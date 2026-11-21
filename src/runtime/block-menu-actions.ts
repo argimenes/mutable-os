@@ -103,7 +103,11 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
   }
 
   const items: BlockMenuItem[] = [...(editor.mounts.get(key)?.contextActions?.() ?? []), historyEntry];
-  if (editor.features.quill && editor.commandRegistry.owner("quill.edit")) items.push(command("quill.edit", "Edit in Quill"));
+  if (editor.features.quill && editor.commandRegistry.owner("quill.edit")) {
+    const composition=ancestors.some(n=>n.viewType==='mutable/svg-text-composition-block');
+    if(composition){items.push(command('quill.edit','Edit in Quill'));items.push({...command('quill.toText','Convert to Standoff Text'),reason:'Removes SVG presentation and preserves native text and annotations. Undo restores the composition.'});}
+    else if(node.viewType==='standoff-editor-block')items.push(command('quill.convert','Convert to Quill'),command('quill.edit','Edit in Quill'),command('quill.convertSelection','Convert selection to Quill'),command('quill.copySelection','Compose independently from selection'));
+  }
   items.push(command('markdown.toggleInput', `Markdown Input Transformation: ${editor.markdownInput.enabled() ? 'On' : 'Off'}`));
   items.push(...tabOrientationMenu(editor, ancestor("tab-row-block", "document-tab-row-block")?.key));
   if (editor.features.tableLayouts) items.push({ label: 'Tables and columns', loadChildren: () => tableMenuItems(editor, key) });

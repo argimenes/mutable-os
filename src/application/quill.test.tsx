@@ -131,3 +131,11 @@ it('hands off Textual invocation to the desktop and returns to the same native s
  expect(nativeText(captureNative(editor.repository.readState(),'quill-document'))).toBe(before);expect(snapshot).not.toHaveBeenCalled();
  expect(host.querySelector('.quill-application [role=alert]')).toBeNull();
 });
+
+it('persists studio appearance independently of documents and cached artwork geometry',async()=>{
+ const f=setup();await f.launch('flint.open');await tick();const source=f.source();convertQuill(f.editor,invokeQuill(f.editor,source.key));await f.launch('quill.open',{documentId:'quill-document'});await tick();
+ const app=f.host.querySelector<HTMLElement>('.quill-application')!,select=app.querySelector<HTMLSelectElement>('[aria-label="Quill appearance"]')!,surface=app.querySelector('.quill-text-surface') as HTMLElement&{quillDiagnostics():unknown},before=surface.quillDiagnostics(),revision=f.editor.repository.state.revision,snapshot=vi.spyOn(f.editor.repository,'snapshot');
+ expect(app.dataset.quillTheme).toBe('midnight');for(const theme of ['parchment','mutable','midnight']){select.value=theme;select.dispatchEvent(new Event('change',{bubbles:true}));expect(app.dataset.quillTheme).toBe(theme);}
+ expect(surface.quillDiagnostics()).toEqual(before);expect(f.editor.repository.state.revision).toBe(revision);expect(snapshot).not.toHaveBeenCalled();expect(JSON.parse(localStorage.getItem('mutable.quill.preferences.v1')!).appearance).toBe('midnight');
+ expect(app.querySelector('[aria-label="Quill tools"]')).not.toBeNull();expect(app.querySelector('[data-quill-inspector]')).not.toBeNull();
+});

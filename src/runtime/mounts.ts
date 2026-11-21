@@ -15,6 +15,8 @@ export interface MountHandle {
   generation: number;
   /** Alternate native text presentation may consume input before DOM editing. */
   interceptInlineInput?(event: Event): boolean;
+  /** Preserve a single owned text source when accepting native rich paragraphs. */
+  prepareInlinePaste?(fragment: import("../interchange/fragment").MutableFragment): import("../interchange/fragment").MutableFragment;
   focus(): void;
   /** Invalidate the existing reading geometry after enclosing inline reflow. */
   invalidateInlineLayout?():void;

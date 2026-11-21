@@ -234,6 +234,9 @@ export class TreeCommands {
 
   isCompactText(key:NodeKey|PlacementKey):boolean {const state=this.current(true);return !!state.contents[state.placements[this.placementKey(key,state)].contentKey].compactInline;}
 
+  /** Identity lookup inside an in-flight native structural transaction. */
+  blockIdOf(key:NodeKey|PlacementKey):string|undefined {const state=this.current(true);return readBlockId(state.contents[state.placements[this.placementKey(key,state)].contentKey]);}
+
   /** Transaction-aware structural reads, including freshly inserted wrappers. */
   childrenOf(key: NodeKey | PlacementKey): PlacementKey[] {
     const state = this.current(true);

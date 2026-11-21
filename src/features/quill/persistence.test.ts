@@ -1,3 +1,4 @@
+import {quillExample} from './examples';
 import {render} from 'solid-js/web';
 import {createComponent} from 'solid-js';
 import {registerApplicationViews} from '../../application/features';
@@ -49,6 +50,7 @@ it('uses the real native coordinator to save in place only on request, including
     expect(mount.captureText!().startsWith('New ')).toBe(true);
     const properties = record(editor, source.placementKey).payload.standoffProperties as any[];
     editor.commands.setPayloadField(source.placementKey, 'standoffProperties', [...properties, { id: 'new-annotation', type: 'style/highlight', start: 0, end: 2 }], 'Annotate Quill text');
+    editor.commands.insert(quillExample(true),{kind:'at',parentKey:doc.key,index:doc.children.length});
     expect(service.isDirty(id)).toBe(true);
     expect(snapshot).not.toHaveBeenCalled(); snapshot.mockRestore();
     expect(requests).not.toHaveBeenCalled();
@@ -60,10 +62,10 @@ it('uses the real native coordinator to save in place only on request, including
     const fresh = make(); expect(await nativeDocumentSession(fresh).open(location)).toBe(id);
     expect(nativeText(captureNative(fresh.repository.readState(), id))).toBe(expected);
     const restored = Object.values(fresh.repository.readState().contents);
-    expect((restored.find(c=>c.viewType===QUILL_TYPE)!.payload.quill as any).paths).toHaveLength(3);
+    expect((restored.find(c=>c.payload.id===record(editor,wrapper).payload.id)!.payload.quill as any).paths).toHaveLength(3);
     registerApplicationViews(fresh);const freshView=fresh.createView('reopened-svg'),freshDoc=Object.values(freshView.state.nodes).find(n=>n.payload.id==='quill-document')!,reopened=fresh.createView('reopened-document',freshDoc.placementKey),reopenedRoot=document.body.appendChild(document.createElement('main'));
     disposers.push(render(()=>createComponent(ReactiveTreeView,{editor:fresh,projection:reopened}),reopenedRoot),()=>reopenedRoot.remove());expect(reopenedRoot.querySelector('.quill-canvas')).not.toBeNull();
-    expect((restored.find(c => c.viewType === QUILL_TYPE)!.payload.quill as any).viewport).toEqual({width:800,height:300});
+    expect((restored.find(c=>c.payload.id===record(editor,wrapper).payload.id)!.payload.quill as any).viewport).toEqual({width:800,height:300});
     expect((restored.find(c => c.payload.id === 'quill-source')!.payload.standoffProperties as any[]).some(p => p.id === 'new-annotation')).toBe(true);
   } finally {
     disposers.reverse().forEach(f=>f());editors.forEach(e => e.dispose()); vi.unstubAllGlobals(); vi.restoreAllMocks();

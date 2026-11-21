@@ -420,8 +420,10 @@ export class MutableClipboard {
   private async prepareImport(input: PastePreparation, files: ClipboardFile[], bookmark: Bookmark, event?: Event, cross = false): Promise<PreparedPaste> {
     if (!this.editor.features.managedAssetClipboard || input.plain || input.asMarkdown) return this.prepare(input);
     const parsed = await this.prepare({ ...input, parseOnly: true });
-    const fragment = parsed.fragment ?? (files.length ? imagesFragment(files) : undefined);
+    let fragment = parsed.fragment ?? (files.length ? imagesFragment(files) : undefined);
     if (!fragment) return parsed;
+    const adapt=bookmark.nodeKey && this.editor.mounts.get(bookmark.nodeKey)?.prepareInlinePaste;
+    if(adapt)fragment=adapt(fragment);
     const valid = () => this.valid(bookmark, event, cross);
     const choose = (urls: string[], error?: string) => new Promise<string[] | undefined>(resolve => {
       if (!valid()) { resolve(undefined); return; }
@@ -493,6 +495,8 @@ export class MutableClipboard {
     this.insert(b, plainFragment(''), true);
   }
   private insert(b: Bookmark, fragment: MutableFragment, cut = false, prepared?: BlockFragment[]): string | undefined {
+    const adapt=b.nodeKey && this.editor.mounts.get(b.nodeKey)?.prepareInlinePaste;
+    if(adapt){const next=adapt(fragment);if(next!==fragment){fragment=next;prepared=undefined;}}
     const hasAlternatives=fragment.blocks.some(c=>c.inline?.atoms.some(a=>a.kind==='alternative'));
     if(hasAlternatives&&!this.editor.features.inlineAlternativeInteroperability)throw Error('Inline alternative clipboard interoperability is disabled.');
     if(hasAlternatives&&!this.editor.features.compactCanonicalText)throw Error('Inline alternatives require compact admission.');
@@ -527,6 +531,7 @@ export class MutableClipboard {
       const root = e.fragment.state.contents[e.fragment.state.placements[e.fragment.roots[0]].contentKey];
       return !inlineMergePredicate(e.fragment, 'standoff-editor-block')(root);
     })) throw Error('Paste structured content into a single text selection.');
+    if(adapt && edits.some(e=>e.segments.length!==1 || e.fragment.roots.length!==1 || !inlineMergePredicate(e.fragment,'standoff-editor-block')(e.fragment.state.contents[e.fragment.state.placements[e.fragment.roots[0]].contentKey])))throw Error('This paste requires independent Blocks. Paste beside the composition to preserve its source.');
     const results = this.editor.commands.insertMutableText(edits, cut); this.assetInserted = true;
     const positions = results.map((r, i) => ({ ...r, caret: r.caret + edits.slice(i + 1).reduce((delta, e) => {
       const root = e.fragment.state.contents[e.fragment.state.placements[e.fragment.roots[0]].contentKey];

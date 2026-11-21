@@ -1,4 +1,6 @@
-import { contentLength } from '../block-tree/inline-sequence';
+import {captureBlocks,cloneBlocks} from '../block-tree/clipboard';
+import {clipProperties} from '../interchange/ranges';
+import { contentLength,inlineSlice,clipCompactProperties } from '../block-tree/inline-sequence';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import { QUILL_TYPE, SOURCE_REFERENCE, defaultComposition, sourceRole, validQuill } from '../features/quill/model';
 
@@ -32,7 +34,7 @@ export function quillSources(editor: ReactiveEditor, placement: string): string[
   if (new Set(sources).size !== sources.length) throw Error('Each source role must own a separate TextBlock.');
   return sources;
 }
-export function invokeQuill(editor: ReactiveEditor, key: string): QuillInvocation {
+export function invokeQuill(editor: ReactiveEditor, key: string, allowRange=false): QuillInvocation {
   if (!editor.features.quill) throw Error('Quill is disabled.');
   const node = editor.node(key);
   if (!node) throw Error('Select a native TextBlock or composition.');
@@ -46,9 +48,9 @@ export function invokeQuill(editor: ReactiveEditor, key: string): QuillInvocatio
   if (source.viewType !== 'standoff-editor-block') throw Error('Select a native TextBlock.');
   if (edge.kind !== 'owned' || edge.resolvedReference || editor.repository.contentReferenceCount(source.key) !== 1) throw Error('Shared text requires an explicit reference policy.');
   const cross = editor.crossText.range();
-  if (!wrapper && cross && (cross.anchor.occurrenceKey !== key || cross.head.occurrenceKey !== key)) throw Error('Quill converts one whole TextBlock. Partial-range conversion is a later milestone.');
+  if (!wrapper && cross && (cross.anchor.occurrenceKey !== key || cross.head.occurrenceKey !== key)) throw Error('Select a range within one native TextBlock. Cross-paragraph conversion is not supported.');
   const selection = editor.mounts.get(key)?.captureInlineSelection?.() ?? editor.mounts.inlineSelection(key);
-  if (!wrapper && selection && selection.anchor !== selection.head && (Math.min(selection.anchor,selection.head) !== 0 || Math.max(selection.anchor,selection.head) !== contentLength(source))) throw Error('Quill converts a whole TextBlock. Collapse the selection or select the entire paragraph.');
+  if (!allowRange && !wrapper && selection && selection.anchor !== selection.head && (Math.min(selection.anchor,selection.head) !== 0 || Math.max(selection.anchor,selection.head) !== contentLength(source))) throw Error('Quill converts a whole TextBlock. Collapse the selection or select the entire paragraph.');
   return {documentId:String((document.payload.metadata as any)?.documentId ?? document.payload.id),documentPlacement:document.placementKey,
     sourcePlacement,sourceId:String(source.payload.id),sourceContent:source.key,sourceRevision:source.revision,parent:editor.repository.locationOf(sourcePlacement)?.ownerContentKey,
     occurrence:key,viewId:node.viewId,selection,existingComposition:wrapper?.placementKey};
@@ -76,4 +78,54 @@ export function convertQuill(editor: ReactiveEditor, invocation: QuillInvocation
     editor.commands.move(invocation.sourcePlacement,{kind:'at',parentKey:wrapper,index:0});
   });
   return wrapper;
+}
+
+/** Remove presentation only. Text identities, definitions and declared reading
+ * order survive; the native structural transaction restores geometry on Undo. */
+export function convertQuillToText(editor: ReactiveEditor, key: string): string[] {
+  if (!editor.features.quill) throw Error('Quill is disabled.');
+  const node=editor.node(key);
+  if (!node) throw Error('Composition is no longer available.');
+  const wrapper=editor.blockQueries.ancestorPath(key).find(n=>n.viewType===QUILL_TYPE);
+  if (!wrapper) throw Error('Select a Quill composition.');
+  const record=quillRecord(editor,wrapper.placementKey),sources=quillSources(editor,wrapper.placementKey);
+  if(editor.repository.contentReferenceCount(record.key)!==1 || record.children.length!==sources.length || Object.keys(record.ownedRelations).length || Object.keys(record.opaqueRelations).length)
+    throw Error('This composition has shared ownership or additional structure. Detach or resolve it before converting.');
+  editor.commands.structuralTransaction('Convert Quill to Standoff Text',()=>{
+    sources.forEach((source,index)=>editor.commands.move(source,{kind:'at',parentKey:wrapper.placementKey,index}));
+    editor.commands.unwrap(wrapper.placementKey);
+  });
+  return sources;
+}
+
+export function addQuillSource(editor:ReactiveEditor,wrapperKey:string,requestedRole='caption'):string {
+ const n=editor.node(wrapperKey),placement=n?.placementKey??wrapperKey,c=quillRecord(editor,placement);quillSources(editor,placement);
+ if(editor.repository.contentReferenceCount(c.key)!==1)throw Error('Detach shared composition before adding a source.');
+ const config=structuredClone(c.payload.quill) as ReturnType<typeof defaultComposition>;
+ let role=requestedRole.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,40)||'source';if(!/^[a-zA-Z]/.test(role))role='source-'+role;const base=role;let suffix=1;while(config.sources.some(s=>s.role===role))role=base+'-'+suffix++;
+ const id=crypto.randomUUID(),pathId=role+'-line',y=Math.max(...config.paths.map(p=>p.y+(p.height??p.amplitude??0)))+70;
+ config.sources.push({role});config.paths.push({id:pathId,kind:'line',x:30,y,width:Math.max(1,config.viewport.width-60)});config.flows.push({id:role,sourceRole:role,pathIds:[pathId],typography:{size:role==='title'?48:20}});config.viewport.height=Math.max(config.viewport.height,y+70);
+ if(!validQuill(config))throw Error('This composition has reached its supported source or artboard limits.');
+ let source='';editor.commands.structuralTransaction('Add Quill text source',()=>{source=editor.commands.insert({id,type:'standoff-editor-block',text:role==='title'?'Title':'New text source',standoffProperties:[]},{kind:'at',parentKey:placement,index:c.children.length});editor.commands.setPayloadField(placement,'quill',config);editor.commands.setPayloadField(placement,'blockProperties',[...(c.payload.blockProperties as any[]),{id:crypto.randomUUID(),type:SOURCE_REFERENCE,value:id,metadata:{quillRole:role}}]);});return source;
+}
+/** Extraction and independent composition share native split/copy contracts. */
+export function composeQuillRange(editor:ReactiveEditor,key:string,independent=false):string {
+ const request=invokeQuill(editor,key,true);if(request.existingComposition)throw Error('Select text outside an existing composition.');
+ const selection=request.selection,start=Math.min(selection?.anchor??0,selection?.head??0),end=Math.max(selection?.anchor??0,selection?.head??0),source=quillRecord(editor,request.sourcePlacement),length=contentLength(source);
+ if(!selection||start===end||start<0||end>length)throw Error('Select a non-empty range in one native paragraph.');
+ if(source.children.length||Object.keys(source.ownedRelations).length||Object.keys(source.opaqueRelations).length)throw Error('Partial composition requires a paragraph without attached structure.');
+ const copied=independent?cloneBlocks(captureBlocks(editor.repository.readState(),[request.sourcePlacement])):undefined;
+ if(copied){const c=copied.state.contents[copied.state.placements[copied.roots[0]].contentKey];
+  c.payload.standoffProperties=(c.compactInline?clipCompactProperties:clipProperties)(c.payload.standoffProperties,start,end,length);
+  if(c.compactInline)c.compactInline.spans=inlineSlice(c.compactInline.spans,start,end);
+  else {const removed=[...c.inlineContent.slice(0,start),...c.inlineContent.slice(end)];c.inlineContent=c.inlineContent.slice(start,end);for(const pk of removed){delete copied.state.contents[copied.state.placements[pk].contentKey];delete copied.state.placements[pk];}}
+ }
+
+ let wrapper='';editor.commands.structuralTransaction(independent?'Compose independently from selection':'Convert selection to Quill',()=>{
+  let selected=request.sourcePlacement;
+  if(copied)selected=editor.commands.insertFragment(copied,{kind:'after',anchorKey:selected})[0];
+  else {if(end<length)editor.commands.splitStandoff(selected,end);if(start>0)selected=editor.commands.splitStandoff(selected,start);}
+  const id=editor.commands.blockIdOf(selected);if(!id)throw Error('Selected text has no native identity.');
+  wrapper=editor.commands.insert({type:QUILL_TYPE,quill:defaultComposition(),blockProperties:[{id:crypto.randomUUID(),type:SOURCE_REFERENCE,value:id,metadata:{quillRole:'body'}}],children:[]},{kind:'before',anchorKey:selected});editor.commands.move(selected,{kind:'at',parentKey:wrapper,index:0});
+ });return wrapper;
 }

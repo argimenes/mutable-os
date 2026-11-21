@@ -1,4 +1,7 @@
-import { Show, createMemo, onMount, onCleanup } from 'solid-js';
+import {CompositionLayers} from '../features/quill/layers';
+import {QuillCompositionContext} from '../features/quill/composition-context';
+import {studioFor} from '../features/quill/studio';
+import { Show, For, createSignal, createMemo, onMount, onCleanup } from 'solid-js';
 import type { CodexFeature } from '../feature-api';
 import type { ReactiveEditor } from '../reactive-editor/editor';
 import { ChildBlocks } from '../rendering/block-outlet';
@@ -7,7 +10,7 @@ import { QuillShell, type QuillContext } from '../features/quill/shell';
 import { documentApplicationCapabilities } from './document-application-capabilities';
 import { createDocumentApplicationTabs } from './document-application-tabs';
 import { documentApplicationPorts } from './document-application-ports';
-import { convertQuill, invokeQuill, quillRecord, quillSources } from './quill-operations';
+import { convertQuill, convertQuillToText, composeQuillRange, addQuillSource, invokeQuill, quillRecord, quillSources } from './quill-operations';
 
 export interface QuillPresentationHost {
   active(): import('../reactive-editor/workspace-presentation').PresentationName;
@@ -21,7 +24,7 @@ export function createQuillFeature(editor: ReactiveEditor, presentation?: QuillP
     documentApplicationCapabilities(editor,scope).register({applicationId:'quill',label:'Quill',type:QUILL_APP,seedDocuments:()=>[],
       beforeOpen(){if(presentation && presentation.active()!=='desktop' && (!presentation.select('desktop') || presentation.active()!=='desktop'))throw Error('Finish the current interaction before opening Quill on the Desktop.');},
       create(documents) { const dto=createDocumentApplicationTabs(QUILL_APP,documents);if(pending)contexts.set(String(dto.id),pending);return dto; },
-      view:props=><QuillShell application={props.application} context={contexts.get(props.application.id ?? '')}/>,
+      view:props=><QuillShell editor={editor} application={props.application} context={contexts.get(props.application.id ?? '')}/>,
     });
     // Discard return bookmarks when their owning application is deleted. No text-edit scan.
     scope.own(editor.repository.subscribeChanges(change=>{
@@ -29,7 +32,8 @@ export function createQuillFeature(editor: ReactiveEditor, presentation?: QuillP
       for(const before of change.previousContents.values()) if(before?.viewType===QUILL_APP && !editor.repository.state.contents[before.key]) contexts.delete(String(before.payload.id));
     }));
     const Composition = (props:{nodeKey:string}) => {
-      let root!:HTMLDivElement;
+      let root!:HTMLDivElement;const [active,setActive]=createSignal<string>();
+      const sources=()=>{const n=editor.node(props.nodeKey);return ((n?.payload.quill as any)?.sources??[]).map((s:any)=>{const ref=(n?.payload.blockProperties as any[])?.find(p=>p.metadata?.quillRole===s.role);return {role:s.role,node:n?.children.map(k=>editor.node(k)).find(c=>c?.payload.id===ref?.value)};});};
       const problem = createMemo(()=>{
         const node=editor.node(props.nodeKey);node?.payload.quill;node?.payload.blockProperties;node?.children;
         try {if(node)quillSources(editor,node.placementKey);return '';}catch(e){return (e as Error).message;}
@@ -38,8 +42,8 @@ export function createQuillFeature(editor: ReactiveEditor, presentation?: QuillP
       return <div ref={root} tabIndex={-1} class="quill-composition" data-block-type={QUILL_TYPE} data-runtime-key={props.nodeKey} data-block-id={String(editor.node(props.nodeKey)?.payload.id ?? '')}>
         <header><strong>Text composition</strong><button disabled={!!problem()} onPointerDown={e=>e.preventDefault()} onClick={()=>editor.commandRegistry.execute('quill.edit',{targetKey:props.nodeKey,args:undefined})}>Edit in Quill</button></header>
         <Show when={problem()}><p role="status">{problem()} Native children are retained below.</p></Show>
-        <Show when={(editor.node(props.nodeKey)?.payload.quill as any)?.sources?.length>1}><p>Multiple sources retain native text editing in this release.</p></Show>
-        <ChildBlocks parentKey={props.nodeKey}/>
+        <Show when={!problem()} fallback={<ChildBlocks parentKey={props.nodeKey}/>}><div class="quill-source-navigation"><label>Text source<select aria-label="Active text source" value={active()??sources()[0]?.node?.key} onChange={e=>{setActive(e.currentTarget.value);studioFor(root)?.choose(e.currentTarget.value);editor.focus.request(e.currentTarget.value,{reason:'quill-source'});}}><For each={sources()}>{s=><option value={s.node?.key}>{s.role}</option>}</For></select></label><button onClick={()=>addQuillSource(editor,props.nodeKey,'title')}>Add title</button><button onClick={()=>addQuillSource(editor,props.nodeKey,'caption')}>Add text source</button><span>Independent native text sources · one artboard</span></div>
+        <QuillCompositionContext.Provider value={{active,setActive}}><div class="quill-source-stack"><CompositionLayers editor={editor} nodeKey={props.nodeKey} root={()=>root} config={()=>editor.node(props.nodeKey)!.payload.quill as any}/><ChildBlocks parentKey={props.nodeKey}/></div></QuillCompositionContext.Provider></Show>
       </div>;
     };
     scope.own(editor.registry.register({type:QUILL_TYPE,capabilities:['container'],view:Composition},scope.owner));
@@ -83,6 +87,9 @@ export function createQuillFeature(editor: ReactiveEditor, presentation?: QuillP
       pending=context;
       try{editor.commandRegistry.execute('quill.open',{targetKey,args:{documentId:invocation.documentId}});}finally{pending=undefined;}
     }},scope.owner));
+    for(const [id,independent] of [['quill.convertSelection',false],['quill.copySelection',true]] as const)scope.own(editor.commandRegistry.register({id,label:independent?'Compose independently from selection':'Convert selection to Quill',canExecute:({targetKey})=>workspace()&&editor.node(targetKey)?.viewType==='standoff-editor-block',execute({targetKey}){composeQuillRange(editor,targetKey,independent);}},scope.owner));
+    scope.own(editor.commandRegistry.register({id:'quill.convert',label:'Convert to Quill',canExecute:({targetKey})=>workspace() && editor.node(targetKey)?.viewType==='standoff-editor-block',execute({targetKey}){convertQuill(editor,invokeQuill(editor,targetKey));}},scope.owner));
+    scope.own(editor.commandRegistry.register({id:'quill.toText',label:'Convert to Standoff Text',canExecute:({targetKey})=>editor.blockQueries.ancestorPath(targetKey).some(n=>n.viewType===QUILL_TYPE),execute({targetKey}){const view=editor.node(targetKey)!.viewId,sources=convertQuillToText(editor,targetKey),node=editor.nodeForPlacementInView(sources[0],view);if(node)editor.focus.request(node.key,{reason:'quill-conversion',caret:'start'});}},scope.owner));
     scope.own(editor.featureActions.register({id:'quill.edit',slot:'document-actions',label:'Edit in Quill',command:'quill.edit',order:90},scope.owner));
   }};
 }

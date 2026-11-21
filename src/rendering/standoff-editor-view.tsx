@@ -341,7 +341,7 @@ export function StandoffEditorView(props: BlockViewProps & {inline?:boolean}) {
   const composition=createMemo(()=>{
     if(!editor.features.quill)return;
     const parent=projection.parentOf(props.nodeKey),data=parent?.payload.quill;
-    return parent?.viewType===QUILL_TYPE && validQuill(data) && data.sources.length===1 && Array.isArray(parent.payload.blockProperties) && parent.payload.blockProperties.some(p=>sourceRole(p)===data.sources[0].role&&p.value===projection.state.nodes[props.nodeKey]?.payload.id) ? parent.key : undefined;
+    return parent?.viewType===QUILL_TYPE && validQuill(data) && Array.isArray(parent.payload.blockProperties) && parent.payload.blockProperties.some(p=>data.sources.some(s=>s.role===sourceRole(p))&&p.value===projection.state.nodes[props.nodeKey]?.payload.id) ? parent.key : undefined;
   });
   return <Show when={composition()} fallback={<NativeStandoffEditorView {...props}/>} keyed>{key=><Show when={!nativeMode()} fallback={<><button onClick={()=>setNativeMode(false)}>Return to SVG</button><NativeStandoffEditorView {...props}/></>}><QuillSurface nodeKey={props.nodeKey} compositionKey={key} onNative={()=>setNativeMode(true)}/></Show>}</Show>;
 }

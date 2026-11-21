@@ -6,7 +6,7 @@ import {admitNative,captureNative,nativeBytes,nativeText,decodeNative} from '../
 import {serializeSelection} from '../../interchange/serializer';
 import {materializeFragment} from '../../interchange/materialize';
 import {inlineText,logicalInline} from '../../block-tree/inline-sequence';
-import {convertQuill,invokeQuill,quillRecord,quillSources} from '../../application/quill-operations';
+import {convertQuill,convertQuillToText,composeQuillRange,addQuillSource,invokeQuill,quillRecord,quillSources} from '../../application/quill-operations';
 import {defaultComposition,validQuill,QUILL_TYPE} from './model';
 import {fixture} from '../../qualification/quill/model';
 const editors:ReactiveEditor[]=[];
@@ -91,4 +91,26 @@ describe('Quill native M0 contract',()=>{
   const changes:number[]=[];const stop=e.repository.subscribeChanges(c=>changes.push(c.previousContents.size));
   try{e.commands.replaceInlineRange(source.placementKey,0,0,'Listen ');e.repository.undo();e.repository.redo();expect(reads).toBe(0);expect(snapshot).not.toHaveBeenCalled();expect(changes).toEqual([1,1,1]);}finally{stop();restore.forEach(f=>f());}
  });
+});
+
+it('unwraps declared reading order atomically and Undo restores exact geometry and native identities',()=>{
+ const {editor:e,source,view}=setup(),wrapper=convertQuill(e,invokeQuill(e,source.key)),title=e.commands.insert({id:'title',type:'standoff-editor-block',text:'The Raven'},{kind:'at',parentKey:wrapper,index:1});
+ const config=structuredClone(quillRecord(e,wrapper).payload.quill) as ReturnType<typeof defaultComposition>;config.sources.unshift({role:'title'});config.flows.push({id:'title',sourceRole:'title',pathIds:['baseline']});
+ e.commands.setPayloadField(wrapper,'quill',config);e.commands.setPayloadField(wrapper,'blockProperties',[...quillRecord(e,wrapper).payload.blockProperties as any[],{type:'codex/block-reference',value:'title',metadata:{quillRole:'title'}}]);
+ const before=nativeText(captureNative(e.repository.readState(),'quill-document')),revision=e.repository.state.revision,sourceContent=quillRecord(e,source.placementKey);
+ expect(convertQuillToText(e,view.nodeForPlacement(wrapper)!.key)).toEqual([title,source.placementKey]);expect(e.repository.state.revision).toBe(revision+1);expect(quillRecord(e,source.placementKey).key).toBe(sourceContent.key);expect(quillRecord(e,source.placementKey).payload.standoffProperties).toEqual(sourceContent.payload.standoffProperties);
+ const location=e.repository.locationOf(source.placementKey)!;expect(e.repository.state.contents[location.ownerContentKey].children.indexOf(title)).toBe(e.repository.state.contents[location.ownerContentKey].children.indexOf(source.placementKey)-1);
+ e.repository.undo();expect(nativeText(captureNative(e.repository.readState(),'quill-document'))).toBe(before);e.repository.redo();expect(e.repository.state.placements[wrapper]).toBeUndefined();
+});
+it('rejects inverse conversion of a shared composition without mutating its source',()=>{
+ const {editor:e,source,view,bank}=setup(),wrapper=convertQuill(e,invokeQuill(e,source.key));e.commands.transclude(wrapper,{kind:'at',parentKey:bank.key,index:1});const revision=e.repository.state.revision;expect(()=>convertQuillToText(e,view.nodeForPlacement(wrapper)!.key)).toThrow('shared ownership');expect(e.repository.state.revision).toBe(revision);
+});
+
+it.each([false,true])('converts partial range with native split/rebase/Undo (independent=%s)',independent=>{
+ const {editor:e,source}=setup(),original=text(e,source.placementKey),before=nativeText(captureNative(e.repository.readState(),'quill-document'));vi.spyOn(e.mounts,'inlineSelection').mockReturnValue({anchor:4,head:9});const revision=e.repository.state.revision,wrapper=composeQuillRange(e,source.key,independent),selected=quillSources(e,wrapper)[0];
+ expect(e.repository.state.revision).toBe(revision+1);expect(text(e,selected)).toBe('raven');expect(text(e,source.placementKey)).toBe(independent?original:'The ');expect(quillRecord(e,selected).payload.standoffProperties).toEqual(expect.arrayContaining([expect.objectContaining({type:'codex/entity-reference',start:0,end:4}),expect.objectContaining({type:'mutable/gloss',start:0,end:4})]));
+ e.repository.undo();expect(nativeText(captureNative(e.repository.readState(),'quill-document'))).toBe(before);e.repository.redo();expect(text(e,quillSources(e,wrapper)[0])).toBe('raven');
+});
+it('adds a separate source without altering body text or its flow',()=>{
+ const {editor:e,source}=setup(),wrapper=convertQuill(e,invokeQuill(e,source.key)),body=text(e,source.placementKey),flow=JSON.stringify((quillRecord(e,wrapper).payload.quill as any).flows[0]),title=addQuillSource(e,wrapper,'title');expect(quillSources(e,wrapper)).toEqual([source.placementKey,title]);expect(text(e,source.placementKey)).toBe(body);expect(JSON.stringify((quillRecord(e,wrapper).payload.quill as any).flows[0])).toBe(flow);e.repository.undo();expect(quillSources(e,wrapper)).toEqual([source.placementKey]);
 });

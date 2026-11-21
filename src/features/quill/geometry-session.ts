@@ -11,8 +11,9 @@ export class GeometrySession {
  commit(){const next=this.draft,original=this.original;this.cancel();if(!next)return;if(JSON.stringify(this.read())!==original)throw Error('Geometry changed elsewhere. The preview was cancelled.');if(JSON.stringify(next)!==original)this.write(JSON.parse(JSON.stringify(next)));}
  cancel(){this.original=undefined;this.draft=undefined;}
 }
-export function linkedWaves(c:QuillComposition,count=3):QuillComposition {
- const first=c.paths[0],spacing=c.pathSpacing??76;
- const paths=Array.from({length:count},(_,i)=>({id:`wave-${i+1}`,kind:'sine' as const,x:first.x,y:50+i*spacing,width:first.width,amplitude:20,cycles:1,phase:0}));
- return {...c,pathSpacing:spacing,viewport:{...c.viewport,height:Math.max(c.viewport.height,100+(count-1)*spacing)},paths,flows:c.flows.map(f=>({...f,pathIds:paths.map(p=>p.id)}))};
+export function linkedWaves(c:QuillComposition,count=3,role=c.sources[0].role):QuillComposition {
+ const flow=c.flows.find(f=>f.sourceRole===role)!,first=c.paths.find(p=>p.id===flow.pathIds[0])!,spacing=c.pathSpacing??76,otherIds=new Set(c.flows.filter(f=>f!==flow).flatMap(f=>f.pathIds));
+ const kept=c.paths.filter(p=>otherIds.has(p.id)),prefix=c.sources.length===1?'wave':role+'-wave';
+ const paths=Array.from({length:count},(_,i)=>{let id=`${prefix}-${i+1}`;while(kept.some(p=>p.id===id))id+='x';return {id,kind:'sine' as const,x:first.x,y:(c.sources.length===1?50:first.y)+i*spacing,width:first.width,amplitude:20,cycles:1,phase:0};});
+ return {...c,pathSpacing:spacing,viewport:{...c.viewport,height:Math.max(c.viewport.height,paths.at(-1)!.y+60)},paths:[...kept,...paths],flows:c.flows.map(f=>f===flow?{...f,pathIds:paths.map(p=>p.id)}:f)};
 }
