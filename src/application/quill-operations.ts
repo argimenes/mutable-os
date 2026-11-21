@@ -46,9 +46,9 @@ export function invokeQuill(editor: ReactiveEditor, key: string): QuillInvocatio
   if (source.viewType !== 'standoff-editor-block') throw Error('Select a native TextBlock.');
   if (edge.kind !== 'owned' || edge.resolvedReference || editor.repository.contentReferenceCount(source.key) !== 1) throw Error('Shared text requires an explicit reference policy.');
   const cross = editor.crossText.range();
-  if (!wrapper && cross && (cross.anchor.occurrenceKey !== key || cross.head.occurrenceKey !== key)) throw Error('M0 converts one whole TextBlock. Partial-range conversion is a later milestone.');
+  if (!wrapper && cross && (cross.anchor.occurrenceKey !== key || cross.head.occurrenceKey !== key)) throw Error('Quill converts one whole TextBlock. Partial-range conversion is a later milestone.');
   const selection = editor.mounts.get(key)?.captureInlineSelection?.() ?? editor.mounts.inlineSelection(key);
-  if (!wrapper && selection && selection.anchor !== selection.head && (Math.min(selection.anchor,selection.head) !== 0 || Math.max(selection.anchor,selection.head) !== contentLength(source))) throw Error('M0 converts a whole TextBlock. Collapse the selection or select the entire paragraph.');
+  if (!wrapper && selection && selection.anchor !== selection.head && (Math.min(selection.anchor,selection.head) !== 0 || Math.max(selection.anchor,selection.head) !== contentLength(source))) throw Error('Quill converts a whole TextBlock. Collapse the selection or select the entire paragraph.');
   return {documentId:String((document.payload.metadata as any)?.documentId ?? document.payload.id),documentPlacement:document.placementKey,
     sourcePlacement,sourceId:String(source.payload.id),sourceContent:source.key,sourceRevision:source.revision,parent:editor.repository.locationOf(sourcePlacement)?.ownerContentKey,
     occurrence:key,viewId:node.viewId,selection,existingComposition:wrapper?.placementKey};

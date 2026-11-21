@@ -1,3 +1,18 @@
+# Quill M1 — direct SVG editing
+
+The production M1 surface is registered under the existing default-on `quill` flag. Open a native paragraph in Flint, choose **Edit in Quill**, confirm conversion, and edit the visible SVG. **Three linked waves**, **Paths**, the inspector and handles reshape/reflow the native text. **Native text** is an explicit presentation fallback; Save stays manual.
+
+See the [M1 implementation report](../../docs/development/quill/M1_IMPLEMENTATION_REPORT.md), [dependency/licence report](../../docs/development/quill/M1_DEPENDENCIES_AND_LICENCES.md), and [evidence index](m1-evidence/validation.json).
+
+```sh
+node experiments/quill/run-m1.mjs
+npx vitest run --maxWorkers=2 --minWorkers=1 src/features/quill src/application/quill.test.tsx
+```
+
+The browser fixture is `/src/features/quill/browser.html`. It uses production components with file persistence disabled; the mounted persistence test exercises the real native store separately. See the report for full regression commands, timing limits and the inherited Flint close-cleanup failure.
+
+The following M0/investigation material is historical.
+
 # Quill M0 foundation and investigation evidence
 
 The authorised M0 implementation is described in the [M0 report](../../docs/development/quill/M0_IMPLEMENTATION_REPORT.md), with the [revised milestones](../../docs/development/quill/IMPLEMENTATION_FEATURE_BRIEF.md). In the real application, use the Quill desktop launcher or **Edit in Quill** from a native TextBlock. The `quill` flag defaults on.

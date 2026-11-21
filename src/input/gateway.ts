@@ -40,6 +40,20 @@ export interface CompletionInput {
   cancel(keepLiteral?:boolean): void;
 }
 
+/** Alternate native presentations must arbitrate before cross-Block selection
+ * and clipboard guards. Existing mounts have no interceptor and pass through. */
+export function installInlinePresentationInput(document:Document,mounts:MountRegistry){
+  const events=['keydown','beforeinput','input','compositionstart','compositionupdate','compositionend','copy','cut','paste'];
+  const intercept=(event:Event)=>{
+    if(event.defaultPrevented)return;
+    if(mounts.resolveEvent(event)?.handle.interceptInlineInput?.(event)){
+      if(event.cancelable)event.preventDefault();event.stopImmediatePropagation();
+    }
+  };
+  for(const name of events)document.addEventListener(name,intercept,true);
+  return ()=>{for(const name of events)document.removeEventListener(name,intercept,true);};
+}
+
 export class InputGateway {
   private installed = false;
 

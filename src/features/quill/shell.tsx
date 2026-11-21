@@ -25,7 +25,7 @@ export function QuillShell(props: { application: DocumentApplicationInstance; co
   const [confirmed,setConfirmed] = createSignal(!!props.context?.existing);
   const run = async (action:()=>unknown) => { setError(''); setBusy(true); try { await action(); } catch(e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
   return <section ref={root} class="quill-application" aria-label="Quill application">
-    <header><strong>Quill</strong><span>Native document studio · M0</span>
+    <header><strong>Quill</strong><span>Geometric text studio</span>
       <button onClick={()=>void run(()=>app.createDocument?.())}>New Document</button>
       <button disabled={!app.files} onClick={()=>setOpening(true)}>Open Ink…</button>
       <button data-document-save disabled={!app.files || !app.properties() || busy()} onPointerDown={e=>e.preventDefault()} onClick={()=>void run(()=>app.files!.save())}>Save Document</button>
@@ -43,7 +43,7 @@ export function QuillShell(props: { application: DocumentApplicationInstance; co
         <Show when={app.vault?.error?.()}><p role="status">{app.vault!.error!()}</p></Show>
       </nav>
       <main><app.tabs/><Show when={!app.properties()}><p class="quill-empty">Create or open an ordinary Ink Document to begin.</p></Show></main>
-      <aside aria-label="Quill inspector"><h2>Composition</h2><p>Native text and annotations are editable in this foundation release.</p><p>Direct SVG editing and path controls arrive in the next milestone.</p>
+      <aside aria-label="Quill inspector"><h2>Composition</h2><p>Select text on the canvas to edit or annotate it.</p><p>Choose Paths to reshape a line, or generate three linked waves. Save Document writes your native Ink file.</p>
         <Show when={app.properties()}>{p=><><h3>{p().title}</h3><p role="status">{!app.files ? 'In-memory document' : p().unsaved ? 'Unsaved changes' : 'No unsaved changes'}</p><p>{app.files?.status()}</p></>}</Show>
       </aside>
     </div>

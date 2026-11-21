@@ -1,12 +1,12 @@
 # Quill implementation — revised milestones
 
-Status: architecture accepted by the user on 21 November 2026. **Only M0 is authorised for implementation.** This replaces the original proposed ordering; the qualification remains a historical evidence record.
+Status: architecture accepted by the user on 21 November 2026. **M0 is accepted; M1 is authorised for implementation. M2–M5 require subsequent review.** This replaces the original proposed ordering; the qualification remains a historical evidence record.
 
 Quill authors ordinary Mutable Ink Documents, including arbitrary supported native Blocks. Compositions own canonical native TextBlocks, native annotations and linked definitions. There is no separate file format, text store, history, or persistence route. The `quill` feature flag defaults on. Disabled readers retain the container and its children. Save stays manual and uses the opened filename; Return never saves.
 
 Estimates assume one experienced engineer plus design review. They are planning ranges, not delivery commitments: roughly **14–25 engineer-weeks** overall, excluding separately commissioned artwork, legal review and broader publication fidelity.
 
-## M0 — native foundation and real application (1–2 weeks; authorised)
+## M0 — native foundation and real application (1–2 weeks; accepted)
 
 Establish the versioned `mutable/svg-text-composition-block` contract, owned native sources and local source roles. Preserve whole-Block identity during confirmed conversion, using one native undoable structural operation. Opening and cancelling must not change the source Document. Reject stale, shared, ambiguous or partial-range conversion requests rather than silently expanding a selection.
 
@@ -18,7 +18,7 @@ Qualify standard clipboard admission for the new schema and owned references thr
 
 Exit: automated schema, ownership, stale/partial/shared rejection, identity, conversion undo/redo, linked definitions, real clipboard, native persistence, disabled fallback and simultaneous application registration tests. Mounted tests prove opening/return does not dirty the source, conversion does, manual Save uses the native coordinator, and local edits avoid unrelated payloads/snapshots/planning. Existing Flint tests pass. Deliver a foundation report and reproducible evidence. M0 does not claim the first major product acceptance test has passed.
 
-## M1 — first direct editing and basic geometry (3–5 weeks; depends on M0)
+## M1 — first direct editing and basic geometry (3–5 weeks; authorised)
 
 Use the production composition contract and application. Place a caret on straight/curved SVG text; insert/delete Latin text, move/select, and reflow through linked paths. Route edits, undo/redo and annotation changes through native commands. Use existing decoration/measurement invalidation services; keep native text authoritative. The native editor beneath the qualification prototype is scaffolding and must not remain the finished workflow.
 
@@ -60,4 +60,4 @@ Exit: all original hard scenarios have reproducible evidence, cross-browser/acce
 
 ## Scope and next review
 
-M0 is intentionally a usable native foundation, not the typography product. After its report, review readiness for M1. Full multi-source editing, partial extraction, complex shaping, advanced geometry, ornaments and publication are not authorised in this pass. Stop for an actual document-model conflict; routine implementation choices within the accepted architecture do not require another broad investigation.
+M0 is accepted. The subsequent M1 authorisation requires three tested checkpoints: direct SVG input; basic geometry and linked-path reflow; then native semantics, round-trip and performance. Full multi-source editing, partial extraction, complex shaping, advanced geometry, ornaments and publication remain outside the authorised pass. Stop for an actual document-model conflict; routine implementation choices within the accepted architecture do not require another broad investigation.

@@ -13,6 +13,8 @@ export interface MountHandle {
   focusElement: HTMLElement;
   inputPolicy: "native-text" | "standoff" | "control" | "container" | "opaque-widget";
   generation: number;
+  /** Alternate native text presentation may consume input before DOM editing. */
+  interceptInlineInput?(event: Event): boolean;
   focus(): void;
   /** Invalidate the existing reading geometry after enclosing inline reflow. */
   invalidateInlineLayout?():void;
@@ -22,6 +24,9 @@ export interface MountHandle {
   restoreInlineSelection?(selection: { anchor: number; head: number }): void;
   inlinePoint?(node: Node, offset: number): number | undefined;
   inlineBoundary?(index: number): { node: Node; offset: number };
+  /** Alternate native presentations expose their shared cached geometry. */
+  inlineRangeRects?(start:number,end:number):DOMRectReadOnly[];
+  inlineCaretRect?(index:number):DOMRectReadOnly|undefined;
   inlinePointAt?(x: number, y: number): number;
   captureText?(): string;
   /** Compact composition uses typed source coordinates in the existing gateway. */

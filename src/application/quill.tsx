@@ -38,6 +38,7 @@ export function createQuillFeature(editor: ReactiveEditor, presentation?: QuillP
       return <div ref={root} tabIndex={-1} class="quill-composition" data-block-type={QUILL_TYPE} data-runtime-key={props.nodeKey} data-block-id={String(editor.node(props.nodeKey)?.payload.id ?? '')}>
         <header><strong>Text composition</strong><button disabled={!!problem()} onPointerDown={e=>e.preventDefault()} onClick={()=>editor.commandRegistry.execute('quill.edit',{targetKey:props.nodeKey,args:undefined})}>Edit in Quill</button></header>
         <Show when={problem()}><p role="status">{problem()} Native children are retained below.</p></Show>
+        <Show when={(editor.node(props.nodeKey)?.payload.quill as any)?.sources?.length>1}><p>Multiple sources retain native text editing in this release.</p></Show>
         <ChildBlocks parentKey={props.nodeKey}/>
       </div>;
     };

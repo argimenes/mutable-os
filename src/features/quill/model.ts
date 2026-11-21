@@ -4,10 +4,11 @@ export const QUILL_APP = 'quill-application-block';
 export const SOURCE_REFERENCE = 'codex/block-reference';
 export interface QuillPath {
   id: string; kind: 'line' | 'sine'; x: number; y: number; width: number;
-  amplitude?: number; cycles?: number;
+  amplitude?: number; cycles?: number; phase?: number;
 }
 export interface QuillComposition {
   version: 1;
+  pathSpacing?: number;
   viewport: { width: number; height: number };
   sources: { role: string }[];
   paths: QuillPath[];
@@ -21,11 +22,11 @@ const unique = (items: string[]) => new Set(items).size === items.length;
 
 /** Strict admission for this version. Future versions retain native children but are not activated. */
 export function validQuill(value: unknown): value is QuillComposition {
-  if (!object(value) || !keys(value, ['version','viewport','sources','paths','flows']) || value.version !== 1) return false;
+  if (!object(value) || !keys(value, ['version','viewport','sources','paths','flows','pathSpacing']) || value.version !== 1 || (value.pathSpacing !== undefined && !number(value.pathSpacing,1,100000))) return false;
   const { viewport, sources, paths, flows } = value;
   if (!object(viewport) || !keys(viewport,['width','height']) || !number(viewport.width,1) || !number(viewport.height,1)) return false;
   if (!Array.isArray(sources) || sources.length < 1 || sources.length > 64 || !sources.every(s => object(s) && keys(s,['role']) && id(s.role)) || !unique(sources.map(s => s.role))) return false;
-  if (!Array.isArray(paths) || paths.length < 1 || paths.length > 256 || !paths.every(p => object(p) && keys(p,['id','kind','x','y','width','amplitude','cycles']) && id(p.id) && ['line','sine'].includes(p.kind) && number(p.x) && number(p.y) && number(p.width,1) && (p.kind === 'line' ? p.amplitude === undefined && p.cycles === undefined : number(p.amplitude,0) && number(p.cycles,0,100))) || !unique(paths.map(p => p.id))) return false;
+  if (!Array.isArray(paths) || paths.length < 1 || paths.length > 256 || !paths.every(p => object(p) && keys(p,['id','kind','x','y','width','amplitude','cycles','phase']) && id(p.id) && ['line','sine'].includes(p.kind) && number(p.x) && number(p.y) && number(p.width,1) && (p.kind === 'line' ? p.amplitude === undefined && p.cycles === undefined && p.phase === undefined : number(p.amplitude,0) && number(p.cycles,0,100) && (p.phase === undefined || number(p.phase,-Math.PI*2,Math.PI*2)))) || !unique(paths.map(p => p.id))) return false;
   if (!Array.isArray(flows) || flows.length < 1 || flows.length > 64 || !flows.every(f => object(f) && keys(f,['id','sourceRole','pathIds']) && id(f.id) && sources.some(s => s.role === f.sourceRole) && Array.isArray(f.pathIds) && f.pathIds.length > 0 && f.pathIds.length <= 256 && unique(f.pathIds) && f.pathIds.every((p: unknown) => paths.some(path => path.id === p))) || !unique(flows.map(f => f.id)) || !unique(flows.map(f => f.sourceRole))) return false;
   return sources.every(s => flows.some(f => f.sourceRole === s.role));
 }

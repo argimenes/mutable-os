@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import {afterEach,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {render} from 'solid-js/web';
 import {ReactiveEditor} from '../reactive-editor/editor';
 import {registerApplicationViews} from './features';
@@ -13,6 +13,7 @@ import {fixture} from '../qualification/quill/model';
 import {convertQuill,invokeQuill} from './quill-operations';
 import {appForAnchor} from '../persistence/managed-desktop';
 import {desktopApplications} from './desktop-applications';
+beforeEach(()=>{vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue({font:'',measureText:(s:string)=>({width:s.length*10})} as any);});
 const cleanups:Array<()=>void>=[];
 afterEach(()=>{cleanups.splice(0).reverse().forEach(f=>f());document.body.replaceChildren();localStorage.clear();vi.restoreAllMocks();vi.unstubAllGlobals();});
 const tick=async()=>{await Promise.resolve();await Promise.resolve();};
@@ -80,7 +81,10 @@ it('uses the same contextual command from a generic native Document window',asyn
  const source=Object.values(f.projection.state.nodes).find(n=>n.payload.id==='generic-text')!,before=nativeText(captureNative(f.editor.repository.readState(),'generic-document'));
  f.editor.focus.request(source.key);await f.editor.commandRegistry.execute('quill.edit',{targetKey:source.key,args:undefined});await tick();
  expect(nativeText(captureNative(f.editor.repository.readState(),'generic-document'))).toBe(before);
- f.button('Convert paragraph').click();await tick();f.button('Return to editor').click();await tick();
+ f.button('Convert paragraph').click();await tick();
+ f.editor.installGateway(document);const quillSource=[...f.editor.projections.values()].flatMap(v=>Object.values(v.state.nodes)).find(n=>n.payload.id==='generic-text'&&f.editor.mounts.get(n.key)?.root.closest('.quill-application'))!,mount=f.editor.mounts.get(quillSource.key)!;
+ expect(mount.root.querySelector('.quill-canvas')).not.toBeNull();mount.focus();mount.restoreInlineSelection!({anchor:0,head:0});mount.focusElement.dispatchEvent(new InputEvent('beforeinput',{data:'SVG ',inputType:'insertText',bubbles:true,cancelable:true}));
+ f.button('Return to editor').click();await tick();expect(f.editor.mounts.get(source.key)?.captureText?.()).toBe('SVG Generic native editor text.');
  expect(f.editor.focus.state.focusedKey).toBe(source.key);expect(f.host.querySelector('[role=alert]')).toBeNull();
 });
 

@@ -52,7 +52,7 @@ import { BlockModeRegistry, validateModeAssignment } from "../block-tree/block-m
 import { StandoffPropertyDefinitionIndex } from "../properties/standoff-property-definitions";
 import { CanonicalRepository } from "../block-tree/repository";
 import type { ExistingBlockDto, NodeKey, PlacementKey, ViewId } from "../block-tree/types";
-import { InputGateway } from "../input/gateway";
+import { InputGateway, installInlinePresentationInput } from "../input/gateway";
 import { FocusService } from "../runtime/focus";
 import { MountRegistry } from "../runtime/mounts";
 import { AnnotationRangeEvents } from "../runtime/annotation-range-events";
@@ -118,6 +118,7 @@ export class ReactiveEditor {
   readonly viewChildren: Record<string, string | undefined>;
   readonly setViewChild: (key: string, child?: string) => void;
   private disposeFindInput?: () => void;
+  private disposeInlineInput?: () => void;
   readonly bindings = new BindingRegistry();
   readonly repository: CanonicalRepository;
   readonly occurrences = new OccurrenceIndex();
@@ -379,8 +380,10 @@ export class ReactiveEditor {
     this.gateway?.dispose();
     this.crossInput?.dispose();
     this.disposeFindInput?.();
+    this.disposeInlineInput?.();
     this.disposeClipboardStatus?.();
     if (this.features.mutableClipboard || this.features.documentInterchange) this.disposeClipboardStatus = installClipboardStatus(document, this.clipboard);
+    this.disposeInlineInput = installInlinePresentationInput(document,this.mounts);
     this.disposeFindInput = this.find.install(document);
     const disposeSelectionGestures = this.selectionGestures.install(document);
     this.crossInput = new CrossBlockInput(this, document);
@@ -420,9 +423,10 @@ export class ReactiveEditor {
     const dispose = this.gateway.install();
     const crossInput = this.crossInput;
     const disposeFind = this.disposeFindInput;
+    const disposeInlineInput = this.disposeInlineInput;
     const disposeClipboardStatus = this.disposeClipboardStatus;
     const disposeInterchangeStatus = this.disposeInterchangeStatus;
-    return () => { disposeInterchangeStatus?.(); disposeClipboardStatus?.(); disposeFind(); disposeSelectionGestures(); crossInput.dispose(); dispose(); };
+    return () => { disposeInlineInput?.(); disposeInterchangeStatus?.(); disposeClipboardStatus?.(); disposeFind(); disposeSelectionGestures(); crossInput.dispose(); dispose(); };
   }
 
   node(nodeKey: NodeKey) {
@@ -585,6 +589,7 @@ export class ReactiveEditor {
     this.standoffPropertyTypes.dispose();
     this.linkedAnnotations.dispose();
     this.disposeFindInput?.();
+    this.disposeInlineInput?.();
     this.stickyNotes.dispose();
     this.concertina.dispose();
     this.find.dispose();

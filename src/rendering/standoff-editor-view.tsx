@@ -1,3 +1,5 @@
+import { QuillSurface } from '../features/quill/surface';
+import { QUILL_TYPE, validQuill, sourceRole } from '../features/quill/model';
 import {Dynamic,render} from 'solid-js/web';
 import {InlineAlternativeView} from './inline-alternative-view';
 import {InlineReadingLayout} from './inline-alternative-context';
@@ -334,6 +336,16 @@ function ProjectedAlternative(props: { nodeKey: NodeKey; sourceIndex: number; so
 }
 
 export function StandoffEditorView(props: BlockViewProps & {inline?:boolean}) {
+  const {editor,projection}=useReactiveView();
+  const [nativeMode,setNativeMode]=createSignal(false);
+  const composition=createMemo(()=>{
+    if(!editor.features.quill)return;
+    const parent=projection.parentOf(props.nodeKey),data=parent?.payload.quill;
+    return parent?.viewType===QUILL_TYPE && validQuill(data) && data.sources.length===1 && Array.isArray(parent.payload.blockProperties) && parent.payload.blockProperties.some(p=>sourceRole(p)===data.sources[0].role&&p.value===projection.state.nodes[props.nodeKey]?.payload.id) ? parent.key : undefined;
+  });
+  return <Show when={composition()} fallback={<NativeStandoffEditorView {...props}/>} keyed>{key=><Show when={!nativeMode()} fallback={<><button onClick={()=>setNativeMode(false)}>Return to SVG</button><NativeStandoffEditorView {...props}/></>}><QuillSurface nodeKey={props.nodeKey} compositionKey={key} onNative={()=>setNativeMode(true)}/></Show>}</Show>;
+}
+function NativeStandoffEditorView(props: BlockViewProps & {inline?:boolean}) {
   const inlineParentLayout=useContext(InlineReadingLayout),viewOwner=getOwner();
   const { editor, projection, coordinates, activity } = useReactiveView();
   const node = () => projection.state.nodes[props.nodeKey];
