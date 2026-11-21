@@ -1,3 +1,4 @@
+import { createQuillFeature, type QuillPresentationHost } from './quill';
 import { createTeiImportFeature } from '../features/tei-import';
 import {createTextualPresentationFeature} from './textual-presentation-contributions';
 import {createCardexFeature} from './cardex';
@@ -23,7 +24,7 @@ import { textOperationCapabilities } from "./text-operation-capabilities";
 import { createTimerFeature } from "../features/timer";
 import { blockFeatureCapabilities } from "./feature-capabilities";
 
-export function registerApplicationViews(editor: ReactiveEditor): void {
+export function registerApplicationViews(editor: ReactiveEditor, presentation?: QuillPresentationHost): void {
   if (editor.features.teiImport) editor.featureHost.activate(createTeiImportFeature(editor));
   if(editor.features.applicationPresentations)editor.featureHost.activate(createTextualPresentationFeature(editor));
   // Temporary legacy assembly: unmigrated views/commands retain their existing path.
@@ -33,6 +34,7 @@ export function registerApplicationViews(editor: ReactiveEditor): void {
   if (editor.features.cardex) editor.featureHost.activate(createCardexFeature(editor));
   if (editor.features.thesis) editor.featureHost.activate(createThesisFeature(editor));
   if (editor.features.phosphor) editor.featureHost.activate(createPhosphorFeature(editor));
+  if (editor.features.quill) editor.featureHost.activate(createQuillFeature(editor, presentation));
   if (editor.features.flint) editor.featureHost.activate(createFlintFeature(scope => documentApplicationCapabilities(editor, scope), editor.features.flintMaterialChrome, editor.features.flintProbe, editor.features.flintSpatialGraph, editor.features.flintLogo, editor.features.flintCompactShell));
   if (editor.features.threeDObjects) editor.featureHost.activate(createThreeDObjectFeature(scope => blockFeatureCapabilities(editor, scope)));
   if (editor.features.anchorRelationships) editor.featureHost.activate(createAnchorRelationshipsFeature(scope => anchorCapabilities(editor, scope)));

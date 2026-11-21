@@ -18,7 +18,9 @@ export const desktopApplications = [
   { id: "graph", name: "Graph", command: "flint.open", view: "graph" },
   { id: "calendar", name: "Calendar" },
   { id: "tasks", name: "Tasks" },
+  // Keep the saved Acetate placeholder identity; Quill is a separate application.
   { id: "acetate", name: "Acetate" },
+  { id: "quill", name: "Quill", command: "quill.open" },
   { id: "cardex", name: "Cardex", command: "cardex.open" },
   { id: "thesis", name: "Thesis", command: "thesis.open" },
   { id: "dialectic", name: "Dialectic" },
@@ -28,7 +30,7 @@ export const desktopApplications = [
 ] as const;
 export type DesktopApplication = (typeof desktopApplications)[number];
 export type DesktopActions = { workbench?: () => void; cavern?: () => void };
-export const desktopIcon = (id: string) => new URL(`../assets/desktop-icons/${id}.png`, import.meta.url).href;
+export const desktopIcon = (id: string) => id === "quill" ? new URL("../assets/quill.svg", import.meta.url).href : new URL(`../assets/desktop-icons/${id}.png`, import.meta.url).href;
 
 /** A normal canonical Window, using the existing renderer and Window Manager. */
 export function createDesktopPlaceholderFeature(editor: ReactiveEditor): CodexFeature {

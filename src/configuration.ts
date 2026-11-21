@@ -73,6 +73,7 @@ export type FeatureFlags = Readonly<{
   /** Generic Desktop Window maximize/restore; normal geometry is retained. */
   windowMaximize: boolean;
   /** Composite Document application; transient tabs share canonical content. */
+  quill: boolean;
   flint: boolean;
   /** Compact HTML shell, resizable panels and local editor-density preferences. */
   flintCompactShell: boolean;
@@ -215,6 +216,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   iiifResourceLoaders: true,
   cavernStartup: true,
   windowMaximize: true,
+  quill: true,
   flint: true,
   flintCompactShell: true,
   flintRecentDocuments: true,

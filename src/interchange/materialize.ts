@@ -1,3 +1,5 @@
+import { admittedQuillBlocks } from '../features/quill/clipboard';
+import { sourceRole } from '../features/quill/model';
 import {copyGlossIdentities} from '../features/gloss/relationships';
 import { INLINE_READING, isReadingRelation } from '../block-tree/inline-alternative';
 import { normalizeInline } from '../block-tree/inline-sequence';
@@ -29,6 +31,7 @@ export const contentRecord = (key: string, viewType: string, payload: JsonObject
 /** Two passes: allocate every owned identity, then resolve typed references only. */
 export function materializeFragment(input: MutableFragment, scope: InterchangeScope = {}, availableAssets: ReadonlyMap<string, string> = new Map(), availableBlocks: ReadonlyMap<string, boolean> = new Map(), retainedBlocks: ReadonlySet<string> = new Set(), allowExternalEntities = true, preserveGlossIds = false): BlockFragment {
   const f = clone(validateFragment(input));
+  const quill = admittedQuillBlocks(f);
   const compact = f.blocks.some(b=>b.inline?.atoms.some(a=>a.kind==='alternative'));
   const keys = new Map(f.blocks.map(b => [b.localId, createContentKey()])), ids = new Map(f.blocks.map(b => [b.localId, createBlockId()]));
   const edges = new Map(f.placements.map(p => [p.localId, createPlacementKey()]));
@@ -39,12 +42,12 @@ export function materializeFragment(input: MutableFragment, scope: InterchangeSc
   const state: RepositoryState = { rootPlacementKey: edges.get(f.roots[0].placement)!, contents: {}, placements: {}, revision: 0 };
   const sameScope = (r: Reference) => r.kind === 'external' && !!scope.cavernId && r.source.cavernId === scope.cavernId;
   const localExternalBlock = (r: Reference) => r.kind === 'external' && r.object === 'block' && sameScope(r) && !!scope.resourceId && r.source.resourceId === scope.resourceId && availableBlocks.has(r.id);
-  const resolveProperty = (type: string, attrs: JsonObject, target?: Reference, block = false): JsonObject => {
+  const resolveProperty = (type: string, attrs: JsonObject, target?: Reference, block = false, quillSource = false): JsonObject => {
     // Never revive an opaque import, even after registration of its original type.
     const attributes = clone(attrs); for (const key of ['id', 'type', 'start', 'end', 'isZeroWidth', 'affinity', 'annotationId', 'externalDefinition']) delete attributes[key];
     if (type === 'mutable/opaque-property' || type === 'mutable/opaque-block-property') return { ...attributes, id: crypto.randomUUID(), type };
     const sourceDefinition=target?.kind==='local'&&target.object==='definition'?f.definitions.find(d=>d.localId===target.id):undefined;
-    const allowed = (block ? type==='tei/semantic' : ['tei/semantic','tei/editorial','tei/milestone','tei/relationship','tei/correspondence','tei/correspAction'].includes(type)) || (!block&&type===GLOSS&&(glossDefinition({...attributes,type})||sourceDefinition&&glossDefinition({...sourceDefinition.attributes,type:sourceDefinition.type}))) || (block && type==='mutable/academic-annotation' && validAcademicAnchor((attributes as any)?.anchor)) || (block ? blockProperties : passiveProperties).has(type);
+    const allowed = quillSource || (block ? type==='tei/semantic' : ['tei/semantic','tei/editorial','tei/milestone','tei/relationship','tei/correspondence','tei/correspAction'].includes(type)) || (!block&&type===GLOSS&&(glossDefinition({...attributes,type})||sourceDefinition&&glossDefinition({...sourceDefinition.attributes,type:sourceDefinition.type}))) || (block && type==='mutable/academic-annotation' && validAcademicAnchor((attributes as any)?.anchor)) || (block ? blockProperties : passiveProperties).has(type);
     let value: string | undefined, annotationId: string | undefined;
     let resolved = !target;
     if (target?.kind === 'url') { resolved = safeUrl(target.url); value = target.url; }
@@ -80,7 +83,7 @@ export function materializeFragment(input: MutableFragment, scope: InterchangeSc
   for (const b of f.blocks) {
     const readingNames=new Map(Object.keys(b.relations).filter(isReadingRelation).map(name=>[name,INLINE_READING+crypto.randomUUID()]));
     let source=false;try{if(isSourceType(b.type)){sourceFormat(b.type,b.data);source=!b.inline;}}catch{}
-    const supported = (b.type===WEB_BLOCK&&!b.inline&&webCapture(b.data.web)) || (b.type===ACADEMIC_BLOCK&&!b.inline&&academicCapture(b.data.academic)) || (b.type===STRUCTURED_BLOCK&&!b.inline&&structuredPayload(b.data)) || (b.type==='mutable/video-block'&&!b.inline&&!!passiveVideo(b.data.video)) || source || passiveBlocks.has(b.type) || b.type === 'mutable/opaque-block';
+    const supported = quill.has(b.localId) || (b.type===WEB_BLOCK&&!b.inline&&webCapture(b.data.web)) || (b.type===ACADEMIC_BLOCK&&!b.inline&&academicCapture(b.data.academic)) || (b.type===STRUCTURED_BLOCK&&!b.inline&&structuredPayload(b.data)) || (b.type==='mutable/video-block'&&!b.inline&&!!passiveVideo(b.data.video)) || source || passiveBlocks.has(b.type) || b.type === 'mutable/opaque-block';
     const payload = clone(b.data);
     for (const key of ['id', 'type', 'standoffProperties', 'blockProperties', 'linkedAnnotations', 'children', 'relation', 'externalReference', 'definitionOwnerKey']) delete payload[key];
     // Layout/relationship metadata is authored, but executable styles and raw anchors are not imported.
@@ -96,7 +99,7 @@ export function materializeFragment(input: MutableFragment, scope: InterchangeSc
     const record = contentRecord(keys.get(b.localId)!, supported ? b.type : 'mutable/opaque-block', supported
       ? { ...payload, id: ids.get(b.localId), type: b.type }
       : { id: ids.get(b.localId), type: 'mutable/opaque-block', original: opaque(b.type, isSourceType(b.type)&&b.inline?{...b.data,inactiveSourceInline:clone(b.inline)}:b.data), preview: b.inline?.atoms.map(a => a.kind === 'text' ? a.text : '\uFFFC').join('') ?? String(b.data.text ?? '') });
-    record.payload.blockProperties = b.blockProperties.map(p => resolveProperty(p.type, p.attributes, p.target, true));
+    record.payload.blockProperties = b.blockProperties.map(p => resolveProperty(p.type, p.attributes, p.target, true, quill.has(b.localId) && !!sourceRole({...p.attributes,type:p.type})));
     record.children = b.children.map(k => edges.get(k)!);
     record.ownedRelations = Object.fromEntries(Object.entries(b.relations).map(([name, key]) => [readingNames.get(name)??name, edges.get(key)!]));
     if (b.data.opaqueRelations && typeof b.data.opaqueRelations === 'object' && !Array.isArray(b.data.opaqueRelations)) {

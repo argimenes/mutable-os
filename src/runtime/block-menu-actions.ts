@@ -103,6 +103,7 @@ export function blockMenuItems(editor: ReactiveEditor, key: NodeKey): BlockMenuI
   }
 
   const items: BlockMenuItem[] = [...(editor.mounts.get(key)?.contextActions?.() ?? []), historyEntry];
+  if (editor.features.quill && editor.commandRegistry.owner("quill.edit")) items.push(command("quill.edit", "Edit in Quill"));
   items.push(command('markdown.toggleInput', `Markdown Input Transformation: ${editor.markdownInput.enabled() ? 'On' : 'Off'}`));
   items.push(...tabOrientationMenu(editor, ancestor("tab-row-block", "document-tab-row-block")?.key));
   if (editor.features.tableLayouts) items.push({ label: 'Tables and columns', loadChildren: () => tableMenuItems(editor, key) });
