@@ -236,3 +236,23 @@ Incremental coordinate tables/projection updates for measured large-block needs;
 The production block, atomic range bridge, native overlapping presentation, annotation authoring, Entity/Gloss service participation, shared input routing, ordinary document lifecycle, and manual native persistence are implemented and exercised. The native document reload preserves the complete source payload and resolves its shared Gloss definition.
 
 Automated correctness and bounded-work checks pass, and real Chromium qualification passes. Cross-browser/real-OS-IME acceptance remains conditional on the explicitly unavailable manual environments. Existing Flint behavior was regression-tested and benchmarked. The implementation introduces no alternate semantic database, Cell model, independent persistence path, autosave, or sidecar.
+
+## Follow-up: development language-import failure
+
+The reported JavaScript/JSON dynamic-import errors were reproduced as HTTP 504 responses for stale optimized chunks. Two Vite servers (ports 3000 and 3001) shared `node_modules/.vite`; the active port-3000 server still referenced a dependency generation whose output files were missing. The two browser qualification scripts also used that shared default cache. A separate server's optimizer could invalidate chunks still referenced by an open editor.
+
+Both `check-standoff-code-mirror-browser.mjs` and `check-editor-input-ownership-browser.mjs` now use a unique optimizer cache under their disposable browser-profile directory. Their cleanup owns only that cache. The stale assistant-owned port-3000 instance was replaced with an isolated-cache instance; the independently running development process/backend was retained. Recovery suppresses Vite's restart-ping reload so an already-open tab can save its edits before the user refreshes it.
+
+The demo's development diagnostics now expose the installed language facet and syntax tree. Browser qualification waits for actual JavaScript/JSON parse nodes, checks TypeScript after switching, and fails on handled dynamic-import error notices. Checking only metadata, mounted editor identity, or uncaught exceptions was insufficient because the language loader reports rejected imports through a caught UI notice.
+
+A live-route mode exercises language loading without running Vault or Save operations:
+
+```sh
+CODE_LIVE_URL=http://localhost:3000/standoff-code-mirror \
+  CODE_OUTPUT=/tmp/cm-live-languages \
+  node scripts/check-standoff-code-mirror-browser.mjs
+```
+
+Validation: 37 standoff browser checks passed; 39 input-ownership browser checks passed; 11 live-route checks passed, including real JavaScript, TypeScript, JSON, Markdown, XML and SQL parsing and removal of the parser for plain text. The live server's optimizer metadata hash remained unchanged across the independent qualification run, and all language parsers loaded again afterward. Client/server typechecking and diff whitespace checks passed. Results are retained in `docs/qualification/standoff-code-mirror/language-import-fix/`.
+
+This correction changes qualification-server cache ownership and development diagnostics. It adds no typing-time scans, snapshots, persistence, geometry work, or annotation remapping.

@@ -14,7 +14,9 @@ await mkdir(output,{recursive:true});await mkdir(path.join(store,'vault'));
 const api=express(),errors=[],checks=[];
 let vite,browser,socket;
 try {
- vite=await createServer({server:{host:'127.0.0.1',port:0,hmr:false},plugins:[{name:'ownership-native-store',configureServer(server){server.middlewares.use(api);}}]});
+ // Each server owns its optimizer output. Sharing the live dev cache can
+ // delete chunks still referenced by open editor tabs (504 Outdated Optimize Dep).
+ vite=await createServer({cacheDir:path.join(profile,'vite-cache'),server:{host:'127.0.0.1',port:0,hmr:false},plugins:[{name:'ownership-native-store',configureServer(server){server.middlewares.use(api);}}]});
  const {createNativeDocumentStoreRouter}=await vite.ssrLoadModule('/server/native-document-store.mjs');
  api.use('/api/native',createNativeDocumentStoreRouter({root:store,defaultVault:'vault',nativeDiscoveryWorker:false}));
  await vite.listen();

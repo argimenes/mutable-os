@@ -9,15 +9,21 @@ import express from 'express';
 import {createServer} from 'vite';
 const profile=await mkdtemp(path.join(tmpdir(),'input-ownership-browser-'));
 const store=await mkdtemp(path.join(tmpdir(),'input-ownership-vault-'));
+// A live URL selects language-only checks: never run native-store/save tests against it.
+const liveURL=process.env.CODE_LIVE_URL;
 const output=process.env.CODE_OUTPUT??'/tmp/standoff-code-mirror-browser';
 await mkdir(output,{recursive:true});await mkdir(path.join(store,'vault'));
 const api=express(),errors=[],checks=[];
 let vite,browser,socket;
 try {
- vite=await createServer({server:{host:'127.0.0.1',port:0,hmr:false},plugins:[{name:'ownership-native-store',configureServer(server){server.middlewares.use(api);}}]});
+ if(!liveURL){
+ // Each server owns its optimizer output. Sharing the live dev cache can
+ // delete chunks still referenced by open editor tabs (504 Outdated Optimize Dep).
+ vite=await createServer({cacheDir:path.join(profile,'vite-cache'),server:{host:'127.0.0.1',port:0,hmr:false},plugins:[{name:'ownership-native-store',configureServer(server){server.middlewares.use(api);}}]});
  const {createNativeDocumentStoreRouter}=await vite.ssrLoadModule('/server/native-document-store.mjs');
  api.use('/api/native',createNativeDocumentStoreRouter({root:store,defaultVault:'vault',nativeDiscoveryWorker:false}));
  await vite.listen();
+ }
  browser=spawn(process.env.CHROME_BIN??'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless=new','--window-size=1500,1050','--disable-background-timer-throttling','--no-first-run','--no-default-browser-check','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank']);
  const endpoint=await new Promise((resolve,reject)=>{let out='';browser.stderr.on('data',b=>{out+=b;const m=out.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(m)resolve(m[1]);});browser.once('error',reject);setTimeout(()=>reject(Error('Chrome startup timeout')),15000).unref();});
  socket=new WebSocket(endpoint);await new Promise(r=>socket.addEventListener('open',r,{once:true}));
@@ -31,9 +37,28 @@ try {
  const key=async(key,code,modifiers=0,text)=>{await send('Input.dispatchKeyEvent',{type:'keyDown',key,code,modifiers,...(text?{text}:{} )},sessionId);await send('Input.dispatchKeyEvent',{type:'keyUp',key,code,modifiers},sessionId);};
  const click=async(expression,button='left')=>{const pos=await evaluate(`(()=>{const e=${expression};e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect();return{x:r.left+Math.min(r.width/2,30),y:r.top+Math.min(r.height/2,12)}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',...pos,button,clickCount:1},sessionId);await send('Input.dispatchMouseEvent',{type:'mouseReleased',...pos,button,clickCount:1},sessionId);};
  await send('Runtime.enable',{},sessionId);await send('Page.bringToFront',{},sessionId);await send('Emulation.setDeviceMetricsOverride',{width:1500,height:1050,deviceScaleFactor:1,mobile:false},sessionId);
- await send('Page.navigate',{url:`http://127.0.0.1:${vite.httpServer.address().port}/standoff-code-mirror`},sessionId);
+ await send('Page.navigate',{url:liveURL??`http://127.0.0.1:${vite.httpServer.address().port}/standoff-code-mirror`},sessionId);
  await wait('window.__standoffCodeMirror?.codes().length===2');
  await evaluate("window.p=window.__standoffCodeMirror;window.a=p.codes().find(c=>c.record().payload.id==='cm-code');window.b=p.codes().find(c=>c.record().payload.id==='cm-json');void 0");
+ await wait("p.syntax().some(s=>s.key===a.nodeKey && s.language==='javascript' && s.tree.includes('VariableDeclaration')) && p.syntax().some(s=>s.key===b.nodeKey && s.language==='json' && s.tree.includes('Object'))");
+ check('JavaScript and JSON parsers actually load',true);
+ check('language loading shows no handled import failures',await evaluate("!document.querySelector('.flint-application').textContent.includes('Failed to fetch dynamically imported module')"));
+ if(liveURL){
+   // This browser owns a disposable in-memory fixture. No Save or Vault actions.
+   const specs=[['javascript','const answer = 42;','VariableDeclaration'],['typescript','const answer: number = 42;','TypeAnnotation'],['json','{"answer":42}','Object'],['markdown','# Heading','ATXHeading1'],['xml','<answer>42</answer>','Element'],['sql','SELECT answer FROM example;','Statement']];
+   for(const [name,source,node] of specs){
+     await evaluate(`a.view.dispatch({changes:{from:0,to:a.view.state.doc.length,insert:${JSON.stringify(source)}}});a.changeLanguage(${JSON.stringify(name)});void 0`);
+     await wait(`p.syntax().some(s=>s.key===a.nodeKey && s.language===${JSON.stringify(name)} && s.tree.includes(${JSON.stringify(node)}))`);
+     check(name+' parses source on the live route',true);
+   }
+   await evaluate("a.changeLanguage('plain');void 0");
+   check('plain text removes the parser',await evaluate('!p.syntax().find(s=>s.key===a.nodeKey).language'));
+   await evaluate("a.changeLanguage('javascript');void 0");await wait("p.syntax().some(s=>s.key===a.nodeKey && s.language==='javascript')");
+   check('no handled dynamic import failure on live route',await evaluate("!document.querySelector('.flint-application').textContent.includes('Failed to fetch dynamically imported module')"));
+   check('no uncaught browser exceptions',errors.length===0);
+   await writeFile(path.join(output,'live-languages.json'),JSON.stringify({url:liveURL,browser:await send('Browser.getVersion'),checks,errors},null,2));
+   console.log('Artifacts: '+output);
+ }else{
  check('ordinary production block mounted in real Flint mixed document',await evaluate("a.view.dom.closest('.flint-application')!==null && !!document.querySelector('.reactive-standoff-flow')"));
  await click('a.view.contentDOM');check('native ownership',await evaluate('p.owner()===a.nodeKey'));
  await evaluate("p.base=a.record().payload.text;a.view.dispatch({selection:{anchor:0}});p.revision=p.editor.repository.state.revision");
@@ -81,6 +106,7 @@ try {
  check('native multiple cursors commit one coherent edit',await evaluate("a.record().payload.text==='X'+p.multiText+'X' && p.editor.repository.state.revision===p.multiRevision+1"));
  await evaluate('p.editor.repository.undo();void 0');await wait('a.record().payload.text===p.multiText');
  await evaluate("p.nativeDOM=a.view.dom;a.changeLanguage('typescript');new Promise(r=>setTimeout(r,200))");
+ await wait("p.syntax().some(s=>s.key===a.nodeKey && s.language==='typescript' && s.tree.includes('VariableDeclaration'))");
  check('language reconfiguration retains the mounted native editor',await evaluate("a.view.dom===p.nativeDOM && a.record().payload.metadata.language==='typescript'"));
  await evaluate("p.copy=p.editor.commands.copy(a.nodeKey,{kind:'after',anchorKey:a.nodeKey});void 0");await wait('p.codes().length===3');check('ordinary block duplication mounts native copy',await evaluate("p.codes().some(c=>c.record().key!==a.record().key && c.record().payload.text===a.record().payload.text)"));
  await evaluate("p.editor.commands.remove(p.copy);void 0");await wait('p.codes().length===2');check('block deletion disposes native editor',true);
@@ -108,5 +134,6 @@ try {
  check('no uncaught browser exceptions',errors.length===0);
  await writeFile(path.join(output,'results.json'),JSON.stringify({browser:await send('Browser.getVersion'),checks,errors,limits:['Real OS IME not automated','WebKit not installed','Entity browser UI uses explicit fixture service; no user Vault modified']},null,2));
  console.log('Artifacts: '+output);
+ }
 } catch(error){console.error(error);console.error(JSON.stringify(errors));process.exitCode=1;}
 finally{socket?.close();browser?.kill();await vite?.close();await rm(profile,{recursive:true,force:true,maxRetries:5});await rm(store,{recursive:true,force:true,maxRetries:5});}
