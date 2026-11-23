@@ -1,3 +1,4 @@
+import { editorInputBoundary } from '../runtime/editor-input';
 import { presentationEligible } from '../runtime/presentation-eligibility';
 import { passiveFocus } from '../runtime/passive-presentation';
 import {NativeTextProtection} from '../block-tree/text-protection';
@@ -209,6 +210,8 @@ export class ReactiveEditor {
     this.repository = new CanonicalRepository(this.features.reversibleBlocks ? upgradeLegacySurfaces(decoded.state) : decoded.state, {compactCanonicalText:this.features.compactCanonicalText});
     this.textProtection = new NativeTextProtection(this.repository);
     const protectedInput=(event:Event)=>{
+      // SDK read-only is synchronised by its adapter; canonical admission remains authoritative.
+      if(editorInputBoundary(event))return;
       if(this.textProtection.isTransientInput(event.target))return;
       const resolved=this.mounts.resolveEvent(event);if(!resolved||this.canEditText(resolved.nodeKey))return;
       if(event instanceof KeyboardEvent){
@@ -497,7 +500,7 @@ export class ReactiveEditor {
       const node = projection.state.nodes[key];
       if (!node || !presentationEligible(this, key)) return;
       const capabilities = this.registry.resolve(node.viewType)?.capabilities;
-      const editable = capabilities?.includes('inline-editor') || capabilities?.includes('native-text');
+      const editable = capabilities?.includes('inline-editor') || capabilities?.includes('native-text') || this.features.editorInputOwnership && capabilities?.includes('self-managed-editor');
       if (direction === 1 && editable) return node;
       const children = direction === 1 ? node.children : [...node.children].reverse();
       for (const child of children) { const found = edge(child); if (found) return found; }
@@ -514,7 +517,7 @@ export class ReactiveEditor {
       }
       if (direction === -1 && parent.key !== scope.key) {
         const caps = this.registry.resolve(parent.viewType)?.capabilities;
-        if (presentationEligible(this, parent.key) && (caps?.includes('inline-editor') || caps?.includes('native-text'))) return parent;
+        if (presentationEligible(this, parent.key) && (caps?.includes('inline-editor') || caps?.includes('native-text') || this.features.editorInputOwnership && caps?.includes('self-managed-editor'))) return parent;
       }
       current = parent;
     }
@@ -582,6 +585,7 @@ export class ReactiveEditor {
   }
 
   dispose(): void {
+    this.mounts.dispose();
     this.disposeTextProtectionInput?.();this.textProtection.dispose();
     this.tables.dispose();
     this.tabs.dispose();

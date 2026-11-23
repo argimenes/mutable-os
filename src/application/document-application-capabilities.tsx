@@ -1,3 +1,4 @@
+import { dispatchEditorSave } from '../input/editor-global-input';
 import {registerDocumentPresentations} from './document-presentation-registration';
 import {RegisteredApplicationView,originPresentationHost} from './application-presentations';
 import { documentApplicationPorts } from './document-application-ports';
@@ -584,6 +585,7 @@ export function documentApplicationCapabilities(editor: ReactiveEditor, scope: F
       } : undefined;
       const application: import('../feature-api/document-application').DocumentApplicationInstance = {
           id: applicationId, activeDocumentId: activeId,
+          handleSaveShortcut: (event, save) => dispatchEditorSave(event, editor.bindings, save),
           createDocument(title = 'Untitled document') {
             guard();
             const { document } = createFormattedDocument('page');
