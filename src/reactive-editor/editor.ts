@@ -251,11 +251,11 @@ export class ReactiveEditor {
     this.commandRegistry.authoringAllowed = (key,id) => ['workspace.presentation.desktop','workspace.presentation.textual'].includes(id) || !this.isPassiveOccurrence(key) && !passiveFocus();
     this.textRanges = new TextRanges(key => {
       const node = this.node(key), content = node && this.repository.readState().contents[node.contentKey];
-      if (!node || !content || !["standoff-editor-block", "plain-text-block", ...sourceTextTypes].includes(node.viewType)) return;
+      if (!node || !content || !["standoff-editor-block", "standoff-code-mirror-block", "plain-text-block", ...sourceTextTypes].includes(node.viewType)) return;
       const cell = node.viewType === "standoff-editor-block";
       return { nodeKey: node.key, contentKey: node.contentKey, placementKey: node.placementKey,
         version: cell ? content.inlineRevision : content.revision,
-        length: cell ? node.inlineContent.length : String(node.payload.text ?? "").length, coordinate: cell ? "cell" : "utf16" };
+        length: cell ? node.inlineContent.length : node.viewType==="standoff-code-mirror-block" ? String(node.payload.text ?? "").replace(/\r\n?/g, "\n").length : String(node.payload.text ?? "").length, coordinate: cell ? "cell" : "utf16" };
     });
     this.decorations.configureValidation(ranges => this.textRanges.validate(ranges), range => this.visualEffects.validateType({
       type:range.type??'editor/temporary-range',renderers:range.renderers??this.visualEffects.type(range.type)?.renderers??[],

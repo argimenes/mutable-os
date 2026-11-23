@@ -39,6 +39,7 @@ export type FeatureFlags = Readonly<{
   standoffCodeHighlighting: boolean;
   /** Mounted SDK editor input ownership; prototype route is separate. */
   editorInputOwnership: boolean;
+  standoffCodeMirror: boolean;
   markdownInputTransformation: boolean;
   /** Presentation orientation on existing TabRows. */
   verticalTabs: boolean;
@@ -269,6 +270,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   blockModes: true,
   standoffCodeHighlighting: true,
   editorInputOwnership: true,
+  standoffCodeMirror: true,
   markdownInputTransformation: true,
   verticalTabs: true,
   desktopApplicationIcons: true,

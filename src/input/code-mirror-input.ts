@@ -14,13 +14,15 @@ export function mountCodeMirrorInput(options: {
   actions?: readonly string[];
   run?(id: string, event: Event): boolean;
   canRun?(id: string): boolean;
+  /** Additional occurrence-local permission, e.g. a passive presentation. */
+  canEdit?(): boolean;
   error?(error: unknown): void;
 }) {
   const { editor, nodeKey, view, root } = options;
   if (!editor.features.editorInputOwnership) throw new Error('Editor input ownership is disabled');
   const contentKey = editor.node(nodeKey)?.contentKey;
   if (!contentKey) throw new Error('Mount requires a live editing occurrence');
-  const canEdit = () => !editor.textProtection.isProtected(contentKey);
+  const canEdit = () => !editor.textProtection.isProtected(contentKey) && (options.canEdit?.() ?? true);
   const allowed = new Set(options.actions ?? []);
   const scopes = [...new Set(['editor', ...[...allowed].map(id => editor.bindings.get(id)?.scope).filter((s): s is string => !!s)])];
   const permission = new Compartment(), input = new Compartment();
