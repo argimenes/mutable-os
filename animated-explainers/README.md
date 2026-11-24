@@ -44,3 +44,13 @@ Copy the episode directory, edit its metadata and storyboard, and register its s
 | Standalone browser SVG | Provides the same typography and range measurements with few dependencies. A separate frame capture, encoding and preview workflow would be needed. |
 
 The series uses the repository’s IBM Plex Mono WOFF2 and its accompanying SIL Open Font License. Source Serif 4 and IBM Plex Sans come from pinned Fontsource packages with their OFL licenses. All fonts are bundled locally. The layered mark is a vector interpretation of the supplied sheet and the wordmark is typeset. The existing repository artwork located during production represented Solid, Codex and individual Mutable applications.
+
+## Episode 001 delivery
+
+The local delivery includes the [master MP4](renders/001-standoff-properties.mp4), [eight-frame review sheet](renders/001-stages.png) and [full-size review frames](renders/001-stills/). A fresh checkout can regenerate the movie with the command above. To export a single full-resolution still directly from the composition, run the following command from this workspace.
+
+```sh
+npx remotion still index.tsx 001-standoff-properties renders/exploded.png --frame=660
+```
+
+The encoded master contains one H.264 video stream, 1,050 frames and a duration of 35.000 seconds. The review sheet was decoded from the MP4 and inspected at a 360-pixel frame width. On macOS, Studio was scrubbed from the exploded pose to the final underlines, back to separation and forward again. All four pairs of endpoints matched the corresponding shaped characters. The sentence retained the same baseline at all three poses. The [storyboard](episodes/001-standoff-properties/storyboard.md) records the editorial choices.

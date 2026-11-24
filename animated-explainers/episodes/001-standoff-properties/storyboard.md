@@ -13,7 +13,7 @@ The viewer follows the same sentence from plain type to an exploded diagram and 
 | 18–24 s | The amber predicate plane rises, followed by the violet opening action. Hold all three readings in the exploded view. | The predicate tells us what Alice did. · One text. Many interpretations. |
 | 24–30 s | Planes descend in sequence. The outlines and guides disappear, leaving the same coloured strokes under the sentence. A wash picks out their shared word. | The action and predicate share “met”. · Annotations can overlap freely. |
 | 30–35 s | Return to the engraved leaves. Hold the concluding type and imprint. | One text. Many layers of meaning. · Mutable OS · mutable.ink |
- 
+
 ## Range decisions
 
 Mint identifies both character names. Amber covers “met the White Rabbit”. Violet covers the opening action “Alice met”. The violet span starts first and ends inside the amber span. The period belongs solely to the original text.
