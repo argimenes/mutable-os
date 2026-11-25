@@ -16,6 +16,8 @@ import {FindingThingsThroughWords} from './episodes/007-finding-things-through-w
 import discovery from './episodes/007-finding-things-through-words/metadata.json';
 import {WhenAnnotationsBecomeQueries} from './episodes/008-when-annotations-become-queries/scene';
 import inquiry from './episodes/008-when-annotations-become-queries/metadata.json';
+import {WhenARelationshipIsNotEnough} from './episodes/009-when-a-relationship-is-not-enough/scene';
+import statement from './episodes/009-when-a-relationship-is-not-enough/metadata.json';
 import './theme/fonts.css';
 
 function MutableConcepts() {
@@ -44,6 +46,9 @@ function MutableConcepts() {
     <Composition id={inquiry.id} component={WhenAnnotationsBecomeQueries}
       width={inquiry.width} height={inquiry.height} fps={inquiry.fps}
       durationInFrames={inquiry.durationSeconds * inquiry.fps} />
+    <Composition id={statement.id} component={WhenARelationshipIsNotEnough}
+      width={statement.width} height={statement.height} fps={statement.fps}
+      durationInFrames={statement.durationSeconds * statement.fps} />
   </>;
 }
 

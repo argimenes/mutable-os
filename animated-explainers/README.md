@@ -129,3 +129,13 @@ npm run render -- 008-when-annotations-become-queries renders/008-when-annotatio
 ```
 
 [Narrated film](renders/008-when-annotations-become-queries.mp4) · [Stage sheet](renders/008-stages.png) · [Storyboard and corpus](episodes/008-when-annotations-become-queries/storyboard.md) · [Production report](episodes/008-when-annotations-become-queries/implementation.md)
+
+## Volume III — The Architecture of Meaning
+
+*When a relationship is not enough* opens the volume with two illustrative sendings. The 90-second film follows each participant from the sentence into the graph and back to its source. Choose `009-when-a-relationship-is-not-enough` in Studio.
+
+```sh
+npm run render -- 009-when-a-relationship-is-not-enough renders/009-when-a-relationship-is-not-enough.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/009-when-a-relationship-is-not-enough.mp4) · [Stage sheet](renders/009-stages.png) · [Storyboard and narration](episodes/009-when-a-relationship-is-not-enough/storyboard.md) · [Production report](episodes/009-when-a-relationship-is-not-enough/implementation.md)
