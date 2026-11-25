@@ -75,11 +75,11 @@ function Folios({spread}: {spread: number}) {
   </g>;
 }
 
-export function Bookend({lead, emphasis, emphasisSize = 89, spread, opacity}: {
-  lead: string; emphasis: string; emphasisSize?: number; spread: number; opacity: number;
+export function Bookend({lead, emphasis, emphasisSize = 89, spread, opacity, imprintOpacity = 1}: {
+  lead: string; emphasis: string; emphasisSize?: number; spread: number; opacity: number; imprintOpacity?: number;
 }) {
   return <g opacity={opacity}>
-    <Folios spread={spread} />
+    <g opacity={imprintOpacity}><Folios spread={spread} /></g>
     <g textAnchor="middle" fontFamily={type.serif} fill={ink.cream}>
       <text x="540" y="679" fontSize={92}>
         {lead}
@@ -88,13 +88,20 @@ export function Bookend({lead, emphasis, emphasisSize = 89, spread, opacity}: {
         {emphasis}
       </text>
     </g>
-    <path d="M76 919H1004" stroke={ink.rule} strokeWidth="1.5" />
-    <text x="76" y="981" fontFamily={type.serif} fontSize="36" fill={ink.cream}>Mutable OS</text>
-    <text x="1004" y="980" textAnchor="end" fontFamily={type.mono} fontSize="28" fill={ink.grey}>mutable.ink</text>
+    <g opacity={imprintOpacity}>
+      <path d="M76 919H1004" stroke={ink.rule} strokeWidth="1.5" />
+      <text x="76" y="981" fontFamily={type.serif} fontSize="36" fill={ink.cream}>Mutable OS</text>
+      <text x="1004" y="980" textAnchor="end" fontFamily={type.mono} fontSize="28" fill={ink.grey}>mutable.ink</text>
+    </g>
   </g>;
 }
 
-export function Caption({text, opacity}: {text: string; opacity: number}) {
+export function Caption({text, opacity}: {text: string | readonly string[]; opacity: number}) {
+  if (typeof text !== 'string') {
+    return <g textAnchor="middle" fontFamily={type.sans} fontSize="42" fill={ink.cream} opacity={opacity}>
+      {text.map((line, index) => <text key={line} x="540" y={949 + index * 50}>{line}</text>)}
+    </g>;
+  }
   return <text x="540" y="967" textAnchor="middle" fontFamily={type.sans} fontSize="42"
     fill={ink.cream} opacity={opacity}>{text}</text>;
 }
