@@ -1,6 +1,6 @@
 # Mutable Motion
 
-Mutable Concepts is a series of silent, code-authored films for Mutable OS. Episode 001 follows four annotations as they lift off one sentence and return as overlapping underlines.
+Mutable Concepts is a series of silent, code-authored films for Mutable OS. Episode 001 follows four annotations as they lift off one sentence and return as overlapping underlines. Episode 002 repeats one edit to show the difference between fixed positions and references to character Cells.
 
 ## Preview and render
 
@@ -19,7 +19,7 @@ npm run typecheck
 npm run render -- 001-standoff-properties renders/001-standoff-properties.mp4
 ```
 
-The render command produces 1,050 frames of silent H.264 video at 1080 × 1080 and 30 fps. Append `--scale=0.5` for a 540-square proof. The first render downloads the matching headless browser. The CLI includes its encoder. Each episode uses this installation, and Mutable’s application build uses its own package manifest and lockfile.
+The Episode 001 render command produces 1,050 frames of silent H.264 video at 1080 × 1080 and 30 fps. Append `--scale=0.5` for a 540-square proof. The first render downloads the matching headless browser. The CLI includes its encoder. Each episode uses this installation, and Mutable’s application build uses its own package manifest and lockfile.
 
 ## Producing another episode
 
@@ -28,6 +28,8 @@ Copy the episode directory, edit its metadata and storyboard, and register its s
 | Location | Contents |
 | --- | --- |
 | `episodes/001-standoff-properties/` | Storyboard, delivery metadata and the scene’s range definitions, captions and timing |
+| `episodes/002-when-text-changes/` | Storyboard, metadata, character model and the nine scenes |
+| `shared/CellSequence.tsx` | Stable character objects, shaped opening text, Cell outlines and suffix index tables |
 | `shared/TextRun.tsx` | A shaped SVG sentence and half-open character ranges measured after fonts load |
 | `shared/AnnotationLayer.tsx` | A translucent plane, keyed range strokes and endpoint guides shared between the raised and flat poses |
 | `shared/SeriesPlate.tsx` | Font readiness, series masthead, caption and engraved title/end card |
@@ -54,3 +56,16 @@ npx remotion still index.tsx 001-standoff-properties renders/exploded.png --fram
 ```
 
 The encoded master contains one H.264 video stream, 1,050 frames and a duration of 35.000 seconds. The review sheet was decoded from the MP4 and inspected at a 360-pixel frame width. On macOS, Studio was scrubbed from the exploded pose to the final underlines, back to separation and forward again. All four pairs of endpoints matched the corresponding shaped characters. The sentence retained the same baseline at all three poses. The [storyboard](episodes/001-standoff-properties/storyboard.md) records the editorial choices.
+
+## Episode 002 delivery
+
+From this workspace, use the same Studio and render commands. Choose `002-when-text-changes` in the sidebar. [Episode 002 on the default Studio port](http://localhost:3000/002-when-text-changes)
+
+```sh
+npm run preview
+npm run render -- 002-when-text-changes renders/002-when-text-changes.mp4
+```
+
+The revised master runs for 60 seconds (1,800 frames at 1080 × 1080 and 30 fps). Start at 12 seconds for the stale numerical boundaries, 32 seconds for the same insertion with Cell references, 41 seconds for the reindexing sweep, or 47 seconds for the insertion inside “fox”. [Master MP4](renders/002-when-text-changes.mp4) · [Review sheet](renders/002-stages.png) · [Storyboard and concept notes](episodes/002-when-text-changes/storyboard.md)
+
+The episode uses the Concept 001 fonts, palette, range strokes, captions, series plate and engraved end card. Both illustrated properties share their starting Cell. Their quotes, connectors and numerical readouts follow the episode’s character model.
