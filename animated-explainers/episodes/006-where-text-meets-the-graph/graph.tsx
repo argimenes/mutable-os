@@ -1,7 +1,7 @@
 import React from 'react';
 import {mix} from '../../shared/CellSequence';
 import {ink, type} from '../../theme';
-import type {Entity} from './corpus';
+export type GraphEntity = {id:string; name:readonly string[]};
 
 export type Point = {x:number; y:number};
 export const point = (x:number, y:number):Point => ({x,y});
@@ -36,7 +36,7 @@ export function MentionNode({id,center,opacity,light}: {id:string;center:Point;o
 }
 
 export const radius = {x:113,y:75};
-export function EntityNode({entity,center,opacity,light}: {entity:Entity;center:Point;opacity:number;light:number}) {
+export function EntityNode({entity,center,opacity,light}: {entity:GraphEntity;center:Point;opacity:number;light:number}) {
   return <g data-entity={entity.id} opacity={opacity} transform={`translate(${center.x} ${center.y})`}>
     <ellipse rx={radius.x} ry={radius.y} stroke={ink.grammar} strokeWidth={2.5} fill="#33312b"/>
     <ellipse rx={radius.x-6} ry={radius.y-6} stroke={ink.grammar} opacity={.25+light*.6} fill="none"/>
