@@ -99,3 +99,13 @@ npm run render -- 005-beyond-the-contiguous-range renders/005-beyond-the-contigu
 ```
 
 [Narrated film](renders/005-beyond-the-contiguous-range.mp4) · [Review sheet](renders/005-stages.png) · [Storyboard and script](episodes/005-beyond-the-contiguous-range/storyboard.md) · [Production report](episodes/005-beyond-the-contiguous-range/implementation.md)
+
+## Episode 006 delivery
+
+*Where text meets the graph* opens Volume II — From Text to Knowledge. The same words, “The Emperor”, lead to Napoleon Bonaparte in one document and Augustus in another. Select `006-where-text-meets-the-graph` in Studio for the 75-second narrated composition.
+
+```sh
+npm run render -- 006-where-text-meets-the-graph renders/006-where-text-meets-the-graph.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/006-where-text-meets-the-graph.mp4) · [Stage sheet](renders/006-stages.png) · [Storyboard and script](episodes/006-where-text-meets-the-graph/storyboard.md) · [Production report](episodes/006-where-text-meets-the-graph/implementation.md)

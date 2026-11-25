@@ -10,6 +10,8 @@ import {WhenCharactersDisappear} from './episodes/004-when-characters-disappear/
 import deletion from './episodes/004-when-characters-disappear/metadata.json';
 import {BeyondTheContiguousRange} from './episodes/005-beyond-the-contiguous-range/scene';
 import segments from './episodes/005-beyond-the-contiguous-range/metadata.json';
+import {WhereTextMeetsTheGraph} from './episodes/006-where-text-meets-the-graph/scene';
+import graph from './episodes/006-where-text-meets-the-graph/metadata.json';
 import './theme/fonts.css';
 
 function MutableConcepts() {
@@ -29,6 +31,9 @@ function MutableConcepts() {
     <Composition id={segments.id} component={BeyondTheContiguousRange}
       width={segments.width} height={segments.height} fps={segments.fps}
       durationInFrames={segments.durationSeconds * segments.fps} />
+    <Composition id={graph.id} component={WhereTextMeetsTheGraph}
+      width={graph.width} height={graph.height} fps={graph.fps}
+      durationInFrames={graph.durationSeconds * graph.fps} />
   </>;
 }
 

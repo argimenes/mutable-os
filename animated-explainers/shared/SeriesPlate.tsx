@@ -26,8 +26,8 @@ function FontGate({children}: {children: ReactNode}) {
 
 const ProductBranding = React.createContext(true);
 
-export function SeriesPlate({number, productBranding = true, children}: {
-  number: string; productBranding?: boolean; children: ReactNode;
+export function SeriesPlate({number, productBranding = true, seriesAttribution = false, children}: {
+  number: string; productBranding?: boolean; seriesAttribution?: boolean; children: ReactNode;
 }) {
   return <FontGate><ProductBranding.Provider value={productBranding}>
     <svg viewBox="0 0 1080 1080" width="100%" height="100%" style={{background: ink.paper}}>
@@ -46,7 +46,10 @@ export function SeriesPlate({number, productBranding = true, children}: {
       <rect width="1080" height="1080" fill="url(#field)" />
       <g fontFamily={type.mono} fontSize={26} fill={ink.cream} letterSpacing={2}>
         <image href={mark} x={76} y={60} width={50} height={50} />
-        <text x={150} y={94}>{productBranding && 'MUTABLE '}<tspan fill={ink.entity}>{productBranding ? '/ CONCEPTS /' : 'CONCEPTS /'}</tspan> {number}</text>
+        <text x={150} y={94}>
+          {seriesAttribution ? 'Mutable OS ' : productBranding && 'MUTABLE '}
+          <tspan fill={ink.entity}>{seriesAttribution ? '/ Concepts /' : productBranding ? '/ CONCEPTS /' : 'CONCEPTS /'}</tspan> {number}
+        </text>
       </g>
       <path d="M76 140H1004" stroke={ink.rule} strokeWidth={1.5} />
       {children}
@@ -79,8 +82,8 @@ function Folios({spread}: {spread: number}) {
   </g>;
 }
 
-export function Bookend({lead, emphasis, leadSize = 92, emphasisSize = 89, spread, opacity, imprintOpacity = 1}: {
-  lead: string; emphasis: string; leadSize?: number; emphasisSize?: number; spread: number; opacity: number; imprintOpacity?: number;
+export function Bookend({lead, emphasis, leadSize = 92, emphasisSize = 89, spread, opacity, imprintOpacity = 1, volumeLabel}: {
+  lead: string; emphasis: string; leadSize?: number; emphasisSize?: number; spread: number; opacity: number; imprintOpacity?: number; volumeLabel?: string;
 }) {
   const productBranding = React.useContext(ProductBranding);
   return <g opacity={opacity}>
@@ -95,7 +98,7 @@ export function Bookend({lead, emphasis, leadSize = 92, emphasisSize = 89, sprea
     </g>
     <g opacity={imprintOpacity}>
       <path d="M76 919H1004" stroke={ink.rule} strokeWidth="1.5" />
-      <text x="76" y="981" fontFamily={type.serif} fontSize="36" fill={ink.cream}>{productBranding ? 'Mutable OS' : 'Volume I'}</text>
+      <text x="76" y="981" fontFamily={type.serif} fontSize="36" fill={ink.cream}>{volumeLabel ?? (productBranding ? 'Mutable OS' : 'Volume I')}</text>
       <text x="1004" y="980" textAnchor="end" fontFamily={type.mono} fontSize="28" fill={ink.grey}>mutable.ink</text>
     </g>
   </g>;
