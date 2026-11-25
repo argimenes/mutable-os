@@ -1,6 +1,6 @@
 # Mutable Motion
 
-Mutable Concepts is a series of silent, code-authored films for Mutable OS. Episode 001 follows four annotations as they lift off one sentence and return as overlapping underlines. Episode 002 repeats one edit to show the difference between fixed positions and references to character Cells.
+Mutable Concepts is a series of code-authored films for Mutable OS. Episode 001 follows four annotations as they lift off one sentence and return as overlapping underlines. Episode 002 repeats one edit to show the difference between fixed positions and references to character Cells.
 
 ## Preview and render
 
@@ -69,3 +69,13 @@ npm run render -- 002-when-text-changes renders/002-when-text-changes.mp4
 The revised master runs for 60 seconds (1,800 frames at 1080 × 1080 and 30 fps). Start at 12 seconds for the stale numerical boundaries, 32 seconds for the same insertion with Cell references, 41 seconds for the reindexing sweep, or 47 seconds for the insertion inside “fox”. [Master MP4](renders/002-when-text-changes.mp4) · [Review sheet](renders/002-stages.png) · [Storyboard and concept notes](episodes/002-when-text-changes/storyboard.md)
 
 The episode uses the Concept 001 fonts, palette, range strokes, captions, series plate and engraved end card. Both illustrated properties share their starting Cell. Their quotes, connectors and numerical readouts follow the episode’s character model.
+
+## Episode 003 delivery
+
+*Beyond the Hierarchy* follows one two-line poem from nested enclosures to crossing tracks, independent ontologies and two readings of “the sleeping sea”. Open `003-beyond-the-hierarchy` in Studio. The 75-second narrated master plays with English speech in Studio. The silent picture master, standalone narration and three signature stills are in `renders/`.
+
+```sh
+npm run render -- 003-beyond-the-hierarchy renders/003-beyond-the-hierarchy.mp4
+```
+
+[Narrated film](renders/003-beyond-the-hierarchy.mp4) · [Narration WAV](renders/003-narration.wav) · [Silent film](renders/003-beyond-the-hierarchy-silent.mp4) · [Signature stills](renders/003-stills/) · [Timed storyboard](episodes/003-beyond-the-hierarchy/storyboard.md) · [Editable scene manifest](episodes/003-beyond-the-hierarchy/scenes.json) · [Implementation and reproduction](episodes/003-beyond-the-hierarchy/implementation.md)
