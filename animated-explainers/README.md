@@ -139,3 +139,13 @@ npm run render -- 009-when-a-relationship-is-not-enough renders/009-when-a-relat
 ```
 
 [Narrated film](renders/009-when-a-relationship-is-not-enough.mp4) · [Stage sheet](renders/009-stages.png) · [Storyboard and narration](episodes/009-when-a-relationship-is-not-enough/storyboard.md) · [Production report](episodes/009-when-a-relationship-is-not-enough/implementation.md)
+
+### Concept 010 · The language of characterisation
+
+The same passage in Luca Landucci’s *Florentine Diary* can lead into a history of the Venetians, a history of Landucci’s observations, or a history of a descriptive concept. Choose `010-the-language-of-characterisation` in Studio for the 103-second narrated film.
+
+```sh
+npm run render -- 010-the-language-of-characterisation renders/010-the-language-of-characterisation.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/010-the-language-of-characterisation.mp4) · [Stage sheet](renders/010-stages.png) · [Storyboard and script](episodes/010-the-language-of-characterisation/storyboard.md) · [Production report](episodes/010-the-language-of-characterisation/implementation.md)

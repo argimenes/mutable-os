@@ -18,6 +18,8 @@ import {WhenAnnotationsBecomeQueries} from './episodes/008-when-annotations-beco
 import inquiry from './episodes/008-when-annotations-become-queries/metadata.json';
 import {WhenARelationshipIsNotEnough} from './episodes/009-when-a-relationship-is-not-enough/scene';
 import statement from './episodes/009-when-a-relationship-is-not-enough/metadata.json';
+import {TheLanguageOfCharacterisation} from './episodes/010-the-language-of-characterisation/scene';
+import traits from './episodes/010-the-language-of-characterisation/metadata.json';
 import './theme/fonts.css';
 
 function MutableConcepts() {
@@ -49,6 +51,9 @@ function MutableConcepts() {
     <Composition id={statement.id} component={WhenARelationshipIsNotEnough}
       width={statement.width} height={statement.height} fps={statement.fps}
       durationInFrames={statement.durationSeconds * statement.fps} />
+    <Composition id={traits.id} component={TheLanguageOfCharacterisation}
+      width={traits.width} height={traits.height} fps={traits.fps}
+      durationInFrames={traits.durationSeconds * traits.fps} />
   </>;
 }
 
