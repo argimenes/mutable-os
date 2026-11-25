@@ -8,6 +8,8 @@ import {BeyondTheHierarchy} from './episodes/003-beyond-the-hierarchy/scene';
 import hierarchy from './episodes/003-beyond-the-hierarchy/metadata.json';
 import {WhenCharactersDisappear} from './episodes/004-when-characters-disappear/scene';
 import deletion from './episodes/004-when-characters-disappear/metadata.json';
+import {BeyondTheContiguousRange} from './episodes/005-beyond-the-contiguous-range/scene';
+import segments from './episodes/005-beyond-the-contiguous-range/metadata.json';
 import './theme/fonts.css';
 
 function MutableConcepts() {
@@ -24,6 +26,9 @@ function MutableConcepts() {
     <Composition id={deletion.id} component={WhenCharactersDisappear}
       width={deletion.width} height={deletion.height} fps={deletion.fps}
       durationInFrames={deletion.durationSeconds * deletion.fps} />
+    <Composition id={segments.id} component={BeyondTheContiguousRange}
+      width={segments.width} height={segments.height} fps={segments.fps}
+      durationInFrames={segments.durationSeconds * segments.fps} />
   </>;
 }
 

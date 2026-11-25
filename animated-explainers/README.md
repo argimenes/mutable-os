@@ -89,3 +89,13 @@ npm run render -- 004-when-characters-disappear renders/004-when-characters-disa
 ```
 
 [Film](renders/004-when-characters-disappear.mp4) · [Review sheet](renders/004-stages.png) · [Storyboard and script](episodes/004-when-characters-disappear/storyboard.md) · [Implementation report](episodes/004-when-characters-disappear/implementation.md)
+
+## Episode 005 delivery
+
+*Beyond the contiguous range* follows the two parts of “pick up”, then a quotation that crosses a block boundary. Open `005-beyond-the-contiguous-range` in Studio. The 64-second composition includes its narration.
+
+```sh
+npm run render -- 005-beyond-the-contiguous-range renders/005-beyond-the-contiguous-range.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/005-beyond-the-contiguous-range.mp4) · [Review sheet](renders/005-stages.png) · [Storyboard and script](episodes/005-beyond-the-contiguous-range/storyboard.md) · [Production report](episodes/005-beyond-the-contiguous-range/implementation.md)
