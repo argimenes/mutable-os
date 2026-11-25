@@ -38,7 +38,53 @@
       "src/features/dialectic/dialectic.test.tsx > rejects Stage 3A nonmanaged and foreign originals, changed sources and late session changes",
       "src/features/grouping/document-style-bar.test.tsx > DocumentWindow annotation toolbar (compact=false) > collects only Control-held gestures, excludes early release, and keeps static highlights",
       "src/features/grouping/document-style-bar.test.tsx > DocumentWindow annotation toolbar (compact=true) > collects only Control-held gestures, excludes early release, and keeps static highlights"
-    ]
+    ],
+    "precedingCommitCheck": {
+      "precedingCommit": "0a4128a61bdd171c6c16c27d7eef3a03e8250882",
+      "acceptedCommit": "7adc6b648913075f28daa8dd3915e5f51e117b0d",
+      "method": "Ran the seven named tests with default feature settings on the detached parent checkout and the accepted source, using the same installed dependencies.",
+      "node": "22.12.0",
+      "vitest": "2.1.9",
+      "command": "node_modules/.bin/vitest run --maxWorkers=1 --minWorkers=1 src/features/dialectic/dialectic.test.tsx src/features/grouping/document-style-bar.test.tsx -t 'fences Stage 3C changed sources|protects submitted base text canonically|qualifies Stage 3B human Add Image|qualifies Stage 3C retained PDF|rejects Stage 3A nonmanaged|collects only Control-held gestures'",
+      "matchingFailures": {
+        "src/features/dialectic/dialectic.test.tsx > fences Stage 3C changed sources and late sessions, and rolls annotations and fragments back atomically": {
+          "line": 1428,
+          "column": 372,
+          "assertion": "AssertionError: expected '' to match /changed/"
+        },
+        "src/features/dialectic/dialectic.test.tsx > protects submitted base text canonically while retaining annotations, drafts and history": {
+          "line": 494,
+          "column": 129,
+          "assertion": "AssertionError: expected true to be false // Object.is equality"
+        },
+        "src/features/dialectic/dialectic.test.tsx > qualifies Stage 3B human Add Image equivalence and mixed managed/external fragment admission": {
+          "line": 1382,
+          "column": 322,
+          "assertion": "AssertionError: expected \"spy\" to be called 1 times, but got 2 times"
+        },
+        "src/features/dialectic/dialectic.test.tsx > qualifies Stage 3C retained PDF native equivalence, mixed admission, identity, history, persistence and bounded work": {
+          "line": 1405,
+          "column": 88,
+          "assertion": "AssertionError: expected \"spy\" to be called 1 times, but got 2 times"
+        },
+        "src/features/dialectic/dialectic.test.tsx > rejects Stage 3A nonmanaged and foreign originals, changed sources and late session changes": {
+          "line": 1373,
+          "column": 156,
+          "assertion": "AssertionError: expected '' to match /changed/"
+        },
+        "src/features/grouping/document-style-bar.test.tsx > DocumentWindow annotation toolbar (compact=false) > collects only Control-held gestures, excludes early release, and keeps static highlights": {
+          "line": 124,
+          "column": 84,
+          "assertion": "AssertionError: expected <g …(2)><path …(7)></path></g>\n…(3) to have a length of 2 but got 4"
+        },
+        "src/features/grouping/document-style-bar.test.tsx > DocumentWindow annotation toolbar (compact=true) > collects only Control-held gestures, excludes early release, and keeps static highlights": {
+          "line": 124,
+          "column": 84,
+          "assertion": "AssertionError: expected <g …(2)><path …(7)></path></g>\n…(3) to have a length of 2 but got 4"
+        }
+      },
+      "introducedRegressions": []
+    }
   },
   "chromeSelection": {
     "browser": "Chrome/158.0.8127.37",
