@@ -109,3 +109,23 @@ npm run render -- 006-where-text-meets-the-graph renders/006-where-text-meets-th
 ```
 
 [Narrated film](renders/006-where-text-meets-the-graph.mp4) · [Stage sheet](renders/006-stages.png) · [Storyboard and script](episodes/006-where-text-meets-the-graph/storyboard.md) · [Production report](episodes/006-where-text-meets-the-graph/implementation.md)
+
+## Episode 007 delivery
+
+*Finding things through words* compares a search of entity properties with a search of annotated passages. Open `007-finding-things-through-words` in Studio for the 80-second narrated film.
+
+```sh
+npm run render -- 007-finding-things-through-words renders/007-finding-things-through-words.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/007-finding-things-through-words.mp4) · [Stage sheet](renders/007-stages.png) · [Storyboard and corpus](episodes/007-finding-things-through-words/storyboard.md) · [Production report](episodes/007-finding-things-through-words/implementation.md)
+
+## Episode 008 delivery
+
+*When annotations become queries* follows an interval test from one sentence to a five-document corpus. Choose `008-when-annotations-become-queries` in Studio for the 100-second narrated film.
+
+```sh
+npm run render -- 008-when-annotations-become-queries renders/008-when-annotations-become-queries.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/008-when-annotations-become-queries.mp4) · [Stage sheet](renders/008-stages.png) · [Storyboard and corpus](episodes/008-when-annotations-become-queries/storyboard.md) · [Production report](episodes/008-when-annotations-become-queries/implementation.md)
