@@ -6,6 +6,8 @@ import {WhenTextChanges} from './episodes/002-when-text-changes/scene';
 import changes from './episodes/002-when-text-changes/metadata.json';
 import {BeyondTheHierarchy} from './episodes/003-beyond-the-hierarchy/scene';
 import hierarchy from './episodes/003-beyond-the-hierarchy/metadata.json';
+import {WhenCharactersDisappear} from './episodes/004-when-characters-disappear/scene';
+import deletion from './episodes/004-when-characters-disappear/metadata.json';
 import './theme/fonts.css';
 
 function MutableConcepts() {
@@ -19,6 +21,9 @@ function MutableConcepts() {
     <Composition id={hierarchy.id} component={BeyondTheHierarchy}
       width={hierarchy.width} height={hierarchy.height} fps={hierarchy.fps}
       durationInFrames={hierarchy.durationSeconds * hierarchy.fps} />
+    <Composition id={deletion.id} component={WhenCharactersDisappear}
+      width={deletion.width} height={deletion.height} fps={deletion.fps}
+      durationInFrames={deletion.durationSeconds * deletion.fps} />
   </>;
 }
 

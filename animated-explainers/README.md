@@ -79,3 +79,13 @@ npm run render -- 003-beyond-the-hierarchy renders/003-beyond-the-hierarchy.mp4
 ```
 
 [Narrated film](renders/003-beyond-the-hierarchy.mp4) · [Narration WAV](renders/003-narration.wav) · [Silent film](renders/003-beyond-the-hierarchy-silent.mp4) · [Signature stills](renders/003-stills/) · [Timed storyboard](episodes/003-beyond-the-hierarchy/storyboard.md) · [Editable scene manifest](episodes/003-beyond-the-hierarchy/scenes.json) · [Implementation and reproduction](episodes/003-beyond-the-hierarchy/implementation.md)
+
+## Episode 004 delivery
+
+*When characters disappear* follows one typographic annotation as text is deleted around it, inside it and at each boundary. Open `004-when-characters-disappear` in Studio. The 56-second composition includes its English narration.
+
+```sh
+npm run render -- 004-when-characters-disappear renders/004-when-characters-disappear.mp4 --audio-bitrate=192k
+```
+
+[Film](renders/004-when-characters-disappear.mp4) · [Review sheet](renders/004-stages.png) · [Storyboard and script](episodes/004-when-characters-disappear/storyboard.md) · [Implementation report](episodes/004-when-characters-disappear/implementation.md)

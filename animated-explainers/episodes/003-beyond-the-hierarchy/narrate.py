@@ -43,8 +43,10 @@ def main():
     parser.add_argument("model_dir", type=Path)
     parser.add_argument("output_m4a", type=Path)
     parser.add_argument("--ffmpeg", default="ffmpeg")
+    parser.add_argument("--episode-dir", type=Path, default=Path(__file__).parent,
+                        help="Directory containing scenes.json and metadata.json")
     args = parser.parse_args()
-    here = Path(__file__).parent
+    here = args.episode_dir
     scenes = json.loads((here / "scenes.json").read_text())
     duration = json.loads((here / "metadata.json").read_text())["durationSeconds"]
     engine = Kokoro(str(args.model_dir / "kokoro-v1.0.onnx"),
