@@ -1,0 +1,858 @@
+[
+  {
+    "number": 1,
+    "title": "The question",
+    "frame": 0,
+    "cues": [
+      {
+        "frame": 36,
+        "speechFrames": 66,
+        "action": "Series folios and title",
+        "text": "What does it mean for something to be mutable?"
+      },
+      {
+        "frame": 115,
+        "speechFrames": 61,
+        "action": "A short line appears",
+        "text": "At first, the answer seems obvious."
+      },
+      {
+        "frame": 189,
+        "speechFrames": 70,
+        "action": "Change one word",
+        "text": "Something is mutable if it can be changed."
+      },
+      {
+        "frame": 272,
+        "speechFrames": 138,
+        "action": "Insert an expression before the bridge",
+        "text": "A sentence can be revised. A paragraph can grow. A document can be rewritten."
+      },
+      {
+        "frame": 423,
+        "speechFrames": 179,
+        "action": "The entity range follows the growing line",
+        "text": "And, as we have seen, even the semantic structures associated with a text can persist as that text changes."
+      },
+      {
+        "frame": 615,
+        "speechFrames": 77,
+        "action": "Hold the opening question",
+        "text": "But perhaps mutability can mean something more."
+      }
+    ],
+    "end": 732
+  },
+  {
+    "number": 2,
+    "title": "Meaning without replacement",
+    "frame": 732,
+    "cues": [
+      {
+        "frame": 744,
+        "speechFrames": 86,
+        "action": "Add two readings to the same words",
+        "text": "A text can acquire new meanings without being rewritten."
+      },
+      {
+        "frame": 843,
+        "speechFrames": 146,
+        "action": "Introduce the three short passages",
+        "text": "A document can acquire new ways of being read without losing its original composition."
+      },
+      {
+        "frame": 1002,
+        "speechFrames": 262,
+        "action": "Gather the mentions, then open the gap again",
+        "text": "Follow Brooklyn Bridge through this little document. The passages that mention it draw together. Open the document again, and the river returns to its old place."
+      },
+      {
+        "frame": 1277,
+        "speechFrames": 171,
+        "action": "Carry both interpretations back into the passage",
+        "text": "Sometimes, what changes is what we can do with it, how we understand it, or how it is presented to us."
+      }
+    ],
+    "end": 1488
+  },
+  {
+    "number": 3,
+    "title": "The limits of categories",
+    "frame": 1488,
+    "cues": [
+      {
+        "frame": 1500,
+        "speechFrames": 121,
+        "action": "Light enters the series plate",
+        "text": "We are accustomed to thinking of digital objects in terms of their categories."
+      },
+      {
+        "frame": 1634,
+        "speechFrames": 169,
+        "action": "Five identifiable works appear",
+        "text": "An image is something we view. A video is something we play. A document is something we read and edit."
+      },
+      {
+        "frame": 1816,
+        "speechFrames": 54,
+        "action": "Give each its familiar verb",
+        "text": "These distinctions are useful."
+      },
+      {
+        "frame": 1883,
+        "speechFrames": 106,
+        "action": "Release the verbs",
+        "text": "But must they also determine the limits of what those objects can become?"
+      },
+      {
+        "frame": 2002,
+        "speechFrames": 102,
+        "action": "Isolate the photograph",
+        "text": "What if an image could acquire some of the capabilities of a document?"
+      },
+      {
+        "frame": 2117,
+        "speechFrames": 98,
+        "action": "Isolate the conversation",
+        "text": "What if a conversation could become an intellectual workspace?"
+      },
+      {
+        "frame": 2228,
+        "speechFrames": 93,
+        "action": "Return to the full constellation",
+        "text": "What if the boundaries between these categories were more permeable?"
+      }
+    ],
+    "end": 2361
+  },
+  {
+    "number": 4,
+    "title": "The common foundation",
+    "frame": 2361,
+    "cues": [
+      {
+        "frame": 2373,
+        "speechFrames": 98,
+        "action": "Outline the same five pieces",
+        "text": "In Mutable, the block is a fundamental unit of composition."
+      },
+      {
+        "frame": 2484,
+        "speechFrames": 152,
+        "action": "Show the distinct interiors",
+        "text": "A block may contain text, an image, a video or a more elaborate intellectual structure."
+      },
+      {
+        "frame": 2649,
+        "speechFrames": 72,
+        "action": "Move pieces into two titled documents",
+        "text": "A document is an arrangement of such blocks."
+      },
+      {
+        "frame": 2734,
+        "speechFrames": 138,
+        "action": "Lift the bridge photograph out",
+        "text": "But a block need not be permanently defined by the document in which it happens to reside."
+      },
+      {
+        "frame": 2885,
+        "speechFrames": 143,
+        "action": "Seat it within the second document",
+        "text": "Here the photograph leaves the field notes. There is a place for it in a study of the crossing."
+      },
+      {
+        "frame": 3041,
+        "speechFrames": 112,
+        "action": "Hold its new placement",
+        "text": "Its context can change without its nature necessarily changing."
+      }
+    ],
+    "end": 3193
+  },
+  {
+    "number": 5,
+    "title": "Composition and decomposition",
+    "frame": 3193,
+    "cues": [
+      {
+        "frame": 3205,
+        "speechFrames": 114,
+        "action": "Gather photograph, caption and note",
+        "text": "We can assemble individual objects into a larger intellectual whole."
+      },
+      {
+        "frame": 3332,
+        "speechFrames": 88,
+        "action": "Pull each block into its own space",
+        "text": "But we can also recover the constituent parts of that whole."
+      },
+      {
+        "frame": 3433,
+        "speechFrames": 79,
+        "action": "Regroup photograph and caption",
+        "text": "Composition need not be a terminal operation."
+      },
+      {
+        "frame": 3525,
+        "speechFrames": 209,
+        "action": "Nest that pair with a third note",
+        "text": "Watch the photograph and its caption. For a moment they travel together. Open that group and each is available on its own again."
+      },
+      {
+        "frame": 3747,
+        "speechFrames": 152,
+        "action": "Separate once more",
+        "text": "The same material can participate in new structures as our intellectual purposes change."
+      }
+    ],
+    "end": 3939
+  },
+  {
+    "number": 6,
+    "title": "More than an image",
+    "frame": 3939,
+    "cues": [
+      {
+        "frame": 3951,
+        "speechFrames": 39,
+        "action": "Present the unwrapped plate",
+        "text": "Consider an image."
+      },
+      {
+        "frame": 4003,
+        "speechFrames": 233,
+        "action": "Assemble the research slips beside it",
+        "text": "This glass negative was published by the Detroit Publishing Company in nineteen oh two. Where shall we keep that fact, and our own reading of the picture?"
+      },
+      {
+        "frame": 4249,
+        "speechFrames": 169,
+        "action": "Move slips behind the photograph",
+        "text": "Rather than treating those materials as a separate document, we can compose them with the image itself."
+      },
+      {
+        "frame": 4431,
+        "speechFrames": 132,
+        "action": "Draw a two-face enclosure and turn",
+        "text": "By giving the image another surface, we create a richer intellectual object."
+      },
+      {
+        "frame": 4576,
+        "speechFrames": 159,
+        "action": "Read the reverse",
+        "text": "The reverse side can contain the apparatus through which we investigate and understand the image."
+      },
+      {
+        "frame": 4772,
+        "speechFrames": 70,
+        "action": "Turn back to the front",
+        "text": "Yet the original image remains an image."
+      },
+      {
+        "frame": 4855,
+        "speechFrames": 93,
+        "action": "Separate the border slightly from the print",
+        "text": "It has become something more without ceasing to be what it was."
+      }
+    ],
+    "end": 4988
+  },
+  {
+    "number": 7,
+    "title": "The generality of the operation",
+    "frame": 4988,
+    "cues": [
+      {
+        "frame": 5000,
+        "speechFrames": 113,
+        "action": "Distinguish the image from its sleeve",
+        "text": "The important thing is not simply that an image can be turned over."
+      },
+      {
+        "frame": 5126,
+        "speechFrames": 105,
+        "action": "Place the paragraph in the same sleeve",
+        "text": "It is that the operation need not belong exclusively to images."
+      },
+      {
+        "frame": 5244,
+        "speechFrames": 141,
+        "action": "Turn the paragraph, then the cable drawing",
+        "text": "A paragraph can acquire another surface. So can a drawing carried by an image block."
+      },
+      {
+        "frame": 5398,
+        "speechFrames": 133,
+        "action": "Match the two folds",
+        "text": "We need not independently invent the same capability for every kind of object."
+      },
+      {
+        "frame": 5544,
+        "speechFrames": 166,
+        "action": "Return both to the front",
+        "text": "Different objects can participate in the expressive possibilities of a common compositional system."
+      }
+    ],
+    "end": 5750
+  },
+  {
+    "number": 8,
+    "title": "The possibilities of a sentence",
+    "frame": 5750,
+    "cues": [
+      {
+        "frame": 5762,
+        "speechFrames": 105,
+        "action": "Set the letter on the table",
+        "text": "Mutability can also operate at the scale of a single thought."
+      },
+      {
+        "frame": 5880,
+        "speechFrames": 166,
+        "action": "Read the disappointed sentence",
+        "text": "In this letter, disappointment, hope and generosity would each sound different to the person receiving it."
+      },
+      {
+        "frame": 6059,
+        "speechFrames": 139,
+        "action": "Try hope, then generosity in its place",
+        "text": "Ordinarily, choosing one formulation means displacing another from the visible document."
+      },
+      {
+        "frame": 6211,
+        "speechFrames": 102,
+        "action": "Restore the three expressions and gather them",
+        "text": "But the alternatives can themselves become part of the composition."
+      },
+      {
+        "frame": 6326,
+        "speechFrames": 122,
+        "action": "Give them authored tabs at the decision",
+        "text": "We can preserve them in the very place where the creative decision is being made."
+      },
+      {
+        "frame": 6485,
+        "speechFrames": 174,
+        "action": "Reread the letter with a different choice",
+        "text": "The document can contain not only what we have chosen to say, but also the possibilities we have considered."
+      }
+    ],
+    "end": 6699
+  },
+  {
+    "number": 9,
+    "title": "The burden of sequence",
+    "frame": 6699,
+    "cues": [
+      {
+        "frame": 6711,
+        "speechFrames": 141,
+        "action": "Begin with the opening claim",
+        "text": "As our thinking develops, the material surrounding an idea can become increasingly rich."
+      },
+      {
+        "frame": 6865,
+        "speechFrames": 219,
+        "action": "Thread five contributions into the sequence",
+        "text": "Here the question is what draws the eye across the water. We accumulate evidence, qualifications, objections and possibilities."
+      },
+      {
+        "frame": 7097,
+        "speechFrames": 79,
+        "action": "Hold the evidence and objection",
+        "text": "Each may deserve a place in our intellectual work."
+      },
+      {
+        "frame": 7189,
+        "speechFrames": 178,
+        "action": "Let the conclusion slip down the growing page",
+        "text": "But if everything must occupy the same continuous sequence, that richness can come at the expense of clarity."
+      },
+      {
+        "frame": 7380,
+        "speechFrames": 142,
+        "action": "Hold the question about sequence",
+        "text": "Must everything that belongs to a document also belong to its primary reading sequence?"
+      }
+    ],
+    "end": 7562
+  },
+  {
+    "number": 10,
+    "title": "Thinking beside",
+    "frame": 7562,
+    "cues": [
+      {
+        "frame": 7574,
+        "speechFrames": 110,
+        "action": "Move evidence beside the claim",
+        "text": "We can place an idea beside another idea rather than after it."
+      },
+      {
+        "frame": 7697,
+        "speechFrames": 147,
+        "action": "Move the objection to the other margin",
+        "text": "Supporting evidence might gather on one side of an argument, and objections on the other."
+      },
+      {
+        "frame": 7857,
+        "speechFrames": 169,
+        "action": "Read the main argument straight through",
+        "text": "Their proximity communicates a relationship without requiring them to interrupt the primary discourse."
+      },
+      {
+        "frame": 8039,
+        "speechFrames": 140,
+        "action": "Reorder the observations on the left",
+        "text": "If we put the boats first among the observations, the balance of the reading changes again."
+      },
+      {
+        "frame": 8192,
+        "speechFrames": 96,
+        "action": "Trace proximity to the sentence",
+        "text": "We are not merely arranging information for aesthetic effect."
+      },
+      {
+        "frame": 8301,
+        "speechFrames": 72,
+        "action": "Leave the new reading in place",
+        "text": "We are using its arrangement to help us think."
+      }
+    ],
+    "end": 8413
+  },
+  {
+    "number": 11,
+    "title": "Thinking behind, otherwise and within",
+    "frame": 8413,
+    "cues": [
+      {
+        "frame": 8425,
+        "speechFrames": 150,
+        "action": "Turn the claim over to inspect the qualification",
+        "text": "We can also think behind an idea, preserving its supporting material on another surface."
+      },
+      {
+        "frame": 8588,
+        "speechFrames": 175,
+        "action": "Give the possibility its own alternative",
+        "text": "We can think in alternatives, allowing several possibilities to occupy the same conceptual position."
+      },
+      {
+        "frame": 8776,
+        "speechFrames": 165,
+        "action": "Move the context to its own page",
+        "text": "And we can think within boundaries, composing related material into manageable intellectual wholes."
+      },
+      {
+        "frame": 8954,
+        "speechFrames": 137,
+        "action": "Visit that page and return",
+        "text": "Each arrangement expresses a different relationship between information and attention."
+      },
+      {
+        "frame": 9104,
+        "speechFrames": 149,
+        "action": "Read the primary composition",
+        "text": "The quantity of information need not determine the complexity of its immediate presentation."
+      }
+    ],
+    "end": 9293
+  },
+  {
+    "number": 12,
+    "title": "Complexity can be composed",
+    "frame": 9293,
+    "cues": [
+      {
+        "frame": 9305,
+        "speechFrames": 88,
+        "action": "Compare the continuous draft and the composed essay",
+        "text": "We have not solved the problem by discarding information."
+      },
+      {
+        "frame": 9406,
+        "speechFrames": 95,
+        "action": "Trace the same coloured topics across both",
+        "text": "We have changed the relationships between its constituent parts."
+      },
+      {
+        "frame": 9514,
+        "speechFrames": 150,
+        "action": "Follow the five present locations",
+        "text": "The material remains available, but it need not all demand our attention simultaneously."
+      },
+      {
+        "frame": 9677,
+        "speechFrames": 66,
+        "action": "Hold the first proposition",
+        "text": "Complexity need not be eliminated."
+      },
+      {
+        "frame": 9756,
+        "speechFrames": 41,
+        "action": "Hold the second proposition",
+        "text": "It can be composed."
+      },
+      {
+        "frame": 9810,
+        "speechFrames": 70,
+        "action": "Settle on the spatial reading",
+        "text": "Mutability liberates spatial thinking."
+      }
+    ],
+    "end": 9920
+  },
+  {
+    "number": 13,
+    "title": "A document within a document",
+    "frame": 9920,
+    "cues": [
+      {
+        "frame": 9932,
+        "speechFrames": 83,
+        "action": "Open Field notes at its own scale",
+        "text": "The same principle can operate at a larger scale."
+      },
+      {
+        "frame": 10028,
+        "speechFrames": 93,
+        "action": "Read the original blocks",
+        "text": "A document may be an intellectual whole in its own right."
+      },
+      {
+        "frame": 10134,
+        "speechFrames": 101,
+        "action": "Bring the page into a larger study",
+        "text": "But that whole can also become a constituent of another composition."
+      },
+      {
+        "frame": 10248,
+        "speechFrames": 256,
+        "action": "Assemble essay and source pages alongside",
+        "text": "Consider a research dossier made of pages. We give the photograph and its field notes a page of their own, alongside the essay and the source record."
+      },
+      {
+        "frame": 10517,
+        "speechFrames": 159,
+        "action": "Enter Field notes and return to the dossier",
+        "text": "Step inside the field notes. We can still read the paragraph and examine the photograph separately."
+      },
+      {
+        "frame": 10689,
+        "speechFrames": 93,
+        "action": "Recover the overview",
+        "text": "Composition can operate upon the results of composition."
+      }
+    ],
+    "end": 10822
+  },
+  {
+    "number": 14,
+    "title": "The application and the document",
+    "frame": 10822,
+    "cues": [
+      {
+        "frame": 10834,
+        "speechFrames": 180,
+        "action": "Place notebook and conversation in parallel",
+        "text": "Conventionally, we distinguish between an application and the material upon which that application operates."
+      },
+      {
+        "frame": 11027,
+        "speechFrames": 108,
+        "action": "Read the different roles of their parts",
+        "text": "The application is the instrument. The document is the object."
+      },
+      {
+        "frame": 11148,
+        "speechFrames": 173,
+        "action": "Disclose the common block boundaries",
+        "text": "But when both participate in a common compositional architecture, that distinction can become more permeable."
+      },
+      {
+        "frame": 11334,
+        "speechFrames": 164,
+        "action": "Enlarge the sequence of contributions",
+        "text": "The capabilities associated with one intellectual environment can become available within another."
+      }
+    ],
+    "end": 11538
+  },
+  {
+    "number": 15,
+    "title": "More than a conversation",
+    "frame": 11538,
+    "cues": [
+      {
+        "frame": 11550,
+        "speechFrames": 50,
+        "action": "Read the first turn",
+        "text": "Consider a conversation."
+      },
+      {
+        "frame": 11613,
+        "speechFrames": 283,
+        "action": "Reveal two replies in order",
+        "text": "We might return to it not merely to remember what was said, but to investigate its ideas, identify its claims, connect its references and develop its implications."
+      },
+      {
+        "frame": 11909,
+        "speechFrames": 220,
+        "action": "Add entity reference, then a gloss",
+        "text": "In this exchange, we can mark a reference to Brooklyn Bridge and add a gloss to the reply. The words each speaker committed stay in place."
+      },
+      {
+        "frame": 12142,
+        "speechFrames": 178,
+        "action": "Hold the source wording as both readings accrue",
+        "text": "The conversation can become an object of sustained intellectual work without ceasing to be a conversation."
+      },
+      {
+        "frame": 12333,
+        "speechFrames": 148,
+        "action": "Follow the reference across the exchange",
+        "text": "We need not treat dialogue as something intellectually separate from the documents through which we think."
+      }
+    ],
+    "end": 12521
+  },
+  {
+    "number": 16,
+    "title": "More than a video",
+    "frame": 12521,
+    "cues": [
+      {
+        "frame": 12533,
+        "speechFrames": 143,
+        "action": "Start the lecture player",
+        "text": "Now consider a video. Listen to a few seconds of a lecture on reading this photograph."
+      },
+      {
+        "frame": 12689,
+        "speechFrames": 211,
+        "action": "Play a voiced excerpt over a moving study of the plate",
+        "text": "Look at the Brooklyn Bridge. Follow the deck out over the water. The far tower nearly disappears into the sky."
+      },
+      {
+        "frame": 12913,
+        "speechFrames": 285,
+        "action": "Lay out a transcript, still and reference",
+        "text": "We may wish to study what is said in it, examine particular images, record observations, investigate its references, or connect its ideas to our wider knowledge."
+      },
+      {
+        "frame": 13211,
+        "speechFrames": 139,
+        "action": "Bring the apparatus behind the video and wrap",
+        "text": "These materials can become part of a composition associated with the video itself."
+      },
+      {
+        "frame": 13363,
+        "speechFrames": 94,
+        "action": "Turn to the transcript and mark its entity",
+        "text": "A reverse surface can contain an annotated transcript."
+      },
+      {
+        "frame": 13470,
+        "speechFrames": 175,
+        "action": "Visit the screenshots and the reference list",
+        "text": "Tabs can preserve screenshots, references and related material within the same intellectual context."
+      },
+      {
+        "frame": 13682,
+        "speechFrames": 107,
+        "action": "Return to the transcript",
+        "text": "The video acquires textual, semantic and scholarly dimensions."
+      },
+      {
+        "frame": 13802,
+        "speechFrames": 45,
+        "action": "Turn back to the footage",
+        "text": "Yet it remains a video."
+      },
+      {
+        "frame": 13860,
+        "speechFrames": 64,
+        "action": "Resume the moving picture",
+        "text": "We have not merely changed its appearance."
+      },
+      {
+        "frame": 13937,
+        "speechFrames": 59,
+        "action": "Hold the enriched object",
+        "text": "We have extended what it can become."
+      }
+    ],
+    "end": 14036
+  },
+  {
+    "number": 17,
+    "title": "Enrichment is not a terminal operation",
+    "frame": 14036,
+    "cues": [
+      {
+        "frame": 14048,
+        "speechFrames": 112,
+        "action": "Keep the player on the table",
+        "text": "But even this enriched composition need not be a final destination."
+      },
+      {
+        "frame": 14173,
+        "speechFrames": 254,
+        "action": "Unwrap, then release the three panels",
+        "text": "First we unwrap the reverse. Its contents move beside the video. Opening the tabs releases the transcript, the stills and the references in order."
+      },
+      {
+        "frame": 14440,
+        "speechFrames": 230,
+        "action": "Move the transcript, then wrap a still",
+        "text": "We move the annotated transcript to a new research page. Its former place is empty. A still can now acquire a surface of its own."
+      },
+      {
+        "frame": 14683,
+        "speechFrames": 111,
+        "action": "Place the source with the new page",
+        "text": "A body of research material can participate in another composition."
+      },
+      {
+        "frame": 14807,
+        "speechFrames": 166,
+        "action": "Leave separate, traceable constituents",
+        "text": "The objects that constitute one intellectual whole can become available for further intellectual work."
+      },
+      {
+        "frame": 14986,
+        "speechFrames": 75,
+        "action": "Hold the new research arrangement",
+        "text": "Enrichment is not a terminal operation."
+      }
+    ],
+    "end": 15101
+  },
+  {
+    "number": 18,
+    "title": "Becoming otherwise",
+    "frame": 15101,
+    "cues": [
+      {
+        "frame": 15113,
+        "speechFrames": 64,
+        "action": "Turn the research photograph",
+        "text": "An image can become more than an image."
+      },
+      {
+        "frame": 15190,
+        "speechFrames": 83,
+        "action": "Switch the letter and spread the essay",
+        "text": "A conversation can become more than a conversation."
+      },
+      {
+        "frame": 15286,
+        "speechFrames": 74,
+        "action": "Place the essay in the dossier",
+        "text": "A document can become part of another document."
+      },
+      {
+        "frame": 15373,
+        "speechFrames": 117,
+        "action": "Annotate the exchange",
+        "text": "Their capabilities need not be exhausted by their original categories."
+      },
+      {
+        "frame": 15503,
+        "speechFrames": 98,
+        "action": "Turn the lecture to its transcript",
+        "text": "Their contexts need not determine their permanent locations."
+      },
+      {
+        "frame": 15614,
+        "speechFrames": 116,
+        "action": "Open the assemblies",
+        "text": "Their present arrangements need not determine their future possibilities."
+      },
+      {
+        "frame": 15743,
+        "speechFrames": 164,
+        "action": "Gather a smaller pair within another document",
+        "text": "Each can participate in new forms of intellectual work while retaining what makes it recognisable."
+      }
+    ],
+    "end": 15947
+  },
+  {
+    "number": 19,
+    "title": "What things can become",
+    "frame": 15947,
+    "cues": [
+      {
+        "frame": 15959,
+        "speechFrames": 139,
+        "action": "Return to the single photograph",
+        "text": "Perhaps mutability is not simply the capacity of an object to undergo change."
+      },
+      {
+        "frame": 16111,
+        "speechFrames": 232,
+        "action": "Add and turn its research surface",
+        "text": "Perhaps it is the capacity to acquire new forms, new relationships and new possibilities without necessarily surrendering its nature."
+      },
+      {
+        "frame": 16356,
+        "speechFrames": 44,
+        "action": "Bring it into a document",
+        "text": "The freedom to compose."
+      },
+      {
+        "frame": 16413,
+        "speechFrames": 50,
+        "action": "Release the print",
+        "text": "The freedom to decompose."
+      },
+      {
+        "frame": 16476,
+        "speechFrames": 45,
+        "action": "Hold its restored front",
+        "text": "The freedom to extend."
+      },
+      {
+        "frame": 16534,
+        "speechFrames": 61,
+        "action": "Quiet the studio",
+        "text": "The freedom to recontextualise."
+      },
+      {
+        "frame": 16608,
+        "speechFrames": 91,
+        "action": "Set the first line of the thesis",
+        "text": "Mutability is not merely the freedom to change things."
+      },
+      {
+        "frame": 16736,
+        "speechFrames": 78,
+        "action": "After a pause, complete the thesis",
+        "text": "It is the freedom to change what things can become."
+      }
+    ],
+    "end": 16854
+  },
+  {
+    "number": 20,
+    "title": "Same Thing. Many Faces.",
+    "frame": 16854,
+    "cues": [
+      {
+        "frame": 16866,
+        "speechFrames": 36,
+        "action": "Typeset the closing wordmark",
+        "text": "Mutable."
+      },
+      {
+        "frame": 16915,
+        "speechFrames": 50,
+        "action": "Reveal the slogan and hold still",
+        "text": "Same Thing. Many Faces."
+      }
+    ],
+    "end": 17043
+  }
+]

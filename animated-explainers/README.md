@@ -149,3 +149,43 @@ npm run render -- 010-the-language-of-characterisation renders/010-the-language-
 ```
 
 [Narrated film](renders/010-the-language-of-characterisation.mp4) · [Stage sheet](renders/010-stages.png) · [Storyboard and script](episodes/010-the-language-of-characterisation/storyboard.md) · [Production report](episodes/010-the-language-of-characterisation/implementation.md)
+
+## Volume IV — From Text to Intelligence
+
+*RAGs to Riches* follows six fictional passages from derived chunks to a question about Napoleon’s leadership. Select `011-rags-to-riches` in Studio to preview the 132-second narrated film.
+
+```sh
+npm run render -- 011-rags-to-riches renders/011-rags-to-riches.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/011-rags-to-riches.mp4) · [Stage sheet](renders/011-stages.png) · [Storyboard and narration](episodes/011-rags-to-riches/storyboard.md) · [Production report](episodes/011-rags-to-riches/implementation.md)
+
+### Concept 012 · What's in a Name?
+
+The 218-second film follows references to Lewis Carroll through a name lookup, a stationary text selection, a four-paragraph review and two inline authoring gestures. Choose `012-whats-in-a-name` in Studio.
+
+```sh
+npm run render -- 012-whats-in-a-name renders/012-whats-in-a-name.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/012-whats-in-a-name.mp4) · [Stage sheet](renders/012-stages.png) · [Storyboard and narration](episodes/012-whats-in-a-name/storyboard.md) · [Production report](episodes/012-whats-in-a-name/implementation.md)
+
+### Concept 013 · A Document in Concert
+
+The 222-second film follows one Lewis Carroll sketch through a semantic inventory, temporary illumination and three reversible passage folds. Choose `013-a-document-in-concert` in Studio.
+
+```sh
+npm run render -- 013-a-document-in-concert renders/013-a-document-in-concert.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/013-a-document-in-concert.mp4) · [Scene sheet](renders/013-stages.png) · [Storyboard and narration](episodes/013-a-document-in-concert/storyboard.md) · [Production notes](episodes/013-a-document-in-concert/implementation.md)
+
+### Concept 014 · Mutability
+
+A 1902 photograph of Brooklyn Bridge passes between a field notebook, an essay, a conversation and a short lecture. On the reverse of the lecture, its transcript becomes the starting point for another study. Select `014-mutability` in Studio for the 9:29 narrated film.
+
+```sh
+npm run render -- 014-mutability renders/014-mutability.mp4 --audio-bitrate=192k
+```
+
+[Narrated film](renders/014-mutability.mp4) · [Review package](renders/014-mutability.zip) · [Scene sheet](renders/014-stages.png) · [Timed storyboard](episodes/014-mutability/storyboard.md) · [Production and verification](episodes/014-mutability/production.md)

@@ -1,0 +1,166 @@
+[
+  {
+    "id": "sequence",
+    "start": 0,
+    "duration": 22,
+    "caption": "One life in five sections.",
+    "narration": [
+      {
+        "at": 0.5,
+        "text": "A document has a beginning, a middle and an end. Here we can read a life, from early puzzles to the work that survived its author."
+      },
+      {
+        "at": 10.8,
+        "text": "Beneath that sequence lies another structure. Dodgson, the mathematician, the author. What if we could follow the person through all those words?"
+      }
+    ]
+  },
+  {
+    "id": "inventories",
+    "start": 22,
+    "duration": 24,
+    "caption": "One text supports both inventories.",
+    "narration": [
+      {
+        "at": 0.4,
+        "text": "A table of contents tells us how a document has been organised. Follow Photography and we arrive at the section the author gave that name."
+      },
+      {
+        "at": 11,
+        "text": "A semantic inventory gathers the things that appear across those sections. Five expressions for the same person give us a single entry, Lewis Carroll."
+      }
+    ]
+  },
+  {
+    "id": "survey",
+    "start": 46,
+    "duration": 31,
+    "caption": "Survey the document in its wider context.",
+    "narration": [
+      {
+        "at": 0.4,
+        "text": "How often do we meet Carroll? Five times in this document. Each annotation counts as one mention here, even when the wording changes."
+      },
+      {
+        "at": 10,
+        "text": "Beside that live count is a different measure. Across the knowledge base, the database counts saved, indexed annotation segments. Unsaved changes stay local."
+      },
+      {
+        "at": 21,
+        "text": "Look at photography. Three of its four recorded references are here. Mathematics appears just once here, yet turns up throughout the collection."
+      }
+    ]
+  },
+  {
+    "id": "illuminate",
+    "start": 77,
+    "duration": 30,
+    "caption": "Hover reveals the existing annotations.",
+    "narration": [
+      {
+        "at": 0.4,
+        "text": "Knowing that a person occurs five times is one thing. Seeing where is another. Hover over Lewis Carroll and watch the words in the document."
+      },
+      {
+        "at": 11,
+        "text": "Dodgson. The mathematician. The author. Carroll. Lewis Carroll. Different expressions light up together because each already points to the same person."
+      },
+      {
+        "at": 21,
+        "text": "Move away and the light recedes. Try photography, then Oxford. The light moves while the words stay where they were."
+      }
+    ]
+  },
+  {
+    "id": "patterns",
+    "start": 107,
+    "duration": 17,
+    "caption": "Step back to see the distribution.",
+    "narration": [
+      {
+        "at": 0.3,
+        "text": "From a little farther away, the individual words give way to a pattern. Carroll runs through the sketch."
+      },
+      {
+        "at": 8,
+        "text": "Photography gathers near the middle and returns at the end. Oxford connects two distant passages. We can see their spacing at a glance."
+      }
+    ]
+  },
+  {
+    "id": "concentrate",
+    "start": 124,
+    "duration": 37,
+    "caption": "Focus brings the marked passages together.",
+    "narration": [
+      {
+        "at": 0.4,
+        "text": "Sometimes we want to do more than locate a reference. What does this sketch actually say about photography?"
+      },
+      {
+        "at": 9,
+        "text": "Follow the marked passages. The camera enters during the Oxford years. Later we meet the demands of the practice and, at the end, its legacy."
+      },
+      {
+        "at": 20,
+        "text": "Now focus on photography. Watch the space between the marked passages contract. The three passages keep their size and their order."
+      },
+      {
+        "at": 29,
+        "text": "Read them together. The document concertinas around the subject of our attention."
+      }
+    ]
+  },
+  {
+    "id": "readings",
+    "start": 161,
+    "duration": 27,
+    "caption": "Release the focus to recover the full sketch.",
+    "narration": [
+      {
+        "at": 0.4,
+        "text": "Release the focus. Each passage returns to its place in the sketch. Now choose Oxford. Teaching and remembrance come together."
+      },
+      {
+        "at": 10.6,
+        "text": "Open the document again and follow Alice Liddell. A sitter in one passage becomes the listener to a story in another."
+      },
+      {
+        "at": 21,
+        "text": "The author wrote one sequence. As readers, we can follow several threads through it."
+      }
+    ]
+  },
+  {
+    "id": "dividends",
+    "start": 188,
+    "duration": 20,
+    "caption": "The same links support three ways of reading.",
+    "narration": [
+      {
+        "at": 0.35,
+        "text": "Recall the connections made while writing. The author and Dodgson were both linked to Lewis Carroll."
+      },
+      {
+        "at": 7.7,
+        "text": "Those links let us survey the people in the sketch, illuminate their words, and concentrate on the passages that mention them. Our earlier acts of annotation become instruments of reading."
+      }
+    ]
+  },
+  {
+    "id": "close",
+    "start": 208,
+    "duration": 14,
+    "caption": "",
+    "narration": [
+      {
+        "at": 0.3,
+        "text": "Release the focus once more. The document responds to the interests of its reader while preserving the composition of its author."
+      },
+      {
+        "at": 10,
+        "text": "One document. Many readings."
+      }
+    ]
+  }
+]

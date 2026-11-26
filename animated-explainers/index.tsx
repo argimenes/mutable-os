@@ -20,7 +20,16 @@ import {WhenARelationshipIsNotEnough} from './episodes/009-when-a-relationship-i
 import statement from './episodes/009-when-a-relationship-is-not-enough/metadata.json';
 import {TheLanguageOfCharacterisation} from './episodes/010-the-language-of-characterisation/scene';
 import traits from './episodes/010-the-language-of-characterisation/metadata.json';
+import {RagsToRiches} from './episodes/011-rags-to-riches/scene';
+import retrieval from './episodes/011-rags-to-riches/metadata.json';
+import {WhatsInAName} from './episodes/012-whats-in-a-name/scene';
+import names from './episodes/012-whats-in-a-name/metadata.json';
+import {ADocumentInConcert} from './episodes/013-a-document-in-concert/scene';
+import concert from './episodes/013-a-document-in-concert/metadata.json';
 import './theme/fonts.css';
+
+import {Mutability} from './episodes/014-mutability/scene';
+import mutability from './episodes/014-mutability/metadata.json';
 
 function MutableConcepts() {
   return <>
@@ -54,6 +63,17 @@ function MutableConcepts() {
     <Composition id={traits.id} component={TheLanguageOfCharacterisation}
       width={traits.width} height={traits.height} fps={traits.fps}
       durationInFrames={traits.durationSeconds * traits.fps} />
+    <Composition id={retrieval.id} component={RagsToRiches}
+      width={retrieval.width} height={retrieval.height} fps={retrieval.fps}
+      durationInFrames={retrieval.durationSeconds * retrieval.fps} />
+    <Composition id={names.id} component={WhatsInAName}
+      width={names.width} height={names.height} fps={names.fps}
+      durationInFrames={names.durationSeconds * names.fps} />
+    <Composition id={concert.id} component={ADocumentInConcert}
+      width={concert.width} height={concert.height} fps={concert.fps}
+      durationInFrames={concert.durationSeconds * concert.fps} />
+    <Composition id={mutability.id} component={Mutability} width={mutability.width} height={mutability.height} fps={mutability.fps}
+      durationInFrames={mutability.durationSeconds * mutability.fps} />
   </>;
 }
 
