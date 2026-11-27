@@ -1,0 +1,58 @@
+[
+  {
+    "paper": "corner",
+    "reference": "https://raw.githubusercontent.com/dfm/corner.py/88054ae759391ad463fd6fdec557999d34638f8e/paper/paper.md",
+    "referenceTokens": 75,
+    "reconstructedTokens": 75,
+    "exactTokenSequence": true,
+    "differences": []
+  },
+  {
+    "paper": "style",
+    "reference": "https://raw.githubusercontent.com/acl-org/acl-anthology/373054444ad4af794277b0608ffad335814cf1f6/data/xml/C18.xml",
+    "referenceTokens": 275,
+    "reconstructedTokens": 273,
+    "exactTokenSequence": false,
+    "differences": [
+      {
+        "operation": "replace",
+        "reference": "single - domain",
+        "reconstructed": "singledomain"
+      }
+    ]
+  },
+  {
+    "paper": "bert",
+    "reference": "https://raw.githubusercontent.com/acl-org/acl-anthology/373054444ad4af794277b0608ffad335814cf1f6/data/xml/N19.xml",
+    "referenceTokens": 220,
+    "reconstructedTokens": 216,
+    "exactTokenSequence": false,
+    "differences": [
+      {
+        "operation": "replace",
+        "reference": "pre - train",
+        "reconstructed": "pretrain"
+      },
+      {
+        "operation": "replace",
+        "reference": "fine - tuned",
+        "reconstructed": "finetuned"
+      },
+      {
+        "operation": "replace",
+        "reference": "task - specific",
+        "reconstructed": "taskspecific"
+      },
+      {
+        "operation": "insert",
+        "reference": "",
+        "reconstructed": "%"
+      },
+      {
+        "operation": "insert",
+        "reference": "",
+        "reconstructed": "%"
+      }
+    ]
+  }
+]

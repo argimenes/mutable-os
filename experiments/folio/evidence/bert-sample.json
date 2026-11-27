@@ -1,0 +1,203 @@
+{
+  "pdfSha256": "987545ffb087f1ece898142c403a516baeabeb70ce19089397fac6f7db12c3d4",
+  "page": 1,
+  "classified": {
+    "kind": "heading",
+    "text": "Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova",
+    "level": 2,
+    "bold": false,
+    "italic": false,
+    "bbox": {
+      "x": 121.81800079345703,
+      "y": 131.7469482421875,
+      "width": 357.1001892089844,
+      "height": 11.011962890625
+    },
+    "textItemIndices": [
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "items": [
+    {
+      "index": 2,
+      "text": "Jacob Devlin",
+      "x": 121.81800079345703,
+      "y": 131.7469482421875,
+      "width": 65.72969818115234,
+      "height": 10.75970458984375,
+      "fontName": "NimbusRomNo9L-Medi",
+      "fontSize": 11.9552001953125,
+      "fontWeight": 700,
+      "rotation": 0
+    },
+    {
+      "index": 3,
+      "text": "Ming-Wei Chang",
+      "x": 202.49169921875,
+      "y": 131.7469482421875,
+      "width": 87.89462280273438,
+      "height": 10.75970458984375,
+      "fontName": "NimbusRomNo9L-Medi",
+      "fontSize": 11.9552001953125,
+      "fontWeight": 700,
+      "rotation": 0
+    },
+    {
+      "index": 4,
+      "text": "Kenton Lee",
+      "x": 305.330322265625,
+      "y": 131.7589111328125,
+      "width": 59.14239501953125,
+      "height": 10.74774169921875,
+      "fontName": "NimbusRomNo9L-Medi",
+      "fontSize": 11.9552001953125,
+      "fontWeight": 700,
+      "rotation": 0
+    },
+    {
+      "index": 5,
+      "text": "Kristina Toutanova",
+      "x": 379.41668701171875,
+      "y": 131.7469482421875,
+      "width": 99.2999267578125,
+      "height": 10.75970458984375,
+      "fontName": "NimbusRomNo9L-Medi",
+      "fontSize": 11.9552001953125,
+      "fontWeight": 700,
+      "rotation": 0
+    }
+  ],
+  "binding": {
+    "blockId": "folio-987545ffb087f1ece898-p1-b1-0",
+    "group": 1,
+    "groups": [
+      1
+    ],
+    "part": 0,
+    "lines": [
+      [
+        2,
+        3,
+        4,
+        5
+      ]
+    ],
+    "joins": [
+      12,
+      27,
+      38
+    ],
+    "mappings": [
+      {
+        "item": 2,
+        "start": 0,
+        "end": 12,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 3,
+        "start": 13,
+        "end": 27,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 4,
+        "start": 28,
+        "end": 38,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 5,
+        "start": 39,
+        "end": 57,
+        "noSpaceAfter": false
+      }
+    ],
+    "recovered": []
+  },
+  "native": {
+    "id": "folio-987545ffb087f1ece898-p1-b1-0",
+    "type": "standoff-editor-block",
+    "properties": {
+      "standoffProperties": [
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-p1-i2",
+          "type": "spatial/source-run",
+          "value": "p1-i2",
+          "start": 0,
+          "end": 11
+        },
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-bold-p1-i2",
+          "type": "style/bold",
+          "start": 0,
+          "end": 11
+        },
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-p1-i3",
+          "type": "spatial/source-run",
+          "value": "p1-i3",
+          "start": 13,
+          "end": 26
+        },
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-bold-p1-i3",
+          "type": "style/bold",
+          "start": 13,
+          "end": 26
+        },
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-p1-i4",
+          "type": "spatial/source-run",
+          "value": "p1-i4",
+          "start": 28,
+          "end": 37
+        },
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-bold-p1-i4",
+          "type": "style/bold",
+          "start": 28,
+          "end": 37
+        },
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-p1-i5",
+          "type": "spatial/source-run",
+          "value": "p1-i5",
+          "start": 39,
+          "end": 56
+        },
+        {
+          "id": "folio-987545ffb087f1ece898-p1-b1-0-bold-p1-i5",
+          "type": "style/bold",
+          "start": 39,
+          "end": 56
+        }
+      ],
+      "metadata": {
+        "folio": {
+          "kind": "heading",
+          "frame": {
+            "x": 121.82,
+            "y": 131.75,
+            "width": 356.9,
+            "height": 10.76
+          },
+          "fontSize": 11.96,
+          "lineCount": 1,
+          "leading": 13.51,
+          "family": "serif",
+          "align": "center"
+        }
+      }
+    },
+    "inline": [
+      {
+        "kind": "text",
+        "text": "Jacob Devlin Ming-Wei Chang Kenton Lee Kristina Toutanova"
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+.folio-spread-host{position:absolute;inset:52px 0 0;background:#eef1ed;color:#22352c}
+.folio-spread-host.editing{right:48%}
+.folio-spread-host .mutable-spread,.folio-reader{height:100%;box-sizing:border-box}
+.folio-reader{display:flex;flex-direction:column;min-height:0}
+.spread-controls{background:#f5f6f2;border-bottom:1px solid #c9d2cc}
+.spread-controls button,.spread-controls select,.folio-reader select{color:#243d32;background:white;border:1px solid #a5b2a9;border-radius:3px;padding:.3em .55em}
+.folio-reader>header{background:#e0e6de;padding:7px 14px;display:flex;align-items:center;justify-content:space-between;font:13px system-ui}
+.folio-reader>header strong{font-weight:600;letter-spacing:.01em}
+.folio-viewport{position:relative;overflow:auto;flex:1;min-height:0;background:#d6dcd5;padding:12px;overscroll-behavior:contain}
+.folio-sheet,.folio-pdf{background:white;margin:0 auto;color:#171717;box-shadow:0 1px 6px #849188;width:fit-content}
+.folio-sheet{padding:0;box-sizing:content-box;text-align:left}
+.folio-pdf .mutable-pdf-page{margin:0}
+.folio-band{display:grid;grid-template-columns:50% 50%;align-items:start}
+.folio-lane{display:flow-root;min-width:0}
+.folio-lane>img{display:block;max-width:none}
+.composed-frame{overflow-wrap:anywhere;white-space:pre-wrap}
+.composed-frame [data-entity]{text-decoration:underline 2px #763694;text-underline-offset:2px}
+.folio-reader output{position:absolute;top:8px;left:8px;background:white;padding:5px;z-index:2}
+.composed-figure{margin:0}
+.composed-figure img{display:block;max-width:none}
+.composed-figure details{font:11px system-ui;color:#405446}
+.composed-figure summary{cursor:pointer}
+.composed-rule{border:0;border-top:.7px solid #777;margin:0;padding:0}
+.folio-import-notes{color:#fff;align-self:center;margin-right:.5rem;text-underline-offset:3px}
+.composed-frame [data-gloss]{background:#fff1bd;border-bottom:1px dotted #986113}

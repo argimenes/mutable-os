@@ -1,0 +1,25 @@
+html, body, #folio {margin:0;height:100%;overflow:hidden}
+.folio-bar {box-sizing:border-box;height:52px;padding:8px 18px;display:flex;align-items:center;gap:18px;background:#203531;color:white;font:14px system-ui}
+.folio-bar strong {font:26px Georgia,serif}
+.folio-bar select,.folio-bar button {border:1px solid #99a8a1;background:white;color:#203531;padding:5px 8px;border-radius:3px;font:inherit}
+.folio-bar select[aria-label=Publication] {max-width:40vw}
+.folio-bar nav {margin-left:auto;display:flex;gap:5px}
+.folio-bar button[aria-pressed=true] {background:#dfecd5}
+.folio-stage,.folio-source,.folio-flint {position:absolute;inset:52px 0 0;width:100%;height:calc(100% - 52px);box-sizing:border-box}
+.folio-stage {overflow:auto;background:#d9dcd7;padding:18px}
+.folio-stage article {margin:auto;position:relative;background:white;box-shadow:0 1px 5px #929990;color:black;text-align:left}
+.folio-frame,.folio-image,.folio-rule {position:absolute;margin:0;padding:0;box-sizing:content-box}
+.folio-frame {white-space:normal;overflow-wrap:anywhere;font-variant-ligatures:normal;letter-spacing:normal}
+.folio-frame [data-gloss] {background:#fff1bd;border-bottom:1px dotted #986113}
+.folio-rule {border-top:0.7px solid #555}
+.folio-source {border:0}
+#folio [hidden] {display:none!important}
+#folio .folio-flint {inset:52px 0 0;overflow:auto}
+.folio-flint .reactive-window:has(.flint-application) {position:absolute!important;inset:0!important;width:100%!important;height:100%!important;transform:none!important}
+.folio-selection,.folio-notice {position:fixed;bottom:12px;left:12px;z-index:20;background:white;border:1px solid #bac6bd;padding:7px;font:13px system-ui;max-width:45vw}
+.folio-selection button {margin:2px;padding:5px}
+.folio-notice {bottom:62px;max-height:25vh;overflow:auto}
+.folio-bar {position:fixed;inset:0 0 auto;z-index:30}
+.folio-stage.split {width:52%}
+#folio .folio-flint {transform:translateZ(0);isolation:isolate}
+#folio .folio-flint.split {left:52%;width:48%}

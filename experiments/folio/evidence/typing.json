@@ -1,0 +1,98 @@
+[
+  {
+    "trial": "withoutSourceRanges",
+    "sync": {
+      "median": 0.800000011920929,
+      "p95": 2.0999999940395355,
+      "max": 5.899999976158142
+    },
+    "settled": {
+      "median": 0.9000000059604645,
+      "p95": 2.199999988079071,
+      "max": 5.899999976158142
+    },
+    "frame": {
+      "median": 45.099999994039536,
+      "p95": 46.5,
+      "max": 49.29999998211861
+    },
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0,
+    "restored": true,
+    "paragraphs": 374,
+    "characters": 1311
+  },
+  {
+    "trial": "withSourceRanges",
+    "sync": {
+      "median": 0.9000000059604645,
+      "p95": 1.5,
+      "max": 5.9000000059604645
+    },
+    "settled": {
+      "median": 1,
+      "p95": 1.5999999940395355,
+      "max": 6
+    },
+    "frame": {
+      "median": 45.099999994039536,
+      "p95": 49.80000001192093,
+      "max": 50.900000005960464
+    },
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0,
+    "restored": true,
+    "paragraphs": 374,
+    "characters": 1311
+  },
+  {
+    "trial": "withSourceRanges",
+    "sync": {
+      "median": 0.9000000059604645,
+      "p95": 2.4000000059604645,
+      "max": 6.899999976158142
+    },
+    "settled": {
+      "median": 0.9000000059604645,
+      "p95": 2.5999999940395355,
+      "max": 7.0999999940395355
+    },
+    "frame": {
+      "median": 45.20000001788139,
+      "p95": 47.29999998211861,
+      "max": 61.400000005960464
+    },
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0,
+    "restored": true,
+    "paragraphs": 374,
+    "characters": 1311
+  },
+  {
+    "trial": "withoutSourceRanges",
+    "sync": {
+      "median": 0.8999999761581421,
+      "p95": 1.699999988079071,
+      "max": 5.5
+    },
+    "settled": {
+      "median": 0.9000000059604645,
+      "p95": 1.699999988079071,
+      "max": 5.600000023841858
+    },
+    "frame": {
+      "median": 45.599999994039536,
+      "p95": 48.099999994039536,
+      "max": 50.19999998807907
+    },
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0,
+    "restored": true,
+    "paragraphs": 374,
+    "characters": 1311
+  }
+]

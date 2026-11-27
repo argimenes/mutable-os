@@ -1,0 +1,98 @@
+[
+  {
+    "edition": "I",
+    "sync": {
+      "median": 0.800000011920929,
+      "p95": 2.9000000059604645,
+      "max": 7
+    },
+    "settled": {
+      "median": 0.9000000059604645,
+      "p95": 2.9000000059604645,
+      "max": 7.199999988079071
+    },
+    "frame": {
+      "median": 45,
+      "p95": 46.80000001192093,
+      "max": 52.19999998807907
+    },
+    "restored": true,
+    "paragraphs": 374,
+    "characters": 1311,
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0
+  },
+  {
+    "edition": "II",
+    "sync": {
+      "median": 0.8999999761581421,
+      "p95": 1.399999976158142,
+      "max": 5.5999999940395355
+    },
+    "settled": {
+      "median": 0.9000000059604645,
+      "p95": 1.5999999940395355,
+      "max": 5.800000011920929
+    },
+    "frame": {
+      "median": 34.099999994039536,
+      "p95": 40.79999998211861,
+      "max": 40.900000005960464
+    },
+    "restored": true,
+    "paragraphs": 370,
+    "characters": 1318,
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0
+  },
+  {
+    "edition": "II",
+    "sync": {
+      "median": 0.800000011920929,
+      "p95": 1.5999999940395355,
+      "max": 6.299999982118607
+    },
+    "settled": {
+      "median": 0.9000000059604645,
+      "p95": 1.5999999940395355,
+      "max": 6.5
+    },
+    "frame": {
+      "median": 33.79999998211861,
+      "p95": 38.400000005960464,
+      "max": 40.69999998807907
+    },
+    "restored": true,
+    "paragraphs": 370,
+    "characters": 1318,
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0
+  },
+  {
+    "edition": "I",
+    "sync": {
+      "median": 0.800000011920929,
+      "p95": 1.9000000059604645,
+      "max": 6.200000017881393
+    },
+    "settled": {
+      "median": 0.9000000059604645,
+      "p95": 2,
+      "max": 6.4000000059604645
+    },
+    "frame": {
+      "median": 44.80000001192093,
+      "p95": 47.69999998807907,
+      "max": 54.30000001192093
+    },
+    "restored": true,
+    "paragraphs": 374,
+    "characters": 1311,
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0
+  }
+]

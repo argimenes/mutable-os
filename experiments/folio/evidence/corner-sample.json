@@ -1,0 +1,522 @@
+{
+  "pdfSha256": "0569cd3d34fd1dcab25b8e39a6c1052280dfc2e71c51b9ae9d80724426fbe5aa",
+  "page": 1,
+  "classified": {
+    "kind": "paragraph",
+    "text": "Authors of JOSS papers retain copyright and release the work under a Creative Commons Attribution 4.0 International License [(CC-BY).](http://creativecommons.org/licenses/by/4.0/)",
+    "bold": false,
+    "italic": false,
+    "bbox": {
+      "x": 27.98999786376953,
+      "y": 283.64337158203125,
+      "width": 129.855224609375,
+      "height": 52.83001708984375
+    },
+    "textItemIndices": [
+      15,
+      16,
+      17,
+      18,
+      19,
+      22,
+      24,
+      25,
+      26,
+      27,
+      28,
+      30,
+      31,
+      32,
+      33,
+      35
+    ]
+  },
+  "items": [
+    {
+      "index": 15,
+      "text": "Authors",
+      "x": 28.039997100830078,
+      "y": 283.64337158203125,
+      "width": 29.785049438476562,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 16,
+      "text": "of",
+      "x": 63.3929328918457,
+      "y": 283.64337158203125,
+      "width": 7.800418853759766,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 17,
+      "text": "JOSS",
+      "x": 76.39363098144531,
+      "y": 283.64337158203125,
+      "width": 21.401840209960938,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 18,
+      "text": "papers",
+      "x": 103.372314453125,
+      "y": 283.64337158203125,
+      "width": 24.988250732421875,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 19,
+      "text": "retain",
+      "x": 133.93740844726562,
+      "y": 283.64337158203125,
+      "width": 21.957748413085938,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 22,
+      "text": "copyright and release the work un-",
+      "x": 28.349998474121094,
+      "y": 294.6033935546875,
+      "width": 129.09243774414062,
+      "height": 9.06463623046875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 24,
+      "text": "der",
+      "x": 28.349998474121094,
+      "y": 305.56341552734375,
+      "width": 12.005470275878906,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 25,
+      "text": "a",
+      "x": 45.905426025390625,
+      "y": 305.56341552734375,
+      "width": 4.429203033447266,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 26,
+      "text": "Creative",
+      "x": 55.88458251953125,
+      "y": 305.56341552734375,
+      "width": 31.434799194335938,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 27,
+      "text": "Commons",
+      "x": 92.8782958984375,
+      "y": 305.56341552734375,
+      "width": 38.03375244140625,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 28,
+      "text": "Attri-",
+      "x": 136.47097778320312,
+      "y": 305.56341552734375,
+      "width": 20.980438232421875,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 30,
+      "text": "bution",
+      "x": 28.349998474121094,
+      "y": 316.52337646484375,
+      "width": 24.41442108154297,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 31,
+      "text": "4.0",
+      "x": 57.74054718017578,
+      "y": 316.52337646484375,
+      "width": 11.781318664550781,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 32,
+      "text": "International",
+      "x": 74.49800109863281,
+      "y": 316.52337646484375,
+      "width": 48.61365509033203,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 33,
+      "text": "License",
+      "x": 128.09674072265625,
+      "y": 316.52337646484375,
+      "width": 27.8035888671875,
+      "height": 8.96600341796875,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    },
+    {
+      "index": 35,
+      "text": "(CC-BY).",
+      "x": 27.98999786376953,
+      "y": 327.473388671875,
+      "width": 36.900672912597656,
+      "height": 9.450225830078125,
+      "fontName": "BCTZES+LMSans9-Regular",
+      "fontSize": 8.965999603271484,
+      "fontWeight": 480,
+      "rotation": 0
+    }
+  ],
+  "binding": {
+    "blockId": "folio-0569cd3d34fd1dcab25b-p1-b7-0",
+    "group": 7,
+    "groups": [
+      7
+    ],
+    "part": 0,
+    "lines": [
+      [
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      [
+        22
+      ],
+      [
+        24,
+        25,
+        26,
+        27,
+        28
+      ],
+      [
+        30,
+        31,
+        32,
+        33
+      ],
+      [
+        35
+      ]
+    ],
+    "joins": [
+      7,
+      10,
+      15,
+      22,
+      29,
+      66,
+      68,
+      77,
+      85,
+      97,
+      101,
+      115,
+      123
+    ],
+    "mappings": [
+      {
+        "item": 15,
+        "start": 0,
+        "end": 7,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 16,
+        "start": 8,
+        "end": 10,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 17,
+        "start": 11,
+        "end": 15,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 18,
+        "start": 16,
+        "end": 22,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 19,
+        "start": 23,
+        "end": 29,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 22,
+        "start": 30,
+        "end": 63,
+        "noSpaceAfter": true,
+        "normalized": "copyright and release the work un"
+      },
+      {
+        "item": 24,
+        "start": 63,
+        "end": 66,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 25,
+        "start": 67,
+        "end": 68,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 26,
+        "start": 69,
+        "end": 77,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 27,
+        "start": 78,
+        "end": 85,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 28,
+        "start": 86,
+        "end": 91,
+        "noSpaceAfter": true,
+        "normalized": "Attri"
+      },
+      {
+        "item": 30,
+        "start": 91,
+        "end": 97,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 31,
+        "start": 98,
+        "end": 101,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 32,
+        "start": 102,
+        "end": 115,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 33,
+        "start": 116,
+        "end": 123,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 35,
+        "start": 124,
+        "end": 132,
+        "noSpaceAfter": false
+      }
+    ],
+    "recovered": []
+  },
+  "native": {
+    "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0",
+    "type": "standoff-editor-block",
+    "properties": {
+      "standoffProperties": [
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i15",
+          "type": "spatial/source-run",
+          "value": "p1-i15",
+          "start": 0,
+          "end": 6
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i16",
+          "type": "spatial/source-run",
+          "value": "p1-i16",
+          "start": 8,
+          "end": 9
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i17",
+          "type": "spatial/source-run",
+          "value": "p1-i17",
+          "start": 11,
+          "end": 14
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i18",
+          "type": "spatial/source-run",
+          "value": "p1-i18",
+          "start": 16,
+          "end": 21
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i19",
+          "type": "spatial/source-run",
+          "value": "p1-i19",
+          "start": 23,
+          "end": 28
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i22",
+          "type": "spatial/source-run",
+          "value": "p1-i22",
+          "start": 30,
+          "end": 62
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i24",
+          "type": "spatial/source-run",
+          "value": "p1-i24",
+          "start": 63,
+          "end": 65
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i25",
+          "type": "spatial/source-run",
+          "value": "p1-i25",
+          "start": 67,
+          "end": 67
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i26",
+          "type": "spatial/source-run",
+          "value": "p1-i26",
+          "start": 69,
+          "end": 76
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i27",
+          "type": "spatial/source-run",
+          "value": "p1-i27",
+          "start": 78,
+          "end": 84
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i28",
+          "type": "spatial/source-run",
+          "value": "p1-i28",
+          "start": 86,
+          "end": 90
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i30",
+          "type": "spatial/source-run",
+          "value": "p1-i30",
+          "start": 91,
+          "end": 96
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i31",
+          "type": "spatial/source-run",
+          "value": "p1-i31",
+          "start": 98,
+          "end": 100
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i32",
+          "type": "spatial/source-run",
+          "value": "p1-i32",
+          "start": 102,
+          "end": 114
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i33",
+          "type": "spatial/source-run",
+          "value": "p1-i33",
+          "start": 116,
+          "end": 122
+        },
+        {
+          "id": "folio-0569cd3d34fd1dcab25b-p1-b7-0-p1-i35",
+          "type": "spatial/source-run",
+          "value": "p1-i35",
+          "start": 124,
+          "end": 131
+        }
+      ],
+      "metadata": {
+        "folio": {
+          "kind": "paragraph",
+          "frame": {
+            "x": 27.99,
+            "y": 283.64,
+            "width": 129.46,
+            "height": 53.28
+          },
+          "fontSize": 8.97,
+          "lineCount": 5,
+          "leading": 10.96,
+          "family": "sans-serif",
+          "align": "left"
+        }
+      }
+    },
+    "inline": [
+      {
+        "kind": "text",
+        "text": "Authors of JOSS papers retain copyright and release the work under a Creative Commons Attribution 4.0 International License (CC-BY)."
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "chrome": "158.0.8127.37",
+  "results": [
+    {
+      "paper": "corner",
+      "openAndSpatialMs": 100,
+      "samplePage": 2,
+      "sampleFrames": 2,
+      "sampleOverflowFrames": 0,
+      "trace": "p. 1 · item 10 · (166.5, 258.6, 386.3, 10.5) pt",
+      "selection": "matplotlib",
+      "sharedGloss": "6e03fedb-855a-4bc5-8783-3b00e6b290c8",
+      "typing": {
+        "affectedFrames": 1,
+        "evaluations": 1,
+        "snapshots": 0,
+        "projectionBuilds": 0,
+        "apiRequests": 0
+      },
+      "manualSaveVerified": true,
+      "undoRedoVerified": true
+    },
+    {
+      "paper": "style",
+      "openAndSpatialMs": 125,
+      "samplePage": 3,
+      "sampleFrames": 11,
+      "sampleOverflowFrames": 0,
+      "flintSwitchMs": 897
+    },
+    {
+      "paper": "bert",
+      "openAndSpatialMs": 309,
+      "samplePage": 1,
+      "sampleFrames": 13,
+      "sampleOverflowFrames": 2,
+      "flintSwitchMs": 1819
+    }
+  ],
+  "errors": []
+}

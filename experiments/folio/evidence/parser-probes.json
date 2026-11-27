@@ -1,0 +1,153 @@
+{
+  "taggedControl": {
+    "tree": {
+      "roots": [
+        {
+          "type": "H1",
+          "attributes": {},
+          "markedContentIds": [
+            0
+          ],
+          "children": [],
+          "annotations": []
+        },
+        {
+          "type": "P",
+          "attributes": {},
+          "markedContentIds": [
+            1
+          ],
+          "children": [],
+          "annotations": []
+        }
+      ]
+    },
+    "items": [
+      {
+        "text": "Control heading",
+        "mcid": 0
+      },
+      {
+        "text": "Control paragraph",
+        "mcid": 1
+      }
+    ]
+  },
+  "cliPageKeys": [
+    "page",
+    "width",
+    "height",
+    "text",
+    "text_items"
+  ],
+  "apiJsonBlockCount": 18,
+  "firstTable": {
+    "kind": "table",
+    "bold": false,
+    "italic": false,
+    "rows": [
+      [
+        {
+          "text": "",
+          "bbox": {
+            "x": 307.27593994140625,
+            "y": 429.80999755859375,
+            "width": 0,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        },
+        {
+          "text": "We argue that",
+          "bbox": {
+            "x": 365.6505126953125,
+            "y": 429.80999755859375,
+            "width": 17.34173583984375,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        },
+        {
+          "text": "current techniques",
+          "bbox": {
+            "x": 424.76141357421875,
+            "y": 429.80999755859375,
+            "width": 46.9945068359375,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        },
+        {
+          "text": "restrict the",
+          "bbox": {
+            "x": 512.2142333984375,
+            "y": 429.80999755859375,
+            "width": 13,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        }
+      ],
+      [
+        {
+          "text": "power",
+          "bbox": {
+            "x": 307.27593994140625,
+            "y": 443.3599853515625,
+            "width": 27,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        },
+        {
+          "text": "of the",
+          "bbox": {
+            "x": 365.6505126953125,
+            "y": 443.3599853515625,
+            "width": 2.090911865234375,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        },
+        {
+          "text": "pre-trained representations,",
+          "bbox": {
+            "x": 424.76141357421875,
+            "y": 443.3599853515625,
+            "width": 71.55828857421875,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        },
+        {
+          "text": "espe-",
+          "bbox": {
+            "x": 512.2142333984375,
+            "y": 443.3599853515625,
+            "width": 13.312744140625,
+            "height": 10.0545654296875
+          },
+          "textItemIndices": []
+        }
+      ]
+    ],
+    "bbox": {
+      "x": 307.27593994140625,
+      "y": 429.80999755859375,
+      "width": 218.25103759765625,
+      "height": 23.60455322265625
+    },
+    "textItemIndices": []
+  },
+  "pdfjs": {
+    "version": "5.4.624",
+    "page": 3,
+    "operatorCounts": {
+      "constructPath": 190,
+      "paintImageXObject": 14,
+      "paintInlineImageXObject": 0,
+      "showText": 303
+    },
+    "textItems": 346
+  }
+}

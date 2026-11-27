@@ -1,0 +1,51 @@
+[
+  {
+    "paper": "corner",
+    "pages": 2,
+    "logicalTextBlocks": 21,
+    "multiFrameBlocks": 0,
+    "images": 3,
+    "liveSourceRuns": 0,
+    "checkedWords": [],
+    "diagnostics": {
+      "Retained ambiguous line-end hyphen.": 3,
+      "Caption or margin text retained independently; association unverified.": 3,
+      "Leading caption font applied only to its printed label.": 1
+    }
+  },
+  {
+    "paper": "style",
+    "pages": 9,
+    "logicalTextBlocks": 115,
+    "multiFrameBlocks": 0,
+    "images": 7,
+    "liveSourceRuns": 0,
+    "checkedWords": [
+      "single-domain"
+    ],
+    "diagnostics": {
+      "Retained ambiguous line-end hyphen.": 28,
+      "Caption or margin text retained independently; association unverified.": 21,
+      "Parser table retained as reading text; grid unverified.": 5
+    }
+  },
+  {
+    "paper": "bert",
+    "pages": 16,
+    "logicalTextBlocks": 370,
+    "multiFrameBlocks": 2,
+    "images": 1,
+    "liveSourceRuns": 0,
+    "checkedWords": [
+      "pre-train",
+      "fine-tuned",
+      "task-specific",
+      "especially"
+    ],
+    "diagnostics": {
+      "Retained ambiguous line-end hyphen.": 323,
+      "Parser table retained as reading text; grid unverified.": 20,
+      "Caption or margin text retained independently; association unverified.": 37
+    }
+  }
+]

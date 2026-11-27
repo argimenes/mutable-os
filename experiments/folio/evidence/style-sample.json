@@ -1,0 +1,155 @@
+{
+  "pdfSha256": "56db47218ab57cdf1ca4378c364a1ae43800c20c73089b915fba0be798c2e8aa",
+  "page": 1,
+  "classified": {
+    "kind": "heading",
+    "text": "Florida Institute for Cybersecurity University of Florida kalaivani.s@ufl.edu",
+    "level": 2,
+    "bold": false,
+    "italic": false,
+    "bbox": {
+      "x": 117.33099365234375,
+      "y": 124.51458740234375,
+      "width": 163.63388061523438,
+      "height": 11
+    },
+    "textItemIndices": [
+      3,
+      5,
+      7
+    ]
+  },
+  "items": [
+    {
+      "index": 3,
+      "text": "Florida Institute for Cybersecurity",
+      "x": 117.33099365234375,
+      "y": 124.51458740234375,
+      "width": 163.70254516601562,
+      "height": 10.75970458984375,
+      "fontName": "NimbusRomNo9L-Regu",
+      "fontSize": 11.9552001953125,
+      "fontWeight": 425,
+      "rotation": 0
+    },
+    {
+      "index": 5,
+      "text": "University of Florida",
+      "x": 148.9459991455078,
+      "y": 138.46258544921875,
+      "width": 100.47151184082031,
+      "height": 10.75970458984375,
+      "fontName": "NimbusRomNo9L-Regu",
+      "fontSize": 11.9552001953125,
+      "fontWeight": 425,
+      "rotation": 0
+    },
+    {
+      "index": 7,
+      "text": "kalaivani.s@ufl.edu",
+      "x": 131.03700256347656,
+      "y": 153.10302734375,
+      "width": 136.2892608642578,
+      "height": 9.2293701171875,
+      "fontName": "NimbusMonL-Regu",
+      "fontSize": 11.9552001953125,
+      "fontWeight": 205,
+      "rotation": 0
+    }
+  ],
+  "binding": {
+    "blockId": "folio-56db47218ab57cdf1ca4-p1-b2-0",
+    "group": 2,
+    "groups": [
+      2
+    ],
+    "part": 0,
+    "lines": [
+      [
+        3
+      ],
+      [
+        5
+      ],
+      [
+        7
+      ]
+    ],
+    "joins": [
+      35,
+      57
+    ],
+    "mappings": [
+      {
+        "item": 3,
+        "start": 0,
+        "end": 35,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 5,
+        "start": 36,
+        "end": 57,
+        "noSpaceAfter": false
+      },
+      {
+        "item": 7,
+        "start": 58,
+        "end": 77,
+        "noSpaceAfter": false
+      }
+    ],
+    "recovered": []
+  },
+  "native": {
+    "id": "folio-56db47218ab57cdf1ca4-p1-b2-0",
+    "type": "standoff-editor-block",
+    "properties": {
+      "standoffProperties": [
+        {
+          "id": "folio-56db47218ab57cdf1ca4-p1-b2-0-p1-i3",
+          "type": "spatial/source-run",
+          "value": "p1-i3",
+          "start": 0,
+          "end": 34
+        },
+        {
+          "id": "folio-56db47218ab57cdf1ca4-p1-b2-0-p1-i5",
+          "type": "spatial/source-run",
+          "value": "p1-i5",
+          "start": 36,
+          "end": 56
+        },
+        {
+          "id": "folio-56db47218ab57cdf1ca4-p1-b2-0-p1-i7",
+          "type": "spatial/source-run",
+          "value": "p1-i7",
+          "start": 58,
+          "end": 76
+        }
+      ],
+      "metadata": {
+        "folio": {
+          "kind": "heading",
+          "frame": {
+            "x": 117.33,
+            "y": 124.51,
+            "width": 163.7,
+            "height": 37.82
+          },
+          "fontSize": 11.96,
+          "lineCount": 3,
+          "leading": 14.64,
+          "family": "serif",
+          "align": "left"
+        }
+      }
+    },
+    "inline": [
+      {
+        "kind": "text",
+        "text": "Florida Institute for Cybersecurity University of Florida kalaivani.s@ufl.edu"
+      }
+    ]
+  }
+}

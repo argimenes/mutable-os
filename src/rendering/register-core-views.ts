@@ -1,3 +1,4 @@
+import { SpreadBlockView } from './spread-block';
 import { registerStandoffCodeMirror } from '../features/standoff-code-mirror/view';
 import {passiveNativeTypes} from '../runtime/passive-presentation';
 import { registerTabOrientationCommands } from '../runtime/tab-orientation';
@@ -55,6 +56,7 @@ function many(editor: ReactiveEditor, types: string[], view: any, capabilities: 
 }
 
 export function registerCoreViews(editor: ReactiveEditor, documentView = ContainerBlockView): void {
+  if(editor.features.spreadBlocks) many(editor,['spread-block'],SpreadBlockView,['container','selectable']);
   registerStandoffCodeMirror(editor);
   editor.registry.register({ type: 'mutable/opaque-block', view: OpaqueClipboardView, capabilities: ['selectable'] });
   if (editor.features.documentInterchange) many(editor, ["mutable/video-block"], VideoBlockView, ["media", "opaque-widget", "selectable"]);

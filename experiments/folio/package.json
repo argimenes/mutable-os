@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@llamaindex/liteparse": "2.21.3",
+    "playwright-core": "1.56.1"
+  },
+  "name": "folio-spatial-investigation",
+  "private": true
+}

@@ -45,6 +45,8 @@ export type FeatureFlags = Readonly<{
   verticalTabs: boolean;
   /** Atlas artwork and application shortcuts on the workspace Desktop. */
   desktopApplicationIcons: boolean;
+  /** Two juxtaposed native occupants with occurrence-scoped coordination. */
+  spreadBlocks: boolean;
   /** Structural containers and retained front/back surfaces. */
   reversibleBlocks: boolean;
   /** Native task items and automatic task prefixes. Legacy data remains readable. */
@@ -277,6 +279,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   markdownInputTransformation: true,
   verticalTabs: true,
   desktopApplicationIcons: true,
+  spreadBlocks: true,
   reversibleBlocks: true,
   taskLists: true,
   tableLayouts: true,

@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Folio · publication study</title></head>
+<body><main id="folio"></main><script type="module">
+  const response = await fetch('./session.json');
+  const config = response.ok && response.headers.get('content-type')?.includes('application/json') && await response.json();
+  if (config?.folioExperiment === 1) await import('./viewer.jsx');
+  else document.querySelector('#folio').textContent = 'Run node experiments/folio/serve.mjs to open the isolated Folio experiment.';
+</script></body>
+</html>

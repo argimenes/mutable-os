@@ -1,0 +1,67 @@
+{
+  "browser": "158.0.8127.37",
+  "mount": {
+    "renderMs": 14.200000017881393,
+    "openToSecondFrameMs": 545.0999999940395
+  },
+  "firstRevealMs": 969.3088749999988,
+  "pageAssetReads": 1,
+  "scroll": {
+    "durationMs": 1750.2479160000003,
+    "wheels": 48,
+    "published": 48,
+    "received": 48,
+    "receiverMs": 4.699999958276749
+  },
+  "navigation": {
+    "apiRequests": 0,
+    "repositoryCommits": 0,
+    "snapshots": 0,
+    "projectionBuilds": 0,
+    "graphSweeps": 0,
+    "delayedEchoes": 0
+  },
+  "repeatRevealMs": 414.20420899999954,
+  "explorerRows": 6,
+  "reflow": {
+    "followingFrameMovedPx": 127,
+    "gapPx": 31.109375
+  },
+  "multiFrameEdit": true,
+  "entity": {
+    "name": "BERT",
+    "id": "8721e7b5-fdd4-4cda-81a3-e065db931869"
+  },
+  "typing": [
+    {
+      "pdf": "expanded",
+      "samples": 12,
+      "driverMedianMs": 29.697542000001704,
+      "driverMaxMs": 76.62024999999994,
+      "affectedContents": 1,
+      "snapshots": 0,
+      "projectionBuilds": 0,
+      "apiRequests": 0
+    },
+    {
+      "pdf": "collapsed",
+      "samples": 12,
+      "driverMedianMs": 25.49537500000224,
+      "driverMaxMs": 65.11070800000016,
+      "affectedContents": 1,
+      "snapshots": 0,
+      "projectionBuilds": 0,
+      "apiRequests": 0
+    }
+  ],
+  "saveOpen": {
+    "layout": true,
+    "editedText": true,
+    "entity": true,
+    "originalSha256": "987545ffb087f1ece898142c403a516baeabeb70ce19089397fac6f7db12c3d4",
+    "transientPageReset": true
+  },
+  "divergentPagination": true,
+  "abortOnCollapse": true,
+  "browserErrors": []
+}
