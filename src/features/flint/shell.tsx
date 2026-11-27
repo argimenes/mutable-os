@@ -3,6 +3,7 @@ import { For, Show, createSignal, createMemo, createUniqueId, onMount, onCleanup
 import type { DocumentApplicationInstance } from '../../feature-api/document-application';
 import { Dynamic } from "solid-js/web";
 import { KnowledgeView } from './knowledge-view';
+import {documentNames} from './vault-files';
 import { VaultView, DocumentProperties } from './vault-view';
 import { RecentDocuments } from './recent-documents';
 import { StorageSheet } from './storage-sheet';
@@ -123,10 +124,10 @@ export function FlintView(props:{application:DocumentApplicationInstance; initia
         <div class="flint-segments" role="group" aria-label="Library views"><button aria-pressed={browse()==='browse'} onPointerDown={e=>e.preventDefault()} onClick={()=>setBrowse('browse')}>Files</button><button aria-pressed={browse()==='search'} onPointerDown={e=>e.preventDefault()} onClick={()=>setBrowse('search')}>Search</button><Show when={app.recentDocuments}><button aria-pressed={browse()==='recent'} onClick={()=>setBrowse('recent')}>Recent</button></Show></div>
         <div hidden={browse()!=='browse'}>
           <Show when={app.vault} fallback={<p>Cavern browsing is unavailable in this host.</p>}><VaultView vault={app.vault!} compact={compact()} activeLocation={activeLocation}/></Show>
-          <Show when={!vault()}><h3>Open Documents</h3><p class="flint-hint">Open a managed directory above, or continue with a Document already in this workspace.</p><For each={app.documents()}>{doc=><button class="flint-open-document" onClick={()=>app.openDocument(doc.id)}><span>{doc.title}</span></button>}</For></Show>
+          <Show when={!vault()}><h3>Open Documents</h3><p class="flint-hint">Open a managed directory above, or continue with a Document already in this workspace.</p><For each={[...app.documents()].sort((a,b)=>documentNames.compare(a.title,b.title))}>{doc=><button class="flint-open-document" onClick={()=>app.openDocument(doc.id)}><span>{doc.title}</span></button>}</For></Show>
         </div>
         <div hidden={browse()!=='recent'}><Show when={app.recentDocuments}>{recent => <RecentDocuments recent={recent()}/>}</Show></div>
-        <div hidden={browse()!=='search'}><Show when={vault()&&app.knowledge} fallback={<p>Open a Cavern to search its available native Documents.</p>}><KnowledgeView knowledge={app.knowledge!} mode="search"/></Show></div>
+        <div hidden={browse()!=='search'}><Show when={vault()&&app.knowledge} fallback={<p>Open a Cavern to search its available native Documents.</p>}><KnowledgeView knowledge={app.knowledge!} vault={app.vault} mode="search"/></Show></div>
         </div>
       </nav>
       <Show when={compact()}><FlintPaneSplitter pane="library" controls={explorerId} width={()=>preferences.layout.explorerWidth} root={()=>shell} resize={(width,save)=>preferences.set('explorerWidth',width,save)}/></Show>

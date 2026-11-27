@@ -20,7 +20,7 @@ execFileSync(process.execPath,['scripts/build-relocation-helper.mjs']);
 const disposers:Array<()=>any>=[], actualFetch=globalThis.fetch;
 afterEach(async()=>{for(const f of disposers.splice(0).reverse())await f();document.body.replaceChildren();localStorage.clear();vi.unstubAllGlobals();});
 const wait=(f:()=>void)=>vi.waitFor(f,{timeout:6000,interval:20});
-const button=(host:ParentNode,label:string)=>{if(label==='Files'||label==='Close tab'){const menu=host.querySelector<HTMLButtonElement>('[aria-label="Flint application menu"]')!;if(menu.getAttribute('aria-expanded')!=='true')menu.click();}const b=[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label);expect(b,`button ${label}`).toBeTruthy();return b!;};
+const button=(host:ParentNode,label:string)=>{if(label==='Files'||label==='Close tab'){const menu=host.querySelector<HTMLButtonElement>('[aria-label="Flint application menu"]')!;if(menu.getAttribute('aria-expanded')!=='true')menu.click();}const b=[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>(label==='Save Document'&&b.getAttribute('aria-label')===label)||b.textContent===label);expect(b,`button ${label}`).toBeTruthy();return b!;};
 const click=(host:ParentNode,label:string)=>{const b=button(host,label);expect(b.disabled,`${label} enabled`).toBe(false);b.click();};
 const field=(host:ParentNode,label:string,value:string)=>{const input=host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;expect(input,label).toBeTruthy();input.value=value;input.dispatchEvent(new Event(input.tagName==='SELECT'?'change':'input',{bubbles:true}));};
 async function fixture(options:{readOnly?:boolean;fault?:(stage:string)=>Promise<void>}={}) {
@@ -38,7 +38,7 @@ async function fixture(options:{readOnly?:boolean;fault?:(stage:string)=>Promise
  const f=make();return {...f,root,make};
 }
 async function open(host:ParentNode,root='vault') {field(host,'Vault directory',root);click(host,'Open Cavern');await wait(()=>expect(host.querySelector('[aria-label="Selected folder"]')?.textContent).toBe(root));await wait(()=>expect(button(host,'Open Cavern').disabled).toBe(false));}
-async function create(host:ParentNode,name='note.mutable.json',title='A title') {field(host,'New Document filename',name);field(host,'New Document title',title);click(host,'New Document');await wait(()=>expect(host.textContent).toContain('Saved Mutable JSON Document'));await wait(()=>expect(host.querySelector(`[aria-label="Open vault/${name}"]`)).toBeTruthy());await wait(()=>expect(button(host,'New Document').disabled).toBe(false));}
+async function create(host:ParentNode,name='note.mutable.json',title='A title') {await wait(()=>expect(button(host,'New Document').disabled).toBe(false));field(host,'New Document filename',name);field(host,'New Document title',title);click(host,'New Document');await wait(()=>expect(host.textContent).toContain('Saved Mutable JSON Document'));await wait(()=>expect(host.querySelector(`[aria-label="Open vault/${name}"]`)).toBeTruthy());await wait(()=>expect(button(host,'New Document').disabled).toBe(false));}
 const idOf=(host:ParentNode)=>host.querySelector('[data-flint-property="id"]')!.textContent!;
 async function documentWithText(f:Awaited<ReturnType<typeof fixture>>,host:HTMLElement,name:string,title:string,text:string) {
  await create(host,name,title);const id=idOf(host),view=[...f.editor.projections.values()].find(p=>p!==f.projection&&(p.state.nodes[p.state.rootKey].payload.metadata as any)?.documentId===id)!;
@@ -53,6 +53,7 @@ it('searches unmounted native text/title, reports unopened coverage, and navigat
  const hits=a.querySelectorAll<HTMLButtonElement>('.flint-search-hit');expect(hits).toHaveLength(1);expect(hits[0].dataset.searchDocument).toBe(one.id);hits[0].click();await wait(()=>expect(idOf(a)).toBe(one.id));await wait(()=>expect(f.editor.focus.state.focusedKey).not.toBe(one.node.key));
  const n=f.editor.node(f.editor.focus.state.focusedKey!)!;expect(n.contentKey).toBe(one.node.contentKey);await wait(()=>expect(f.editor.mounts.get(n.key)?.captureInlineSelection?.()).toEqual({anchor:2,head:3}));expect(f.editor.repository.snapshot()).toEqual(before);expect(history).not.toHaveBeenCalled();
  await search(a,'Compass');expect(a.querySelectorAll('.flint-search-hit')).toHaveLength(1);expect(a.querySelector('.flint-search-hit')?.textContent).toContain('title');
+ await search(a,'unopened.mutable');expect(a.querySelector('.flint-knowledge .flint-open-document')?.textContent).toContain('vault/unopened.mutable.json');
 },15000);
 it('uses the invoking Window occurrence; simultaneous occurrences never duplicate matches or steal the other selection',async()=>{
  const f=await fixture(),a=f.windows()[0];await open(a);const doc=await documentWithText(f,a,'one.mutable.json','One','needle passage');f.launch();const b=f.windows().find(w=>w!==a)!;await open(b);

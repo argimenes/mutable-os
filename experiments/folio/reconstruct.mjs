@@ -108,7 +108,7 @@ function paragraph(lines, id, page, region, options) {
 }
 
 export function reconstruct(paper, result, imageUrls,options={}) {
-  const docId = 'folio-'+paper.sha256.slice(0,20);
+  const docId = options.documentId ?? 'folio-'+paper.sha256.slice(0,20);
   const doc = {type:'document-block',id:docId,metadata:{name:paper.title,folio:{
     version:1, source:{...paper,license:'CC BY 4.0'},coordinateSystem:'top-left-72dpi', evidence:paper.id+'.source.json.gz'}},children:[]};
   const evidence = {version:1,source:paper.sha256,parser:'@llamaindex/liteparse@2.21.3',offsets:'Unicode code points, half-open at import',pages:[]};

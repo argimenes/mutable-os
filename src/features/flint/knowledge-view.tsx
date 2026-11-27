@@ -1,23 +1,35 @@
 import { ApplicationSurfaceBoundary } from "../../feature-api";
+import {documentNames} from './vault-files';
 import {SavedCoverage} from './saved-coverage';
 import {QueryResults} from './query-results';
 import { For, Show, createSignal, onCleanup } from 'solid-js';
-import type { ApplicationKnowledge, DocumentTarget, NativeReferenceItem, VaultSearchResults } from '../../feature-api/document-application';
+import type { ApplicationKnowledge, ApplicationVault, ApplicationVaultDocument, DocumentTarget, NativeReferenceItem, VaultSearchResults } from '../../feature-api/document-application';
 
-export function KnowledgeView(props:{knowledge:ApplicationKnowledge; mode?:'search'|'references'}) {
+export function KnowledgeView(props:{knowledge:ApplicationKnowledge; vault?:ApplicationVault; mode?:'search'|'references'}) {
   const api=props.knowledge;
   const [query,setQuery]=createSignal(''),[results,setResults]=createSignal<VaultSearchResults>(),[pending,setPending]=createSignal(false),[message,setMessage]=createSignal('');
+  const [fileMatches,setFileMatches]=createSignal<readonly ApplicationVaultDocument[]>([]);
+  function matchFiles(){
+    const term=query().trim().toLocaleLowerCase();
+    const rows=props.vault?.state()?.documents??[];
+    setFileMatches(term?rows.filter(row=>row.title.toLocaleLowerCase().includes(term)||row.location.filename.toLocaleLowerCase().includes(term))
+      .sort((a,b)=>documentNames.compare(a.title,b.title)||documentNames.compare(a.location.filename,b.location.filename)):[]);
+  }
   const [picker,setPicker]=createSignal<{selection:string;targets:readonly DocumentTarget[];diagnostics:readonly string[]}>();
   const [references,setReferences]=createSignal<{token:string;items:readonly NativeReferenceItem[];diagnostics:readonly string[]}>();
   let pickerButton!:HTMLButtonElement;
   const closePicker=()=>{api.cancelPicker();setPicker(undefined);queueMicrotask(()=>{if(live&&pickerButton?.isConnected)pickerButton.focus();});};
   const [acting,setActing]=createSignal(false);let generation=0,live=true;
   onCleanup(()=>{live=false;generation++;if(props.mode!=='references')api.cancel();if(props.mode!=='search')api.cancelPicker();});
-  const cancel=()=>{generation++;api.cancel();setPending(false);setResults(undefined);};
-  const search=async()=>{const request=++generation;setPending(true);setMessage('');setResults(undefined);try{const value=await api.search(query());if(live&&request===generation)setResults(value);}catch(e){if(live&&request===generation)setMessage((e as Error).name==='AbortError'?'Query cancelled or changed. Search again.':String(e));}finally{if(live&&request===generation)setPending(false);}};
+  const cancel=()=>{generation++;api.cancel();setPending(false);setFileMatches([]);setResults(undefined);};
+  const search=async()=>{const request=++generation;matchFiles();setPending(true);setMessage('');setResults(undefined);try{const value=await api.search(query());if(live&&request===generation)setResults(value);}catch(e){if(live&&request===generation)setMessage((e as Error).name==='AbortError'?'Query cancelled or changed. Search again.':String(e));}finally{if(live&&request===generation)setPending(false);}};
   const act=async(action:()=>Promise<unknown>|void)=>{if(acting())return;setActing(true);setMessage('');try{await action();}catch(e){if(live)setMessage(String(e));}finally{if(live)setActing(false);}};
   return <section class="flint-knowledge" aria-label={props.mode==='search'?'Vault search':props.mode==='references'?'Document references':'Vault search and references'}>
     <Show when={props.mode!=='references'}><h2>Search</h2><form onSubmit={e=>{e.preventDefault();void search();}}><label>Titles and native text<input aria-label="Search vault" value={query()} maxLength={256} onInput={e=>{cancel();setQuery(e.currentTarget.value);}}/></label><button type="submit">Search vault</button><Show when={pending()}><button type="button" onClick={cancel}>Cancel search</button></Show></form>
+    <Show when={fileMatches().length}><h3>Matching files</h3><QueryResults each={fileMatches()}>{file=>
+      <button class="flint-open-document" disabled={acting()||file.state==='ambiguous'||file.state==='pending'} onClick={()=>void act(()=>props.vault!.openFile(file.location))}>
+        <span>{file.title||file.location.filename}</span><small>{file.location.folder==='.'?file.location.filename:file.location.folder+'/'+file.location.filename}</small>
+      </button>}</QueryResults></Show>
     <Show when={pending()}><p role="status">Searching available native Documents…</p></Show>
     <Show when={results()}>{result=><div><SavedCoverage value={result().savedProvider}/><p role="status">{result().hits.length} results · {result().available}/{result().discovered} Documents available. {result().complete?(result().coverageMode==='saved-and-live'?'Verified saved/live coverage complete.':'Loaded vault coverage complete.'):'Incomplete coverage; zero results do not establish absence.'}</p>
       <Show when={!api.current(result().token)}><p role="status">Results are stale. Search again.</p></Show>

@@ -18,6 +18,7 @@ export default defineConfig({
     },
   },
   build: {
+    rollupOptions: { input: { desktop: 'index.html', folio: 'folio/index.html' } },
     target: 'esnext',
     sourcemap: true
   },

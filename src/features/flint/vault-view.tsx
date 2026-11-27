@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createMemo, createSignal, on } from 'solid-js';
+import {filesByFolder} from './vault-files';
 import type { ApplicationVault, DocumentApplicationInstance } from '../../feature-api/document-application';
 import { useCurrentCavern } from '../../application/cavern-startup';
 import type { DocumentFormat } from '../document-formats/model';
@@ -27,14 +28,14 @@ export function VaultView(props:{vault:ApplicationVault; compact?:boolean; activ
   createEffect(()=>{const s=state();if(s && folder()!==s.root&&!s.folders.includes(folder()))setFolder(s.root);});
   const folders=createMemo(()=>state()?[state()!.root,...state()!.folders]:[]);
   const tags=createMemo(()=>[...new Set(state()?.documents.flatMap(d=>d.tags)??[])].sort());
-  const documentFolders=createMemo(()=>groupByFolder(state()?.documents.filter(d=>!tag()||d.loaded&&d.tags.includes(tag()))??[],d=>d.location.folder));
+  const documents=createMemo(()=>state()?.documents), candidates=createMemo(()=>state()?.candidates);
+  const files=createMemo(()=>filesByFolder(documents()?.filter(d=>!tag()||d.loaded&&d.tags.includes(tag()))??[],candidates()??[]));
   const childFolders=createMemo(()=>groupByFolder(state()?.folders??[],f=>location(f).folder));
-  const candidateFolders=createMemo(()=>groupByFolder(state()?.candidates??[],f=>location(f).folder));
   const pickFolder=(p:string)=>{setFolder(p);setSelected('');setMoveName(p.split('/').pop()!);setDestination(state()!.root);};
   const Folder=(p:{path:string})=> <details class="flint-tree-folder" open={p.path===state()?.root}><summary><button aria-pressed={folder()===p.path&&!selected()} onClick={()=>pickFolder(p.path)}>{p.path===state()?.root?(cavern?.current()?.name ?? (p.path==='.'?'Cavern':p.path)):p.path.split('/').pop()}</button></summary>
-    <For each={documentFolders().get(p.path)}>{d=><div class="flint-tree-document"><button title={`${d.title} · ${path(d.location)} · ${d.state}`} aria-current={props.activeLocation?.() && path(props.activeLocation()!)===path(d.location) ? "page" : undefined} aria-label={`Open ${path(d.location)}`} disabled={busy()||!state()!.complete||d.state==='ambiguous'||d.state==='pending'} onClick={()=>{setSelected(path(d.location));setFolder(d.location.folder);setDestination(d.location.folder);setMoveName(d.location.filename);void run(()=>props.vault.openFile(d.location));}}>{d.title}<small>{d.location.filename} · {d.state}</small></button><Show when={d.state==='pending'}><button disabled={busy()||readOnly()} onClick={()=>void run(()=>props.vault.recoverNative(d.location))}>Recover {d.location.filename}</button></Show></div>}</For>
     <For each={childFolders().get(p.path)}>{f=><Folder path={f}/>}</For>
-    <For each={candidateFolders().get(p.path)}>{candidate=><div class="flint-tree-document"><button aria-label={`Open ${candidate}`} disabled={busy()} onClick={()=>{setSelected('');setFolder(location(candidate).folder);void run(async()=>{if(!props.vault.openCandidate)throw Error('Content recognition is unavailable');await props.vault.openCandidate(location(candidate));});}}>{location(candidate).filename}<small>File · recognize on Open</small></button></div>}</For>
+    <For each={files().get(p.path)}>{d=>typeof d!=='string'?<div class="flint-tree-document"><button title={`${d.title} · ${path(d.location)} · ${d.state}`} aria-current={props.activeLocation?.() && path(props.activeLocation()!)===path(d.location) ? "page" : undefined} aria-label={`Open ${path(d.location)}`} disabled={busy()||!state()!.complete||d.state==='ambiguous'||d.state==='pending'} onClick={()=>{setSelected(path(d.location));setFolder(d.location.folder);setDestination(d.location.folder);setMoveName(d.location.filename);void run(()=>props.vault.openFile(d.location));}}>{d.title}<small>{d.location.filename} · {d.state}</small></button><Show when={d.state==='pending'}><button disabled={busy()||readOnly()} onClick={()=>void run(()=>props.vault.recoverNative(d.location))}>Recover {d.location.filename}</button></Show></div>
+      :<div class="flint-tree-document"><button aria-label={`Open ${d}`} disabled={busy()} onClick={()=>{setSelected('');setFolder(location(d).folder);void run(async()=>{if(!props.vault.openCandidate)throw Error('Content recognition is unavailable');await props.vault.openCandidate(location(d));});}}>{location(d).filename}<small>File · recognize on Open</small></button></div>}</For>
   </details>;
   return <section ref={controls} class="flint-vault-controls" aria-label="Filesystem Cavern" onKeyDown={event=>{if(props.compact&&panel()&&event.key==='Escape'){event.preventDefault();event.stopPropagation();setPanel('');controls.querySelector<HTMLButtonElement>('[data-new-document]')?.focus();}}}>
     <Show when={props.compact}><div class="flint-file-actions" role="group" aria-label="File actions">

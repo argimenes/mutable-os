@@ -10,6 +10,13 @@ it('reserves left-side cells without shrinking narrow editors or overlapping the
  for(const columns of [42,90,128,182]){const p=flintPanes({columns,rows:40,cellWidthPx:10,cellHeightPx:20},true,true,false,88,true);expect(p.vault+p.document+p.left+p.right).toBe(p.width);expect(p.document).toBeGreaterThan(0);expect(p.vaultWidth).toBe(28);expect(p.vaultOverlay).toBe(columns<82);}
  expect(flintPanes({columns:182,rows:40,cellWidthPx:10,cellHeightPx:20},false,false,false,88,false).vault).toBe(0);
 });
+it('orders each folder by visible title across native and recognized files',()=>{
+ const doc=(title:string,filename:string)=>({id:filename,title,location:{folder:'.',filename},state:'paired',loaded:false,tags:[]});
+ const vault={state:()=>({root:'.',folders:[],documents:[doc('Volume 10','a.ink'),doc('alpha','z.ink'),doc('Volume 2','b.ink')],candidates:['Beta.md']})} as unknown as ApplicationVault;
+ const host=document.body.appendChild(document.createElement('div'));
+ dispose=render(()=><TextualVault vault={vault} activeLocation={()=>undefined} collapse={()=>{}} create={()=>{}} opened={()=>{}}/>,host);
+ expect([...host.querySelectorAll('.tw-vault-file')].map(el=>el.textContent)).toEqual(['alpha','Beta.md','Volume 2','Volume 10']);
+});
 it('uses existing open/refresh commands and does no listing or row work for unrelated state or active-file changes',async()=>{
  let reads=0;const location={get folder(){reads++;return 'vault';},filename:'one.ink'};
  const [state,setState]=createSignal<ApplicationVaultState>({root:'vault',folders:['vault/sub'],documents:[{id:'one',title:'One',location,state:'paired',loaded:true,tags:[]},{id:'pending',title:'Pending',location:{folder:'vault/sub',filename:'pending.ink'},state:'pending',loaded:false,tags:[]}],markdown:[],candidates:['vault/plain.md'],diagnostics:[],operations:[],readOnly:false,complete:true,busy:false,notice:''});

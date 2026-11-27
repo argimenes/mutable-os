@@ -1,5 +1,7 @@
 import {createEffect,createMemo,createSignal,For,Show,onCleanup,onMount,untrack} from 'solid-js';
 import {render} from 'solid-js/web';
+import {PdfActions} from './pdf-actions';
+import {admitNative} from '../../../src/persistence/native-resource';
 import {WorkspaceSession} from '../../../src/application/workspace-session';
 import {WorkspacePresentationView} from '../../../src/application/workspace-presentation-view';
 import {materializeLocalWorkspace} from '../../../src/reactive-editor/workspace-manifest';
@@ -20,22 +22,44 @@ import '../viewer.css';
 import '../ii/viewer.css';
 import './viewer.css';
 
-const host=document.querySelector('#folio');
-async function start(){
- const settings=await fetch('./session.json').then(r=>r.json()),file=new URLSearchParams(location.search).get('file')??(settings.files.includes('bert.ink')?'bert.ink':settings.files[0]);
- if(!settings.files.includes(file))throw Error('Choose a native file in the reading vault.');
+let host,loadSettings;
+let release=()=>{};
+window.addEventListener('pagehide',()=>release(),{once:true});
+
+function availableName(title,files){
+ const base=Array.from(title.replace(/[\x00-\x1f/\\:*?"<>|]/g,'-').replace(/^[.\s]+|[.\s]+$/g,'')).slice(0,55).join('')||'Publication';
+ const used=new Set(files.map(f=>f.toLowerCase()));
+ let name=base+'.ink';
+ for(let n=2;used.has(name.toLowerCase());n++)name=base+' ('+n+').ink';
+ return name;
+}
+function landing(message,files=[]){
+ release();
+ release=render(()=><div class="folio-app"><header class="folio-top"><strong>Folio</strong><PdfActions open={start}/></header>
+   <main class="folio-landing"><p>{message}</p><For each={files}>{f=><p><a href={'?file='+encodeURIComponent(f)}>{f}</a></p>}</For></main></div>,host);
+}
+async function start(imported){
+ const settings=await loadSettings();
+ const file=imported?availableName(imported.title,settings.files):new URLSearchParams(location.search).get('file')??(settings.vaultName?undefined:settings.files.includes('bert.ink')?'bert.ink':settings.files[0]);
+ if(!imported&&!settings.files.includes(file)){landing(settings.vaultName?'Open a PDF or choose a saved publication in '+settings.vaultName+'.':'Choose a PDF or open a saved publication.',settings.files);return;}
  const session=new WorkspaceSession(materializeLocalWorkspace({type:'workspace-block',children:[{type:'workspace-object-bank-block',children:[]}]}),
   {features:{nativeKnowledge:false,sqliteKnowledge:false,sqliteEntities:false,semanticRetrieval:false,desktopApplicationIcons:false,flintProbe:false,flintMaterialChrome:false}});
  const editor=session.editor;if(!editor.features.folioSemanticReading)throw Error('Folio reading is disabled.');
  editor.setAssetContext(()=>settings);
- const native=nativeDocumentSession(editor),startTime=performance.now(),id=await native.open({folder:'.',filename:file});
+ const native=nativeDocumentSession(editor),startTime=performance.now();
+ let id;
+ try{
+   if(imported){
+     const bank=Object.values(editor.repository.readState().contents).find(c=>c.viewType==='workspace-object-bank-block');
+     admitNative(editor.repository,new TextEncoder().encode(imported.wire),bank.key);
+     id=imported.id;native.trackCandidate(id);
+   }else id=await native.open({folder:settings.folder??'.',filename:file});
+ }catch(error){session.dispose();throw error;}
  const projection=editor.createView('folio-reader'),state=editor.repository.state;
  const rootNode=Object.values(projection.state.nodes).find(n=>n.payload.id===id),root=state.contents[rootNode.contentKey];
  const spread=rootNode.children.map(k=>projection.state.nodes[k]).find(n=>n.viewType==='spread-block');
  const pub=spread?.children.flatMap(k=>projection.state.nodes[k].children).map(k=>projection.state.nodes[k]).find(n=>n.viewType==='folio-publication-block');
- if(!pub){const label=document.createElement('label');label.textContent='This file has no Folio publication. Open another file ';
-   const select=document.createElement('select');for(const f of settings.files)select.add(new Option(f,f,false,f===file));
-   select.onchange=()=>{location.search='?file='+encodeURIComponent(select.value);};label.append(select);host.replaceChildren(label);session.dispose();return;}
+ if(!pub){session.dispose();landing('This file has no Folio publication. Choose another file.',settings.files);return;}
  const metrics={frameReads:[],record:false,live:0,published:0,received:0,deliveryMs:0,threadFrames:0,rangeReads:0};
  let api;const disposeFeature=editor.featureHost.activate({id:'folio-reader',activate:scope=>{api=annotationCapabilities(editor,scope);}});
  const gateway=editor.installGateway(document);
@@ -117,12 +141,31 @@ async function start(){
   async function toggleFlint(){if(!flint())await editor.commandRegistry.execute('flint.open',{targetKey:session.projection.state.rootKey,args:undefined});setFlint(!flint());}
   const [galleryStart,setGalleryStart]=createSignal(0),galleryPages=createMemo(()=>filtered()?pages().filter(p=>counts().has(p.number)):pages());
   function jumpToPage(n){pageGo(n);setGalleryStart(Math.floor((n-1)/8)*8);}
-  const save=()=>native.save(id).then(result=>{if(result?.phase!=='saved')setNotice(result?.error??native.notice??'Check the save status.');}).catch(e=>setNotice(e.message));
+  const [openedFile,setOpenedFile]=createSignal(file);
+  const listed=()=>settings.files.includes(openedFile())?settings.files:[...settings.files,openedFile()];
+  async function save(){
+    try{
+      let dest;
+      if(imported&&native.needsSaveDestination(id)){
+        const choice=window.prompt(settings.vaultName?'Save publication in '+settings.vaultName:'Save publication as',openedFile())?.trim();
+        if(!choice)return;
+        dest={folder:settings.folder??'.',filename:/\.ink$/i.test(choice)?choice:choice+'.ink'};
+      }
+      const result=await native.save(id,dest);
+      if(result?.phase!=='saved')throw Error(result?.error??native.notice??'Check the save status.');
+      if(imported){const name=native.location(id).filename;setOpenedFile(name);history.replaceState(null,'','?file='+encodeURIComponent(name));}
+      setNotice('');
+    }catch(error){setNotice(error.message);}
+  }
+  async function openPdf(candidate){
+    if(native.isDirty(id)&&!window.confirm('Discard unsaved changes and open the PDF?'))return;
+    await start(candidate);
+  }
   function keys(e){if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();e.stopImmediatePropagation();void save();}}
   window.addEventListener('keydown',keys,true);onCleanup(()=>window.removeEventListener('keydown',keys,true));
   window.folioIII={editor,native,id,metrics,projection,inventory,selection,mentions,nav,save,file};
   requestAnimationFrame(()=>requestAnimationFrame(()=>{metrics.openMs=performance.now()-startTime;}));
-  return <div class="folio-app"><header class="folio-top"><strong>Folio</strong><h1>{root.payload.metadata.name}</h1><select aria-label="Open publication" value={file} onChange={e=>{location.href='?file='+encodeURIComponent(e.currentTarget.value);}}><For each={settings.files}>{f=><option value={f} selected={file===f}>{f}</option>}</For></select>
+  return <div class="folio-app"><header class="folio-top"><strong>Folio</strong><h1>{root.payload.metadata.title??root.payload.metadata.name}</h1><PdfActions open={openPdf}/><select aria-label="Open publication" value={openedFile()} onChange={e=>{location.href='?file='+encodeURIComponent(e.currentTarget.value);}}><For each={listed()}>{f=><option value={f} selected={openedFile()===f}>{f}</option>}</For></select>
     <button onClick={save}>Save{native.isDirty(id)?' *':''}</button><button onClick={toggleFlint}>{flint()?'Close Flint':'Open in Flint'}</button></header>
     <nav class="reading-tools"><For each={['Bind entity','Scry','Gloss','Highlight']}>{label=><button onPointerDown={e=>e.preventDefault()} onClick={()=>annotate(label==='Bind entity'?'Scry':label)}>{label}</button>}</For>
     <button disabled={!mentions().length} onClick={()=>step(-1)}>Previous reference</button><button disabled={!mentions().length} onClick={()=>step(1)}>Next reference</button>
@@ -149,8 +192,14 @@ async function start(){
       <Show when={unplaced().length}> · {unplaced().length} blocks need frames <button onClick={()=>!flint()&&toggleFlint()}>Read unplaced content in Flint</button></Show><output>{notice()}</output></footer>
     <Show when={scry()} keyed>{s=><Scry selection={s} editor={editor} api={api} inventory={inventory} text={text} property={property} navigate={navigate} focus={pin} close={()=>setScry()}/>}</Show></div>;
  }
+ release();
+ if(imported)history.replaceState(null,'',location.pathname);
  const dispose=render(App,host);
  const guard=e=>{if(native.isDirty(id)){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',guard);
- window.addEventListener('pagehide',()=>{window.removeEventListener('beforeunload',guard);dispose();disposeFeature();gateway();session.dispose();},{once:true});
+ release=()=>{window.removeEventListener('beforeunload',guard);dispose();disposeFeature();gateway();session.dispose();};
 }
-start().catch(e=>{host.textContent=e.message;console.error(e);});
+export function mountFolio(element,settings){
+ host=element;loadSettings=settings;
+ start().catch(e=>{landing(e.message);console.error(e);});
+ return ()=>release();
+}

@@ -7,6 +7,7 @@ import "./desktop-applications.css";
 // Presentation metadata only. Working applications still own their launch commands.
 export const desktopApplications = [
   { id: "flint", name: "Flint", command: "flint.open" },
+  { id: "folio", name: "Folio", href: "/folio/" },
   { id: "cavern", name: "Cavern" },
   { id: "workbench", name: "Workbench" },
   { id: "search", name: "Search" },
@@ -109,6 +110,7 @@ export function DesktopApplicationIcons(props: { session: WorkspaceSession; acti
     try {
       if (application.id === "workbench" && props.actions?.workbench) props.actions.workbench();
       else if (application.id === "cavern" && props.actions?.cavern) props.actions.cavern();
+      else if ("href" in application) window.open(application.href, "_blank", "noopener,noreferrer");
       else if ("command" in application && editor.commandRegistry.owner(application.command) && (!("view" in application) || editor.features.flintSpatialGraph)) {
         await editor.commandRegistry.execute(application.command, { targetKey: projection.state.rootKey, args: "view" in application ? { view: application.view } : undefined });
       } else openDesktopPlaceholder(props.session, application);
@@ -117,7 +119,7 @@ export function DesktopApplicationIcons(props: { session: WorkspaceSession; acti
     } finally { launching = false; }
   };
   return <div ref={root} class="desktop-applications" role="group" aria-label="Desktop applications">
-    <For each={desktopApplications}>{application => <button type="button" class="desktop-application" data-desktop-application={application.id}
+    <For each={desktopApplications.filter(app => app.id !== "folio" || editor.features.folioSemanticReading)}>{application => <button type="button" class="desktop-application" data-desktop-application={application.id}
       aria-label={application.name} aria-pressed={selected() === application.id} title={`Open ${application.name}`}
       onClick={event => { setSelected(application.id); if (event.detail === 0) void launch(application); }}
       onDblClick={event => { event.preventDefault(); void launch(application); }}>

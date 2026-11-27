@@ -40,6 +40,16 @@ it("uses existing commands and host actions only on activation", async () => {
   f.click("workbench", true); await tick(); f.click("cavern", true); await tick();
   expect(workbench).toHaveBeenCalledOnce(); expect(cavern).toHaveBeenCalledOnce();
 });
+it("opens the Folio reader on double click or keyboard activation", async () => {
+  const f = mount(), open = vi.spyOn(window, "open").mockReturnValue(null);
+  expect(f.icon("folio").querySelector("img")?.src).toContain("folio.png");
+  f.click("folio");
+  expect(open).not.toHaveBeenCalled();
+  f.click("folio", true); await tick();
+  f.icon("folio").click(); await tick();
+  expect(open).toHaveBeenCalledTimes(2);
+  expect(open).toHaveBeenCalledWith("/folio/", "_blank", "noopener,noreferrer");
+});
 it.each([0, 50])("placeholder creation is local with %i unrelated Documents; reuse, restore, Close and history use existing windows", async extra => {
   const f = mount(true, extra), app = desktopApplications.find(a => a.id === "tasks")!;
   const snapshot = vi.spyOn(f.editor.repository, "snapshot"), rebuild = vi.spyOn(f.editor.repository as any, "rebuildReferences"), projection = vi.spyOn(f.session.projection as any, "build");

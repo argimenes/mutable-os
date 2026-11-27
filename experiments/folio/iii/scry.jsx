@@ -1,4 +1,4 @@
-import {createEffect,createSignal,For,Show,onCleanup,untrack} from 'solid-js';
+import {createEffect,createSignal,For,Show,onCleanup} from 'solid-js';
 import {LerSession} from '../../../src/features/entity-references/ler-session';
 import {searchEntities} from '../../../src/features/entity-references/read-only-search';
 import {chooseEntity} from '../../../src/features/entity-references/entity-search';
@@ -14,6 +14,10 @@ export function Scry(p){
   const session=new LerSession(data,original.ranges[0].nodeKey);session.input(data.entityQuery);
   const search=new TextSearch(editor);onCleanup(()=>search.dispose());
   const [entities,setEntities]=createSignal([]),[results,setResults]=createSignal([]),[chosen,setChosen]=createSignal([]),[entity,setEntity]=createSignal(),[error,setError]=createSignal(''),[busy,setBusy]=createSignal(false);
+  const [creating,setCreating]=createSignal(false),[createdName,setCreatedName]=createSignal('');
+  const queryName=()=>session.query().trim();
+  const canCreate=()=>queryName() && queryName()!==createdName() && !busy() && !creating();
+  let searchContext,attempt;
   const reader={async search(query,signal){
     const output=await lookup({op:'search',query:query.query,stream:query.stream,match:query.match},signal),rows=new Map();
     for(const m of output.matches){if(!rows.has(m.id))rows.set(m.id,{id:m.id,name:m.name,evidence:[]});rows.get(m.id).evidence.push({kind:m.kind,text:m.text});}
@@ -23,7 +27,8 @@ export function Scry(p){
     }
     return {candidates:[...rows.values()],diagnostics:output.diagnostics,complete:output.complete,current(){signal.throwIfAborted();}};
   }};
-  createEffect(()=>{const q=session.query(),stream=session.state.field,match=session.state.match,abort=new AbortController();setChosen([]);setResults([]);setEntities([]);setEntity();setBusy(true);
+  createEffect(()=>{const q=session.query(),stream=session.state.field,match=session.state.match,abort=new AbortController();setChosen([]);setResults([]);setEntities([]);setEntity();setBusy(true);setError('');
+    searchContext=abort.signal;
     const timer=setTimeout(async()=>{try{
       const [resolved,found]=await Promise.all([searchEntities(reader,{query:q,stream,match,scope:'vault'},abort.signal),
         search.searchText({query:q,scope:api.scope(original.ranges[0].nodeKey,'document'),options:{wholeWords:match==='exact'},signal:abort.signal})]);
@@ -33,6 +38,20 @@ export function Scry(p){
   });
   const cycle=()=>{const fields=['all','name','alias','mention'];session.field(fields[(fields.indexOf(session.state.field)+1)%4]);};
   let queryInput,dialog;
+  async function createEntity(){
+    if(!canCreate())return;
+    const name=queryName(),context=searchContext;
+    if(attempt?.name!==name)attempt={op:'create',id:crypto.randomUUID(),name};
+    setCreating(true);setError('');
+    try{
+      const {entity:created}=await lookup(attempt);
+      setCreatedName(name);
+      if(context.aborted)return;
+      setEntities(rows=>[created,...rows.filter(row=>row.id!==created.id)]);
+      setEntity(created);
+    }catch(e){if(!context.aborted)setError(e.message);}
+    finally{setCreating(false);}
+  }
   function bind(){
     try{if(!entity())throw Error('Choose an entity.');editor.textRanges.validate(original.ranges,'cell');
       const groups=[original.ranges,...chosen().map(m=>m.ranges)];
@@ -60,7 +79,8 @@ export function Scry(p){
     <header><h2>Scry</h2><button onClick={p.close} aria-label="Close Scry">×</button></header>
     <blockquote>{original.text}</blockquote><input ref={queryInput} autofocus aria-label="Scry query" value={session.query()} onInput={e=>session.input(e.currentTarget.value)}/>
     <div><button onClick={cycle}>@ {session.state.field}</button><button onClick={()=>session.match(session.state.match==='exact'?'partial':'exact')}>* {session.state.match}</button></div>
-    <h3>Entities</h3><Show when={!busy()} fallback={<p>Searching…</p>}><For each={entities()} fallback={<p>No matching entities.</p>}>{e=><button aria-pressed={entity()?.id===e.id} onClick={()=>setEntity(e)}>{e.name}</button>}</For></Show>
+    <div class="folio-entity-heading"><h3>Entities</h3><button type="button" aria-label="Create entity from search term" title={'Create entity “'+queryName()+'”'} disabled={!canCreate()} onClick={createEntity}>+ New</button></div>
+    <Show when={!busy()} fallback={<p>Searching…</p>}><For each={entities()} fallback={<p>No matching entities.</p>}>{e=><button aria-pressed={entity()?.id===e.id} onClick={()=>setEntity(e)}>{e.name}</button>}</For></Show>
     <h3>Passages ({results().length})</h3><button disabled={!results().length} onClick={()=>setChosen(chosen().length===results().length?[]:results())}>{chosen().length===results().length?'Clear matches':'Select all matches'}</button>
     <ol><For each={results().slice(0,100)}>{m=><li><input type="checkbox" aria-label={'Include '+m.context} checked={chosen().includes(m)} onChange={e=>setChosen(e.currentTarget.checked?[...chosen(),m]:chosen().filter(x=>x!==m))}/><button onClick={()=>p.navigate(m.ranges[0])}>{m.context}</button></li>}</For></ol>
     <button disabled={!entity()||busy()} onClick={bind}>Bind {chosen().length?'selected mentions':'original selection'}</button>

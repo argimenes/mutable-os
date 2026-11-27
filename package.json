@@ -60,6 +60,7 @@
     "@kobalte/core": "^0.13.9",
     "@lezer/javascript": "^1.5.6",
     "@lezer/highlight": "^1.2.5",
+    "@llamaindex/liteparse": "2.21.3",
     "@paper-design/shaders": "^0.0.16",
     "@retorquere/bibtex-parser": "12.1.9",
     "@solid-primitives/autofocus": "^0.0.111",

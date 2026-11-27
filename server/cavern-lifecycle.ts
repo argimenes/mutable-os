@@ -120,6 +120,13 @@ export function createCavernLifecycle(options: { stateFile?: string } = {}) {
     };
     return { api, sql, attachmentServices:()=>assets&&services?{store:assets.store,executor:services.executor}:undefined,
       async activateAssets(cavern: Cavern) {
+        if(featureFlags.folioSemanticReading){
+          let folio: Promise<ReturnType<typeof Router>> | undefined;
+          api.use('/folio',(req,res,next)=>{
+            folio ??= import('./folio-router.mjs').then(({folioRouter})=>folioRouter({cavernId:cavern.cavernGuid,store:()=>assets?.store,knowledge:sql,scope:'.'}));
+            void folio.then(router=>router(req,res,next)).catch(next);
+          });
+        }
         if(featureFlags.semanticRetrieval&&featureFlags.derivedRetrieval){retrieval=new CavernRetrieval(sql,root,cavern.cavernGuid,{deferStartup:true});await retrieval.start();}
         if(featureFlags.applicationServices)services=createApplicationServiceHost({root,cavernId:cavern.cavernGuid,nativeEnabled:featureFlags.nativeDocumentPersistence,publicationEnabled:featureFlags.webPublishing,academicEnabled:featureFlags.academicResourceLoaders,iiifEnabled:featureFlags.iiifResourceLoaders,crossResourceEnabled:featureFlags.crossResourceLoaders,structuredEnabled:featureFlags.structuredResources,deterministicEnabled:featureFlags.deterministicAcademicResources,webEnabled:featureFlags.webResourceViewers,everydayEnabled:featureFlags.everydayWebResources,academic:(request,signal)=>sql.academic(request,signal),assets:()=>assets?.store,knowledge:(request,signal)=>sql.entityLookup({vault:'.',request},signal,true)});
         if (featureFlags.managedAssetClipboard) { assets = createManagedAssetService({ root, quillEnabled:featureFlags.quill, cavernId: cavern.cavernGuid, session: cavern.session,crossResourceEnabled:featureFlags.crossResourceLoaders,structuredEnabled:featureFlags.structuredResources,deterministicEnabled:featureFlags.deterministicAcademicResources,webEnabled:featureFlags.webResourceViewers,inspectOriginal:(bytes,mediaType,signal)=>{if(!services)throw Error('Application services unavailable');return services.executor.run(['application/xml','application/epub+zip','application/x-bibtex','application/x-research-info-systems'].includes(mediaType)?{kind:'academic-original-inspect',bytes,mediaType}:mediaType==='application/pdf'?{kind:'pdf-inspect',bytes}:{kind:'json-inspect',bytes},signal);} }); return assets.recover(); } },

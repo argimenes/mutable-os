@@ -43,10 +43,8 @@ export async function serve({port=4176,vault=path.resolve(here,'../work/folio-se
   }
   await knowledge.acquire(scope);
   api.get('/experiments/folio/iii/session.json',async(_req,res)=>res.json({cavernId,session:'folio-iii',files:(await readdir(vault)).filter(n=>n.endsWith('.ink'))}));
-  api.use('/api/folio/entity',express.json(),async(req,res)=>{
-    try{const result=await knowledge.entityLookup({vault:scope,request:req.body});res.json(result);}
-    catch(e){res.status(400).json({error:e.message});}
-  });
+  const {folioRouter}=await vite.ssrLoadModule('/server/folio-router.mjs');
+  api.use('/api/folio',folioRouter({cavernId,store:()=>assets.store,knowledge,scope}));
   const {createNativeDocumentStoreRouter}=await vite.ssrLoadModule('/server/native-document-store.mjs');
   api.use('/api/assets',assets.router);
   api.use('/api/native',createNativeDocumentStoreRouter({root:vault,defaultVault:'.',nativeDiscoveryWorker:false,coordinate:action=>knowledge.foreground(action)}));

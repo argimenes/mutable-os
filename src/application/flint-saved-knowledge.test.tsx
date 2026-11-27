@@ -66,7 +66,10 @@ it('progressively searches saved resources without admission, then opens only th
  await readySearch(a,'Leonardo');expect(a.querySelectorAll('[data-search-document="resource-1"]')).toHaveLength(12);
 },30000);
 it('Backlinks lists saved entity references without admitting incoming document-link sources',async()=>{
- const f=await savedFixture(),a=f.windows()[0];await open(a);a.querySelector<HTMLButtonElement>('[aria-label="Open vault/0.mutable.json"]')!.click();await wait(()=>expect(idOf(a)).toBe('resource-0'));click(a,'Backlinks');
+ const f=await savedFixture(),a=f.windows()[0];await open(a);a.querySelector<HTMLButtonElement>('[aria-label="Open vault/0.mutable.json"]')!.click();await wait(()=>expect(idOf(a)).toBe('resource-0'));
+ const inspector=a.querySelector<HTMLButtonElement>('[aria-label="Toggle Context"]');
+ if(inspector?.getAttribute('aria-expanded')==='false')inspector.click();
+ click(a,'Backlinks');
  await wait(()=>{
    const rows=a.querySelectorAll('[aria-label="Document backlinks"] tbody tr');expect(rows).toHaveLength(1);
    expect([...rows[0].querySelectorAll('td')].map(cell=>cell.textContent)).toEqual(['Leonardo','—','3']);

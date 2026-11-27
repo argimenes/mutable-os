@@ -43,6 +43,16 @@ try{
  await selectTerm('BERT');await button('Gloss').click();const gloss=page.getByRole('textbox',{name:'Gloss'});
  await gloss.fill('note: Spatial annotation qualification');await gloss.press('Enter');await wait(()=>document.querySelector('[data-gloss]'));
  await selectTerm('BERT');await button('Scry').click();const query=page.getByLabel('Scry query');
+ const create=button('Create entity from search term'),name='Scry verification '+crypto.randomUUID();
+ await query.fill('   ');assert.ok(await create.isDisabled());
+ const beforeCreate=await page.evaluate(()=>folioIII.editor.repository.state.revision);
+ await query.fill('  '+name+'  ');await create.click();
+ await page.getByRole('button',{name,exact:true,pressed:true}).waitFor();
+ assert.ok(await create.isDisabled());
+ assert.equal(await page.locator('.folio-scry blockquote').innerText(),'BERT');
+ assert.equal(await page.evaluate(()=>folioIII.editor.repository.state.revision),beforeCreate);
+ const lookup=await page.request.post(new URL('/api/folio/entity',server.url).href,{data:{op:'search',query:name,stream:'name',match:'exact'}});
+ assert.deepEqual((await lookup.json()).matches.map(m=>m.name),[name]);
  await query.fill('Transformers');await wait(()=>document.querySelector('.folio-scry li'));assert.equal(await page.locator('blockquote').innerText(),'BERT');
  await query.fill('BERT');await wait(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Bind original selection')?.disabled);
  await snap('scry');await timed('singleBindMs',()=>button('Bind original selection').click());await wait(()=>folioIII.mentions().length===1);
