@@ -162,6 +162,8 @@ async function start(imported){
     await start(candidate);
   }
   function keys(e){if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();e.stopImmediatePropagation();void save();}}
+  function closing(e){if(native.isDirty(id)&&!window.confirm('Discard unsaved changes and close Folio?'))e.preventDefault();}
+  document.addEventListener('folio-request-close',closing);onCleanup(()=>document.removeEventListener('folio-request-close',closing));
   window.addEventListener('keydown',keys,true);onCleanup(()=>window.removeEventListener('keydown',keys,true));
   window.folioIII={editor,native,id,metrics,projection,inventory,selection,mentions,nav,save,file};
   requestAnimationFrame(()=>requestAnimationFrame(()=>{metrics.openMs=performance.now()-startTime;}));

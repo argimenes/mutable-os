@@ -1,4 +1,5 @@
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import type { ExistingBlockDto } from "../block-tree/types";
 import type { CodexFeature } from "../feature-api";
 import type { ReactiveEditor } from "../reactive-editor/editor";
 import type { WorkspaceSession } from "./workspace-session";
@@ -7,7 +8,7 @@ import "./desktop-applications.css";
 // Presentation metadata only. Working applications still own their launch commands.
 export const desktopApplications = [
   { id: "flint", name: "Flint", command: "flint.open" },
-  { id: "folio", name: "Folio", href: "/folio/" },
+  { id: "folio", name: "Folio", command: "folio.open" },
   { id: "cavern", name: "Cavern" },
   { id: "workbench", name: "Workbench" },
   { id: "search", name: "Search" },
@@ -56,7 +57,13 @@ export function createDesktopPlaceholderFeature(editor: ReactiveEditor): CodexFe
 }
 
 export function openDesktopPlaceholder(session: WorkspaceSession, application: DesktopApplication) {
-  const { editor, projection, windowManager: manager } = session;
+  openDesktopWindow(session.editor, session.projection.viewId, application,
+    { type: "desktop-application-placeholder-block", metadata: { application: application.id } },
+    { w: Math.min(440, Math.max(280, window.innerWidth - 32)), h: 320 });
+}
+
+export function openDesktopWindow(editor: ReactiveEditor, viewId: string, application: { id: string; name: string }, child: ExistingBlockDto, size: { w: number; h: number }) {
+  const manager = editor.windowManager;
   const state = editor.repository.readState(), root = state.rootPlacementKey;
   const host = state.contents[state.placements[root].contentKey];
   const desktop = host.children.find(key => ["image-background-block", "canvas-background-block", "video-background-block", "youtube-video-background-block"].includes(state.contents[state.placements[key].contentKey].viewType)) ?? root;
@@ -66,24 +73,24 @@ export function openDesktopPlaceholder(session: WorkspaceSession, application: D
     return content.viewType === "window-block" && (content.payload.metadata as any)?.desktopApplication === application.id;
   });
   if (existing) {
-    const node = projection.nodeForPlacement(existing);
+    const node = editor.nodeForPlacementInView(existing, viewId);
     // Close is presentation state in Mutable; reveal that same placement again.
     editor.viewVisibility.set(existing, false);
     if (node && manager) manager.lifecycle.reveal(node.key);
     else if (node) {
-      editor.commands.setPayloadField(node.key, "metadata", { ...(node.payload.metadata as object), state: "normal" }, "Restore application placeholder");
+      editor.commands.setPayloadField(node.key, "metadata", { ...(node.payload.metadata as object), state: "normal" }, "Restore application window");
       editor.focus.request(node.key, { reason: "desktop-application" });
     }
     return;
   }
   let placement!: string;
-  editor.commands.structuralTransaction(`Open ${application.name} placeholder`, () => {
+  editor.commands.structuralTransaction(`Open ${application.name}`, () => {
     placement = editor.commands.insert({ type: "window-block", metadata: {
       title: application.name, desktopApplication: application.id,
-      position: { x: Math.max(16, Math.min(350, window.innerWidth - 456)), y: 80 },
-      size: { w: Math.min(440, Math.max(280, window.innerWidth - 32)), h: 320 },
+      position: { x: Math.max(16, Math.min(350, window.innerWidth - size.w - 16)), y: 80 },
+      size,
       zIndex: manager?.launchMetadata().zIndex ?? 102,
-    }, children: [{ type: "desktop-application-placeholder-block", metadata: { application: application.id } }] }, { kind: "at", parentKey: desktop, index: 0 });
+    }, children: [child] }, { kind: "at", parentKey: desktop, index: 0 });
   });
   manager?.activatePlacement(placement);
 }
@@ -110,7 +117,6 @@ export function DesktopApplicationIcons(props: { session: WorkspaceSession; acti
     try {
       if (application.id === "workbench" && props.actions?.workbench) props.actions.workbench();
       else if (application.id === "cavern" && props.actions?.cavern) props.actions.cavern();
-      else if ("href" in application) window.open(application.href, "_blank", "noopener,noreferrer");
       else if ("command" in application && editor.commandRegistry.owner(application.command) && (!("view" in application) || editor.features.flintSpatialGraph)) {
         await editor.commandRegistry.execute(application.command, { targetKey: projection.state.rootKey, args: "view" in application ? { view: application.view } : undefined });
       } else openDesktopPlaceholder(props.session, application);

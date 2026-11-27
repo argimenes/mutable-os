@@ -40,15 +40,20 @@ it("uses existing commands and host actions only on activation", async () => {
   f.click("workbench", true); await tick(); f.click("cavern", true); await tick();
   expect(workbench).toHaveBeenCalledOnce(); expect(cavern).toHaveBeenCalledOnce();
 });
-it("opens the Folio reader on double click or keyboard activation", async () => {
-  const f = mount(), open = vi.spyOn(window, "open").mockReturnValue(null);
-  expect(f.icon("folio").querySelector("img")?.src).toContain("folio.png");
-  f.click("folio");
-  expect(open).not.toHaveBeenCalled();
+it("opens and restores the Folio reader in a managed window with pointer or keyboard activation", async () => {
+  const f = mount(), manager = f.session.windowManager!, popup = vi.spyOn(window, "open").mockReturnValue(null);
+  f.click("folio"); expect(Object.keys(manager.registry.windows)).toHaveLength(0);
   f.click("folio", true); await tick();
+  const id = manager.registry.activeWindowId!, frame = f.host.querySelector<HTMLIFrameElement>('iframe[title="Folio reader"]')!;
+  expect(frame.closest(".reactive-window")).toBeTruthy(); expect(frame.getAttribute("src")).toBe("/folio/");
+  manager.lifecycle.minimize(id); await tick();
+  expect(manager.registry.windows[id].visible).toBe(false);
   f.icon("folio").click(); await tick();
-  expect(open).toHaveBeenCalledTimes(2);
-  expect(open).toHaveBeenCalledWith("/folio/", "_blank", "noopener,noreferrer");
+  expect(Object.keys(manager.registry.windows)).toEqual([id]); expect(manager.registry.windows[id].visible).toBe(true);
+  expect(f.host.querySelector('iframe[title="Folio reader"]')).toBe(frame);
+  await f.editor.closeView(id); expect(manager.registry.windows[id]).toBeUndefined();
+  f.click("folio", true); await tick(); expect(Object.keys(manager.registry.windows)).toEqual([id]);
+  expect(popup).not.toHaveBeenCalled();
 });
 it.each([0, 50])("placeholder creation is local with %i unrelated Documents; reuse, restore, Close and history use existing windows", async extra => {
   const f = mount(true, extra), app = desktopApplications.find(a => a.id === "tasks")!;

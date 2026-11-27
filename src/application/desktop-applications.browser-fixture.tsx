@@ -68,14 +68,6 @@ export async function qualifyDesktopApplications() {
     const layout = () => icons().map(button => { const r = button.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; });
     const positions = JSON.stringify(layout());
     for (const app of desktopApplications) {
-      if ("href" in app) {
-        const originalOpen = window.open;
-        let opened: string | undefined;
-        window.open = url => { opened = String(url); return null; };
-        try { await click(icon(app.id), true); } finally { window.open = originalOpen; }
-        check(opened === app.href, `${app.name} launches its reader in a browser tab`);
-        continue;
-      }
       await click(icon(app.id), true);
       if (app.id === 'workbench') {
         check(!!host.querySelector('[data-system-menu="workspace"]'), 'Workbench opens the existing Workspace menu');

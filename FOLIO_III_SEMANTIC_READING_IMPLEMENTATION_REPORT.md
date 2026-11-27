@@ -74,7 +74,7 @@ node experiments/folio/iii/import.mjs
 node experiments/folio/iii/serve.mjs
 ```
 
-Open [Folio](http://127.0.0.1:4176/experiments/folio/iii/). The default host seeds a local reading Vault with the eight publications and managed assets. The five fresh PDF downloads are hash checked. Starting the host again preserves authored files in the Vault. To use an existing native Vault, set `FOLIO_VAULT` and `FOLIO_CAVERN_ID` to its location and managed asset context. This skips sample import and entity seeding. The Mutable Desktop icon opens the application at `/folio/` in the current Cavern. Manual Save uses its `documents` directory when present and otherwise its root. The dedicated port above is for the study fixtures. [All native publications](experiments/folio/iii/generated) · [Host](experiments/folio/iii/serve.mjs)
+Open [Folio](http://127.0.0.1:4176/experiments/folio/iii/). The default host seeds a local reading Vault with the eight publications and managed assets. The five fresh PDF downloads are hash checked. Starting the host again preserves authored files in the Vault. To use an existing native Vault, set `FOLIO_VAULT` and `FOLIO_CAVERN_ID` to its location and managed asset context. This skips sample import and entity seeding. The Mutable Desktop icon opens a managed application window containing the `/folio/` reader in the current Cavern. Manual Save uses its `documents` directory when present and otherwise its root. The dedicated port above is for the study fixtures. [All native publications](experiments/folio/iii/generated) · [Host](experiments/folio/iii/serve.mjs)
 
 ```sh
 node scripts/build-relocation-helper.mjs

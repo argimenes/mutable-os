@@ -6,6 +6,7 @@ import {createCardexFeature} from './cardex';
 import {createAutocompleteFeature} from '../features/autocomplete';
 import { createDesktopPlaceholderFeature } from './desktop-applications';
 import { createThesisFeature } from './thesis';
+import { createFolioFeature } from "./folio";
 import { createPhosphorFeature } from "./phosphor";
 import { FormattedDocumentView } from "../features/document-formats/view";
 import { createFlintFeature } from "../features/flint";
@@ -35,6 +36,7 @@ export function registerApplicationViews(editor: ReactiveEditor, presentation?: 
   if (editor.features.cardex) editor.featureHost.activate(createCardexFeature(editor));
   if (editor.features.thesis) editor.featureHost.activate(createThesisFeature(editor));
   if (editor.features.dialectic) editor.featureHost.activate(createDialecticFeature(editor));
+  if (editor.features.folioSemanticReading) editor.featureHost.activate(createFolioFeature(editor));
   if (editor.features.phosphor) editor.featureHost.activate(createPhosphorFeature(editor));
   if (editor.features.quill) editor.featureHost.activate(createQuillFeature(editor, presentation));
   if (editor.features.flint) editor.featureHost.activate(createFlintFeature(scope => documentApplicationCapabilities(editor, scope), editor.features.flintMaterialChrome, editor.features.flintProbe, editor.features.flintSpatialGraph, editor.features.flintLogo, editor.features.flintCompactShell));
