@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Folio · Contribution and passage fixture</title>
+<style>
+body{margin:0;background:#f2f2eb;color:#24372f;font:16px system-ui}main{max-width:900px;margin:8vh auto;padding:2em}h1{font:36px Georgia,serif}section{position:relative;display:flex;gap:18%;align-items:center;margin:3em 0}article{width:41%;background:white;padding:1em;border:1px solid #9aa99d}small{color:#495c50}svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}path{stroke:#87602d;stroke-dasharray:5 3;fill:none}blockquote{margin:1em 0}output{overflow-wrap:anywhere;font:13px monospace}
+</style>
+<main><h1>Contribution and passage</h1><p>Synthetic Dialectic contribution with an unreviewed attribution to the BERT abstract.</p>
+<section><article id="contribution"><small>Fixture contribution</small><p>The authors describe BERT as a language representation model.</p></article>
+<article id="passage"><small>Canonical passage · BERT, page 1</small><blockquote></blockquote></article><svg aria-hidden="true"><path/></svg></section>
+<p>Dashed line · AI-attributed evidence · Unverified</p><output></output></main>
+<script type="module">
+import {resolveThreads} from '/src/features/folio/threads';
+const wire=await fetch('./generated/bert.ink').then(r=>r.json());
+const block=wire.document.blocks.find(b=>b.inline?.some(atom=>atom.text?.includes('We introduce a new')));
+const text=block.inline.map(atom=>atom.text??'').join(''),end=text.indexOf('.')+1;
+document.querySelector('blockquote').textContent=text.slice(0,end);
+const from='fixture/contribution-7',to=wire.resourceId+'/'+block.id+'#0-'+[...text.slice(0,end)].length;
+document.querySelector('output').textContent=to;
+const link={id:'fixture-citation',from,to,kind:'evidence',origin:'ai-attributed',review:'unverified'};
+const stage=document.querySelector('section');
+new ResizeObserver(()=>{const bounds=stage.getBoundingClientRect(),map=new Map();
+ for(const [key,id] of [[from,'contribution'],[to,'passage']])map.set(key,[{occurrence:id,rects:[document.getElementById(id).getBoundingClientRect()],clip:bounds}]);
+ document.querySelector('path').setAttribute('d',resolveThreads([link],map,bounds)[0]?.path??'');
+}).observe(stage);
+</script></html>

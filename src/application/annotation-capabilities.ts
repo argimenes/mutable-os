@@ -1,3 +1,4 @@
+import {inlineLength} from '../block-tree/inline-sequence';
 import { codeSurface } from '../features/standoff-code-mirror/mounts';
 import { Coordinates } from '../features/standoff-code-mirror/model';
 import { immutable } from "../runtime/effect-contributions";
@@ -98,10 +99,11 @@ export function annotationCapabilities(editor: ReactiveEditor, scope: FeatureSco
       }));
       return { scope, blockReferences, texts: found.filter(({node})=>['standoff-editor-block','standoff-code-mirror-block'].includes(node.viewType)).map(({node})=>{
         const native=node.viewType==='standoff-code-mirror-block',coordinates=native?new Coordinates(String(node.payload.text??'')):undefined;
-        return immutable({key:node.key,contentKey:node.contentKey,placementKey:node.placementKey,
-          version:native?editor.repository.state.contents[node.contentKey].revision:editor.repository.state.contents[node.contentKey]?.inlineRevision??0,
+        const content=editor.repository.state.contents[node.contentKey];
+        return immutable({key:node.key,contentKey:node.contentKey,placementKey:node.placementKey,blockId:typeof node.payload.id==='string'?node.payload.id:undefined,
+          version:native?content.revision:content.inlineRevision,
           coordinate:native?'utf16' as const:'cell' as const,
-          cellCount:coordinates?.text.length??node.inlineContent.length,
+          cellCount:coordinates?.text.length??(node.inlineContent.length || (content.compactInline ? inlineLength(content.compactInline.spans) : 0)),
           properties:((Array.isArray(node.payload.standoffProperties)?node.payload.standoffProperties:[]) as Record<string,unknown>[])
             .filter(p=>p&&typeof p==='object'&&!Array.isArray(p)).flatMap(p=>{
               const resolved=JSON.parse(JSON.stringify(editor.linkedAnnotations.resolve(p,node.contentKey)));

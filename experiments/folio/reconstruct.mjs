@@ -68,7 +68,7 @@ function assignItems(page) {
   return joined;
 }
 const ligatures = {'ﬀ':'ff','ﬁ':'fi','ﬂ':'fl','ﬃ':'ffi','ﬄ':'ffl'};
-function paragraph(lines, id, page, region) {
+function paragraph(lines, id, page, region, options) {
   let text = '', offset = 0;
   const mappings = [], props = [], joins = [];
   function append(value) { text += value; offset += length(value); }
@@ -82,7 +82,7 @@ function paragraph(lines, id, page, region) {
       let value = raw.replace(/[ﬀﬁﬂﬃﬄ]/gu, c => ligatures[c]).normalize('NFC');
       const left = value.match(/(\p{L}+)-$/u)?.[1];
       const right = lines[row+1]?.items[0].text.trim().match(/^([\p{Ll}]+)/u)?.[1];
-      const removeHyphen = last && left && right && (region.text ?? '').includes(left+right);
+      const removeHyphen = !options.retainHyphens && last && left && right && (region.text ?? '').includes(left+right);
       if (removeHyphen) value = value.slice(0,-1);
       const prev = mappings.at(-1);
       const adjacent = column > 0 && item.x - (line.items[column-1].x + line.items[column-1].width) < item.fontSize * 0.12;
@@ -107,7 +107,7 @@ function paragraph(lines, id, page, region) {
   return {text,props,joins,mappings};
 }
 
-export function reconstruct(paper, result, imageUrls) {
+export function reconstruct(paper, result, imageUrls,options={}) {
   const docId = 'folio-'+paper.sha256.slice(0,20);
   const doc = {type:'document-block',id:docId,metadata:{name:paper.title,folio:{
     version:1, source:{...paper,license:'CC BY 4.0'},coordinateSystem:'top-left-72dpi', evidence:paper.id+'.source.json.gz'}},children:[]};
@@ -162,7 +162,7 @@ export function reconstruct(paper, result, imageUrls) {
         const members = chunk.flatMap(l=>l.items), frame = bounds(members);
         const fontSize = middle(members.map(i=>i.fontSize));
         const leading = middle(chunk.slice(1).map((l,i)=>l.y-chunk[i].y)) || fontSize*1.13;
-        const {text,props,joins,mappings} = paragraph(chunk,blockId,number,block);
+        const {text,props,joins,mappings} = paragraph(chunk,blockId,number,block,options);
         const kind = /^(Figure|Fig\.|Table)\s+\d+[:.]/i.test(text) ? 'caption' : block.kind;
         const family = /sans/i.test(members[0].fontName) ? 'sans-serif' : /mono|typewriter/i.test(members[0].fontName) ? 'monospace' : 'serif';
         pageDto.children.push({id:blockId,type:'standoff-editor-block',inlineAtoms:[{kind:'text',text}],standoffProperties:props,

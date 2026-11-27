@@ -48,7 +48,7 @@ function navigation(props,metrics,composition){
   }};
   onMount(()=>{metrics.live++;onCleanup(editor.mounts.register(props.nodeKey,{root,focusElement:viewport,inputPolicy:'opaque-widget',focus:()=>viewport.focus()}));});
   onCleanup(()=>{live=false;metrics.live--;memory.set('page',page());memory.set('position',position);});
-  return {page,metadata,ready:apply,view:(title,contents)=><div class="folio-reader" ref={root} data-runtime-key={props.nodeKey} data-pagination-domain={pageDomain()}>
+  return {page,choose,metadata,ready:apply,view:(title,contents)=><div class="folio-reader" ref={root} data-runtime-key={props.nodeKey} data-pagination-domain={pageDomain()}>
     <header><strong>{title}</strong><label>Page <select aria-label={title+' page'} value={page()} onChange={e=>choose(+e.currentTarget.value)}>
       <For each={Array.from({length:count()},(_,i)=>i+1)}>{n=><option value={n}>{n}</option>}</For>
     </select> / {count()}</label></header>
@@ -56,14 +56,27 @@ function navigation(props,metrics,composition){
       onKeyDown={e=>{if(['PageDown','PageUp','Home','End','ArrowDown','ArrowUp',' '].includes(e.key))local();}}
       onScroll={scroll}>{contents}</div></div>};
 }
-export function pdfLeaf(metrics){return function Original(props){
+export function pdfLeaf(metrics,{cacheBytes=0}={}){
+  let cached; // One verified source per publication reader. PDF.js takes ownership of its input.
+  return function Original(props){
   const n=navigation(props,metrics),[viewer,setViewer]=createSignal(),[status,setStatus]=createSignal('Opening source…');
   const abort=new AbortController();let host;
   onCleanup(()=>abort.abort());
   onMount(async()=>{try{
-    const response=await fetch(assetURL(n.metadata.original),{signal:abort.signal});
-    if(!response.ok)throw Error('Managed PDF unavailable');
-    const instance=await mountPdfViewer(host,new Uint8Array(await response.arrayBuffer()),undefined,abort.signal,()=>{});
+    const asset=n.metadata.original,url=assetURL(asset);
+    let bytes;
+    if(cached?.url===url)bytes=cached.bytes.slice();
+    else{
+      const response=await fetch(url,{signal:abort.signal});
+      if(!response.ok)throw Error('Managed PDF unavailable');
+      bytes=new Uint8Array(await response.arrayBuffer());
+      if(cacheBytes&&bytes.length<=cacheBytes){
+        const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+        if(asset.assetId!=='sha256:'+Array.from(digest,v=>v.toString(16).padStart(2,'0')).join(''))throw Error('Managed PDF digest mismatch');
+        abort.signal.throwIfAborted();cached={url,bytes:bytes.slice()};
+      }
+    }
+    const instance=await mountPdfViewer(host,bytes,undefined,abort.signal,()=>{});
     if(!abort.signal.aborted)setViewer(instance);
   }catch(error){if(!abort.signal.aborted)setStatus(error.message);}});
   createEffect(()=>{const v=viewer(),page=n.page();if(!v)return;
@@ -94,9 +107,34 @@ function bands(page){
     });})};
   });
 }
-export function compositionLeaf(publication,metrics){return function Composition(props){
+export function compositionLeaf(publication,metrics){
+  // Keep managed figure reads within the store's foreground concurrency limit alongside the PDF.
+  let images=Promise.resolve();
+  function FigureImage(props){
+    const [src,setSrc]=createSignal(),[error,setError]=createSignal('');
+    let url,abort=new AbortController();
+    function load(){
+      setError('');
+      images=images.then(async()=>{
+        if(abort.signal.aborted)return;
+        try{
+          const response=await fetch(assetURL(props.c.payload.asset),{signal:abort.signal});
+          if(!response.ok)throw Error('Managed figure unavailable');
+          const blob=await response.blob();abort.signal.throwIfAborted();
+          url=URL.createObjectURL(blob);setSrc(url);
+        }catch(e){if(!abort.signal.aborted)setError(e.message);}
+      });
+    }
+    onMount(load);onCleanup(()=>{abort.abort();if(url)URL.revokeObjectURL(url);});
+    return <Show when={!error()} fallback={<button onClick={load}>{error()} · Retry</button>}>
+      <img width={props.box.width} height={props.box.height} src={src()} alt={props.c.payload.metadata.alt}/>
+    </Show>;
+  }
+  return function Composition(props){
   const {state,root,byId}=publication,nav=navigation(props,metrics,()=>root.payload.metadata.folio);
   if(root.payload.id!==nav.metadata.publicationId)throw Error('Unknown publication identity');
+  const interaction=publication.interaction;
+  if(interaction){interaction.connect(nav);onCleanup(()=>interaction.disconnect(nav));}
   const current=createMemo(()=>root.payload.metadata.folio.pages[nav.page()-1]);
   const groups=createMemo(()=>current()?bands(current()):[]);
   createEffect(()=>{current();queueMicrotask(nav.ready);});
@@ -105,32 +143,40 @@ export function compositionLeaf(publication,metrics){return function Composition
     const style={'margin-top':px(gap),'margin-left':px(b.x-side*current().width/2),width:px(b.width+1),'min-height':px(b.height),
       'font-family':f.family,'font-size':px(f.fontSize??12),'line-height':px(f.leading??14),'text-align':f.align};
     if(f.kind==='rule')return <hr class="composed-rule" style={style}/>;
-    const key=byId.get(f.id);
-    return <Show when={state.contents[key]} keyed fallback={<aside style={style}>Frame content unavailable</aside>}>
+    const key=()=>byId.get(f.id);
+    return <Show when={state.contents[key()]} keyed fallback={<aside style={style}>Frame content unavailable</aside>}>
       {c=><ContentFrame c={c} f={f} style={style}/>}</Show>;
   }
   function ContentFrame({c,f,style}){
     const b=f.frame;
     if(c.viewType==='image-block')return <figure class="composed-figure" style={style}>
-      <img width={b.width} height={b.height} src={c.payload.asset?assetURL(c.payload.asset):c.payload.metadata.url} alt={c.payload.metadata.alt}/>
+      <Show when={interaction&&c.payload.asset} fallback={<img width={b.width} height={b.height} src={interaction?undefined:c.payload.asset?assetURL(c.payload.asset):c.payload.metadata.url} alt={c.payload.metadata.alt}/>}>
+        <FigureImage c={c} box={b}/>
+      </Show>
       <Show when={c.payload.metadata.labels}><details><summary>Figure labels</summary>
         <For each={c.payload.metadata.labels}>{label=><p>{label}</p>}</For>
       </details></Show></figure>;
+    const slice=createMemo(()=>{
+      void c.revision;const text=inlineText(logicalInline(state,c)),chars=Array.from(text);
+      const cut=(value)=>interaction?interaction.cut(text,value):Math.min(chars.length,value??chars.length);
+      return {chars,start:cut(f.start??0),end:cut(f.end)};
+    });
     const runs=createMemo(()=>{
       if(metrics.record)metrics.frameReads.push(c.key);
-      void c.revision;
-      const chars=Array.from(inlineText(logicalInline(state,c))),start=Math.min(chars.length,f.start??0),end=Math.min(chars.length,f.end??chars.length);
+      const {chars,start,end}=slice();
       const properties=(c.payload.standoffProperties??[]).filter(p=>!p.isDeleted&&p.end>=start&&p.start<end)
         .map(p=>p.annotationId?publication.editor.linkedAnnotations.resolve(p,c.key):p).filter(p=>!p.isDeleted);
       const cuts=[...new Set([start,end,...properties.flatMap(p=>[Math.max(start,p.start),Math.min(end,p.end+1)])])].sort((a,b)=>a-b);
       return cuts.slice(1).map((stop,i)=>{const active=properties.filter(p=>p.start<=cuts[i]&&p.end>=cuts[i]),entity=active.find(p=>p.type==='codex/entity-reference');
-        return {text:chars.slice(cuts[i],stop).join(''),entity,gloss:active.find(p=>p.type==='mutable/gloss'),bold:active.some(p=>p.type==='style/bold'),italic:active.some(p=>p.type==='style/italics')};
+        return {text:chars.slice(cuts[i],stop).join(''),entity,highlight:active.find(p=>p.type==='style/highlight')?.value,gloss:active.find(p=>p.type==='mutable/gloss'),bold:active.some(p=>p.type==='style/bold'),italic:active.some(p=>p.type==='style/italics')};
       });
     });
-    return <div class="composed-frame" style={style} data-frame={f.id} data-content={c.key} data-start={f.start??0}><For each={runs()}>{r=>
-      <span data-entity={r.entity?.value} data-gloss={r.gloss?.annotationId} title={r.entity?.metadata?.entityName??r.gloss?.value} style={{'font-weight':r.bold?'bold':undefined,'font-style':r.italic?'italic':undefined}}>{r.text}</span>}</For></div>;
+    let frame;
+    if(interaction)onMount(()=>onCleanup(interaction.mount(frame,c,f,slice)));
+    return <div ref={frame} class="composed-frame" style={style} data-frame={f.id} data-content={c.key} data-start={slice().start}><span class="folio-ink"><For each={runs()}>{r=>
+      <span data-reference={r.entity?.id} data-entity={r.entity?.value} data-gloss={r.gloss?.annotationId} title={r.entity?.metadata?.entityName??r.gloss?.value} style={{'background-color':r.highlight,'font-weight':r.bold?'bold':undefined,'font-style':r.italic?'italic':undefined}}>{r.text}</span>}</For></span><Show when={interaction}>{i=>i().overlay(c,slice)}</Show></div>;
   }
-  return nav.view('Mutable Folio',<article class="folio-sheet" style={{width:px(current()?.width??0),'min-height':px(current()?.height??0)}}>
+  return nav.view('Mutable Folio',<article class="folio-sheet" style={{zoom:interaction?.zoom(),width:px(current()?.width??0),'min-height':px(current()?.height??0)}}>
     <For each={groups()}>{g=><div class="folio-band" style={{'padding-top':px(g.gap)}}><For each={g.lanes}>{(lane,i)=>
       <div class="folio-lane"><For each={lane}>{item=><Frame item={item} side={i()}/>}</For></div>}</For></div>}</For>
   </article>);

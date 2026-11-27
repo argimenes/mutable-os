@@ -1,3 +1,4 @@
+import {migrateSpreadWire} from '../block-tree/spread';
 /** History-independent native resource codec/admission. Reuses the accepted resource graph and preserves its guards. */
 import { clone } from "../block-tree/clone";
 import { INLINE_ALTERNATIVES_CAPABILITY, validateCapabilities, NATIVE_CAPABILITIES } from '../interchange/capabilities';
@@ -200,6 +201,7 @@ export function decodeNative(bytes: Uint8Array, timings?: Record<string, number>
   let last = timings ? performance.now() : 0;
   const value = parseNativeEnvelope(bytes), doc = value.document;
   if (timings) { timings.nativeWireParsing = performance.now() - last; }
+  if(doc.blocks.some(b=>b.type==='spread-block'||b.type==='leaf-block'))migrateSpreadWire(doc);
   let resource = decodeGateDocument(doc, value.valueEncoding ? "native" : "legacy", timings, compact);
   if (timings) last = performance.now();
   const root = resource.placements[resource.rootPlacementKey]; check(root.target.kind === "local", "external root");

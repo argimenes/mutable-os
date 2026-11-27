@@ -60,6 +60,13 @@ export class GlossController {
   }
   return {owner,selection:{...saved},range:this.editor.textRanges.snapshot(key,start,end),viewId:n.viewId};
  }
+ openSpatial(range:TextRangeSnapshot,anchorElement:HTMLElement) {
+  if(!this.editor.features.glossMode||this.draft)return false;
+  this.editor.textRanges.validate([range],'cell');
+  const owner=this.owner(range.contentKey),node=this.editor.node(range.nodeKey);
+  if(!node||!owner||this.documentFor(node.key)!==owner||!this.editor.canEditText(node.key))throw Error('Gloss requires an editable passage owned by this Document.');
+  return this.activate({key:node.key,owner,range,anchorElement,viewId:node.viewId,raw:''});
+ }
  open(key:string,selection?:{anchor:number;head:number},id?:string) {
   if(!this.editor.features.glossMode)return false;
   if(this.draft&&!id){this.status[1]('Commit or cancel the open Gloss first.');this.draftInput?.focus();return false;}
@@ -143,7 +150,7 @@ export class GlossController {
  private close(restoreSelection:boolean){this.clickEpoch++;const d=this.draft;this.closeUI?.();this.closeUI=undefined;this.draftInput=undefined;this.draft=undefined;if(d&&restoreSelection){const h=this.editor.mounts.get(d.key);if(d.selection&&h?.root.isConnected){h.focus();h.restoreInlineSelection?.(d.selection);}else if(d.anchorElement?.isConnected)d.anchorElement.focus({preventScroll:true});}}
  releaseView(viewId:string){if(this.draft?.viewId===viewId)this.status[1]('The anchor view closed. Your draft is retained; copy it or cancel.');}
  private show(){
-  const d=this.draft!,h=this.editor.mounts.get(d.key)!,doc=h.root.ownerDocument,win=doc.defaultView!;
+  const d=this.draft!,h=this.editor.mounts.get(d.key)??{root:d.anchorElement!,inlineBoundary:undefined},doc=h.root.ownerDocument,win=doc.defaultView!;
   const box=doc.createElement('div');box.className='gloss-input';box.setAttribute('role','dialog');box.setAttribute('aria-label',d.id?'Edit Gloss':'Create Gloss');
   const input=doc.createElement('textarea');input.setAttribute('aria-label','Gloss');input.placeholder='type: your thought';input.value=d.raw;input.rows=2;this.draftInput=input;
   const suggestions=doc.createElement('div');suggestions.className='gloss-suggestions';suggestions.id='gloss-suggestions-'+crypto.randomUUID();suggestions.setAttribute('role','listbox');
@@ -172,7 +179,7 @@ export class GlossController {
   const releaseHighlight=()=>{if(highlightLive){highlightLive=false;this.editor.decorations.disposeSession(highlightOwner!);}};
   let frame=0,alive=true,scrolled=false;
   const position=()=>{frame=0;if(!alive)return;if(!h.root.isConnected){releaseHighlight();status.textContent='The anchor view closed. Your draft is retained; copy it or cancel.';return;}
-   if(!d.range){const r=(d.anchorElement?.isConnected?d.anchorElement:h.root).getBoundingClientRect();box.style.left=`${Math.max(8,Math.min(r.left,win.innerWidth-340))}px`;box.style.top=`${Math.max(8,Math.min(r.bottom+7,win.innerHeight-190))}px`;return;}
+   if(!d.range||d.anchorElement){const r=(d.anchorElement?.isConnected?d.anchorElement:h.root).getBoundingClientRect();box.style.left=`${Math.max(8,Math.min(r.left,win.innerWidth-340))}px`;box.style.top=`${Math.max(8,Math.min(r.bottom+7,win.innerHeight-190))}px`;return;}
    try{this.editor.textRanges.validate([d.range]);}catch{releaseHighlight();status.textContent='The anchor changed. Copy your draft before cancelling and selecting it again.';return;}
    const origin=h.root.getBoundingClientRect(),scale=origin.width/((h.root instanceof HTMLElement?h.root.offsetWidth:origin.width)||origin.width||1);const rects=this.editor.measurements.retainedRangeRects(d.key,d.range.start,d.range.end,this.editor.repository.readState().contents[d.range.contentKey].revision,origin,scale||1);const last=rects.at(-1);if(!last)return;
    if(!scrolled&&last.bottom>win.innerHeight-220){scrolled=true;const boundary=h.inlineBoundary?.(d.range.end);const cell=boundary?.node.childNodes[Math.max(0,(boundary?.offset??1)-1)];if(cell instanceof Element&&typeof cell.scrollIntoView==='function'){cell.scrollIntoView({block:'center'});schedule();return;}}

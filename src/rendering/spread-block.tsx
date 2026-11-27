@@ -17,7 +17,7 @@ export function useSpreadLeaf(key:string) {
     const lease=scope.gateway.register(scope.side,endpoint);onCleanup(lease.release);return lease;
   }};
 }
-interface Layout {ratio?:number; collapsed?:Partial<Record<LeafSide,boolean>>; bindings?:Binding[]}
+interface Layout {version?:number;ratio?:number; collapsed?:Partial<Record<LeafSide,boolean>>; bindings?:Binding[]}
 const sides:LeafSide[]=['left','right'];
 const clamp=(ratio:number)=>Number.isFinite(ratio)?Math.max(.15,Math.min(.85,ratio)):.5;
 export function SpreadBlockView(props:BlockViewProps) {
@@ -25,13 +25,20 @@ export function SpreadBlockView(props:BlockViewProps) {
   const node=()=>projection.state.nodes[props.nodeKey];
   const metadata=()=>(node()?.payload.metadata??{}) as Record<string,unknown>;
   const config=()=>(metadata().spread??{}) as Layout;
-  const bindings=createMemo<Binding[]>(()=>Array.isArray(config().bindings)?config().bindings!:[]);
+  const leafNode=(side:LeafSide)=>projection.state.nodes[node()?.children[side==='left'?0:1]];
+  const physical=(side:LeafSide)=>leafNode(side)?.payload.placement==='recto'?'right':'left';
+  const bindings=createMemo<Binding[]>(()=>(Array.isArray(config().bindings)?config().bindings!:[]).map(b=>{
+    if(!b.publisherLeafId)return b;
+    const from=sides.find(side=>leafNode(side)?.payload.id===b.publisherLeafId);
+    const to=sides.find(side=>leafNode(side)?.payload.id===b.subscriberLeafId);
+    return {...b,enabled:b.enabled&&!!from&&!!to&&from!==to,direction:b.direction==='bidirectional'?'bidirectional':from==='left'?'left-to-right':'right-to-left'};
+  }));
   const [registration,setRegistration]=createSignal(0);
   const gateway=new LeafGateway(undefined,undefined,()=>setRegistration(n=>n+1));
   const available=(type:Binding['type'])=>{registration();return sides.some(side=>gateway.compatible(side,type));};
   onCleanup(()=>gateway.dispose());
   createEffect(()=>gateway.configure(bindings()));
-  const [collapsed,setCollapsed]=createSignal({...config().collapsed});
+  const [collapsed,setCollapsed]=createSignal({left:!!leafNode('left')?.payload.collapsedByDefault,right:!!leafNode('right')?.payload.collapsedByDefault});
   const [preview,setPreview]=createSignal<number>();
   const ratio=()=>preview()??clamp(config().ratio??.5);
   const write=(patch:Partial<Layout>)=>{
@@ -42,14 +49,20 @@ export function SpreadBlockView(props:BlockViewProps) {
   };
   let root!:HTMLElement, grid!:HTMLDivElement;
   onMount(()=>onCleanup(editor.mounts.register(props.nodeKey,{root,focusElement:root,inputPolicy:'container',focus:()=>root.focus()})));
+  const swap=()=>editor.commands.structuralTransaction('Swap Leaves',()=>{
+    for(const side of sides){const n=leafNode(side);editor.commands.setPayloadField(n.key,'placement',physical(side)==='left'?'recto':'verso');}
+  });
+  const remember=()=>editor.commands.structuralTransaction('Remember open Leaves',()=>{
+    for(const side of sides)editor.commands.setPayloadField(leafNode(side).key,'collapsedByDefault',collapsed()[side]);
+  });
   const leaf=(side:LeafSide)=>{
     const key=()=>node()?.children[side==='left'?0:1];
     return <Show when={key()} keyed>{occupant=>{
       const memory=new Map<string,number>();
-      return <Show when={!collapsed()[side]}><section class="spread-leaf" data-leaf={side} aria-label={side+' leaf'}>
-        <ReactiveViewProvider {...context}><Scope.Provider value={{key:occupant,gateway,side,memory}}>
+      return <Show when={!collapsed()[side]}><section class="spread-leaf" data-leaf={physical(side)} data-leaf-id={String(leafNode(side)?.payload.id)} style={{'grid-column':!collapsed().left&&!collapsed().right?(physical(side)==='left'?1:3):1,'grid-row':1}} aria-label={physical(side)+' leaf'}>
+        <ReactiveViewProvider {...context}><Scope.Provider value={{get key(){return projection.state.nodes[occupant]?.children[0];},gateway,side,memory}}>
           <BlockOutlet nodeKey={occupant}/>
-          <Show when={side==='right'}><For each={node()?.children.slice(2)}>{key=><BlockOutlet nodeKey={key}/>}</For></Show>
+
         </Scope.Provider></ReactiveViewProvider>
       </section></Show>;
     }}</Show>;
@@ -60,20 +73,27 @@ export function SpreadBlockView(props:BlockViewProps) {
   };
   return <section ref={root} tabindex="-1" class="mutable-spread" data-block-type="spread-block" data-runtime-key={props.nodeKey}>
     <div class="spread-controls"><For each={sides}>{side=><button aria-expanded={!collapsed()[side]}
-      onClick={()=>setCollapsed({...collapsed(),[side]:!collapsed()[side]})}>{collapsed()[side]?'Reveal':'Collapse'} {side} leaf</button>}</For>
-      <button onClick={()=>write({collapsed:{...collapsed()}})}>Remember open leaves</button>
+      onClick={()=>setCollapsed({...collapsed(),[side]:!collapsed()[side]})}>{collapsed()[side]?'Reveal':'Collapse'} {physical(side)} leaf</button>}</For>
+      <button onClick={remember}>Remember open leaves</button><button onPointerDown={e=>e.preventDefault()} onClick={swap}>Swap Leaves</button>
       <label>Link <select aria-label="Navigation binding" value={bindings().find(b=>b.enabled)?.type??''}
-        onChange={e=>{const type=e.currentTarget.value as Binding['type'];write({bindings:type?[{type,enabled:true,direction:'bidirectional'}]:[]});}}>
-        <option value="">Independent</option><option disabled={!available('navigation/page')} value="navigation/page">Page</option><option disabled={!available('navigation/progress')} value="navigation/progress">Progress</option>
+        onChange={e=>{const type=e.currentTarget.value as Binding['type'];write({bindings:type?[{type,enabled:true,direction:'bidirectional',publisherLeafId:String(leafNode('left').payload.id),subscriberLeafId:String(leafNode('right').payload.id)}]:[]});}}>
+        <option value="">Independent</option><option disabled={!available('navigation/page')} value="navigation/page">Page</option><option disabled={!available('navigation/progress')} value="navigation/progress">Page progress</option>
       </select></label>
     </div>
     <div class="spread-grid" ref={grid} style={{'grid-template-columns':!collapsed().left&&!collapsed().right?
       'minmax(0,'+ratio()+'fr) 10px minmax(0,'+(1-ratio())+'fr)':'minmax(0,1fr)'}}>
-      {leaf('left')}<Show when={!collapsed().left&&!collapsed().right}><div class="spread-gutter" role="separator" tabindex="0"
+      {leaf('left')}<Show when={!collapsed().left&&!collapsed().right}><div class="spread-gutter" style={{'grid-column':2,'grid-row':1}} role="separator" tabindex="0"
         aria-label="Leaf width" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="85" aria-valuenow={Math.round(ratio()*100)}
         onPointerDown={e=>{e.preventDefault();e.currentTarget.focus();e.currentTarget.setPointerCapture(e.pointerId);}}
         onPointerMove={drag} onPointerCancel={()=>setPreview(undefined)} onPointerUp={e=>{drag(e);if(preview()!==undefined)write({ratio:ratio()});setPreview(undefined);}}
         onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();e.stopPropagation();write({ratio:clamp(ratio()+(e.key==='ArrowLeft'?-.05:.05))});}}}/></Show>{leaf('right')}
     </div>
   </section>;
+}
+
+export function SpreadPresentation(props:BlockViewProps){
+  const {projection}=useReactiveView(), node=()=>projection.state.nodes[props.nodeKey];
+  const continuous=()=>{const id=(node()?.payload.metadata as any)?.spread?.continuousLeafId;
+    return id&&node()?.children.find(k=>projection.state.nodes[k]?.payload.id===id);};
+  return <Show when={continuous()} keyed fallback={<SpreadBlockView {...props}/>}>{key=><BlockOutlet nodeKey={key}/>}</Show>;
 }

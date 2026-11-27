@@ -19,7 +19,7 @@ function Underline(props:VisualEffectProps){
     stroke-dasharray={props.params().lineStyle==='dashed'?'6 3':props.params().lineStyle==='dotted'?'1 3':undefined}
     stroke-linecap={props.params().lineStyle==='dotted'?'round':'butt'}/></Show>;
 }
-function Region(props:VisualEffectProps) {
+export function Region(props:VisualEffectProps) {
   return <Show when={props.geometry().fragments.some(f=>!!f.matrix)} fallback={<For each={props.geometry().fragments.map((_,index)=>index)}>{index=><path
     data-property-type={props.tag}
     data-decoration-key={`${props.identity}:${index}`}

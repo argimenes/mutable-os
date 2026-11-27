@@ -1,3 +1,4 @@
+import {checkLeafChanges,checkSpread} from './spread';
 import {validateAlternativeReadings, validateReadingOwnership, isReadingRelation} from './inline-alternative';
 import { compactInlineOwnerFor } from "./compact-inline-plan";
 import { inlineLength, inlineSlice, normalizeInline, validateCompactInline } from "./inline-sequence";
@@ -145,6 +146,7 @@ export function deriveLocations(state: RepositoryState, observe?: (c: ContentRec
   const readingTargets = new Set<string>();
 
   for (const content of Object.values(state.contents)) {
+    checkSpread(content,k=>state.placements[k],k=>state.contents[k]);
     validateCompactInline(content);
     validateAlternativeReadings(content,key=>{const p=state.placements[key];return p&&{owned:p.kind==='owned'&&!p.resolvedReference&&!p.externalReference,content:state.contents[p.contentKey]};});
     observe?.(content);
@@ -192,7 +194,17 @@ export function validateRepository(state: RepositoryState, boundary?: BoundaryVa
     throw new ModelInvariantError(`Missing root placement ${state.rootPlacementKey}`);
   }
 
-  const locations = deriveLocations(state);
+  const leaves=new Set<string>();
+  const locations = deriveLocations(state,c=>{if(c.viewType==='leaf-block')leaves.add(c.key);});
+  if(leaves.size){
+    const found=new Set<string>();
+    for(const p of Object.values(state.placements))if(leaves.has(p.contentKey)){
+      const location=locations.get(p.key);
+      if(p.kind!=='owned'||!location||location.slot.kind!=='children'||state.contents[location.ownerContentKey]?.viewType!=='spread-block'||found.has(p.contentKey))throw new ModelInvariantError('Leaf ownership is invalid');
+      found.add(p.contentKey);
+    }
+    if(found.size!==leaves.size)throw new ModelInvariantError('Detached Leaf');
+  }
   for (const placementKey of Object.keys(state.placements)) {
     if (placementKey === state.rootPlacementKey) continue;
     if (!locations.has(placementKey)) {
@@ -724,6 +736,17 @@ export class CanonicalRepository {
     const stage = (name: string) => { if (timings) { const now = performance.now(); timings[`commit.${name}`] = now - last; last = now; } };
     this.assertNotCaptureCallback();
     if (!operations.length) return;
+    const stateBefore = this.readState();
+    const changesContainment = operations.some(op => {
+      if (op.kind !== 'put-content') return true;
+      const previous = stateBefore.contents[op.record.key];
+      return previous?.viewType !== op.record.viewType || op.record.viewType === 'leaf-block' ||
+        op.record.viewType === 'spread-block' || !!previous?.children.length || !!op.record.children.length;
+    });
+    if (changesContainment) {
+      checkLeafChanges(stateBefore, recordOperations(operations), key => this.locationOf(key)?.ownerContentKey,
+        key => this.ownedPlacementKeys(key));
+    }
     for (const guard of this.admission) guard(operations, this.readState(), metadata);
     for(const op of recordOperations(operations))if(op.kind==='put-content'){
       const before=this.readState().contents[op.record.key];

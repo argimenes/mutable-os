@@ -10,6 +10,8 @@ export interface Descriptor {
   pagination?: string;
 }
 export interface Binding {
+  publisherLeafId?: string;
+  subscriberLeafId?: string;
   type: Navigation['type'];
   direction: 'left-to-right' | 'right-to-left' | 'bidirectional';
   enabled: boolean;

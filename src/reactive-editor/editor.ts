@@ -1,3 +1,4 @@
+import {inlineLength} from '../block-tree/inline-sequence';
 import { characterIndex, characterSelector } from '../rendering/character-address';
 import { editorInputBoundary } from '../runtime/editor-input';
 import { presentationEligible } from '../runtime/presentation-eligibility';
@@ -256,7 +257,7 @@ export class ReactiveEditor {
       const cell = node.viewType === "standoff-editor-block";
       return { nodeKey: node.key, contentKey: node.contentKey, placementKey: node.placementKey,
         version: cell ? content.inlineRevision : content.revision,
-        length: cell ? node.inlineContent.length : node.viewType==="standoff-code-mirror-block" ? String(node.payload.text ?? "").replace(/\r\n?/g, "\n").length : String(node.payload.text ?? "").length, coordinate: cell ? "cell" : "utf16" };
+        length: cell ? (node.inlineContent.length || (content.compactInline ? inlineLength(content.compactInline.spans) : 0)) : node.viewType==="standoff-code-mirror-block" ? String(node.payload.text ?? "").replace(/\r\n?/g, "\n").length : String(node.payload.text ?? "").length, coordinate: cell ? "cell" : "utf16" };
     });
     this.decorations.configureValidation(ranges => this.textRanges.validate(ranges), range => this.visualEffects.validateType({
       type:range.type??'editor/temporary-range',renderers:range.renderers??this.visualEffects.type(range.type)?.renderers??[],

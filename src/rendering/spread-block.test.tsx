@@ -34,3 +34,28 @@ it('routes between direct occupants of each mounted occurrence and isolates nest
    y.publish({type:progress.type,position:.3});await deliver('x');expect(received).toHaveBeenCalledTimes(2);
  }finally{dispose();editor.dispose();host.remove();}
 });
+
+it('retains endpoint leases and their authored direction through swap and undo',async()=>{
+ const editor=new ReactiveEditor({type:'document-block',children:[{type:'spread-block',id:'pair',metadata:{spread:{version:3,bindings:[
+  {type:progress.type,enabled:true,publisherLeafId:'a',subscriberLeafId:'b',direction:'left-to-right'}]}},children:[
+  {type:'leaf-block',id:'a',placement:'verso',children:[terminal('publisher')]},
+  {type:'leaf-block',id:'b',placement:'recto',children:[terminal('subscriber')]}]}]});
+ registerCoreViews(editor);
+ const projection=editor.createView('one-way'),leases=new Map<string,any>(),received=vi.fn(),acquired=vi.fn();
+ editor.registry.register({type:'study-participant',capabilities:[],view:props=>{
+  const id=String(projection.state.nodes[props.nodeKey].payload.id);
+  leases.set(id,useSpreadLeaf(props.nodeKey)!.register({publishes:[progress],subscribes:[progress],receive:()=>received(id)}));acquired(id);
+  return <button>{id}</button>;
+ }});
+ const host=document.createElement('div'),dispose=render(()=><ReactiveTreeView editor={editor} projection={projection}/>,host);
+ try{
+  const button=[...host.querySelectorAll('button')].find(b=>b.textContent==='Swap Leaves')!;
+  const publisher=leases.get('publisher'),subscriber=leases.get('subscriber');
+  for(const action of [()=>button.click(),()=>editor.repository.undo(),()=>editor.repository.redo()]){
+   action();publisher.publish({type:progress.type,position:.2});await new Promise(requestAnimationFrame);
+   subscriber.publish({type:progress.type,position:.4});await new Promise(requestAnimationFrame);
+  }
+  expect(acquired).toHaveBeenCalledTimes(2);
+  expect(received.mock.calls).toEqual([['subscriber'],['subscriber'],['subscriber']]);
+ }finally{dispose();editor.dispose();}
+});

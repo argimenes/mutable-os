@@ -1,0 +1,77 @@
+[
+  {
+    "id": "potnia",
+    "samplePage": 2,
+    "sourceHeight": 841.8900146484375,
+    "frames": 12,
+    "horizontalOverflow": 0,
+    "text": [
+      "non-alphabetic scripts, where beginners need to grasp a vast repertoire of unfamiliar signs). However, it is w",
+      "• the use of various notation systems, with different transliterations representing the exact same sign in dis",
+      "• changing opinions on particular sign values over time, introducing possible differences between older and ne",
+      "• and the way in which transliteration obscures polyvalency in scripts, where a single sign can represent mult"
+    ],
+    "sourceSample": "non-alphabetic scripts, where beginners need to grasp a vast repertoire of unfamiliar signs).However, it is well recognized that this process can only provide a",
+    "sheetHeight": 903
+  },
+  {
+    "id": "teiphy",
+    "samplePage": 3,
+    "sourceHeight": 841.8900146484375,
+    "frames": 11,
+    "horizontalOverflow": 0,
+    "text": [
+      "for multiple analyses of this type, which have generally applied clustering and biclustering algorithms to col",
+      "Design",
+      "While the conversion process is a straightforward one for most collation data, various sources of ambiguity ca",
+      "Collations should preserve as much detail as possible, including information on how certain types of data can "
+    ],
+    "sourceSample": "for multiple analyses of this type, which have generally applied clustering and biclusteringalgorithms to collation matrices (Baldwin, 2010; Finney, 2018; McCol",
+    "sheetHeight": 880
+  },
+  {
+    "id": "corpora",
+    "samplePage": 2,
+    "sourceHeight": 841.8900146484375,
+    "frames": 17,
+    "horizontalOverflow": 0,
+    "text": [
+      "• Document visualisation and display: Easy navigation to and within full-text docu-ments with pattern matches ",
+      "• Document retrieval: Extraction of subsets of the corpus in a format suitable for close reading.",
+      "The API and GUI of corporaexplorer, as well as the inner workings of the package, are documented more thorough",
+      "While collecting and preparing the text collections to be explored requires some familiarity with R programmin"
+    ],
+    "sourceSample": "• Document visualisation and display: Easy navigation to and within full-text docu-ments with pattern matches highlighted.• Document retrieval: Extraction of su",
+    "sheetHeight": 954
+  },
+  {
+    "id": "chronicle",
+    "samplePage": 4,
+    "sourceHeight": 841.8900146484375,
+    "frames": 13,
+    "horizontalOverflow": 0,
+    "text": [
+      "Data Set Chronicle Data Author Data Source Data External Data 1 - author source-hist Dataset1 chr-1 author sou",
+      "Table 2: Groupings of text types used in the clustering experiments.",
+      "1. Stylo: First the preprocessed data is loaded into the R package Stylo Eder et al. (2016),4 which is a tool ",
+      "2. Gephi OpenOrd: The second step in the method is to load the Stylo generated edge tables into the network vi"
+    ],
+    "sourceSample": "5868Data Set Chronicle Data Author Data Source DataExternal Data 1 - author source-histDataset1 chr-1 author source-histOutliers 1 chr-1 outlier fragments autho",
+    "sheetHeight": 842
+  },
+  {
+    "id": "newspapers",
+    "samplePage": 2,
+    "sourceHeight": 841.8900146484375,
+    "frames": 13,
+    "horizontalOverflow": 0,
+    "text": [
+      "2. Related work",
+      "The impact of OCR quality on natural language pro-cessing tasks and pipelines in digital humanities con-texts ",
+      "van Strein et al. (2020) define a Levenshtein distance-based method of evaluating an OCR transcription against",
+      "OCR quality as a function of edit distance is a fre-quent finding within the literature-Neudecker and"
+    ],
+    "sourceSample": "58602. Related workThe impact of OCR quality on natural language pro-cessing tasks and pipelines in digital humanities con-texts is a widely researched topic (S",
+    "sheetHeight": 850
+  }
+]

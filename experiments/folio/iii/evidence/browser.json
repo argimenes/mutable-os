@@ -1,0 +1,28 @@
+{
+  "browser": "158.0.8127.37",
+  "openMs": 1482.0999999940395,
+  "singleBindMs": 86,
+  "multiBindMs": 112,
+  "references": 118,
+  "manualSaveMs": 11685,
+  "sourceRevealMs": 3246,
+  "repeatRevealMs": 640,
+  "swapMs": 74,
+  "linkedScrollMs": 880,
+  "scrollDeliveries": 24,
+  "focusSpineMinimapMs": 70,
+  "referenceMs": 66,
+  "galleryMs": 82,
+  "threadsMs": 66,
+  "visibleThreads": 5,
+  "transientWrites": [],
+  "flintGloss": 4,
+  "flintEditsMs": 197,
+  "withFolio": {
+    "snapshots": 0,
+    "builds": 0,
+    "summaryBuilds": 0,
+    "readBlocks": 1
+  },
+  "managedFigureWidth": 1216
+}

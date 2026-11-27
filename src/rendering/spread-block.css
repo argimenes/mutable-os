@@ -5,3 +5,5 @@
 .spread-leaf{min-width:0;min-height:0;overflow:auto}
 .spread-gutter{cursor:col-resize;touch-action:none;background:linear-gradient(90deg,transparent 3px,#98a49c 4px,#98a49c 5px,transparent 6px)}
 .spread-gutter:focus-visible{outline:2px solid #456955}
+.spread-grid{grid-template-rows:minmax(0,1fr)}
+.spread-leaf [data-block-type="leaf-block"]{height:100%;box-sizing:border-box}

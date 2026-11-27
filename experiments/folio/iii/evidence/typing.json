@@ -1,0 +1,50 @@
+[
+  {
+    "edition": "II",
+    "sync": {
+      "median": 1.699999988079071,
+      "p95": 5.9000000059604645,
+      "max": 13.899999976158142
+    },
+    "settled": {
+      "median": 1.699999988079071,
+      "p95": 6,
+      "max": 14.299999982118607
+    },
+    "frame": {
+      "median": 58.10000002384186,
+      "p95": 95.40000000596046,
+      "max": 108
+    },
+    "restored": true,
+    "paragraphs": 370,
+    "characters": 1318,
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0
+  },
+  {
+    "edition": "III",
+    "sync": {
+      "median": 0.800000011920929,
+      "p95": 2.800000011920929,
+      "max": 7
+    },
+    "settled": {
+      "median": 0.8999999761581421,
+      "p95": 2.9000000059604645,
+      "max": 7.199999988079071
+    },
+    "frame": {
+      "median": 38.900000005960464,
+      "p95": 43.69999998807907,
+      "max": 49.69999998807907
+    },
+    "restored": true,
+    "paragraphs": 370,
+    "characters": 1318,
+    "snapshots": 0,
+    "serviceRequests": 0,
+    "workerStarts": 0
+  }
+]

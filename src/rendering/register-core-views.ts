@@ -1,4 +1,5 @@
-import { SpreadBlockView } from './spread-block';
+import {FolioPublication,FolioOriginal} from './folio-manifestation';
+import { SpreadPresentation } from './spread-block';
 import { registerStandoffCodeMirror } from '../features/standoff-code-mirror/view';
 import {passiveNativeTypes} from '../runtime/passive-presentation';
 import { registerTabOrientationCommands } from '../runtime/tab-orientation';
@@ -56,7 +57,11 @@ function many(editor: ReactiveEditor, types: string[], view: any, capabilities: 
 }
 
 export function registerCoreViews(editor: ReactiveEditor, documentView = ContainerBlockView): void {
-  if(editor.features.spreadBlocks) many(editor,['spread-block'],SpreadBlockView,['container','selectable']);
+  if(editor.features.spreadBlocks) many(editor,['spread-block'],SpreadPresentation,['container','selectable']);
+  if(editor.features.folioSemanticReading){
+    many(editor,['folio-publication-block'],FolioPublication,['container','selectable']);
+    many(editor,['folio-original-block'],FolioOriginal,['opaque-widget']);
+  }
   registerStandoffCodeMirror(editor);
   editor.registry.register({ type: 'mutable/opaque-block', view: OpaqueClipboardView, capabilities: ['selectable'] });
   if (editor.features.documentInterchange) many(editor, ["mutable/video-block"], VideoBlockView, ["media", "opaque-widget", "selectable"]);
@@ -86,7 +91,7 @@ export function registerCoreViews(editor: ReactiveEditor, documentView = Contain
   editor.registry.register({ type: "cyclic-reference", view: UnknownBlockView, capabilities: ["reference-placeholder"] });
   editor.registry.register({ type: "document-reference-block", view: DocumentReferenceView, capabilities: ["reference-placeholder", "selectable"] });
 
-  many(editor, ["universe-block", "workspace-block", "root-block", "container-block", "book-block", "fixed-size-page-block", "side-block", "embed-document-block", "entities-list-block", "context-menu-block", "control-panel-block", "monitor-block", "left-margin-block", "right-margin-block", "error-block", "unknown-block"], GenericContainerView, ["container", "selectable"]);
+  many(editor, ["leaf-block", "universe-block", "workspace-block", "root-block", "container-block", "book-block", "fixed-size-page-block", "side-block", "embed-document-block", "entities-list-block", "context-menu-block", "control-panel-block", "monitor-block", "left-margin-block", "right-margin-block", "error-block", "unknown-block"], GenericContainerView, ["container", "selectable"]);
   many(editor, ["surface-block"], editor.features.reversibleBlocks ? ReversibleSurfaceView : FlippableSurfaceView, ["container", "sides", "selectable"]);
   many(editor, ["canvas-block"], CanvasPreviewView, ["container", "canvas-preview", "selectable"]);
   many(editor, ["page-block"], PageView, ["container", "selectable"]);

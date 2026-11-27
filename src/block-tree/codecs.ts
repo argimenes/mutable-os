@@ -1,3 +1,4 @@
+import {migrateSpreadDto} from './spread';
 import {logicalInline} from "./inline-sequence";
 import { clone } from "./clone";
 import { createContentKey, createPlacementKey } from "./ids";
@@ -46,6 +47,7 @@ export function decodeBlockTree(dto: ExistingBlockDto): DecodedSubtree {
   const placements: RepositoryState["placements"] = {};
 
   const decode = (input: ExistingBlockDto): PlacementKey => {
+    if(input.type==='spread-block')input=migrateSpreadDto(input);
     const contentKey = createContentKey();
     const placementKey = createPlacementKey();
     const hasChildren = Object.prototype.hasOwnProperty.call(input, "children");

@@ -1,0 +1,43 @@
+.folio-app{height:100%;display:flex;flex-direction:column;background:#f2f2eb;color:#24372f;font:14px "Inter",system-ui,sans-serif}
+.folio-top,.reading-tools{display:flex;align-items:center;gap:8px;padding:8px 16px}
+.folio-top{background:#203b33;color:#fff;min-height:40px}
+.folio-top strong{font:30px Georgia,serif;letter-spacing:-1px}
+.folio-top h1{flex:1;margin:0 12px;font:18px Georgia,serif;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.folio-top select{max-width:13em}
+.folio-app button,.folio-app select,.folio-app input{font:inherit}
+.folio-app button,.folio-app select{border:1px solid #b1bdb3;color:#273e33;background:#fff;border-radius:4px;padding:4px 8px}
+.folio-app button:disabled{opacity:.5}
+.folio-app button[aria-pressed=true],.folio-app button[aria-current=page]{background:#d2e4d3;border-color:#637d68}
+.reading-tools{flex-wrap:wrap;border-bottom:1px solid #afb9b0}
+.reading-stage{display:flex;flex:1;min-height:0;position:relative;isolation:isolate}
+.reading-stage.editing{margin-right:48%}
+.reader-spread{flex:1;min-width:0;min-height:0}
+.reader-spread .mutable-spread{height:100%}
+.reader-spread .folio-reader{height:100%}
+.semantic-inspector,.page-gallery{padding:12px;overflow:auto;width:185px;flex-shrink:0;background:#f9faf6;box-sizing:border-box}
+.folio-app h2{font:22px Georgia,serif;margin:0 0 12px}
+.folio-app h3{font-size:14px}
+.semantic-inspector input,.folio-scry input:not([type=checkbox]){width:100%;box-sizing:border-box;margin-bottom:8px;padding:5px}
+.entity-row{display:flex;justify-content:space-between;width:100%;margin-top:6px}
+.page-gallery{width:130px}
+.page-gallery button{display:block;margin:.5em 0;width:100%}
+.page-gallery svg{height:75px;width:100%;display:block}
+.semantic-spine{display:flex;flex-direction:column;align-items:stretch;gap:2px;width:26px;overflow:auto;padding:4px 2px}
+.semantic-spine button{min-height:15px;padding:1px;font-size:10px}
+.semantic-spine button[data-marked=true]{background:#a1c1ab}
+.page-markers{position:relative;height:150px;background:linear-gradient(90deg,transparent 47%,#c1cdbf 49%,#c1cdbf 51%,transparent 53%)}
+.page-markers button{position:absolute;left:45%;font-size:10px;padding:1px 3px}
+.folio-app footer{padding:5px 14px;font-size:12px;border-top:1px solid #b5c1b5}
+.folio-app footer output{margin-left:1em;color:#8b372a}
+.folio-scry{position:absolute;z-index:45;right:14px;top:88px;width:min(335px,90vw);max-height:76vh;box-sizing:border-box;overflow:auto;background:#fafaf7;border:1px solid #91a593;padding:14px;box-shadow:0 4px 26px #233c3329}
+.folio-scry header{display:flex;justify-content:space-between}
+.folio-scry blockquote{margin:6px 0 10px;border-left:3px solid #7d9e88;padding-left:8px;max-height:4em;overflow:auto}
+.folio-scry ol{list-style:none;padding:0;max-height:215px;overflow:auto}
+.folio-scry li{display:flex;align-items:center;margin:4px 0}
+.folio-scry li button{text-align:left;flex:1}
+.folio-app .composed-frame{position:relative}
+.folio-range-layer,.folio-threads{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.folio-threads{z-index:3;overflow:hidden}
+.folio-threads path{fill:none;stroke:#435f52;stroke-width:1.3;opacity:.72}
+.spotlight .composed-frame:not(:has(.folio-range-layer path)){color:#686d67}
+#folio .folio-app .folio-flint.split{top:105px;bottom:28px;height:auto}

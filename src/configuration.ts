@@ -47,6 +47,7 @@ export type FeatureFlags = Readonly<{
   desktopApplicationIcons: boolean;
   /** Two juxtaposed native occupants with occurrence-scoped coordination. */
   spreadBlocks: boolean;
+  folioSemanticReading: boolean;
   /** Structural containers and retained front/back surfaces. */
   reversibleBlocks: boolean;
   /** Native task items and automatic task prefixes. Legacy data remains readable. */
@@ -280,6 +281,7 @@ export const featureFlags: FeatureFlags = Object.freeze({
   verticalTabs: true,
   desktopApplicationIcons: true,
   spreadBlocks: true,
+  folioSemanticReading: true,
   reversibleBlocks: true,
   taskLists: true,
   tableLayouts: true,

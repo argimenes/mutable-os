@@ -1,9 +1,10 @@
 import type { AnnotationCapabilities, SearchRange, SearchScope } from "../../feature-api";
+export interface DocumentMentionRange extends SearchRange { propertyId: string; mentionId: string }
 export interface DocumentEntityRow {
   id: string;
   fallbackName?: string;
   documentMentions: number;
-  ranges: SearchRange[];
+  ranges: DocumentMentionRange[];
 }
 
 export interface DocumentEntityInventory {
@@ -22,7 +23,7 @@ function metadataName(value: unknown): string | undefined {
 /** Model-only inventory. Counts canonical logical mentions while retaining every occurrence range for previews. */
 export function collectDocumentEntities(editor: AnnotationCapabilities, originKey: string): DocumentEntityInventory {
   const { scope, texts, blockReferences = [] } = editor.documentAnnotations(originKey);
-  const grouped = new Map<string, { name?: string; mentions: Set<string>; ranges: SearchRange[]; rangeKeys: Set<string> }>();
+  const grouped = new Map<string, { name?: string; mentions: Set<string>; ranges: DocumentMentionRange[]; rangeKeys: Set<string> }>();
 
   for(const block of blockReferences)for(const [index,p] of block.properties.entries()){
     if(p.isDeleted||p.type!=='codex/entity-reference'||typeof p.value!=='string'||!p.value)continue;
@@ -58,6 +59,7 @@ export function collectDocumentEntities(editor: AnnotationCapabilities, originKe
         start,
         end: end + 1,
         coordinate: node.coordinate ?? "cell",
+        propertyId, mentionId: annotationId ?? JSON.stringify([node.blockId ?? node.contentKey, propertyId]),
       });
     });
   }
