@@ -17,14 +17,22 @@ test('same root reopens with same identity and persistent overlap rejection outl
 });
 test('dormant child forbids parent and sibling vaults retain independent knowledge identities',async t=>{
  const root=fixture(t),a=path.join(root,'a'),b=path.join(root,'b');fs.mkdirSync(a);fs.mkdirSync(b);
- const id=await init(a);assert.notEqual(await init(b),id);await assert.rejects(init(root),/descendant/);assert.equal(fs.existsSync(path.join(root,'.mutable')),false);
+ const id=await init(a);assert.notEqual(await init(b),id);await assert.rejects(init(root),/descendant/);assert.equal(fs.existsSync(path.join(root,'cavern.phext')),false);
 });
-test('incomplete, symlink, partial infrastructure and conflicting existing topology fail closed',async t=>{
+test('incomplete, symlink, unconverted and conflicting existing topology fail closed',async t=>{
  const root=fixture(t);fs.mkdirSync(path.join(root,'a'));fs.mkdirSync(path.join(root,'a/b'));
  assert.throws(()=>inspectVaultScope(root,{maxEntries:1}),/incomplete/);
  fs.symlinkSync(path.join(root,'a'),path.join(root,'alias'));await assert.rejects(init(root),/incomplete.*symlink/);fs.unlinkSync(path.join(root,'alias'));
- fs.mkdirSync(path.join(root,'.mutable'));await assert.rejects(init(root),/recovery|restore/);assert.equal(fs.existsSync(path.join(root,'.mutable/mutable.db')),false);fs.rmdirSync(path.join(root,'.mutable'));
- await init(root);fs.cpSync(path.join(root,'.mutable'),path.join(root,'a/.mutable'),{recursive:true});
+ // An empty .mutable documents home is not knowledge infrastructure
+ // in the phext era and does not block establishment; a .mutable that
+ // still carries a disk database is unconverted knowledge and the
+ // foundation refuses it explicitly (conversion is the way in).
+ fs.mkdirSync(path.join(root,'.mutable'));const id=await init(root);assert.ok(id);assert.ok(fs.existsSync(path.join(root,'cavern.phext')));
+ fs.writeFileSync(path.join(root,'.mutable/mutable.db'),'not a database');await assert.rejects(init(root),/convert/);
+ fs.rmSync(path.join(root,'.mutable'),{recursive:true,force:true});
+ const other=fixture(t);fs.mkdirSync(path.join(other,'.mutable'));fs.symlinkSync('/elsewhere',path.join(other,'.mutable/mutable.db'));
+ assert.throws(()=>inspectVaultScope(other),/invalid current database/);
+ fs.copyFileSync(path.join(root,'cavern.phext'),path.join(root,'a/cavern.phext'));
  await assert.rejects(init(root),/descendant/);await assert.rejects(init(path.join(root,'a')),/ancestor/);
  assert.throws(()=>restoreSnapshot(path.join(root,'a'),path.join(root,'a/b')),/ancestor/);
 });
